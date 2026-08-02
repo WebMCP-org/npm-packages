@@ -1,6 +1,6 @@
 ---
 title: '@mcp-b/smart-dom-reader'
-description: 'Token-efficient DOM extraction for AI agents. Two extraction approaches, ranked selectors, and zero runtime dependencies.'
+description: 'Token-efficient DOM extraction for AI agents, with ranked selectors and progressive extraction.'
 keywords:
   [
     '@mcp-b/smart-dom-reader',
@@ -14,13 +14,13 @@ keywords:
 icon: 'code'
 ---
 
-`@mcp-b/smart-dom-reader` extracts DOM structure optimized for AI/LLM consumption. It provides stable CSS selectors, interactive element maps, and semantic page structure while minimizing token usage. Zero runtime dependencies.
+`@mcp-b/smart-dom-reader` extracts interactive controls, semantic content, page structure,
+and ranked selectors from browser DOM trees. The package has no runtime dependencies.
 
-```
+```text title="Package metadata"
 npm: @mcp-b/smart-dom-reader
 license: MIT
 dependencies: none
-optional peer: @modelcontextprotocol/sdk ^1.26.0 (for MCP server)
 ```
 
 ## Installation
@@ -29,251 +29,265 @@ optional peer: @modelcontextprotocol/sdk ^1.26.0 (for MCP server)
 npm install @mcp-b/smart-dom-reader
 ```
 
-## Minimal example
+## Entry points
 
-<Snippet file="snippets/packages/smart-dom-reader-quickstart.ts" />
+| Entry point                             | Exports                                                        |
+| --------------------------------------- | -------------------------------------------------------------- |
+| `@mcp-b/smart-dom-reader`               | Extraction classes, formatting utilities, and TypeScript types |
+| `@mcp-b/smart-dom-reader/bundle-string` | `SMART_DOM_READER_BUNDLE` and `SMART_DOM_READER_VERSION`       |
 
-## Two extraction approaches
+`SmartDOMReader` is both a named export and the package's default export.
 
-### Full extraction (`SmartDOMReader`)
+## `SmartDOMReader`
 
-Single-pass extraction of all elements. Use when you need everything upfront.
-
-```typescript
-import { SmartDOMReader } from '@mcp-b/smart-dom-reader';
-
-// Interactive mode: UI elements only
-const interactive = SmartDOMReader.extractInteractive(document);
-
-// Full mode: interactive + semantic elements
-const full = SmartDOMReader.extractFull(document);
-
-// From a specific element
-const region = SmartDOMReader.extractFromElement(element, 'interactive');
-```
-
-Instance-based usage with options:
+`SmartDOMReader` returns one `SmartDOMResult` for a `Document` or `Element`.
+Runtime options override constructor options.
 
 ```typescript
-const reader = new SmartDOMReader({
-  mode: 'interactive',
-  mainContentOnly: true,
-  viewportOnly: false,
-});
-const result = reader.extract(document);
+class SmartDOMReader {
+  constructor(options?: Partial<ExtractionOptions>);
+
+  extract(
+    rootElement?: Document | Element,
+    runtimeOptions?: Partial<ExtractionOptions>
+  ): SmartDOMResult;
+
+  static extractInteractive(doc: Document, options?: Partial<ExtractionOptions>): SmartDOMResult;
+
+  static extractFull(doc: Document, options?: Partial<ExtractionOptions>): SmartDOMResult;
+
+  static extractFromElement(
+    element: Element,
+    mode?: ExtractionMode,
+    options?: Partial<ExtractionOptions>
+  ): SmartDOMResult;
+}
 ```
 
-### Progressive extraction (`ProgressiveExtractor`)
+`extract()` defaults to the current global `document`. `extractInteractive()` forces
+`mode: 'interactive'`; `extractFull()` forces `mode: 'full'`.
 
-Step-by-step extraction for token-sensitive AI workflows.
+## `ProgressiveExtractor`
 
 ```typescript
-import { ProgressiveExtractor } from '@mcp-b/smart-dom-reader';
+class ProgressiveExtractor {
+  static extractStructure(root: Document | Element): StructuralOverview;
 
-// Step 1: Page structure overview (minimal tokens)
-const structure = ProgressiveExtractor.extractStructure(document);
+  static extractRegion(
+    selector: string,
+    doc: Document,
+    options?: Partial<ExtractionOptions>
+  ): SmartDOMResult | null;
 
-// Step 2: Extract a specific region
-const region = ProgressiveExtractor.extractRegion(structure.summary.mainContentSelector, document, {
-  mode: 'interactive',
-});
-
-// Step 3: Extract readable content
-const content = ProgressiveExtractor.extractContent('article.main-article', document, {
-  includeHeadings: true,
-  includeLists: true,
-});
+  static extractContent(
+    selector: string,
+    doc: Document,
+    options?: ContentExtractionOptions
+  ): ExtractedContent | null;
+}
 ```
 
-`extractStructure` accepts a `Document` or an `Element` to scope the extraction.
+`extractRegion()` and `extractContent()` return `null` when `selector` has no match.
+When `extractStructure()` receives an `Element`, that element is reported as the main region.
 
 ## Extraction modes
 
-| Mode          | Includes                                                                             |
-| ------------- | ------------------------------------------------------------------------------------ |
-| `interactive` | Buttons, links, form inputs, clickable elements, form structures                     |
-| `full`        | Everything in `interactive` plus headings, images, tables, lists, articles, metadata |
+```typescript
+type ExtractionMode = 'interactive' | 'full' | 'structure' | 'content';
+```
 
-## Options
+| Value         | Contract                                                                       |
+| ------------- | ------------------------------------------------------------------------------ |
+| `interactive` | Returns page state, landmarks, forms, and interactive elements                 |
+| `full`        | Adds `semantic` and `metadata` to the interactive result                       |
+| `structure`   | Compatibility label; direct `SmartDOMReader` output remains interactive-shaped |
+| `content`     | Compatibility label; direct `SmartDOMReader` output remains interactive-shaped |
 
-| Option             | Type                      | Default         | Description                                   |
-| ------------------ | ------------------------- | --------------- | --------------------------------------------- |
-| `mode`             | `'interactive' \| 'full'` | `'interactive'` | Extraction mode                               |
-| `maxDepth`         | `number`                  | `5`             | Maximum DOM traversal depth                   |
-| `includeHidden`    | `boolean`                 | `false`         | Include hidden elements                       |
-| `includeShadowDOM` | `boolean`                 | `true`          | Traverse shadow DOM roots                     |
-| `includeIframes`   | `boolean`                 | `false`         | Traverse iframes                              |
-| `viewportOnly`     | `boolean`                 | `false`         | Only extract elements in the visible viewport |
-| `mainContentOnly`  | `boolean`                 | `false`         | Focus on the detected main content area       |
-| `customSelectors`  | `string[]`                | `[]`            | Additional CSS selectors to extract           |
+`SmartDOMReader` adds semantic output only for `full`. Use `ProgressiveExtractor.extractStructure()`
+and `ProgressiveExtractor.extractContent()` for the specialized structure and content result types.
 
-## Output structure
+## `ExtractionOptions`
+
+The public interface requires `mode`; every constructor and method accepts
+`Partial<ExtractionOptions>` and supplies the defaults below.
+
+| Field                         | Type             | Default       | Contract                                                                 |
+| ----------------------------- | ---------------- | ------------- | ------------------------------------------------------------------------ |
+| `mode`                        | `ExtractionMode` | `interactive` | Result mode                                                              |
+| `maxDepth`                    | `number`         | `5`           | Maximum traversal depth                                                  |
+| `includeHidden`               | `boolean`        | `false`       | Includes elements that fail visibility checks                            |
+| `includeShadowDOM`            | `boolean`        | `true`        | Recursively queries open shadow roots                                    |
+| `includeIframes`              | `boolean`        | `false`       | Accepted compatibility field; the reader does not traverse frames itself |
+| `viewportOnly`                | `boolean`        | `false`       | Includes only elements intersecting the viewport                         |
+| `mainContentOnly`             | `boolean`        | `false`       | Uses detected main content when the root is a `Document`                 |
+| `customSelectors`             | `string[]`       | `[]`          | Adds matching elements to `interactive.clickable`                        |
+| `attributeTruncateLength`     | `number`         | `100`         | Maximum selected-attribute value length, including recognized test IDs   |
+| `dataAttributeTruncateLength` | `number`         | `50`          | Maximum value length for additional `data-*` attributes                  |
+| `textTruncateLength`          | `number`         | unlimited     | Maximum extracted text length per element                                |
+| `filter`                      | `FilterOptions`  | none          | Applies element-level filters                                            |
+
+### `FilterOptions`
+
+| Field              | Type                               | Match rule                                         |
+| ------------------ | ---------------------------------- | -------------------------------------------------- |
+| `includeSelectors` | `string[]`                         | Any selector                                       |
+| `excludeSelectors` | `string[]`                         | Excludes on any selector                           |
+| `textContains`     | `string[]`                         | Any case-insensitive substring                     |
+| `textMatches`      | `RegExp[]`                         | Any regular expression                             |
+| `hasAttributes`    | `string[]`                         | Every named attribute                              |
+| `attributeValues`  | `Record<string, string \| RegExp>` | Every attribute-value condition                    |
+| `tags`             | `string[]`                         | Tag name appears in the list                       |
+| `interactionTypes` | `Array<keyof ElementInteraction>`  | Any requested interaction flag                     |
+| `withinSelectors`  | `string[]`                         | Element is within any matching ancestor            |
+| `nearText`         | `string`                           | Parent text contains the value, case-insensitively |
+
+### `ContentExtractionOptions`
+
+| Field                | Type      | Default   | Contract                                                         |
+| -------------------- | --------- | --------- | ---------------------------------------------------------------- |
+| `includeHeadings`    | `boolean` | `true`    | Includes H1-H6 headings                                          |
+| `includeLists`       | `boolean` | `true`    | Includes ordered and unordered lists                             |
+| `includeTables`      | `boolean` | `true`    | Includes table headers and body rows                             |
+| `includeMedia`       | `boolean` | `true`    | Includes image, video, and audio references                      |
+| `preserveFormatting` | `boolean` | —         | Reserved public field; the current extractor does not consult it |
+| `maxTextLength`      | `number`  | unlimited | Maximum length of headings, paragraphs, and list items           |
+
+### `MarkdownFormatOptions`
+
+| Field           | Type                              | Contract                                                    |
+| --------------- | --------------------------------- | ----------------------------------------------------------- |
+| `detail`        | `'summary' \| 'region' \| 'deep'` | Reserved field; current formatter methods do not inspect it |
+| `maxTextLength` | `number`                          | Maximum rendered text length per item                       |
+| `maxElements`   | `number`                          | Maximum rendered items in each repeated group               |
+
+## Result types
 
 ### `SmartDOMResult`
 
+| Field         | Type             | Contract                                                         |
+| ------------- | ---------------- | ---------------------------------------------------------------- |
+| `mode`        | `ExtractionMode` | Effective result mode                                            |
+| `timestamp`   | `number`         | Extraction start time in Unix milliseconds                       |
+| `page`        | `PageState`      | URL, title, loading, error, modal, and optional focus state      |
+| `landmarks`   | `PageLandmarks`  | Selectors grouped by detected landmark                           |
+| `interactive` | object           | Buttons, links, inputs, forms, and other clickable elements      |
+| `semantic`    | object           | Headings, images, tables, lists, and articles; `full` mode only  |
+| `metadata`    | object           | Element counts, main-content selector, and language; `full` only |
+
+### Element types
+
+| Type                       | Contract                                                                                                        |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `ExtractedElement`         | Tag, text, selector, attributes, context, interaction flags, and children                                       |
+| `ElementSelector`          | Best CSS selector, XPath, optional hints, and ranked candidates                                                 |
+| `ElementSelectorCandidate` | `type`, `value`, and numeric `score`                                                                            |
+| `ElementContext`           | Nearest form, section, main, nav, and parent chain                                                              |
+| `ElementInteraction`       | Compact optional flags; booleans are emitted only when `true`                                                   |
+| `FormInfo`                 | Form selector, action, method, inputs, and buttons                                                              |
+| `PageState`                | Current page URL, title, diagnostic flags, and focused selector                                                 |
+| `PageLandmarks`            | Navigation, main, form, header, and footer selectors; `articles` and `sections` share detected region selectors |
+
+### Progressive result types
+
+| Type                 | Contract                                                                     |
+| -------------------- | ---------------------------------------------------------------------------- |
+| `StructuralOverview` | Regions, form summaries, page summary, and optional extraction suggestions   |
+| `RegionInfo`         | Region selector, label, role, feature flags, counts, and text preview        |
+| `ExtractedContent`   | Headings, paragraphs, lists, tables, media, word count, and interaction flag |
+
+## Selector generation
+
 ```typescript
-interface SmartDOMResult {
-  mode: 'interactive' | 'full';
-  timestamp: number;
-
-  page: {
-    url: string;
-    title: string;
-    hasErrors: boolean;
-    isLoading: boolean;
-    hasModals: boolean;
-    hasFocus?: string;
-  };
-
-  landmarks: {
-    navigation: string[];
-    main: string[];
-    forms: string[];
-    headers: string[];
-    footers: string[];
-    articles: string[];
-    sections: string[];
-  };
-
-  interactive: {
-    buttons: ExtractedElement[];
-    links: ExtractedElement[];
-    inputs: ExtractedElement[];
-    forms: FormInfo[];
-    clickable: ExtractedElement[];
-  };
-
-  semantic?: {
-    // full mode only
-    headings: ExtractedElement[];
-    images: ExtractedElement[];
-    tables: ExtractedElement[];
-    lists: ExtractedElement[];
-    articles: ExtractedElement[];
-  };
-
-  metadata?: {
-    // full mode only
-    totalElements: number;
-    extractedElements: number;
-    mainContent?: string;
-    language?: string;
-  };
+class SelectorGenerator {
+  static generateSelectors(element: Element): ElementSelector;
+  static getContextPath(element: Element): string[];
 }
 ```
 
-### `ExtractedElement`
+`generateSelectors()` sorts `candidates` from highest to lowest score and selects the
+highest-ranked CSS candidate for `ElementSelector.css`.
+
+| Candidate     | Score                                             | Notes                                          |
+| ------------- | ------------------------------------------------- | ---------------------------------------------- |
+| `id`          | `100`                                             | Emitted only for a unique ID                   |
+| `data-testid` | `90`, plus `5` when unique                        | Recognizes common test-ID attribute names      |
+| `role-aria`   | `85`, plus `5` when unique                        | Requires both `role` and `aria-label`          |
+| `name`        | `78`, plus `5` when unique                        | Uses the `name` attribute                      |
+| `class-path`  | `max(0, 70 + class bonus - structural penalties)` | Class bonus is `8`; each `:nth-child` is `-10` |
+| `xpath`       | `40`                                              | Fallback XPath                                 |
+| `text`        | `30`                                              | Hint for short button, link, or label text     |
+
+The `ElementSelectorCandidate.type` union also contains `css-path`; the current generator
+emits generated CSS paths as `class-path`. Text candidates use the non-standard `:contains()`
+form as a hint and are never selected for `ElementSelector.css`.
+
+## Supporting classes
 
 ```typescript
-interface ExtractedElement {
-  tag: string;
-  text: string;
+class ContentDetection {
+  static findMainContent(doc: Document): Element;
+  static calculateContentScore(element: Element): number;
+  static isNavigation(element: Element): boolean;
+  static isSupplementary(element: Element): boolean;
+  static detectLandmarks(doc: Document): Record<string, Element[]>;
+}
 
-  selector: {
-    css: string;
-    xpath: string;
-    textBased?: string;
-    dataTestId?: string;
-    ariaLabel?: string;
-    candidates?: Array<{
-      type:
-        | 'id'
-        | 'data-testid'
-        | 'role-aria'
-        | 'name'
-        | 'class-path'
-        | 'css-path'
-        | 'xpath'
-        | 'text';
-      value: string;
-      score: number;
-    }>;
-  };
+class MarkdownFormatter {
+  static structure(
+    overview: StructuralOverview,
+    options?: MarkdownFormatOptions,
+    meta?: { title?: string; url?: string }
+  ): string;
 
-  attributes: Record<string, string>;
+  static region(
+    result: SmartDOMResult,
+    options?: MarkdownFormatOptions,
+    meta?: { title?: string; url?: string }
+  ): string;
 
-  context: {
-    nearestForm?: string;
-    nearestSection?: string;
-    nearestMain?: string;
-    nearestNav?: string;
-    parentChain: string[];
-  };
-
-  interaction: {
-    click?: boolean;
-    change?: boolean;
-    submit?: boolean;
-    nav?: boolean;
-    disabled?: boolean;
-    hidden?: boolean;
-    role?: string;
-    form?: string;
-  };
+  static content(
+    content: ExtractedContent,
+    options?: MarkdownFormatOptions,
+    meta?: { title?: string; url?: string }
+  ): string;
 }
 ```
 
-Interaction flags are only present when `true`, saving tokens.
+The formatter methods return XML-wrapped Markdown strings.
 
-## Selector ranking
+## Bundle string API
 
-Selectors are ranked by stability (higher score = more reliable):
-
-| Strategy            | Score | Example                                |
-| ------------------- | ----- | -------------------------------------- |
-| ID                  | 100   | `#unique-id`                           |
-| `data-testid`       | 90    | `[data-testid="submit"]`               |
-| ARIA (role + label) | 80    | `[role="button"][aria-label="Submit"]` |
-| Name/ID attributes  | 70    | `input[name="email"]`                  |
-| Class paths         | 50    | `.form-container .submit-btn`          |
-
-## Exported modules
-
-| Export                  | Kind  | Description                                               |
-| ----------------------- | ----- | --------------------------------------------------------- |
-| `SmartDOMReader`        | Class | Full single-pass extraction                               |
-| `ProgressiveExtractor`  | Class | Step-by-step extraction                                   |
-| `SelectorGenerator`     | Class | CSS/XPath selector generation with ranking                |
-| `ContentDetection`      | Class | Landmark detection and main content identification        |
-| `MarkdownFormatter`     | Class | Format extraction results as Markdown                     |
-| `MarkdownFormatOptions` | Type  | Options for Markdown formatting                           |
-| `SmartDOMResult`        | Type  | Full extraction result shape                              |
-| `ExtractedElement`      | Type  | Single extracted element                                  |
-| `ExtractionOptions`     | Type  | Options accepted by the reader                            |
-| `ExtractionMode`        | Type  | `'interactive' \| 'full'`                                 |
-| `FormInfo`              | Type  | Form metadata (selector, inputs, buttons, action, method) |
-| `PageState`             | Type  | Current page state (URL, title, loading, errors)          |
-| `PageLandmarks`         | Type  | Detected page landmarks                                   |
-
-### Bundle string export
-
-A self-contained IIFE bundle is available for injection into pages (e.g. via `chrome.userScripts.execute`):
+The `bundle-string` entry point exposes an injectable IIFE string and its bundle-format
+version marker. After evaluating `SMART_DOM_READER_BUNDLE`, call:
 
 ```typescript
-import { SMART_DOM_READER_BUNDLE } from '@mcp-b/smart-dom-reader/bundle-string';
-
-const code = `(() => {
-  ${SMART_DOM_READER_BUNDLE}
-  return SmartDOMReaderBundle.executeExtraction('extractStructure', {
-    selector: undefined,
-    formatOptions: { detail: 'summary' }
-  });
-})()`;
+SmartDOMReaderBundle.executeExtraction<M extends ExtractionMethod>(
+  method: M,
+  args: ExtractionArgs[M],
+): ExtractionResult;
 ```
 
-The bundle contains guarded fallbacks for non-browser environments and has no runtime imports.
+`ExtractionResult` is the formatted `string` or `{ error: string }`.
+
+| `ExtractionMethod`   | Method-specific arguments       |
+| -------------------- | ------------------------------- |
+| `extractStructure`   | `selector?`                     |
+| `extractRegion`      | `selector`, `mode?`, `options?` |
+| `extractContent`     | `selector`, `options?`          |
+| `extractInteractive` | `selector?`, `options?`         |
+| `extractFull`        | `selector?`, `options?`         |
+
+Every argument type also accepts `frameSelector?` and `formatOptions?`. `frameSelector`
+must identify a same-origin iframe with an accessible `contentDocument`.
+
+The root package exports `ExtractionMethod`, `ExtractionArgs`, `ExtractionResult`, and the
+five method-specific argument types: `ExtractStructureArgs`, `ExtractRegionArgs`,
+`ExtractContentArgs`, `ExtractInteractiveArgs`, and `ExtractFullArgs`.
 
 ## MCP server
 
-An optional MCP server returns XML-wrapped Markdown. Output format:
-
-```xml
-<page title="..." url="...">
-  <outline><![CDATA[ ...markdown... ]]></outline>
-</page>
-```
-
-Server tools:
+The separate `@mcp-b/smart-dom-reader-server` package wraps the browser library with
+`@modelcontextprotocol/server` v2 and returns XML-wrapped Markdown.
 
 | Tool                      | Parameters                                               |
 | ------------------------- | -------------------------------------------------------- |
@@ -284,16 +298,8 @@ Server tools:
 | `dom_extract_content`     | `selector`, `options?`                                   |
 | `dom_extract_interactive` | `selector?`, `options?`                                  |
 | `browser_screenshot`      | `path?`, `fullPage?`                                     |
-| `browser_close`           | (none)                                                   |
-
-Golden path sequence:
-
-1. `dom_extract_structure` to get the page outline
-2. `dom_extract_region` to get selectors for a target area
-3. Write a script using those selectors
-4. Optionally `dom_extract_content` for readable text
+| `browser_close`           | none                                                     |
 
 ## Related
 
-- [@mcp-b/extension-tools](/packages/extension-tools/reference) (uses `smart-dom-reader` for DOM extraction tools)
-- [Chrome DevTools MCP](/packages/chrome-devtools-mcp/reference) (upstream DevTools-based browser automation)
+- [Use Chrome DevTools MCP](/how-to/use-devtools-mcp)

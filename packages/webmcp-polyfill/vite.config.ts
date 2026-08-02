@@ -1,5 +1,8 @@
 import type { Options } from 'vite-plus/pack';
+import { playwright } from 'vite-plus/test/browser-playwright';
 import { defineConfig } from 'vite-plus';
+
+const isCI = process.env.CI === 'true';
 
 // ESM build for npm package
 const esmConfig: Options = {
@@ -23,7 +26,7 @@ const esmConfig: Options = {
 // Uses index.ts which auto-initializes on load
 const iifeConfig: Options = {
   entry: {
-    index: 'src/index.ts',
+    index: 'src/iife.ts',
   },
   format: ['iife'],
   dts: false,
@@ -33,8 +36,9 @@ const iifeConfig: Options = {
   minify: true,
   target: 'esnext',
   platform: 'browser',
-  external: [], // Bundle everything - no externals for standalone script
-  noExternal: [/.*/], // Explicitly bundle all dependencies
+  deps: {
+    alwaysBundle: [/.*/],
+  },
   tsconfig: './tsconfig.json',
   outDir: 'dist',
   globalName: 'WebMCPPolyfill',
@@ -47,7 +51,17 @@ const iifeConfig: Options = {
 export default defineConfig({
   pack: [esmConfig, iifeConfig],
   test: {
-    exclude: ['conformance/**/*', 'dist', 'node_modules'],
+    browser: {
+      enabled: true,
+      provider: playwright({
+        launchOptions: process.env.CHROME_BIN ? { executablePath: process.env.CHROME_BIN } : {},
+      }),
+      instances: [{ browser: 'chromium' }],
+    },
+    include: ['src/**/*.test.ts', 'conformance/**/*.test.ts'],
+    exclude: ['dist', 'node_modules'],
     globals: true,
+    maxConcurrency: isCI ? 1 : 2,
+    fileParallelism: false,
   },
 });

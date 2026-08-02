@@ -4,11 +4,9 @@
  * Run after tsdown produces dist/browser/{embed.iife.js, widget.iife.js}.
  */
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const browserDir = resolve(__dirname, '../dist/browser');
+const browserDir = resolve(import.meta.dirname, '../dist/browser');
 
 // Rename .iife.js → .js for cleaner paths
 renameSync(resolve(browserDir, 'embed.iife.js'), resolve(browserDir, 'embed.js'));

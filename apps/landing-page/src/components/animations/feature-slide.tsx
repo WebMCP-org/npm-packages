@@ -108,7 +108,7 @@ const codeTabs = [
       '    inputSchema: {',
       '      query: z.string()',
       '    },',
-      '    handler: async ({ query }) => {',
+      '    execute: async ({ query }) => {',
       '      return catalog.search(query);',
       '    },',
       '  });',
@@ -133,9 +133,8 @@ const codeTabs = [
       '',
       'interface ModelContext {',
       '  registerTool(tool: ToolDescriptor)',
-      '    : void;',
-      '  unregisterTool(name: string)',
-      '    : void;',
+      '    : Promise<void>;',
+      '  getTools(): Promise<RegisteredTool[]>;',
       '}',
     ],
   },
@@ -165,7 +164,7 @@ const packageGroups = [
   },
   {
     label: 'Agent and browser tooling',
-    packages: ['@mcp-b/webmcp-local-relay', '@mcp-b/extension-tools', '@mcp-b/smart-dom-reader'],
+    packages: ['@mcp-b/webmcp-local-relay', '@mcp-b/smart-dom-reader'],
   },
 ];
 

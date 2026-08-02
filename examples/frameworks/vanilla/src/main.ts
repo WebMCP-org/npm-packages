@@ -2,7 +2,7 @@ import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 
 initializeWebMCPPolyfill();
 
-navigator.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'get_status',
   description: 'Returns app status',
   inputSchema: {

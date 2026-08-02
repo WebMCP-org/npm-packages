@@ -5,8 +5,7 @@
  * without mocking or faking any behavior. All events still flow through the real
  * MCP stack unchanged.
  */
-
-import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { Client } from '@modelcontextprotocol/client';
 
 export interface McpEvent {
   type: 'tool_call' | 'tool_result' | 'tool_error' | 'connection' | 'tools_listed';

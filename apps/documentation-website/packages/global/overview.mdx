@@ -5,11 +5,11 @@ keywords: ['@mcp-b/global', 'overview', 'BrowserMcpServer', 'transport', 'MCP-B 
 icon: 'globe'
 ---
 
-`@mcp-b/global` is the full runtime entry point for browser applications. It installs or adopts the strict WebMCP surface, creates a `BrowserMcpServer`, connects transport, and exposes MCP-B extension methods on `document.modelContext`.
+`@mcp-b/global` is the full runtime entry point for browser applications. It installs or adopts the strict WebMCP surface, creates a `BrowserMcpServer`, and connects transport behind `document.modelContext`.
 
 ## When to use this package
 
-- You want prompts, resources, sampling, elicitation, or transport-facing helpers.
+- You want prompts, resources, browser transport, or direct access to the composed official MCP server.
 - You want browser tools to be reachable by extensions, relays, or desktop MCP clients.
 - You want one import that wires the runtime stack together.
 
@@ -24,7 +24,7 @@ icon: 'globe'
 
 ## First step
 
-Import the package as early as possible in the browser entry point, then register tools on `document.modelContext`. Use the [reference page](/packages/global/reference) when you need configuration, cleanup, or transport details.
+Import the package as early as possible in the browser entry point, then use `document.modelContext` normally. Set options before the package loads. Call `initializeWebModelContext()` manually only after disabling auto-initialization, as shown on the [reference page](/packages/global/reference#configuration).
 
 ## Related pages
 

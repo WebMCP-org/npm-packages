@@ -9,8 +9,8 @@ This test app demonstrates and validates all features of the `@mcp-b/react-webmc
 - **Tool Registration** - 7 different MCP tools with various configurations
 - **State Management** - Execution tracking, error handling, and result management
 - **React StrictMode** - Validates duplicate registration prevention
-- **Type Safety** - Zod schema validation for inputs
-- **Real MCP Stack** - Uses real `@mcp-b/global`, `@mcp-b/transports`, and MCP SDK
+- **Type Safety** - JSON Schema validation for inputs
+- **Real MCP Stack** - Uses real `@mcp-b/global`, `@mcp-b/transports`, and MCP TypeScript SDK v2 packages
 
 ## Features Tested
 
@@ -18,7 +18,7 @@ This test app demonstrates and validates all features of the `@mcp-b/react-webmc
 
 - `counter_increment` - Increment counter (mutation, non-idempotent)
 - `counter_decrement` - Decrement counter (mutation, non-idempotent)
-- `counter_reset` - Reset to zero (destructive operation with elicitation)
+- `counter_reset` - Reset to zero (destructive operation)
 - `counter_get` - Get current value (read-only, idempotent query)
 
 ### Posts Tools (Complex Operations)
@@ -74,7 +74,7 @@ pnpm --filter mcp-e2e-tests test:react-webmcp:debug
 
 ## Test Coverage
 
-The Playwright test suite includes 18 comprehensive tests:
+The Playwright test suite includes 34 comprehensive tests:
 
 1. **Initialization Tests**
    - App loads and initializes MCP
@@ -116,10 +116,10 @@ The test app uses the **complete real MCP stack** for true end-to-end testing:
 
 ### Architecture Flow
 
-1. **Tool Registration**: `useWebMCP()` hooks register tools with `navigator.modelContext` (provided by `@mcp-b/global`)
+1. **Tool Registration**: `useWebMCP()` hooks register tools with `document.modelContext` (provided by `@mcp-b/global`)
 2. **MCP Server**: `@mcp-b/global` creates a real MCP server that handles tool execution
 3. **Transport Layer**: `TabClientTransport` from `@mcp-b/transports` connects client to server via browser tab messaging
-4. **MCP Client**: Real `@modelcontextprotocol/sdk` Client instance connects to the server
+4. **MCP Client**: Real `@modelcontextprotocol/client` instance connects to the server
 5. **Tool Consumption**: `useMcpClient()` hook provides access to call tools via the real MCP protocol
 
 This is **not a mock** - it uses the actual workspace packages and real MCP protocol messages over real browser postMessage APIs.
@@ -171,11 +171,10 @@ The test app uses:
 - **React 19** with StrictMode
 - **Vite** for fast development
 - **TypeScript** for type safety
-- **Zod** for runtime validation
 - **@mcp-b/react-webmcp** for MCP tool registration (real package from workspace)
-- **@mcp-b/global** for navigator.modelContext polyfill (real package from workspace)
+- **@mcp-b/global** for the document-first WebMCP runtime (real package from workspace)
 - **@mcp-b/transports** for TabClientTransport (real package from workspace)
-- **@modelcontextprotocol/sdk** for MCP Client (real SDK)
+- **@modelcontextprotocol/client** for the MCP TypeScript SDK v2 client
 
 ## Notes
 

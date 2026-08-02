@@ -5,21 +5,28 @@ keywords: ['webmcp spec', 'w3c', 'preview', 'limitations']
 icon: 'flag'
 ---
 
-WebMCP is an active community-group proposal, not a completed W3C
-standard. It defines the direction of the browser API, but several
-details are still a work in progress.
+WebMCP is a Draft Community Group Report, not a completed W3C standard. It
+defines the direction of the browser API, but several details remain a work in
+progress.
 
-Browser APIs, declarative attributes, testing surfaces, iframe policy,
-concurrency, cancellation, and output-schema behavior may continue to change.
+The imperative draft now defines cross-document exposure, discovery, and the
+`tools` Permissions Policy. Declarative attributes, testing surfaces,
+browser-agent mediation, cancellation, and output-schema behavior may continue
+to change.
 
-Implementations should track the current [W3C draft](https://webmachinelearning.github.io/webmcp/),
+Chrome offers WebMCP through an origin trial beginning in Chrome 149. Local
+development uses the dedicated `chrome://flags/#enable-webmcp-testing` flag.
+Track the [Chrome WebMCP overview](https://developer.chrome.com/docs/ai/webmcp)
+for current availability.
+
+Implementations should track the current [Community Group draft](https://webmachinelearning.github.io/webmcp/),
 keep domain operations separate from the browser registration adapter, use
 feature detection, and test both native and polyfill paths. MCP-B extensions
 must remain clearly distinguished from the standard surface.
 
-New code uses `document.modelContext`. `navigator.modelContext` remains a
-deprecated compatibility alias, while `navigator.modelContextTesting` is a
-testing and inspection surface. Adapter boundaries reduce migration cost.
+The current proposal defines `document.modelContext`. Navigator-based model
+context APIs are not part of that surface; MCP-B retains them only as
+compatibility shims. Adapter boundaries reduce migration cost.
 
 See [Try the native Chrome preview](/tutorials/first-native-preview) and
 [Test native and polyfill](/how-to/test-native-and-polyfill).
@@ -28,18 +35,19 @@ See [Try the native Chrome preview](/tutorials/first-native-preview) and
 
 Use first-party sources for compatibility decisions:
 
-| Source                                                                                       | Owns                                                                                                                               |
-| -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| [W3C WebMCP draft](https://webmachinelearning.github.io/webmcp/)                             | Standard API shape, `document.modelContext`, `registerTool()`, permissions policy, security model                                  |
-| [Chrome WebMCP imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api)   | Current Chrome preview behavior for `getTools()`, `executeTool()`, `AbortSignal` cleanup, and `navigator.modelContext` deprecation |
-| [Chrome WebMCP declarative API](https://developer.chrome.com/docs/ai/webmcp/declarative-api) | Form annotation behavior and declarative schema synthesis                                                                          |
-| [Chrome WebMCP tool security](https://developer.chrome.com/docs/ai/webmcp/security)          | Browser-facing tool security guidance                                                                                              |
-| [MCP SEP-2106](https://modelcontextprotocol.io/seps/2106-json-schema-2020-12)                | MCP schema changes for JSON Schema 2020-12, output schemas, and `structuredContent`                                                |
+| Source                                                                                                   | Owns                                                                                    |
+| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| [WebMCP Community Group draft](https://webmachinelearning.github.io/webmcp/)                             | Standard API shape, `document.modelContext`, permissions policy, and security model     |
+| [Chrome WebMCP overview](https://developer.chrome.com/docs/ai/webmcp)                                    | Current Chrome availability, testing flag, origin isolation, and permissions policy     |
+| [Chrome WebMCP imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api)               | Chrome behavior for registration, discovery, `executeTool()`, and `AbortSignal` cleanup |
+| [Chrome WebMCP declarative API](https://developer.chrome.com/docs/ai/webmcp/declarative-api)             | Form annotation behavior and declarative schema synthesis                               |
+| [Chrome secure tools guidance](https://developer.chrome.com/docs/ai/webmcp/secure-tools)                 | Browser-facing tool security guidance                                                   |
+| [Current MCP tools specification](https://modelcontextprotocol.io/specification/2026-07-28/server/tools) | MCP tool schemas, output schemas, and `structuredContent`                               |
 
-This release line follows those sources by making `document.modelContext` the
-primary surface, preferring `getTools()` plus `executeTool()`, using
-`AbortSignal` for cleanup, and keeping legacy MCP-B helpers as compatibility
-APIs.
+MCP-B follows those boundaries by making `document.modelContext` the primary
+surface, using `getTools()` for discovery, feature-detecting Chrome's optional
+`executeTool()` extension, using `AbortSignal` for cleanup, and keeping legacy
+helpers as compatibility APIs.
 
 `outputSchema` is not part of the current W3C/Chrome WebMCP tool dictionary.
 MCP-B keeps it as helper metadata for TypeScript inference, structured MCP

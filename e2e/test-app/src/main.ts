@@ -1,14 +1,15 @@
 // Web Model Context API Test App
 // Tests strict tool replacement plus MCPB extension APIs
 
-// Import the global package to initialize navigator.modelContext
+// Import the global package to initialize document.modelContext
 import '@mcp-b/global';
+import type { BrowserMcpServer, PromptDescriptor, ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
 import type {
+  InputSchema,
   ModelContextTesting,
-  ModelContextTestingPolyfillExtensions,
+  RegistrationHandle,
+  ToolDescriptor,
 } from '@mcp-b/webmcp-types';
-
-type ExtendedModelContextTesting = ModelContextTesting & ModelContextTestingPolyfillExtensions;
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -18,47 +19,42 @@ function requireElement<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
-const modelContext = navigator.modelContext;
-const baseContextControllers: AbortController[] = [];
+const modelContext = document.modelContext as BrowserMcpServer;
+const baseToolControllers: AbortController[] = [];
+let baseResourceRegistrations: RegistrationHandle[] = [];
+let basePromptRegistrations: RegistrationHandle[] = [];
 let dynamicToolController: AbortController | null = null;
 
-function getTestingAPI(): ExtendedModelContextTesting | undefined {
-  return navigator.modelContextTesting as ExtendedModelContextTesting | undefined;
+function getTestingAPI(): ModelContextTesting | undefined {
+  return navigator.modelContextTesting;
 }
 
-type RegisterableContext = {
-  tools?: unknown[];
-  resources?: unknown[];
-  prompts?: unknown[];
-};
+type RegisteredToolDescriptor = ToolDescriptor & { inputSchema: InputSchema };
 
-function provideExtendedContext(options: RegisterableContext): void {
-  for (const controller of baseContextControllers.splice(0)) {
+async function replaceOwnedTools(tools: RegisteredToolDescriptor[]): Promise<void> {
+  for (const controller of baseToolControllers.splice(0)) {
     controller.abort();
   }
 
-  const register = (
-    item: unknown,
-    methodName: 'registerTool' | 'registerResource' | 'registerPrompt'
-  ) => {
+  for (const tool of tools) {
     const controller = new AbortController();
-    baseContextControllers.push(controller);
-    const registerMethod = (modelContext as unknown as Record<string, unknown>)[methodName];
-    if (typeof registerMethod !== 'function') {
-      throw new Error(`${methodName} is not available`);
-    }
-    registerMethod.call(modelContext, item, { signal: controller.signal });
-  };
+    baseToolControllers.push(controller);
+    await modelContext.registerTool(tool, { signal: controller.signal });
+  }
+}
 
-  for (const tool of options.tools ?? []) {
-    register(tool, 'registerTool');
+function replaceOwnedResources(resources: ResourceDescriptor[]): void {
+  for (const registration of baseResourceRegistrations) {
+    registration.unregister();
   }
-  for (const resource of options.resources ?? []) {
-    register(resource, 'registerResource');
+  baseResourceRegistrations = resources.map((resource) => modelContext.registerResource(resource));
+}
+
+function replaceOwnedPrompts(prompts: PromptDescriptor[]): void {
+  for (const registration of basePromptRegistrations) {
+    registration.unregister();
   }
-  for (const prompt of options.prompts ?? []) {
-    register(prompt, 'registerPrompt');
-  }
+  basePromptRegistrations = prompts.map((prompt) => modelContext.registerPrompt(prompt));
 }
 
 // Counter state
@@ -100,9 +96,6 @@ const clearLogBtn = requireElement<HTMLButtonElement>('clear-log');
 
 const testingApiStatusEl = requireElement<HTMLDivElement>('testing-api-status');
 const checkTestingApiBtn = requireElement<HTMLButtonElement>('check-testing-api');
-const testToolTrackingBtn = requireElement<HTMLButtonElement>('test-tool-tracking');
-const testMockResponseBtn = requireElement<HTMLButtonElement>('test-mock-response');
-const testResetBtn = requireElement<HTMLButtonElement>('test-reset');
 
 // Resource DOM elements
 const resourcesStatusEl = requireElement<HTMLDivElement>('resources-status');
@@ -111,19 +104,12 @@ const registerDynamicResourceBtn = requireElement<HTMLButtonElement>('register-d
 const unregisterDynamicResourceBtn = requireElement<HTMLButtonElement>(
   'unregister-dynamic-resource'
 );
-const listResourcesBtn = requireElement<HTMLButtonElement>('list-resources');
-const listResourceTemplatesBtn = requireElement<HTMLButtonElement>('list-resource-templates');
-const readStaticResourceBtn = requireElement<HTMLButtonElement>('read-static-resource');
-const readTemplateResourceBtn = requireElement<HTMLButtonElement>('read-template-resource');
 
 // Prompt DOM elements
 const promptsStatusEl = requireElement<HTMLDivElement>('prompts-status');
 const registerBasePromptsBtn = requireElement<HTMLButtonElement>('register-base-prompts');
 const registerDynamicPromptBtn = requireElement<HTMLButtonElement>('register-dynamic-prompt');
 const unregisterDynamicPromptBtn = requireElement<HTMLButtonElement>('unregister-dynamic-prompt');
-const listPromptsBtn = requireElement<HTMLButtonElement>('list-prompts');
-const getPromptWithoutArgsBtn = requireElement<HTMLButtonElement>('get-prompt-without-args');
-const getPromptWithArgsBtn = requireElement<HTMLButtonElement>('get-prompt-with-args');
 
 // Logging utility
 function log(message: string, type: 'info' | 'success' | 'error' = 'info') {
@@ -148,112 +134,110 @@ function hasRegisteredTool(name: string): boolean {
 
 // Check if API is available
 function checkAPIAvailability() {
-  if ('modelContext' in navigator) {
+  if ('modelContext' in document) {
     apiStatusEl.textContent = 'API: Ready ✅';
     apiStatusEl.className = 'status connected';
     apiStatusEl.setAttribute('data-status', 'ready');
-    log('navigator.modelContext API is available', 'success');
+    log('document.modelContext API is available', 'success');
     return true;
   }
   apiStatusEl.textContent = 'API: Not Available ❌';
   apiStatusEl.className = 'status disconnected';
   apiStatusEl.setAttribute('data-status', 'unavailable');
-  log('navigator.modelContext API is NOT available', 'error');
+  log('document.modelContext API is NOT available', 'error');
   return false;
 }
 
 // Register base tools using AbortSignal-scoped registerTool calls.
-function registerBaseTools() {
+async function registerBaseTools() {
   try {
     log('Registering base tools via registerTool()...');
 
-    provideExtendedContext({
-      tools: [
-        {
-          name: 'incrementCounter',
-          description: 'Increment the counter by 1',
-          inputSchema: {
-            type: 'object',
-            properties: {},
-          },
-          async execute() {
-            counter++;
-            updateCounterDisplay();
-            log(`Counter incremented to ${counter}`, 'success');
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `Counter incremented to ${counter}`,
-                },
-              ],
-            };
-          },
+    await replaceOwnedTools([
+      {
+        name: 'incrementCounter',
+        description: 'Increment the counter by 1',
+        inputSchema: {
+          type: 'object',
+          properties: {},
         },
-        {
-          name: 'decrementCounter',
-          description: 'Decrement the counter by 1',
-          inputSchema: {
-            type: 'object',
-            properties: {},
-          },
-          async execute() {
-            counter--;
-            updateCounterDisplay();
-            log(`Counter decremented to ${counter}`, 'success');
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `Counter decremented to ${counter}`,
-                },
-              ],
-            };
-          },
+        async execute() {
+          counter++;
+          updateCounterDisplay();
+          log(`Counter incremented to ${counter}`, 'success');
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Counter incremented to ${counter}`,
+              },
+            ],
+          };
         },
-        {
-          name: 'resetCounter',
-          description: 'Reset the counter to 0',
-          inputSchema: {
-            type: 'object',
-            properties: {},
-          },
-          async execute() {
-            const oldValue = counter;
-            counter = 0;
-            updateCounterDisplay();
-            log(`Counter reset from ${oldValue} to 0`, 'success');
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: 'Counter reset to 0',
-                },
-              ],
-            };
-          },
+      },
+      {
+        name: 'decrementCounter',
+        description: 'Decrement the counter by 1',
+        inputSchema: {
+          type: 'object',
+          properties: {},
         },
-        {
-          name: 'getCounter',
-          description: 'Get the current counter value',
-          inputSchema: {
-            type: 'object',
-            properties: {},
-          },
-          async execute() {
-            log(`Counter value retrieved: ${counter}`, 'info');
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `Current counter value: ${counter}`,
-                },
-              ],
-            };
-          },
+        async execute() {
+          counter--;
+          updateCounterDisplay();
+          log(`Counter decremented to ${counter}`, 'success');
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Counter decremented to ${counter}`,
+              },
+            ],
+          };
         },
-      ],
-    });
+      },
+      {
+        name: 'resetCounter',
+        description: 'Reset the counter to 0',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+        async execute() {
+          const oldValue = counter;
+          counter = 0;
+          updateCounterDisplay();
+          log(`Counter reset from ${oldValue} to 0`, 'success');
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Counter reset to 0',
+              },
+            ],
+          };
+        },
+      },
+      {
+        name: 'getCounter',
+        description: 'Get the current counter value',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+        async execute() {
+          log(`Counter value retrieved: ${counter}`, 'info');
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Current counter value: ${counter}`,
+              },
+            ],
+          };
+        },
+      },
+    ]);
 
     log('Base tools registered successfully (Bucket A)', 'success');
   } catch (error) {
@@ -263,7 +247,7 @@ function registerBaseTools() {
 }
 
 // Register a dynamic tool (Bucket B) using registerTool
-function registerDynamicTool() {
+async function registerDynamicTool() {
   try {
     if (hasRegisteredTool(DYNAMIC_TOOL_NAME)) {
       log('Dynamic tool already registered', 'error');
@@ -273,7 +257,7 @@ function registerDynamicTool() {
     log('Registering dynamic tool via registerTool()...');
 
     dynamicToolController = new AbortController();
-    modelContext.registerTool(
+    await modelContext.registerTool(
       {
         name: DYNAMIC_TOOL_NAME,
         description: 'A dynamically registered tool',
@@ -317,12 +301,8 @@ function unregisterDynamicTool() {
     }
 
     log('Unregistering dynamic tool...');
-    if (dynamicToolController) {
-      dynamicToolController.abort();
-      dynamicToolController = null;
-    } else {
-      modelContext.unregisterTool(DYNAMIC_TOOL_NAME);
-    }
+    dynamicToolController?.abort();
+    dynamicToolController = null;
 
     log('Dynamic tool unregistered successfully', 'success');
     dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
@@ -348,56 +328,54 @@ function callDynamicTool() {
 }
 
 // Replace base tools to test two-bucket system
-function replaceBaseTools() {
+async function replaceBaseTools() {
   try {
     log('Replacing base tools with new set (Bucket A should be replaced)...');
 
-    provideExtendedContext({
-      tools: [
-        {
-          name: 'doubleCounter',
-          description: 'Double the counter value',
-          inputSchema: {
-            type: 'object',
-            properties: {},
-          },
-          async execute() {
-            counter *= 2;
-            updateCounterDisplay();
-            log(`Counter doubled to ${counter}`, 'success');
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `Counter doubled to ${counter}`,
-                },
-              ],
-            };
-          },
+    await replaceOwnedTools([
+      {
+        name: 'doubleCounter',
+        description: 'Double the counter value',
+        inputSchema: {
+          type: 'object',
+          properties: {},
         },
-        {
-          name: 'halveCounter',
-          description: 'Halve the counter value',
-          inputSchema: {
-            type: 'object',
-            properties: {},
-          },
-          async execute() {
-            counter = Math.floor(counter / 2);
-            updateCounterDisplay();
-            log(`Counter halved to ${counter}`, 'success');
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `Counter halved to ${counter}`,
-                },
-              ],
-            };
-          },
+        async execute() {
+          counter *= 2;
+          updateCounterDisplay();
+          log(`Counter doubled to ${counter}`, 'success');
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Counter doubled to ${counter}`,
+              },
+            ],
+          };
         },
-      ],
-    });
+      },
+      {
+        name: 'halveCounter',
+        description: 'Halve the counter value',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+        },
+        async execute() {
+          counter = Math.floor(counter / 2);
+          updateCounterDisplay();
+          log(`Counter halved to ${counter}`, 'success');
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Counter halved to ${counter}`,
+              },
+            ],
+          };
+        },
+      },
+    ]);
 
     log('Base tools replaced! Old tools (increment, decrement, etc.) are gone.', 'success');
     if (hasRegisteredTool(DYNAMIC_TOOL_NAME)) {
@@ -416,24 +394,13 @@ function replaceBaseTools() {
   }
 }
 
-// List all registered tools (simulated)
+// List all registered tools.
 function listAllTools() {
   log('Listing all registered tools...', 'info');
-  log('In a real scenario, an MCP client would call listTools()', 'info');
-  log('Check browser console for __mcpBridge.tools to see registered tools', 'info');
-
-  // Access the internal bridge for debugging
-  const w = window as unknown as {
-    __mcpBridge?: {
-      tools: Map<string, { description: string; [key: string]: unknown }>;
-    };
-  };
-  if (w.__mcpBridge) {
-    const tools = w.__mcpBridge.tools;
-    log(`Total tools registered: ${tools.size}`, 'info');
-    tools.forEach((tool, name: string) => {
-      log(`  - ${name}: ${tool.description}`, 'info');
-    });
+  const tools = modelContext.listTools();
+  log(`Total tools registered: ${tools.length}`, 'info');
+  for (const tool of tools) {
+    log(`  - ${tool.name}: ${tool.description}`, 'info');
   }
 }
 
@@ -444,65 +411,44 @@ function registerBaseResources() {
   try {
     log('Registering base resources via registerResource()...', 'info');
 
-    provideExtendedContext({
-      resources: [
-        {
-          uri: 'config://app-settings',
-          name: 'App Settings',
-          description: 'Application configuration settings',
-          mimeType: 'application/json',
-          async read() {
-            log('Reading app settings resource', 'info');
-            return {
-              contents: [
-                {
-                  uri: 'config://app-settings',
-                  text: JSON.stringify(appConfig, null, 2),
-                  mimeType: 'application/json',
-                },
-              ],
-            };
-          },
+    replaceOwnedResources([
+      {
+        uri: 'config://app-settings',
+        name: 'App Settings',
+        description: 'Application configuration settings',
+        mimeType: 'application/json',
+        async read() {
+          log('Reading app settings resource', 'info');
+          return {
+            contents: [
+              {
+                uri: 'config://app-settings',
+                text: JSON.stringify(appConfig, null, 2),
+                mimeType: 'application/json',
+              },
+            ],
+          };
         },
-        {
-          uri: 'counter://value',
-          name: 'Counter Value',
-          description: 'Current counter value',
-          mimeType: 'text/plain',
-          async read() {
-            log('Reading counter value resource', 'info');
-            return {
-              contents: [
-                {
-                  uri: 'counter://value',
-                  text: `Counter: ${counter}`,
-                  mimeType: 'text/plain',
-                },
-              ],
-            };
-          },
+      },
+      {
+        uri: 'counter://value',
+        name: 'Counter Value',
+        description: 'Current counter value',
+        mimeType: 'text/plain',
+        async read() {
+          log('Reading counter value resource', 'info');
+          return {
+            contents: [
+              {
+                uri: 'counter://value',
+                text: `Counter: ${counter}`,
+                mimeType: 'text/plain',
+              },
+            ],
+          };
         },
-        {
-          uri: 'file://{path}',
-          name: 'File Reader',
-          description: 'Read files from the virtual filesystem',
-          mimeType: 'text/plain',
-          async read(uri: URL, params?: Record<string, string>) {
-            const path = params?.path ?? 'unknown';
-            log(`Reading file resource: ${path}`, 'info');
-            return {
-              contents: [
-                {
-                  uri: uri.href,
-                  text: `Contents of file: ${path}\nThis is mock file content for testing.`,
-                  mimeType: 'text/plain',
-                },
-              ],
-            };
-          },
-        },
-      ],
-    });
+      },
+    ]);
 
     log('Base resources registered successfully (Bucket A)', 'success');
     if (resourcesStatusEl) {
@@ -589,112 +535,6 @@ function unregisterDynamicResource() {
   }
 }
 
-// List all resources
-function listResources() {
-  try {
-    log('Listing all registered resources...', 'info');
-    const resources = modelContext.listResources();
-    log(`Total resources: ${resources.length}`, 'success');
-
-    if (resourcesStatusEl) {
-      resourcesStatusEl.setAttribute('data-resource-count', resources.length.toString());
-    }
-
-    resources.forEach((resource) => {
-      log(`  - ${resource.uri}: ${resource.name}`, 'info');
-    });
-  } catch (error) {
-    log(`Failed to list resources: ${error}`, 'error');
-    console.error(error);
-  }
-}
-
-// List resource templates
-function listResourceTemplates() {
-  try {
-    log('Listing all resource templates...', 'info');
-    const templates = modelContext.listResourceTemplates();
-    log(`Total templates: ${templates.length}`, 'success');
-
-    if (resourcesStatusEl) {
-      resourcesStatusEl.setAttribute('data-template-count', templates.length.toString());
-    }
-
-    templates.forEach((template) => {
-      log(`  - ${template.uriTemplate}: ${template.name}`, 'info');
-    });
-  } catch (error) {
-    log(`Failed to list resource templates: ${error}`, 'error');
-    console.error(error);
-  }
-}
-
-// Read static resource
-async function readStaticResource() {
-  try {
-    log('Reading static resource config://app-settings...', 'info');
-
-    const w = window as unknown as {
-      __mcpBridge?: {
-        modelContext: {
-          readResource: (
-            uri: string
-          ) => Promise<{ contents: Array<{ uri: string; text?: string }> }>;
-        };
-      };
-    };
-
-    if (w.__mcpBridge) {
-      const result = await w.__mcpBridge.modelContext.readResource('config://app-settings');
-      log('Resource read successfully:', 'success');
-      if (result.contents[0]?.text) {
-        log(`  Content: ${result.contents[0].text}`, 'info');
-      }
-      if (resourcesStatusEl) {
-        resourcesStatusEl.setAttribute('data-read-static', 'success');
-      }
-    } else {
-      log('__mcpBridge not available', 'error');
-    }
-  } catch (error) {
-    log(`Failed to read resource: ${error}`, 'error');
-    console.error(error);
-  }
-}
-
-// Read template resource
-async function readTemplateResource() {
-  try {
-    log('Reading template resource file://test.txt...', 'info');
-
-    const w = window as unknown as {
-      __mcpBridge?: {
-        modelContext: {
-          readResource: (
-            uri: string
-          ) => Promise<{ contents: Array<{ uri: string; text?: string }> }>;
-        };
-      };
-    };
-
-    if (w.__mcpBridge) {
-      const result = await w.__mcpBridge.modelContext.readResource('file://test.txt');
-      log('Template resource read successfully:', 'success');
-      if (result.contents[0]?.text) {
-        log(`  Content: ${result.contents[0].text}`, 'info');
-      }
-      if (resourcesStatusEl) {
-        resourcesStatusEl.setAttribute('data-read-template', 'success');
-      }
-    } else {
-      log('__mcpBridge not available', 'error');
-    }
-  } catch (error) {
-    log(`Failed to read template resource: ${error}`, 'error');
-    console.error(error);
-  }
-}
-
 // ==================== PROMPTS ====================
 
 // Register base prompts (Bucket A)
@@ -702,53 +542,51 @@ function registerBasePrompts() {
   try {
     log('Registering base prompts via registerPrompt()...', 'info');
 
-    provideExtendedContext({
-      prompts: [
-        {
-          name: 'greeting',
-          description: 'A simple greeting prompt',
-          async get() {
-            log('Getting greeting prompt', 'info');
-            return {
-              messages: [
-                {
-                  role: 'user',
-                  content: { type: 'text', text: 'Hello! How can you help me today?' },
-                },
-              ],
-            };
-          },
+    replaceOwnedPrompts([
+      {
+        name: 'greeting',
+        description: 'A simple greeting prompt',
+        async get() {
+          log('Getting greeting prompt', 'info');
+          return {
+            messages: [
+              {
+                role: 'user',
+                content: { type: 'text', text: 'Hello! How can you help me today?' },
+              },
+            ],
+          };
         },
-        {
-          name: 'code-review',
-          description: 'Review code for best practices',
-          argsSchema: {
-            type: 'object',
-            properties: {
-              code: { type: 'string', description: 'The code to review' },
-              language: { type: 'string', description: 'Programming language' },
-            },
-            required: ['code'],
+      },
+      {
+        name: 'code-review',
+        description: 'Review code for best practices',
+        argsSchema: {
+          type: 'object',
+          properties: {
+            code: { type: 'string', description: 'The code to review' },
+            language: { type: 'string', description: 'Programming language' },
           },
-          async get(args: Record<string, unknown>) {
-            log(`Getting code-review prompt with args: ${JSON.stringify(args)}`, 'info');
-            const code = args.code as string;
-            const language = (args.language as string) || 'unknown';
-            return {
-              messages: [
-                {
-                  role: 'user',
-                  content: {
-                    type: 'text',
-                    text: `Please review this ${language} code for best practices:\n\n\`\`\`${language}\n${code}\n\`\`\``,
-                  },
-                },
-              ],
-            };
-          },
+          required: ['code'],
         },
-      ],
-    });
+        async get(args: Record<string, string>) {
+          log(`Getting code-review prompt with args: ${JSON.stringify(args)}`, 'info');
+          const code = args.code;
+          const language = args.language || 'unknown';
+          return {
+            messages: [
+              {
+                role: 'user',
+                content: {
+                  type: 'text',
+                  text: `Please review this ${language} code for best practices:\n\n\`\`\`${language}\n${code}\n\`\`\``,
+                },
+              },
+            ],
+          };
+        },
+      },
+    ]);
 
     log('Base prompts registered successfully (Bucket A)', 'success');
     if (promptsStatusEl) {
@@ -782,9 +620,9 @@ function registerDynamicPrompt() {
         },
         required: ['text'],
       },
-      async get(args: Record<string, unknown>) {
+      async get(args: Record<string, string>) {
         log(`Getting dynamic-summary prompt with args: ${JSON.stringify(args)}`, 'info');
-        const text = args.text as string;
+        const text = args.text;
         return {
           messages: [
             {
@@ -839,103 +677,6 @@ function unregisterDynamicPrompt() {
   }
 }
 
-// List all prompts
-function listPrompts() {
-  try {
-    log('Listing all registered prompts...', 'info');
-    const prompts = modelContext.listPrompts();
-    log(`Total prompts: ${prompts.length}`, 'success');
-
-    if (promptsStatusEl) {
-      promptsStatusEl.setAttribute('data-prompt-count', prompts.length.toString());
-    }
-
-    prompts.forEach((prompt) => {
-      log(`  - ${prompt.name}: ${prompt.description}`, 'info');
-    });
-  } catch (error) {
-    log(`Failed to list prompts: ${error}`, 'error');
-    console.error(error);
-  }
-}
-
-// Get prompt without arguments
-async function getPromptWithoutArgs() {
-  try {
-    log('Getting prompt without args (greeting)...', 'info');
-
-    const w = window as unknown as {
-      __mcpBridge?: {
-        modelContext: {
-          getPrompt: (
-            name: string,
-            args?: Record<string, unknown>
-          ) => Promise<{
-            messages: Array<{ role: string; content: { type: string; text: string } }>;
-          }>;
-        };
-      };
-    };
-
-    if (w.__mcpBridge) {
-      const result = await w.__mcpBridge.modelContext.getPrompt('greeting');
-      log('Prompt retrieved successfully:', 'success');
-      if (result.messages[0]?.content) {
-        const content = result.messages[0].content;
-        log(`  Message: ${content.text}`, 'info');
-      }
-      if (promptsStatusEl) {
-        promptsStatusEl.setAttribute('data-get-prompt-no-args', 'success');
-      }
-    } else {
-      log('__mcpBridge not available', 'error');
-    }
-  } catch (error) {
-    log(`Failed to get prompt: ${error}`, 'error');
-    console.error(error);
-  }
-}
-
-// Get prompt with arguments
-async function getPromptWithArgs() {
-  try {
-    log('Getting prompt with args (code-review)...', 'info');
-
-    const w = window as unknown as {
-      __mcpBridge?: {
-        modelContext: {
-          getPrompt: (
-            name: string,
-            args?: Record<string, unknown>
-          ) => Promise<{
-            messages: Array<{ role: string; content: { type: string; text: string } }>;
-          }>;
-        };
-      };
-    };
-
-    if (w.__mcpBridge) {
-      const result = await w.__mcpBridge.modelContext.getPrompt('code-review', {
-        code: 'console.log("Hello World");',
-        language: 'javascript',
-      });
-      log('Prompt with args retrieved successfully:', 'success');
-      if (result.messages[0]?.content) {
-        const content = result.messages[0].content;
-        log(`  Message: ${content.text.substring(0, 100)}...`, 'info');
-      }
-      if (promptsStatusEl) {
-        promptsStatusEl.setAttribute('data-get-prompt-with-args', 'success');
-      }
-    } else {
-      log('__mcpBridge not available', 'error');
-    }
-  } catch (error) {
-    log(`Failed to get prompt with args: ${error}`, 'error');
-    console.error(error);
-  }
-}
-
 // Check if modelContextTesting API is available
 function checkTestingAPI() {
   if (testingApiStatusEl) {
@@ -954,15 +695,7 @@ function checkTestingAPI() {
         'success'
       );
 
-      const methods = [
-        'getToolCalls',
-        'clearToolCalls',
-        'setMockToolResponse',
-        'clearMockToolResponse',
-        'clearAllMockToolResponses',
-        'getRegisteredTools',
-        'reset',
-      ];
+      const methods = ['listTools', 'executeTool', 'addEventListener'];
       log(`Available methods: ${methods.join(', ')}`, 'info');
     } else {
       testingApiStatusEl.textContent = 'Testing API: Not Available ❌';
@@ -970,160 +703,6 @@ function checkTestingAPI() {
       testingApiStatusEl.setAttribute('data-testing-api', 'unavailable');
       log('navigator.modelContextTesting is NOT available', 'error');
     }
-  }
-}
-
-// Test tool call tracking
-async function testToolCallTracking() {
-  if (!('modelContextTesting' in navigator)) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  const testingAPI = getTestingAPI();
-  if (!testingAPI) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  log('Testing tool call tracking...', 'info');
-
-  testingAPI.clearToolCalls();
-  log('Cleared tool call history', 'info');
-
-  const tools = modelContext.listTools();
-  if (tools.length === 0) {
-    log('No tools registered. Register tools first.', 'error');
-    return;
-  }
-
-  const firstTool = tools[0];
-  if (!firstTool) {
-    log('No tool available to execute', 'error');
-    return;
-  }
-  log(`Executing tool: ${firstTool.name}`, 'info');
-
-  try {
-    await modelContext.executeTool(firstTool.name, {});
-
-    const calls = testingAPI.getToolCalls();
-    log(`Tool calls tracked: ${calls.length}`, 'success');
-
-    if (calls.length > 0) {
-      const lastCall = calls[calls.length - 1];
-      if (!lastCall) {
-        return;
-      }
-      log(
-        `Last call: ${lastCall.toolName} at ${new Date(lastCall.timestamp).toLocaleTimeString()}`,
-        'info'
-      );
-      testingApiStatusEl?.setAttribute('data-tool-calls', calls.length.toString());
-    }
-  } catch (error) {
-    log(`Tool execution failed: ${error}`, 'error');
-  }
-}
-
-// Test mock response functionality
-async function testMockResponse() {
-  if (!('modelContextTesting' in navigator)) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  const testingAPI = getTestingAPI();
-  if (!testingAPI) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  log('Testing mock response...', 'info');
-
-  const tools = modelContext.listTools();
-  if (tools.length === 0) {
-    log('No tools registered. Register tools first.', 'error');
-    return;
-  }
-
-  const firstTool = tools[0];
-  if (!firstTool) {
-    log('No tool available to mock', 'error');
-    return;
-  }
-  const mockResponse = {
-    content: [
-      {
-        type: 'text' as const,
-        text: 'This is a MOCK response!',
-      },
-    ],
-  };
-
-  testingAPI.setMockToolResponse(firstTool.name, mockResponse);
-  log(`Set mock response for ${firstTool.name}`, 'info');
-
-  try {
-    const result = await modelContext.executeTool(firstTool.name, {});
-    log(`Tool returned: ${JSON.stringify(result)}`, 'info');
-
-    const firstContent = result.content[0];
-    const mockText =
-      firstContent &&
-      typeof firstContent === 'object' &&
-      'type' in firstContent &&
-      firstContent.type === 'text' &&
-      'text' in firstContent &&
-      typeof firstContent.text === 'string'
-        ? firstContent.text
-        : undefined;
-
-    if (mockText === 'This is a MOCK response!') {
-      log('Mock response verified! ✅', 'success');
-      testingApiStatusEl?.setAttribute('data-mock-response', 'working');
-    } else {
-      log('Mock response NOT used', 'error');
-    }
-
-    testingAPI.clearMockToolResponse(firstTool.name);
-    log(`Cleared mock response for ${firstTool.name}`, 'info');
-  } catch (error) {
-    log(`Tool execution failed: ${error}`, 'error');
-  }
-}
-
-// Test reset functionality
-function testReset() {
-  if (!('modelContextTesting' in navigator)) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  const testingAPI = getTestingAPI();
-  if (!testingAPI) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  log('Testing reset functionality...', 'info');
-
-  const callsBefore = testingAPI.getToolCalls().length;
-  log(`Tool calls before reset: ${callsBefore}`, 'info');
-
-  testingAPI.reset();
-  log('Called reset()', 'info');
-
-  const callsAfter = testingAPI.getToolCalls().length;
-  log(`Tool calls after reset: ${callsAfter}`, 'info');
-
-  if (callsAfter === 0) {
-    log('Reset successful! ✅', 'success');
-    testingApiStatusEl?.setAttribute('data-reset', 'working');
-    testingApiStatusEl?.removeAttribute('data-tool-calls');
-    testingApiStatusEl?.removeAttribute('data-mock-response');
-  } else {
-    log('Reset failed', 'error');
   }
 }
 
@@ -1157,45 +736,18 @@ clearLogBtn.addEventListener('click', () => {
 });
 
 checkTestingApiBtn.addEventListener('click', checkTestingAPI);
-testToolTrackingBtn.addEventListener('click', testToolCallTracking);
-testMockResponseBtn.addEventListener('click', testMockResponse);
-testResetBtn.addEventListener('click', testReset);
 
 // Resource event listeners
 registerBaseResourcesBtn.addEventListener('click', registerBaseResources);
 registerDynamicResourceBtn.addEventListener('click', registerDynamicResource);
 unregisterDynamicResourceBtn.addEventListener('click', unregisterDynamicResource);
-listResourcesBtn.addEventListener('click', listResources);
-listResourceTemplatesBtn.addEventListener('click', listResourceTemplates);
-readStaticResourceBtn.addEventListener('click', readStaticResource);
-readTemplateResourceBtn.addEventListener('click', readTemplateResource);
 
 // Prompt event listeners
 registerBasePromptsBtn.addEventListener('click', registerBasePrompts);
 registerDynamicPromptBtn.addEventListener('click', registerDynamicPrompt);
 unregisterDynamicPromptBtn.addEventListener('click', unregisterDynamicPrompt);
-listPromptsBtn.addEventListener('click', listPrompts);
-getPromptWithoutArgsBtn.addEventListener('click', getPromptWithoutArgs);
-getPromptWithArgsBtn.addEventListener('click', getPromptWithArgs);
 
-// Sampling & Elicitation event listeners
-const samplingButtons = {
-  checkSamplingApi: document.getElementById('check-sampling-api'),
-  testSamplingCall: document.getElementById('test-sampling-call'),
-  testElicitationCall: document.getElementById('test-elicitation-call'),
-};
-
-if (samplingButtons.checkSamplingApi) {
-  samplingButtons.checkSamplingApi.addEventListener('click', checkSamplingApi);
-}
-if (samplingButtons.testSamplingCall) {
-  samplingButtons.testSamplingCall.addEventListener('click', testSamplingCall);
-}
-if (samplingButtons.testElicitationCall) {
-  samplingButtons.testElicitationCall.addEventListener('click', testElicitationCall);
-}
-
-// Chromium native API event listeners
+// Historical MCP-B compatibility event listeners
 const chromiumButtons = {
   unregisterTool: document.getElementById('chromium-unregister-tool'),
   clearContext: document.getElementById('chromium-clear-context'),
@@ -1237,120 +789,17 @@ updateCounterDisplay();
 log('Application initialized');
 
 if (checkAPIAvailability()) {
-  registerBaseTools();
-  log('✅ Test app ready! Use buttons to test two-bucket system.', 'success');
+  void registerBaseTools().then(() => {
+    log('✅ Test app ready! Use buttons to test two-bucket system.', 'success');
+  });
 }
 
-// ==================== SAMPLING & ELICITATION ====================
+// Historical MCP-B compatibility test functions
 
-const samplingStatusEl = document.getElementById('sampling-status');
-
-// Check if sampling/elicitation API is available
-function checkSamplingApi() {
-  try {
-    log('Checking sampling/elicitation API availability...', 'info');
-
-    const hasCreateMessage = 'createMessage' in navigator.modelContext;
-    const hasElicitInput = 'elicitInput' in navigator.modelContext;
-
-    if (samplingStatusEl) {
-      if (hasCreateMessage && hasElicitInput) {
-        samplingStatusEl.textContent =
-          'Sampling/Elicitation: Available ✅ (createMessage, elicitInput)';
-        samplingStatusEl.style.background = '#d4edda';
-        samplingStatusEl.setAttribute('data-sampling-api', 'available');
-      } else {
-        samplingStatusEl.textContent = `Sampling/Elicitation: Partial ⚠️ (createMessage: ${hasCreateMessage}, elicitInput: ${hasElicitInput})`;
-        samplingStatusEl.style.background = '#fff3cd';
-        samplingStatusEl.setAttribute('data-sampling-api', 'partial');
-      }
-    }
-
-    log(`createMessage available: ${hasCreateMessage}`, hasCreateMessage ? 'success' : 'error');
-    log(`elicitInput available: ${hasElicitInput}`, hasElicitInput ? 'success' : 'error');
-  } catch (error) {
-    log(`Failed to check sampling API: ${error}`, 'error');
-  }
-}
-
-// Test createMessage call (should fail without connected client)
-async function testSamplingCall() {
-  try {
-    log('Testing createMessage() - this should fail without a connected client...', 'info');
-
-    const result = await modelContext.createMessage({
-      messages: [{ role: 'user', content: { type: 'text', text: 'Hello, this is a test!' } }],
-      maxTokens: 100,
-    });
-
-    // If we got here, a client responded (unexpected in this test environment)
-    log(`createMessage() succeeded unexpectedly: ${JSON.stringify(result)}`, 'success');
-    if (samplingStatusEl) {
-      samplingStatusEl.setAttribute('data-sampling-call', 'success');
-    }
-  } catch (error) {
-    // Expected behavior - no connected client with sampling capability
-    log(`createMessage() threw error (expected): ${error}`, 'info');
-    if (samplingStatusEl) {
-      samplingStatusEl.setAttribute('data-sampling-call', 'error-no-client');
-    }
-
-    // Check if it's the expected error message
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (
-      errorMessage.includes('Sampling is not supported') ||
-      errorMessage.includes('no connected client')
-    ) {
-      log('✅ Correct error thrown for missing client capability', 'success');
-    }
-  }
-}
-
-// Test elicitInput call (should fail without connected client)
-async function testElicitationCall() {
-  try {
-    log('Testing elicitInput() - this should fail without a connected client...', 'info');
-
-    const result = await modelContext.elicitInput({
-      message: 'Please provide your name',
-      requestedSchema: {
-        type: 'object',
-        properties: {
-          name: { type: 'string', title: 'Name', description: 'Your name' },
-        },
-        required: ['name'],
-      },
-    });
-
-    // If we got here, a client responded (unexpected in this test environment)
-    log(`elicitInput() succeeded unexpectedly: ${JSON.stringify(result)}`, 'success');
-    if (samplingStatusEl) {
-      samplingStatusEl.setAttribute('data-elicitation-call', 'success');
-    }
-  } catch (error) {
-    // Expected behavior - no connected client with elicitation capability
-    log(`elicitInput() threw error (expected): ${error}`, 'info');
-    if (samplingStatusEl) {
-      samplingStatusEl.setAttribute('data-elicitation-call', 'error-no-client');
-    }
-
-    // Check if it's the expected error message
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (
-      errorMessage.includes('Elicitation is not supported') ||
-      errorMessage.includes('no connected client')
-    ) {
-      log('✅ Correct error thrown for missing client capability', 'success');
-    }
-  }
-}
-
-// Chromium Native API Test Functions
-
-// Test unregisterTool (Chromium native API)
+// Test compatibility removal
 function testChromiumUnregisterTool() {
   try {
-    log('Testing unregisterTool() (Chromium native API)...', 'info');
+    log('Testing MCP-B compatibility removal...', 'info');
 
     if (!hasRegisteredTool(DYNAMIC_TOOL_NAME)) {
       log('No dynamic tool registered. Register one first.', 'error');
@@ -1358,12 +807,8 @@ function testChromiumUnregisterTool() {
     }
 
     const toolName = DYNAMIC_TOOL_NAME;
-    if (dynamicToolController) {
-      dynamicToolController.abort();
-      dynamicToolController = null;
-    } else {
-      modelContext.unregisterTool(toolName);
-    }
+    dynamicToolController?.abort();
+    dynamicToolController = null;
 
     dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
     dynamicStatusEl.style.background = '#f5f5f5';
@@ -1373,7 +818,7 @@ function testChromiumUnregisterTool() {
 
     log(`Tool unregistered via AbortSignal cleanup: ${toolName}`, 'success');
   } catch (error) {
-    log(`unregisterTool() failed: ${error}`, 'error');
+    log(`AbortSignal cleanup failed: ${error}`, 'error');
   }
 }
 
@@ -1382,7 +827,7 @@ function testChromiumClearContext() {
   try {
     log('Testing AbortSignal cleanup...', 'info');
 
-    for (const controller of baseContextControllers.splice(0)) {
+    for (const controller of baseToolControllers.splice(0)) {
       controller.abort();
     }
     if (dynamicToolController) {
@@ -1402,7 +847,7 @@ function testChromiumClearContext() {
   }
 }
 
-// Test executeTool (Chromium native API)
+// Test deprecated testing-shim execution
 async function testChromiumExecuteTool() {
   if (!('modelContextTesting' in navigator)) {
     log('modelContextTesting API not available', 'error');
@@ -1416,9 +861,9 @@ async function testChromiumExecuteTool() {
   }
 
   try {
-    log('Testing executeTool() (Chromium native API)...', 'info');
+    log('Testing compatibility executeTool()...', 'info');
 
-    const tools = modelContext.listTools();
+    const tools = await modelContext.getTools();
     if (tools.length === 0) {
       log('No tools registered. Register tools first.', 'error');
       return;
@@ -1440,7 +885,7 @@ async function testChromiumExecuteTool() {
   }
 }
 
-// Test listTools (Chromium native API)
+// Test deprecated testing-shim discovery
 function testChromiumListTools() {
   if (!('modelContextTesting' in navigator)) {
     log('modelContextTesting API not available', 'error');
@@ -1454,7 +899,7 @@ function testChromiumListTools() {
   }
 
   try {
-    log('Testing listTools() (Chromium native API)...', 'info');
+    log('Testing compatibility listTools()...', 'info');
 
     const tools = testingAPI.listTools();
     log(`listTools() returned ${tools.length} tools`, 'success');
@@ -1482,39 +927,37 @@ function testChromiumListTools() {
   }
 }
 
-// Test registerToolsChangedCallback on registerTool
+// Test toolchange on registerTool
 function testChromiumCallbackRegister() {
-  if (!('modelContextTesting' in navigator)) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  const testingAPI = getTestingAPI();
-  if (!testingAPI) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
   try {
-    log('Testing registerToolsChangedCallback() on registerTool...', 'info');
+    log('Testing toolchange on registerTool...', 'info');
 
     let callbackFired = false;
-    testingAPI.registerToolsChangedCallback(() => {
-      callbackFired = true;
-      log('Callback fired on registerTool!', 'success');
-    });
+    modelContext.addEventListener(
+      'toolchange',
+      () => {
+        callbackFired = true;
+        log('Callback fired on registerTool!', 'success');
+      },
+      { once: true }
+    );
 
     // Register a tool to trigger callback
-    modelContext.registerTool({
-      name: 'callbackTest1',
-      description: 'Test callback',
-      inputSchema: { type: 'object', properties: {} },
-      async execute() {
-        return { content: [{ type: 'text', text: 'test' }] };
+    const controller = new AbortController();
+    void modelContext.registerTool(
+      {
+        name: 'callbackTest1',
+        description: 'Test callback',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'test' }] };
+        },
       },
-    });
+      { signal: controller.signal }
+    );
 
     setTimeout(() => {
+      controller.abort();
       if (callbackFired) {
         const statusEl = document.getElementById('chromium-callback-status');
         if (statusEl) statusEl.setAttribute('data-register-fired', 'true');
@@ -1528,36 +971,25 @@ function testChromiumCallbackRegister() {
   }
 }
 
-// Test registerToolsChangedCallback on unregisterTool
+// Test toolchange on AbortSignal unregistration
 function testChromiumCallbackUnregister() {
-  if (!('modelContextTesting' in navigator)) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  const testingAPI = getTestingAPI();
-  if (!testingAPI) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
   try {
-    log('Testing registerToolsChangedCallback() on unregisterTool...', 'info');
+    log('Testing toolchange on AbortSignal unregistration...', 'info');
 
     let callbackFired = false;
-    testingAPI.registerToolsChangedCallback(() => {
-      callbackFired = true;
-      log('Callback fired on unregisterTool!', 'success');
-    });
+    modelContext.addEventListener(
+      'toolchange',
+      () => {
+        callbackFired = true;
+        log('toolchange fired on AbortSignal cleanup!', 'success');
+      },
+      { once: true }
+    );
 
     // Unregister the dynamic tool to trigger callback
     if (hasRegisteredTool(DYNAMIC_TOOL_NAME)) {
-      if (dynamicToolController) {
-        dynamicToolController.abort();
-        dynamicToolController = null;
-      } else {
-        modelContext.unregisterTool(DYNAMIC_TOOL_NAME);
-      }
+      dynamicToolController?.abort();
+      dynamicToolController = null;
 
       setTimeout(() => {
         if (callbackFired) {
@@ -1576,41 +1008,32 @@ function testChromiumCallbackUnregister() {
   }
 }
 
-// Test registerToolsChangedCallback on registerTool.
-function testChromiumCallbackProvide() {
-  if (!('modelContextTesting' in navigator)) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  const testingAPI = getTestingAPI();
-  if (!testingAPI) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
+// Test grouped registration toolchange.
+async function testChromiumCallbackProvide() {
   try {
-    log('Testing registerToolsChangedCallback() on registerTool...', 'info');
+    log('Testing toolchange on grouped registration...', 'info');
 
     let callbackFired = false;
-    testingAPI.registerToolsChangedCallback(() => {
-      callbackFired = true;
-      log('Callback fired on registerTool!', 'success');
-    });
+    modelContext.addEventListener(
+      'toolchange',
+      () => {
+        callbackFired = true;
+        log('Callback fired on registerTool!', 'success');
+      },
+      { once: true }
+    );
 
     // Register a tool to trigger callback
-    provideExtendedContext({
-      tools: [
-        {
-          name: 'callbackTest2',
-          description: 'Test callback',
-          inputSchema: { type: 'object', properties: {} },
-          async execute() {
-            return { content: [{ type: 'text', text: 'test' }] };
-          },
+    await replaceOwnedTools([
+      {
+        name: 'callbackTest2',
+        description: 'Test callback',
+        inputSchema: { type: 'object', properties: {} },
+        async execute() {
+          return { content: [{ type: 'text', text: 'test' }] };
         },
-      ],
-    });
+      },
+    ]);
 
     setTimeout(() => {
       if (callbackFired) {
@@ -1626,30 +1049,23 @@ function testChromiumCallbackProvide() {
   }
 }
 
-// Test registerToolsChangedCallback on AbortSignal cleanup.
+// Test toolchange on bulk AbortSignal cleanup.
 function testChromiumCallbackClear() {
-  if (!('modelContextTesting' in navigator)) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  const testingAPI = getTestingAPI();
-  if (!testingAPI) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
   try {
-    log('Testing registerToolsChangedCallback() on AbortSignal cleanup...', 'info');
+    log('Testing toolchange on bulk AbortSignal cleanup...', 'info');
 
     let callbackFired = false;
-    testingAPI.registerToolsChangedCallback(() => {
-      callbackFired = true;
-      log('Callback fired on AbortSignal cleanup!', 'success');
-    });
+    modelContext.addEventListener(
+      'toolchange',
+      () => {
+        callbackFired = true;
+        log('Callback fired on AbortSignal cleanup!', 'success');
+      },
+      { once: true }
+    );
 
     // Abort base registrations to trigger callback
-    for (const controller of baseContextControllers.splice(0)) {
+    for (const controller of baseToolControllers.splice(0)) {
       controller.abort();
     }
 
@@ -1679,33 +1095,39 @@ function testChromiumCallbackClear() {
 let toolNotificationCount = 0;
 let resourceNotificationCount = 0;
 let promptNotificationCount = 0;
-let notificationTrackingEnabled = false;
+let stopTrackingToolNotifications: (() => void) | undefined;
+
+function listenForToolChanges(listener: () => void): () => void {
+  modelContext.addEventListener('toolchange', listener);
+  return () => modelContext.removeEventListener('toolchange', listener);
+}
+
+function registerTemporaryTool(name: string, text: string): AbortController {
+  const controller = new AbortController();
+  void modelContext.registerTool(
+    {
+      name,
+      description: `Temporary notification test tool: ${name}`,
+      inputSchema: { type: 'object', properties: {} },
+      async execute() {
+        return { content: [{ type: 'text', text }] };
+      },
+    },
+    { signal: controller.signal }
+  );
+  return controller;
+}
 
 // Start tracking notifications
 function startNotificationTracking() {
-  if (!('modelContextTesting' in navigator)) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  const testingAPI = getTestingAPI();
-  if (!testingAPI) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  // Reset counts
+  stopTrackingToolNotifications?.();
   toolNotificationCount = 0;
   resourceNotificationCount = 0;
   promptNotificationCount = 0;
-  notificationTrackingEnabled = true;
 
-  // Register callback to count tool notifications
-  testingAPI.registerToolsChangedCallback(() => {
-    if (notificationTrackingEnabled) {
-      toolNotificationCount++;
-      log(`[Notification Tracking] Tool notification #${toolNotificationCount}`, 'info');
-    }
+  stopTrackingToolNotifications = listenForToolChanges(() => {
+    toolNotificationCount++;
+    log(`[Notification Tracking] Tool notification #${toolNotificationCount}`, 'info');
   });
 
   log('Notification tracking started', 'success');
@@ -1717,7 +1139,8 @@ function stopNotificationTracking(): {
   resources: number;
   prompts: number;
 } {
-  notificationTrackingEnabled = false;
+  stopTrackingToolNotifications?.();
+  stopTrackingToolNotifications = undefined;
   log(
     `Notification tracking stopped. Counts: tools=${toolNotificationCount}, resources=${resourceNotificationCount}, prompts=${promptNotificationCount}`,
     'success'
@@ -1737,44 +1160,22 @@ function testRapidToolRegistration(count: number): Promise<{
   return new Promise((resolve) => {
     log(`Testing rapid registration of ${count} tools...`, 'info');
 
-    // Reset notification count
     toolNotificationCount = 0;
-    notificationTrackingEnabled = true;
-
-    // Register callback before registrations
-    const testingAPI = getTestingAPI();
-    if (testingAPI) {
-      testingAPI.registerToolsChangedCallback(() => {
-        if (notificationTrackingEnabled) {
-          toolNotificationCount++;
-        }
-      });
-    }
+    const stopListening = listenForToolChanges(() => toolNotificationCount++);
 
     // Register N tools synchronously (should batch into 1 notification)
-    const registeredToolNames: string[] = [];
+    const registrations: AbortController[] = [];
     for (let i = 0; i < count; i++) {
-      const toolName = `batchTestTool_${i}`;
-      modelContext.registerTool({
-        name: toolName,
-        description: `Batch test tool ${i}`,
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: `Tool ${i} executed` }] };
-        },
-      });
-      registeredToolNames.push(toolName);
+      registrations.push(registerTemporaryTool(`batchTestTool_${i}`, `Tool ${i} executed`));
     }
 
-    log(`Registered ${registeredToolNames.length} tools synchronously`, 'info');
+    log(`Registered ${registrations.length} tools synchronously`, 'info');
 
-    // Wait for microtask to complete, then check notification count
-    // Use setTimeout to ensure we're after the microtask queue
     setTimeout(() => {
-      notificationTrackingEnabled = false;
+      stopListening();
 
       const result = {
-        registeredCount: registeredToolNames.length,
+        registeredCount: registrations.length,
         notificationCount: toolNotificationCount,
       };
 
@@ -1783,13 +1184,10 @@ function testRapidToolRegistration(count: number): Promise<{
         result.notificationCount <= 1 ? 'success' : 'error'
       );
 
-      // Cleanup: unregister all test tools
-      for (const toolName of registeredToolNames) {
-        modelContext.unregisterTool(toolName);
-      }
+      registrations.forEach((controller) => controller.abort());
 
       resolve(result);
-    }, 50); // Wait for microtask + some buffer
+    }, 50);
   });
 }
 
@@ -1801,32 +1199,18 @@ function testMultiTaskToolRegistration(count: number): Promise<{
   return new Promise((resolve) => {
     log(`Testing multi-task registration of ${count} tools...`, 'info');
 
-    // Reset notification count
     toolNotificationCount = 0;
-    notificationTrackingEnabled = true;
-
-    // Register callback before registrations
-    const testingAPI = getTestingAPI();
-    if (testingAPI) {
-      testingAPI.registerToolsChangedCallback(() => {
-        if (notificationTrackingEnabled) {
-          toolNotificationCount++;
-        }
-      });
-    }
-
-    const registeredToolNames: string[] = [];
+    const stopListening = listenForToolChanges(() => toolNotificationCount++);
+    const registrations: AbortController[] = [];
     let registered = 0;
 
-    // Register tools across separate tasks using setTimeout
     function registerNext() {
       if (registered >= count) {
-        // All registered, wait and check
         setTimeout(() => {
-          notificationTrackingEnabled = false;
+          stopListening();
 
           const result = {
-            registeredCount: registeredToolNames.length,
+            registeredCount: registrations.length,
             notificationCount: toolNotificationCount,
           };
 
@@ -1835,10 +1219,7 @@ function testMultiTaskToolRegistration(count: number): Promise<{
             result.notificationCount === count ? 'success' : 'info'
           );
 
-          // Cleanup
-          for (const toolName of registeredToolNames) {
-            modelContext.unregisterTool(toolName);
-          }
+          registrations.forEach((controller) => controller.abort());
 
           resolve(result);
         }, 50);
@@ -1846,18 +1227,8 @@ function testMultiTaskToolRegistration(count: number): Promise<{
       }
 
       const i = registered++;
-      const toolName = `multiTaskTool_${i}`;
-      modelContext.registerTool({
-        name: toolName,
-        description: `Multi-task test tool ${i}`,
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: `Tool ${i} executed` }] };
-        },
-      });
-      registeredToolNames.push(toolName);
+      registrations.push(registerTemporaryTool(`multiTaskTool_${i}`, `Tool ${i} executed`));
 
-      // Schedule next registration in a new task
       setTimeout(registerNext, 10);
     }
 
@@ -1879,30 +1250,16 @@ function testMixedRegistrationBatching(): Promise<{
     let phase3Notifications = 0;
     let currentPhase = 1;
 
-    // Register callback
-    const testingAPI = getTestingAPI();
-    if (testingAPI) {
-      testingAPI.registerToolsChangedCallback(() => {
-        if (currentPhase === 1) phase1Notifications++;
-        else if (currentPhase === 2) phase2Notifications++;
-        else if (currentPhase === 3) phase3Notifications++;
-      });
-    }
-
-    const allRegistrationToolNames: string[] = [];
+    const stopListening = listenForToolChanges(() => {
+      if (currentPhase === 1) phase1Notifications++;
+      else if (currentPhase === 2) phase2Notifications++;
+      else if (currentPhase === 3) phase3Notifications++;
+    });
+    const registrations: AbortController[] = [];
 
     // Phase 1: Register 5 tools synchronously (should batch to 1 notification)
     for (let i = 0; i < 5; i++) {
-      const toolName = `mixedPhase1_${i}`;
-      modelContext.registerTool({
-        name: toolName,
-        description: `Mixed phase 1 tool ${i}`,
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'test' }] };
-        },
-      });
-      allRegistrationToolNames.push(toolName);
+      registrations.push(registerTemporaryTool(`mixedPhase1_${i}`, 'test'));
     }
 
     // After microtask, move to phase 2
@@ -1911,16 +1268,7 @@ function testMixedRegistrationBatching(): Promise<{
 
       // Phase 2: Register 3 more tools synchronously (should batch to 1 notification)
       for (let i = 0; i < 3; i++) {
-        const toolName = `mixedPhase2_${i}`;
-        modelContext.registerTool({
-          name: toolName,
-          description: `Mixed phase 2 tool ${i}`,
-          inputSchema: { type: 'object', properties: {} },
-          async execute() {
-            return { content: [{ type: 'text', text: 'test' }] };
-          },
-        });
-        allRegistrationToolNames.push(toolName);
+        registrations.push(registerTemporaryTool(`mixedPhase2_${i}`, 'test'));
       }
 
       setTimeout(() => {
@@ -1928,19 +1276,11 @@ function testMixedRegistrationBatching(): Promise<{
 
         // Phase 3: Register 2 more tools synchronously (should batch to 1 notification)
         for (let i = 0; i < 2; i++) {
-          const toolName = `mixedPhase3_${i}`;
-          modelContext.registerTool({
-            name: toolName,
-            description: `Mixed phase 3 tool ${i}`,
-            inputSchema: { type: 'object', properties: {} },
-            async execute() {
-              return { content: [{ type: 'text', text: 'test' }] };
-            },
-          });
-          allRegistrationToolNames.push(toolName);
+          registrations.push(registerTemporaryTool(`mixedPhase3_${i}`, 'test'));
         }
 
         setTimeout(() => {
+          stopListening();
           const result = {
             phase1Notifications,
             phase2Notifications,
@@ -1954,10 +1294,7 @@ function testMixedRegistrationBatching(): Promise<{
               : 'error'
           );
 
-          // Cleanup
-          for (const toolName of allRegistrationToolNames) {
-            modelContext.unregisterTool(toolName);
-          }
+          registrations.forEach((controller) => controller.abort());
 
           resolve(result);
         }, 50);
@@ -1971,45 +1308,31 @@ declare global {
   interface Window {
     testApp: {
       counter: () => number;
-      registerBaseTools: () => void;
-      registerDynamicTool: () => void;
+      registerBaseTools: () => Promise<void>;
+      registerDynamicTool: () => Promise<void>;
       unregisterDynamicTool: () => void;
-      replaceBaseTools: () => void;
+      replaceBaseTools: () => Promise<void>;
       listAllTools: () => void;
       getAPIStatus: () => boolean;
       checkTestingAPI: () => void;
-      testToolCallTracking: () => Promise<void>;
-      testMockResponse: () => Promise<void>;
-      testReset: () => void;
       hasTestingAPI: () => boolean;
-      // Chromium native API tests
+      // Historical MCP-B compatibility tests
       testChromiumUnregisterTool: () => void;
       testChromiumClearContext: () => void;
       testChromiumExecuteTool: () => Promise<void>;
       testChromiumListTools: () => void;
       testChromiumCallbackRegister: () => void;
       testChromiumCallbackUnregister: () => void;
-      testChromiumCallbackProvide: () => void;
+      testChromiumCallbackProvide: () => Promise<void>;
       testChromiumCallbackClear: () => void;
       // Resource tests
       registerBaseResources: () => void;
       registerDynamicResource: () => void;
       unregisterDynamicResource: () => void;
-      listResources: () => void;
-      listResourceTemplates: () => void;
-      readStaticResource: () => Promise<void>;
-      readTemplateResource: () => Promise<void>;
       // Prompt tests
       registerBasePrompts: () => void;
       registerDynamicPrompt: () => void;
       unregisterDynamicPrompt: () => void;
-      listPrompts: () => void;
-      getPromptWithoutArgs: () => Promise<void>;
-      getPromptWithArgs: () => Promise<void>;
-      // Sampling & Elicitation tests
-      checkSamplingApi: () => void;
-      testSamplingCall: () => Promise<void>;
-      testElicitationCall: () => Promise<void>;
       // Notification batching tests
       startNotificationTracking: () => void;
       stopNotificationTracking: () => { tools: number; resources: number; prompts: number };
@@ -2038,13 +1361,10 @@ window.testApp = {
   unregisterDynamicTool,
   replaceBaseTools,
   listAllTools,
-  getAPIStatus: () => 'modelContext' in navigator,
+  getAPIStatus: () => 'modelContext' in document,
   checkTestingAPI,
-  testToolCallTracking,
-  testMockResponse,
-  testReset,
   hasTestingAPI: () => 'modelContextTesting' in navigator,
-  // Chromium native API tests
+  // Historical MCP-B compatibility tests
   testChromiumUnregisterTool,
   testChromiumClearContext,
   testChromiumExecuteTool,
@@ -2057,21 +1377,10 @@ window.testApp = {
   registerBaseResources,
   registerDynamicResource,
   unregisterDynamicResource,
-  listResources,
-  listResourceTemplates,
-  readStaticResource,
-  readTemplateResource,
   // Prompt tests
   registerBasePrompts,
   registerDynamicPrompt,
   unregisterDynamicPrompt,
-  listPrompts,
-  getPromptWithoutArgs,
-  getPromptWithArgs,
-  // Sampling & Elicitation tests
-  checkSamplingApi,
-  testSamplingCall,
-  testElicitationCall,
   // Notification batching tests
   startNotificationTracking,
   stopNotificationTracking,

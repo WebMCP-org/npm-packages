@@ -29,11 +29,13 @@ The [Web Model Context API](https://webmachinelearning.github.io/webmcp/) is a [
 ```
 document.modelContext
 ├── .registerTool(tool, { signal })  Register a tool for AI agents
-├── .getTools()                      Discover registered tools
-└── .executeTool(tool, inputJson)     Execute a discovered tool
+└── .getTools()                      Discover registered tools
+
+Chrome preview extension
+└── .executeTool(tool, inputJson)    Execute a discovered tool
 ```
 
-MCP-b **polyfills** that API for all browsers today, and **bridges** it to the full [Model Context Protocol](https://modelcontextprotocol.io/) — turning that tool source into a complete MCP server with prompts, resources, sampling, and transports.
+MCP-b **polyfills** that API for all browsers today, and **bridges** it to the full [Model Context Protocol](https://modelcontextprotocol.io/) — turning that tool source into a complete MCP server with prompts, resources, and browser transports.
 
 > Built by [MCP-b](https://docs.mcp-b.ai). Not an official W3C or MCP project.
 
@@ -43,10 +45,10 @@ MCP-b **polyfills** that API for all browsers today, and **bridges** it to the f
 
 If you're running Chrome with [`--enable-experimental-web-platform-features`](./e2e/web-standards-showcase/CHROMIUM_FLAGS.md), `document.modelContext` is already there. Just use it:
 
-Add `@mcp-b/webmcp-types` (`pnpm add -D @mcp-b/webmcp-types`) for full input/output schema inference:
+Add `@mcp-b/webmcp-types` (`pnpm add -D @mcp-b/webmcp-types`) for input schema inference:
 
 ```ts
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'add_todo',
   description: 'Add a new todo item',
   inputSchema: {
@@ -54,12 +56,6 @@ document.modelContext.registerTool({
     properties: { title: { type: 'string' }, done: { type: 'boolean' } },
     required: ['title'],
   } as const, // ← args inferred: { title: string; done?: boolean }
-  outputSchema: {
-    // ← optional — infers return type
-    type: 'object',
-    properties: { id: { type: 'number' }, title: { type: 'string' } },
-    required: ['id', 'title'],
-  } as const,
   execute: async (args) => ({ id: Date.now(), title: args.title }),
 });
 ```
@@ -73,7 +69,7 @@ import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill'; // pnpm add @
 
 initializeWebMCPPolyfill(); // no-op if native support exists
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'get_page_title',
   description: 'Returns the current page title',
   inputSchema: { type: 'object', properties: {} },
@@ -100,13 +96,13 @@ function PageTitle() {
 
 ### 3. Full MCP server
 
-Need the full [Model Context Protocol](https://modelcontextprotocol.io/) — prompts, resources, sampling, transports, interop with Claude Desktop / Cursor / any MCP client? Use `@mcp-b/global`:
+Need the full [Model Context Protocol](https://modelcontextprotocol.io/) — prompts, resources, transports, and interop with Claude Desktop, Cursor, or another MCP client? Use `@mcp-b/global`:
 
 ```ts
 import '@mcp-b/global'; // pnpm add @mcp-b/global
 
 // Same registerTool API — now backed by a full MCP server
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'add_todo',
   description: 'Add a new todo item',
   inputSchema: {
@@ -127,23 +123,30 @@ Or as a script tag (zero build step):
 
 ```html
 <script src="https://unpkg.com/@mcp-b/global/dist/index.iife.js"></script>
-<script>
-  document.modelContext.registerTool({
+<script type="module">
+  await document.modelContext.registerTool({
     /* ... */
   });
 </script>
 ```
 
-Or with React: `pnpm add @mcp-b/react-webmcp`
+Or with React: `pnpm add @mcp-b/global @mcp-b/react-webmcp`
 
 ```tsx
+import '@mcp-b/global';
 import { useWebMCP } from '@mcp-b/react-webmcp';
 
 function TodoApp({ todos, addTodo }) {
   useWebMCP({
     name: 'add_todo',
     description: 'Add a new todo item',
-    schema: { title: z.string().describe('Todo title') },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Todo title' },
+      },
+      required: ['title'],
+    } as const,
     execute: async ({ title }) => {
       addTodo(title);
       return { success: true };
@@ -207,15 +210,17 @@ Any website running `@mcp-b/global` becomes callable from your desktop AI agent.
 
 ## Which Package?
 
-| I want to…                          | Package                                                                        |
-| ----------------------------------- | ------------------------------------------------------------------------------ |
-| Add tools to my site (simplest)     | [`@mcp-b/global`](./packages/global)                                           |
-| Just the polyfill, no MCP bridge    | [`@mcp-b/webmcp-polyfill`](./packages/webmcp-polyfill)                         |
-| Register tools from React           | [`@mcp-b/react-webmcp`](./packages/react-webmcp)                               |
-| Forward tools to local AI agents    | [`@mcp-b/webmcp-local-relay`](./packages/webmcp-local-relay)                   |
-| Build a Chrome extension with tools | [`@mcp-b/extension-tools`](./packages/extension-tools)                         |
-| Control Chrome from an AI agent     | [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) |
-| Just the TypeScript types           | [`@mcp-b/webmcp-types`](./packages/webmcp-types)                               |
+| I want to…                       | Package                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------ |
+| Add tools to my site (simplest)  | [`@mcp-b/global`](./packages/global)                                           |
+| Just the polyfill, no MCP bridge | [`@mcp-b/webmcp-polyfill`](./packages/webmcp-polyfill)                         |
+| Register tools from React        | [`@mcp-b/react-webmcp`](./packages/react-webmcp)                               |
+| Add WebMCP from an extension     | [`@mcp-b/webmcp-extension`](./packages/webmcp-extension)                       |
+| Forward tools to local AI agents | [`@mcp-b/webmcp-local-relay`](./packages/webmcp-local-relay)                   |
+| Control Chrome from an AI agent  | [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) |
+| Just the TypeScript types        | [`@mcp-b/webmcp-types`](./packages/webmcp-types)                               |
+
+Chrome DevTools integration now lives entirely upstream; its WebMCP changes have all landed there.
 
 ---
 
@@ -232,16 +237,16 @@ pnpm add @mcp-b/webmcp-polyfill
 pnpm add -D @mcp-b/webmcp-types
 
 # React hooks for full runtime
-pnpm add @mcp-b/react-webmcp zod
+pnpm add @mcp-b/react-webmcp
 
 # React hooks for strict WebMCP core only
-pnpm add usewebmcp zod
+pnpm add usewebmcp
 
 # Transport layer (custom integrations)
 pnpm add @mcp-b/transports
 
-# Chrome Extension API tools
-pnpm add @mcp-b/extension-tools
+# Chromium extension template and content-script client
+pnpm add @mcp-b/global @mcp-b/webmcp-extension
 
 # DOM extraction for AI
 pnpm add @mcp-b/smart-dom-reader
@@ -251,19 +256,20 @@ pnpm add @mcp-b/smart-dom-reader
 
 ### Core
 
-| Package                                              | Version                                                                                                             | Description                                                         |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| [@mcp-b/webmcp-polyfill](./packages/webmcp-polyfill) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill) | `document.modelContext` polyfill, with a deprecated navigator alias |
-| [@mcp-b/webmcp-types](./packages/webmcp-types)       | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-types)](https://www.npmjs.com/package/@mcp-b/webmcp-types)       | TypeScript definitions for the WebMCP core API                      |
-| [@mcp-b/global](./packages/global)                   | [![npm](https://img.shields.io/npm/v/@mcp-b/global)](https://www.npmjs.com/package/@mcp-b/global)                   | Full runtime — polyfill + MCP bridge (prompts, resources, sampling) |
-| [@mcp-b/webmcp-ts-sdk](./packages/webmcp-ts-sdk)     | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)     | Browser-adapted MCP TypeScript SDK with dynamic tool registration   |
+| Package                                              | Version                                                                                                             | Description                                                          |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| [@mcp-b/webmcp-polyfill](./packages/webmcp-polyfill) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill) | `document.modelContext` polyfill, with a deprecated navigator alias  |
+| [@mcp-b/webmcp-types](./packages/webmcp-types)       | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-types)](https://www.npmjs.com/package/@mcp-b/webmcp-types)       | TypeScript definitions for the WebMCP core API                       |
+| [@mcp-b/global](./packages/global)                   | [![npm](https://img.shields.io/npm/v/@mcp-b/global)](https://www.npmjs.com/package/@mcp-b/global)                   | Full runtime — polyfill + MCP bridge (prompts, resources, transport) |
+| [@mcp-b/webmcp-ts-sdk](./packages/webmcp-ts-sdk)     | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)     | Browser-adapted MCP TypeScript SDK with dynamic tool registration    |
 
 ### Transports & Composition
 
 | Package                                                    | Version                                                                                                                   | Description                                                              |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | [@mcp-b/transports](./packages/transports)                 | [![npm](https://img.shields.io/npm/v/@mcp-b/transports)](https://www.npmjs.com/package/@mcp-b/transports)                 | `postMessage`, iframe, and Chrome extension transports                   |
-| [@mcp-b/mcp-iframe](./packages/mcp-iframe)                 | [![npm](https://img.shields.io/npm/v/@mcp-b/mcp-iframe)](https://www.npmjs.com/package/@mcp-b/mcp-iframe)                 | `<mcp-iframe>` web component — surfaces iframe tools to the parent page  |
+| [@mcp-b/webmcp-extension](./packages/webmcp-extension)     | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-extension)](https://www.npmjs.com/package/@mcp-b/webmcp-extension)     | MV3 template and isolated content-script client for page tools           |
+| [@mcp-b/mcp-iframe](./packages/mcp-iframe)                 | [![npm](https://img.shields.io/npm/v/@mcp-b/mcp-iframe)](https://www.npmjs.com/package/@mcp-b/mcp-iframe)                 | Web component for exposing iframe tools, resources, and prompts          |
 | [@mcp-b/webmcp-local-relay](./packages/webmcp-local-relay) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-local-relay)](https://www.npmjs.com/package/@mcp-b/webmcp-local-relay) | Localhost relay — forwards website tools to Claude Desktop, Cursor, etc. |
 
 ### React
@@ -275,18 +281,18 @@ pnpm add @mcp-b/smart-dom-reader
 
 ### Browser Tooling
 
-| Package                                                | Version                                                                                                               | Description                                                                 |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| [@mcp-b/extension-tools](./packages/extension-tools)   | [![npm](https://img.shields.io/npm/v/@mcp-b/extension-tools)](https://www.npmjs.com/package/@mcp-b/extension-tools)   | Pre-built MCP tools for Chrome Extension APIs (tabs, bookmarks, history, …) |
-| [@mcp-b/smart-dom-reader](./packages/smart-dom-reader) | [![npm](https://img.shields.io/npm/v/@mcp-b/smart-dom-reader)](https://www.npmjs.com/package/@mcp-b/smart-dom-reader) | Token-efficient DOM extraction for AI agents                                |
+| Package                                                | Version                                                                                                               | Description                                  |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| [@mcp-b/smart-dom-reader](./packages/smart-dom-reader) | [![npm](https://img.shields.io/npm/v/@mcp-b/smart-dom-reader)](https://www.npmjs.com/package/@mcp-b/smart-dom-reader) | Token-efficient DOM extraction for AI agents |
 
 <details>
 <summary>Deprecated packages</summary>
 
-| Package                        | Status     | Migration                                                  |
-| ------------------------------ | ---------- | ---------------------------------------------------------- |
-| ~~@mcp-b/mcp-react-hooks~~     | Deprecated | Use [@mcp-b/react-webmcp](./packages/react-webmcp) instead |
-| ~~@mcp-b/mcp-react-hook-form~~ | Removed    | Use custom `useWebMCP` wrappers                            |
+| Package                        | Status     | Migration                                                                                                                                                   |
+| ------------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~@mcp-b/mcp-react-hooks~~     | Deprecated | Use [@mcp-b/react-webmcp](./packages/react-webmcp) instead                                                                                                  |
+| ~~@mcp-b/mcp-react-hook-form~~ | Removed    | Use custom `useWebMCP` wrappers                                                                                                                             |
+| ~~@mcp-b/codemode~~            | Removed    | Use [Cloudflare Code Mode](https://github.com/cloudflare/agents/tree/main/packages/codemode); browser APIs are exported from `@cloudflare/codemode/browser` |
 
 </details>
 
@@ -297,11 +303,11 @@ pnpm add @mcp-b/smart-dom-reader
 │  Your web app                                            │
 │  document.modelContext.registerTool({ ... })              │
 ├────────────── @mcp-b/global ─────────────────────────────┤
-│  MCP bridge: prompts, resources, sampling, elicitation   │
+│  MCP bridge: prompts, resources, browser transports      │
 ├────────────── @mcp-b/webmcp-ts-sdk ──────────────────────┤
 │  BrowserMcpServer — wraps native/polyfill context        │
 ├────────────── @mcp-b/webmcp-polyfill ────────────────────┤
-│  Strict WebMCP core (registerTool, getTools, executeTool)│
+│  WebMCP core + optional Chrome executeTool extension    │
 ├──────────────────────────────────────────────────────────┤
 │  Native browser API (when available)                     │
 └──────────────────────────────────────────────────────────┘
@@ -316,16 +322,18 @@ pnpm add @mcp-b/smart-dom-reader
 
 ```
 webmcp-types          (canonical type definitions)
-├── webmcp-polyfill   (canonical runtime polyfill)
-├── webmcp-ts-sdk     (TypeScript SDK adapter)
-├── transports        (browser transports)
-│   ├── mcp-iframe    (iframe custom element)
-│   └── global        (full MCP-B runtime)
-│       └── react-webmcp (React hooks for MCP-B)
-└── usewebmcp         (React hooks for strict core)
+└── webmcp-polyfill   (canonical runtime polyfill)
+    ├── webmcp-ts-sdk (TypeScript SDK adapter)
+    │   ├── global    (full runtime; also uses transports)
+    │   ├── mcp-iframe (iframe element; also uses transports)
+    │   └── react-webmcp (also uses usewebmcp; pair with global at app level)
+    └── usewebmcp     (React hooks for strict core)
+
+transports            (browser transports shared by integrations)
+└── webmcp-extension  (MV3 template and isolated content-script client)
 ```
 
-Standalone packages: `extension-tools`, `smart-dom-reader`, `webmcp-local-relay`.
+Standalone packages: `smart-dom-reader`, `webmcp-local-relay`.
 
 ## Development
 
@@ -340,7 +348,7 @@ pnpm build
 | --------------------------- | --------------------------------- |
 | `pnpm build`                | Build all packages                |
 | `pnpm typecheck`            | Type-check all packages           |
-| `pnpm check`                | Lint + format (Biome)             |
+| `pnpm check`                | Lint + format (Oxlint + Oxfmt)    |
 | `pnpm test:unit`            | Unit tests                        |
 | `pnpm test:e2e`             | E2E tests (Playwright)            |
 | `pnpm test`                 | All tests                         |
@@ -352,18 +360,16 @@ pnpm build
 
 ## Documentation
 
-| Document                                                           | Purpose                                             |
-| ------------------------------------------------------------------ | --------------------------------------------------- |
-| [CONTRIBUTING.md](./CONTRIBUTING.md)                               | How to contribute: setup, PR process, commit format |
-| [AGENTS.md](./AGENTS.md)                                           | Quick reference for AI agents working in this repo  |
-| [Package Philosophy](./docs/MCPB_PACKAGE_PHILOSOPHY.md)            | Package boundaries and layering model               |
-| [Testing Philosophy](./docs/TESTING_PHILOSOPHY.md)                 | Test layers, mocking policy, coverage expectations  |
-| [E2E Testing](./docs/TESTING.md)                                   | Playwright setup, test apps, debugging              |
-| [@mcp-b/global guide](./docs/global-guide.md)                      | Advanced usage for the full runtime                 |
-| [@mcp-b/react-webmcp guide](./docs/react-webmcp-guide.md)          | Advanced React patterns                             |
-| [WebMCP Alignment Matrix](./docs/plans/WEBMCP_ALIGNMENT_MATRIX.md) | Spec vs native vs polyfill parity tracking          |
-| [AI Contribution Manifesto](./docs/AI_CONTRIBUTION_MANIFESTO.md)   | Safety rules and code quality bar                   |
-| [Relevant Links](./docs/RELEVANT_LINKS.md)                         | Curated external best practices for contributors    |
+| Document                                                         | Purpose                                             |
+| ---------------------------------------------------------------- | --------------------------------------------------- |
+| [CONTRIBUTING.md](./CONTRIBUTING.md)                             | How to contribute: setup, PR process, commit format |
+| [AGENTS.md](./AGENTS.md)                                         | Quick reference for AI agents working in this repo  |
+| [Package Philosophy](./docs/MCPB_PACKAGE_PHILOSOPHY.md)          | Package boundaries and layering model               |
+| [Testing Philosophy](./docs/TESTING_PHILOSOPHY.md)               | Test layers, mocking policy, coverage expectations  |
+| [E2E Testing](./docs/TESTING.md)                                 | Playwright setup, test apps, debugging              |
+| [@mcp-b/global guide](./docs/global-guide.md)                    | Advanced usage for the full runtime                 |
+| [AI Contribution Manifesto](./docs/AI_CONTRIBUTION_MANIFESTO.md) | Safety rules and code quality bar                   |
+| [Relevant Links](./docs/RELEVANT_LINKS.md)                       | Curated external best practices for contributors    |
 
 ## Contributing
 

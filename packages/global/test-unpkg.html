@@ -3,22 +3,22 @@
   <head>
     <title>Test IIFE - unpkg CDN</title>
     <!-- Test with unpkg - using specific version to bypass cache -->
-    <script src="https://unpkg.com/@mcp-b/global@1.1.0/dist/index.iife.js"></script>
+    <script src="https://unpkg.com/@mcp-b/global@4.0.0/dist/index.iife.js"></script>
   </head>
   <body>
     <h1>My AI-Powered App (unpkg Test)</h1>
     <div id="status"></div>
 
-    <script>
+    <script type="module">
       const statusEl = document.getElementById('status');
 
-      // Check if navigator.modelContext is available
-      if (window.navigator.modelContext) {
-        statusEl.innerHTML = '<p style="color: green;">✅ navigator.modelContext is available!</p>';
+      // Check if document.modelContext is available
+      if (document.modelContext) {
+        statusEl.innerHTML = '<p style="color: green;">✅ document.modelContext is available!</p>';
 
         try {
           // Register tools with AI agents
-          window.navigator.modelContext.registerTool({
+          await document.modelContext.registerTool({
             name: 'get-page-title',
             description: 'Get the current page title',
             inputSchema: {
@@ -40,20 +40,17 @@
           statusEl.innerHTML += '<p style="color: green;">✅ Tool registered successfully!</p>';
 
           // List registered tools
-          const tools = window.navigator.modelContextTesting?.listTools();
-          if (tools) {
-            statusEl.innerHTML += `<p>Registered tools: ${tools.length}</p>`;
-            statusEl.innerHTML += '<pre>' + JSON.stringify(tools, null, 2) + '</pre>';
-          }
+          const tools = await document.modelContext.getTools();
+          statusEl.innerHTML += `<p>Registered tools: ${tools.length}</p>`;
+          statusEl.innerHTML += '<pre>' + JSON.stringify(tools, null, 2) + '</pre>';
         } catch (error) {
           statusEl.innerHTML += `<p style="color: red;">❌ Error: ${error.message}</p>`;
           statusEl.innerHTML += `<pre>${error.stack}</pre>`;
           console.error(error);
         }
       } else {
-        statusEl.innerHTML =
-          '<p style="color: red;">❌ navigator.modelContext is NOT available</p>';
-        console.error('navigator.modelContext not found');
+        statusEl.innerHTML = '<p style="color: red;">❌ document.modelContext is NOT available</p>';
+        console.error('document.modelContext not found');
 
         // Check what's in window
         statusEl.innerHTML += '<p>Available globals:</p>';

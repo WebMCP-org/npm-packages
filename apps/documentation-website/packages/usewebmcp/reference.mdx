@@ -11,7 +11,7 @@ icon: 'react'
 
 ## Installation
 
-```bash
+```bash title="Install packages"
 pnpm add usewebmcp react
 ```
 
@@ -23,7 +23,7 @@ pnpm add usewebmcp react
 
 ### `useWebMCP(config, deps?)`
 
-```ts
+```ts title="Import"
 import { useWebMCP } from 'usewebmcp';
 ```
 
@@ -42,20 +42,18 @@ import { useWebMCP } from 'usewebmcp';
 
 ## Config fields
 
-| Field                      | Type                              | Required | Description                                                      |
-| -------------------------- | --------------------------------- | -------- | ---------------------------------------------------------------- |
-| `name`                     | `string`                          | Yes      | Unique tool identifier (lowercase with underscores)              |
-| `description`              | `string`                          | Yes      | Human-readable description for AI assistants                     |
-| `inputSchema`              | JSON Schema or Standard Schema v1 | No       | Defines input parameters. Use `as const` for inference.          |
-| `outputSchema`             | JSON Schema                       | No       | MCP-B helper metadata for output typing and `structuredContent`. |
-| `annotations`              | `ToolAnnotations`                 | No       | Metadata hints such as `readOnlyHint` and `idempotentHint`       |
-| `execute(input)`           | `(input) => T \| Promise<T>`      | Yes\*    | Preferred tool implementation function                           |
-| `handler(input)`           | `(input) => T \| Promise<T>`      | Yes\*    | Backward-compatible alias for `execute`                          |
-| `formatOutput(output)`     | `(output) => string`              | No       | Deprecated. Prefer `outputSchema`.                               |
-| `onSuccess(result, input)` | `(result, input) => void`         | No       | Callback after successful execution                              |
-| `onError(error, input)`    | `(error, input) => void`          | No       | Callback after failed execution                                  |
+| Field            | Type                                   | Required | Description                                                      |
+| ---------------- | -------------------------------------- | -------- | ---------------------------------------------------------------- |
+| `name`           | `string`                               | Yes      | Unique tool identifier                                           |
+| `description`    | `string`                               | Yes      | Human-readable description for AI assistants                     |
+| `inputSchema`    | JSON Schema or Standard JSON Schema v1 | No       | Defines input parameters. Use `as const` for inference.          |
+| `outputSchema`   | JSON Schema                            | No       | MCP-B helper metadata for output typing and `structuredContent`. |
+| `annotations`    | `ToolAnnotations`                      | No       | Standard and MCP-B behavior hints                                |
+| `execute(input)` | `(input) => T \| Promise<T>`           | Yes      | Tool implementation                                              |
 
-_One of `execute` or `handler` is required. If both are present, `execute` wins._
+The WebMCP draft standardizes `readOnlyHint` and `untrustedContentHint`.
+MCP-specific hints such as `idempotentHint` remain available when the hook
+registers against an MCP-B runtime, but they are not standard WebMCP metadata.
 
 ## `ToolExecutionState`
 
@@ -70,16 +68,16 @@ _One of `execute` or `handler` is required. If both are present, `execute` wins.
 
 Input inference works with two schema formats:
 
-- JSON Schema literals with `as const`
-- Standard Schema v1 implementations such as Zod v4, Valibot, and ArkType
+- inline JSON Schema literals, or reusable constants preserved with `as const`
+- Standard JSON Schema v1 implementations such as Zod 4.2+
 
 Output inference comes from `outputSchema` when you pass a JSON Schema literal:
 
-- the `execute` or `handler` return type is inferred from the schema
+- the `execute` return type is inferred from the schema
 - `state.lastResult` is typed accordingly
 - the MCP response includes `structuredContent`
 
-```tsx
+```tsx title="Output inference"
 const OUTPUT_SCHEMA = {
   type: 'object',
   properties: {
@@ -103,27 +101,29 @@ The hook unregisters and re-registers when any of these values change:
 
 - `name`
 - `description`
-- `inputSchema` reference
-- `outputSchema` reference
-- `annotations` reference
 - values in `deps`
 
-These callbacks are stored in refs and do not trigger re-registration:
+The latest committed `execute` implementation applies without re-registration. The hook also stores
+`inputSchema`, `outputSchema`, and `annotations` in a committed ref, so new object references do not
+re-register the tool. A registered descriptor retains its current metadata until another trigger
+re-registers it. Include a primitive schema or annotation revision in `deps` when that metadata must
+change.
 
-- `execute`
-- `handler`
-- `onSuccess`
-- `onError`
-- `formatOutput`
+In the browser, the hook updates that ref with React's
+[`useLayoutEffect`](https://react.dev/reference/react/useLayoutEffect). This publishes the newest
+committed callback before passive effects run, covering the window where an external MCP call can
+arrive immediately after a commit. A render that suspends or is otherwise abandoned never updates
+the ref. During server rendering, the hook falls back to
+[`useEffect`](https://react.dev/reference/react/useEffect), following React's
+[server-rendering guidance for layout effects](https://react.dev/reference/react/useLayoutEffect#im-getting-an-error-uselayouteffect-does-nothing-on-the-server).
 
-<Warning>
-  Define `inputSchema`, `outputSchema`, and `annotations` outside the component or memoize them.
-  Fresh object references on every render force unnecessary re-registration.
-</Warning>
+## Tool responses
 
-## Output schema contract
-
-When `outputSchema` is defined, the implementation must return a JSON-serializable value that matches that schema for MCP-B helpers that consume it. Object, array, string, number, boolean, and null schemas are supported for type inference and hook result shaping.
+Existing MCP responses pass through unchanged. Raw strings become text content, while other JSON
+values become text content plus `structuredContent`. When `outputSchema` is defined, the
+implementation must return a JSON-serializable value. The schema drives TypeScript inference; the
+hook does not validate the returned value against it at runtime. Object, array, string, number,
+boolean, and null schemas are supported for inference.
 
 Native Chrome WebMCP does not currently define or enforce `outputSchema`; the browser standard tool dictionary defines `inputSchema`.
 

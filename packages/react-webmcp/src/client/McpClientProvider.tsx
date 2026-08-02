@@ -1,13 +1,12 @@
 import {
   type Client,
-  type Tool as McpTool,
-  type RequestOptions,
+  type ConnectOptions,
   type Resource,
-  ResourceListChangedNotificationSchema,
   type ServerCapabilities,
-  ToolListChangedNotificationSchema,
+  type SubscriptionFilter,
+  type Tool as McpTool,
   type Transport,
-} from '@mcp-b/webmcp-ts-sdk';
+} from '@modelcontextprotocol/client';
 import {
   createContext,
   type ReactElement,
@@ -15,9 +14,11 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
+import { useCommittedRef } from '../useCommittedRef.js';
 
 /**
  * Context value provided by McpClientProvider.
@@ -32,37 +33,42 @@ interface McpClientContextValue {
   isLoading: boolean;
   error: Error | null;
   capabilities: ServerCapabilities | null;
-  reconnect: () => Promise<void>;
+  reconnect: (freshTransport?: Transport) => Promise<void>;
 }
+
+type ConnectionState = 'disconnected' | 'connecting' | 'initializing' | 'connected';
 
 const McpClientContext = createContext<McpClientContextValue | null>(null);
-const EMPTY_REQUEST_OPTS: RequestOptions = {};
-const TOOL_FLOW_TRACE_KEY = 'WEBMCP_TRACE_TOOL_FLOW';
 
-function emitForcedToolFlowTrace(event: string, details: Record<string, unknown>): void {
-  const consoleRef = globalThis.console;
-  if (!consoleRef) {
-    return;
-  }
+function startListChangedSubscription(
+  client: Client,
+  filter: SubscriptionFilter,
+  refreshLists: () => Promise<void>
+): () => void {
+  const controller = new AbortController();
 
-  const method = consoleRef.debug ?? consoleRef.log;
-  if (typeof method !== 'function') {
-    return;
-  }
+  void client
+    .listen(filter, { signal: controller.signal })
+    .then(async (subscription) => {
+      if (controller.signal.aborted) {
+        await subscription.close();
+        return;
+      }
 
-  method.call(consoleRef, '[ReactWebMCP:McpClientProvider:ToolFlow]', event, details);
-}
+      // Modern servers deliver list_changed only after listen is acknowledged.
+      await refreshLists();
+    })
+    .catch((error) => {
+      if (!controller.signal.aborted) {
+        console.error(
+          '[ReactWebMCP:McpClientProvider]',
+          'Failed to listen for list_changed notifications:',
+          error
+        );
+      }
+    });
 
-function isToolFlowTraceEnabled(): boolean {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  try {
-    return window.localStorage.getItem(TOOL_FLOW_TRACE_KEY) === '1';
-  } catch {
-    return false;
-  }
+  return () => controller.abort();
 }
 
 /**
@@ -87,9 +93,9 @@ export interface McpClientProviderProps {
   transport: Transport;
 
   /**
-   * Optional request options for the connection.
+   * Optional connection options.
    */
-  opts?: RequestOptions;
+  opts?: ConnectOptions;
 }
 
 /**
@@ -111,17 +117,18 @@ export interface McpClientProviderProps {
  * @example
  * Connect to an MCP server via tab transport:
  * ```tsx
- * import { Client } from '@modelcontextprotocol/sdk/client/index.js';
  * import { TabClientTransport } from '@mcp-b/transports';
  * import { McpClientProvider } from '@mcp-b/react-webmcp';
+ * import { Client } from '@modelcontextprotocol/client';
  *
  * const client = new Client(
  *   { name: 'my-app', version: '1.0.0' },
- *   { capabilities: {} }
+ *   { versionNegotiation: { mode: 'auto' } }
  * );
  *
- * const transport = new TabClientTransport('mcp', {
- *   clientInstanceId: 'my-app-instance',
+ * const transport = new TabClientTransport({
+ *   channelId: 'mcp',
+ *   targetOrigin: window.location.origin,
  * });
  *
  * function App() {
@@ -168,205 +175,271 @@ export function McpClientProvider({
 }: McpClientProviderProps): ReactElement {
   const [resources, setResources] = useState<Resource[]>([]);
   const [tools, setTools] = useState<McpTool[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [capabilities, setCapabilities] = useState<ServerCapabilities | null>(null);
-  const requestOpts = opts ?? EMPTY_REQUEST_OPTS;
-
-  const connectionStateRef = useRef<'disconnected' | 'connecting' | 'connected'>('disconnected');
-  const toolFlowSequenceRef = useRef(0);
-  const logToolFlow = useCallback((event: string, details: Record<string, unknown> = {}) => {
-    const sequence = ++toolFlowSequenceRef.current;
-    const message = `[${sequence}] ${event}`;
-
-    if (isToolFlowTraceEnabled()) {
-      emitForcedToolFlowTrace(message, details);
-    }
-  }, []);
+  const isConnected = connectionState === 'initializing' || connectionState === 'connected';
+  const isLoading = connectionState === 'connecting' || connectionState === 'initializing';
+  const connectionStateRef = useRef<ConnectionState>('disconnected');
+  const connectionGenerationRef = useRef(0);
+  const closePromiseRef = useRef<Promise<void> | null>(null);
+  const providerCloseRef = useRef<object | null>(null);
+  const inventoryRequestRef = useRef(0);
+  const requestOptsRef = useCommittedRef(opts);
 
   /**
-   * Fetches available resources from the MCP server.
-   * Only fetches if the server supports the resources capability.
+   * Refreshes every provider-owned inventory list and clears a prior inventory
+   * error only after the complete refresh succeeds.
    */
-  const fetchResourcesInternal = useCallback(async () => {
-    if (!client) return;
+  const refreshInventory = useCallback(
+    async (connectionGeneration: number): Promise<void> => {
+      const inventoryRequest = ++inventoryRequestRef.current;
+      const serverCapabilities = client.getServerCapabilities();
 
-    const serverCapabilities = client.getServerCapabilities();
-    if (!serverCapabilities?.resources) {
-      setResources([]);
-      return;
-    }
+      try {
+        const [resourceResponse, toolResponse] = await Promise.all([
+          serverCapabilities?.resources
+            ? client.listResources(undefined, { cacheMode: 'refresh' })
+            : undefined,
+          serverCapabilities?.tools
+            ? client.listTools(undefined, { cacheMode: 'refresh' })
+            : undefined,
+        ]);
 
-    try {
-      const response = await client.listResources();
-      setResources(response.resources);
-    } catch (e) {
-      console.error('[ReactWebMCP:McpClientProvider]', 'Error fetching resources:', e);
-      throw e;
-    }
-  }, [client]);
+        if (
+          connectionGeneration !== connectionGenerationRef.current ||
+          inventoryRequest !== inventoryRequestRef.current
+        ) {
+          return;
+        }
+
+        setResources(resourceResponse?.resources ?? []);
+        setTools(toolResponse?.tools ?? []);
+        setError(null);
+      } catch (cause) {
+        const error = cause instanceof Error ? cause : new Error(String(cause));
+        if (
+          connectionGeneration !== connectionGenerationRef.current ||
+          inventoryRequest !== inventoryRequestRef.current
+        ) {
+          return;
+        }
+        setError(error);
+        throw error;
+      }
+    },
+    [client]
+  );
 
   /**
-   * Fetches available tools from the MCP server.
-   * Only fetches if the server supports the tools capability.
+   * Connects a disconnected client, or retries inventory discovery when the
+   * MCP handshake is already alive. Calls made while work is in progress no-op.
+   *
+   * Pass a fresh transport after a one-shot transport has closed.
    */
-  const fetchToolsInternal = useCallback(async () => {
-    if (!client) return;
+  const reconnect = useCallback(
+    async (freshTransport?: Transport): Promise<void> => {
+      if (connectionStateRef.current === 'connected' && freshTransport === undefined) {
+        const connectionGeneration = connectionGenerationRef.current;
+        connectionStateRef.current = 'initializing';
+        setConnectionState('initializing');
 
-    const serverCapabilities = client.getServerCapabilities();
-    if (!serverCapabilities?.tools) {
-      logToolFlow('listTools:capability_missing', {});
-      setTools([]);
-      return;
-    }
+        try {
+          await refreshInventory(connectionGeneration);
+        } catch {
+          // Inventory failure does not undo the completed MCP handshake.
+        }
 
-    const startedAt = Date.now();
-    logToolFlow('listTools:start', {
-      hasToolsCapability: Boolean(serverCapabilities.tools),
-    });
-    try {
-      const response = await client.listTools();
-      setTools(response.tools);
-      logToolFlow('listTools:success', {
-        durationMs: Date.now() - startedAt,
-        toolCount: response.tools.length,
-      });
-    } catch (e) {
-      logToolFlow('listTools:error', {
-        durationMs: Date.now() - startedAt,
-        errorMessage: e instanceof Error ? e.message : String(e),
-      });
-      console.error('[ReactWebMCP:McpClientProvider]', 'Error fetching tools:', e);
-      throw e;
-    }
-  }, [client, logToolFlow]);
+        if (connectionGeneration === connectionGenerationRef.current) {
+          connectionStateRef.current = 'connected';
+          setConnectionState('connected');
+        }
+        return;
+      }
 
-  /**
-   * Establishes connection to the MCP server.
-   * Safe to call multiple times - will no-op if already connected or connecting.
-   */
-  const reconnect = useCallback(async () => {
-    if (!client || !transport) {
-      throw new Error('Client or transport not available');
-    }
+      if (connectionStateRef.current !== 'disconnected') {
+        return;
+      }
 
-    if (connectionStateRef.current !== 'disconnected') {
-      return;
-    }
+      connectionStateRef.current = 'connecting';
+      setConnectionState('connecting');
+      setError(null);
+      const connectionGeneration = connectionGenerationRef.current;
 
-    connectionStateRef.current = 'connecting';
-    setIsLoading(true);
-    setError(null);
+      try {
+        await closePromiseRef.current;
+        if (connectionGeneration !== connectionGenerationRef.current) {
+          return;
+        }
+        await client.connect(freshTransport ?? transport, requestOptsRef.current);
+        if (connectionGeneration !== connectionGenerationRef.current) {
+          return;
+        }
+      } catch (e) {
+        const err = e instanceof Error ? e : new Error(String(e));
+        if (connectionGeneration === connectionGenerationRef.current) {
+          connectionStateRef.current = 'disconnected';
+          setConnectionState('disconnected');
+          setError(err);
+        }
+        throw err;
+      }
 
-    try {
-      await client.connect(transport, requestOpts);
       const caps = client.getServerCapabilities();
-      setIsConnected(true);
-      setCapabilities(caps || null);
-      connectionStateRef.current = 'connected';
-      logToolFlow('reconnect:connected', {
-        hasToolsListChanged: Boolean(caps?.tools?.listChanged),
-      });
+      setCapabilities(caps ?? null);
+      connectionStateRef.current = 'initializing';
+      setConnectionState('initializing');
 
-      await Promise.all([fetchResourcesInternal(), fetchToolsInternal()]);
-    } catch (e) {
-      const err = e instanceof Error ? e : new Error(String(e));
-      connectionStateRef.current = 'disconnected';
-      setError(err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [client, transport, requestOpts, fetchResourcesInternal, fetchToolsInternal, logToolFlow]);
+      try {
+        await refreshInventory(connectionGeneration);
+      } catch {
+        if (connectionGeneration === connectionGenerationRef.current) {
+          // Inventory failure does not undo the completed MCP handshake.
+          connectionStateRef.current = 'connected';
+          setConnectionState('connected');
+        }
+        return;
+      }
+      if (connectionGeneration !== connectionGenerationRef.current) {
+        return;
+      }
+      connectionStateRef.current = 'connected';
+      setConnectionState('connected');
+    },
+    [client, transport, refreshInventory, requestOptsRef]
+  );
 
   useEffect(() => {
-    if (!isConnected || !client) {
+    if (!isConnected) {
       return;
     }
 
     const serverCapabilities = client.getServerCapabilities();
 
-    const handleResourcesChanged = () => {
-      fetchResourcesInternal().catch((error) => {
+    const resourcesListChanged = serverCapabilities?.resources?.listChanged === true;
+    const toolsListChanged = serverCapabilities?.tools?.listChanged === true;
+    const refreshLists = async () => {
+      try {
+        await refreshInventory(connectionGenerationRef.current);
+      } catch (error) {
         console.error(
           '[ReactWebMCP:McpClientProvider]',
-          'Failed to refresh resources after list_changed:',
+          'Failed to refresh tools/resources after list_changed:',
           error
         );
-      });
+      }
     };
 
-    const handleToolsChanged = () => {
-      logToolFlow('notification:tools/list_changed', {});
-      fetchToolsInternal().catch((error) => {
-        console.error(
-          '[ReactWebMCP:McpClientProvider]',
-          'Failed to refresh tools after list_changed:',
-          error
-        );
-      });
-    };
-
-    if (serverCapabilities?.resources?.listChanged) {
-      client.setNotificationHandler(ResourceListChangedNotificationSchema, handleResourcesChanged);
+    if (resourcesListChanged) {
+      client.setNotificationHandler('notifications/resources/list_changed', refreshLists);
     }
 
-    if (serverCapabilities?.tools?.listChanged) {
-      client.setNotificationHandler(ToolListChangedNotificationSchema, handleToolsChanged);
+    if (toolsListChanged) {
+      client.setNotificationHandler('notifications/tools/list_changed', refreshLists);
     }
 
-    // Re-fetch after setting up handlers to catch any changes that occurred
-    // during the gap between initial fetch and handler setup
-    Promise.all([fetchResourcesInternal(), fetchToolsInternal()]).catch((error) => {
-      console.error(
-        '[ReactWebMCP:McpClientProvider]',
-        'Failed to refresh tools/resources after handler registration:',
-        error
-      );
-    });
+    const hasListChanged = resourcesListChanged || toolsListChanged;
+    const stopListening =
+      client.getProtocolEra() === 'modern' && hasListChanged
+        ? startListChangedSubscription(
+            client,
+            {
+              ...(toolsListChanged && { toolsListChanged: true }),
+              ...(resourcesListChanged && { resourcesListChanged: true }),
+            },
+            refreshLists
+          )
+        : undefined;
+    if (!stopListening && hasListChanged) {
+      // Legacy servers deliver list_changed unsolicited once handlers are installed.
+      void refreshLists();
+    }
 
     return () => {
-      if (serverCapabilities?.resources?.listChanged) {
+      if (resourcesListChanged) {
         client.removeNotificationHandler('notifications/resources/list_changed');
       }
 
-      if (serverCapabilities?.tools?.listChanged) {
+      if (toolsListChanged) {
         client.removeNotificationHandler('notifications/tools/list_changed');
       }
-    };
-  }, [client, isConnected, fetchResourcesInternal, fetchToolsInternal, logToolFlow]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional - reconnect when client/transport props change
+      stopListening?.();
+    };
+  }, [client, isConnected, refreshInventory]);
+
   useEffect(() => {
+    let active = true;
+    const connectionGeneration = connectionGenerationRef.current;
+    const previousOnclose = client.onclose;
+    const handleClientClose = () => {
+      try {
+        previousOnclose?.();
+      } finally {
+        if (active && providerCloseRef.current === null) {
+          connectionGenerationRef.current += 1;
+          inventoryRequestRef.current += 1;
+          connectionStateRef.current = 'disconnected';
+          setConnectionState('disconnected');
+          setCapabilities(null);
+          setResources([]);
+          setTools([]);
+        }
+      }
+    };
+    client.onclose = handleClientClose;
+    connectionStateRef.current = 'disconnected';
+    setConnectionState('disconnected');
+
     // Initial connection - reconnect() has its own guard to prevent concurrent connections
     reconnect().catch((err) => {
-      console.error('[ReactWebMCP:McpClientProvider]', 'Failed to connect MCP client:', err);
+      if (connectionGeneration === connectionGenerationRef.current) {
+        console.error('[ReactWebMCP:McpClientProvider]', 'Failed to connect MCP client:', err);
+      }
     });
 
-    // Cleanup: mark as disconnected so next mount will reconnect
     return () => {
+      active = false;
+      if (client.onclose === handleClientClose) {
+        if (previousOnclose) {
+          client.onclose = previousOnclose;
+        } else {
+          Reflect.deleteProperty(client, 'onclose');
+        }
+      }
+      connectionGenerationRef.current += 1;
+      inventoryRequestRef.current += 1;
       connectionStateRef.current = 'disconnected';
-      setIsConnected(false);
+      const closeToken = {};
+      providerCloseRef.current = closeToken;
+      closePromiseRef.current = client
+        .close()
+        .catch((error: unknown) => {
+          console.error('[ReactWebMCP:McpClientProvider]', 'Failed to close MCP client:', error);
+        })
+        .finally(() => {
+          if (providerCloseRef.current === closeToken) {
+            providerCloseRef.current = null;
+          }
+        });
     };
   }, [client, transport, reconnect]);
 
-  return (
-    <McpClientContext.Provider
-      value={{
-        client,
-        tools,
-        resources,
-        isConnected,
-        isLoading,
-        error,
-        capabilities,
-        reconnect,
-      }}
-    >
-      {children}
-    </McpClientContext.Provider>
+  const contextValue = useMemo(
+    () => ({
+      client,
+      tools,
+      resources,
+      isConnected,
+      isLoading,
+      error,
+      capabilities,
+      reconnect,
+    }),
+    [client, tools, resources, isConnected, isLoading, error, capabilities, reconnect]
   );
+
+  return <McpClientContext.Provider value={contextValue}>{children}</McpClientContext.Provider>;
 }
 
 /**
@@ -387,7 +460,7 @@ export function McpClientProvider({
  *     return (
  *       <div>
  *         Error: {error.message}
- *         <button onClick={reconnect}>Retry</button>
+ *         <button onClick={() => void reconnect()}>Retry</button>
  *       </div>
  *     );
  *   }

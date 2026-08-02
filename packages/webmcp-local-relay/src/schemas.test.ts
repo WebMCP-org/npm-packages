@@ -1,787 +1,274 @@
 import { describe, expect, it } from 'vitest';
-import { InboundToolSchema, NormalizedToolSchema, normalizeInboundTool } from './protocol.js';
 import {
-  BrowserHelloMessageSchema,
-  BrowserPongMessageSchema,
-  BrowserToolResultMessageSchema,
-  BrowserToolsChangedMessageSchema,
-  BrowserToolsListMessageSchema,
   BrowserToRelayMessageSchema,
-  RelayClientHelloSchema,
-  RelayClientInvokeSchema,
-  RelayClientListToolsSchema,
+  DEFAULT_TOOL_INPUT_SCHEMA,
+  InboundToolSchema,
+  NormalizedToolSchema,
+  normalizeInboundTool,
   RelayClientToServerMessageSchema,
   RelayDescriptorSchema,
   RelayHelloAcceptedMessageSchema,
   RelayHelloRejectedMessageSchema,
-  RelayInvokeMessageSchema,
-  RelayPingMessageSchema,
-  RelayReloadMessageSchema,
-  RelayServerResultSchema,
   RelayServerToClientMessageSchema,
-  RelayServerToolsChangedSchema,
-  RelayServerToolsSchema,
   RelaySourceInfoSchema,
   RelayToBrowserMessageSchema,
   ServerHelloMessageSchema,
-} from './schemas.js';
+} from './index.js';
 
-describe('InboundToolSchema', () => {
-  it('accepts a valid tool with name only', () => {
-    const result = InboundToolSchema.safeParse({ name: 'search' });
-    expect(result.success).toBe(true);
+const TOOL = {
+  name: 'search',
+  description: 'Search for items',
+  inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
+};
+
+const SOURCE = {
+  sourceId: 'connection-1',
+  tabId: 'tab-1',
+  origin: 'https://example.com',
+  url: 'https://example.com/page',
+  title: 'Example',
+  iconUrl: 'https://example.com/icon.svg',
+  connectedAt: 1_000,
+  lastSeenAt: 2_000,
+  toolCount: 1,
+};
+
+const SERVER_HELLO = {
+  type: 'server-hello',
+  service: 'webmcp-local-relay',
+  version: 1,
+  host: '127.0.0.1',
+  instanceId: 'relay-1',
+  label: 'Local Relay',
+  port: 9333,
+  relayId: 'desktop',
+  workspace: 'default',
+};
+
+const TOOLS_PAYLOAD = {
+  tools: [TOOL],
+  sources: [SOURCE],
+  toolSourceMap: { search: ['connection-1'] },
+};
+
+describe('tool wire contract', () => {
+  it('defaults only an omitted input schema', () => {
+    const inbound = InboundToolSchema.parse({ name: 'search' });
+    const normalized = normalizeInboundTool(inbound);
+
+    expect(normalized).toEqual({ name: 'search', inputSchema: DEFAULT_TOOL_INPUT_SCHEMA });
+    expect(NormalizedToolSchema.safeParse(normalized).success).toBe(true);
   });
 
-  it('accepts a tool with SDK-compatible fields', () => {
-    const result = InboundToolSchema.safeParse({
-      name: 'search',
+  it('preserves valid MCP tool metadata', () => {
+    const inbound = InboundToolSchema.parse({
+      ...TOOL,
       title: 'Search',
-      description: 'Search for items',
-      inputSchema: { type: 'object', properties: { q: { type: 'string' } } },
-      outputSchema: { type: 'object' },
-      annotations: { readOnlyHint: true },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects a tool with empty name', () => {
-    const result = InboundToolSchema.safeParse({ name: '' });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a tool with missing name', () => {
-    const result = InboundToolSchema.safeParse({ description: 'no name' });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('normalizeInboundTool', () => {
-  it('normalizes to SDK Tool shape with default inputSchema', () => {
-    const normalized = normalizeInboundTool({ name: 'search' });
-    const parsed = NormalizedToolSchema.safeParse(normalized);
-    expect(parsed.success).toBe(true);
-    expect(parsed.data?.inputSchema).toEqual({ type: 'object', properties: {} });
-  });
-
-  it('drops invalid optional metadata', () => {
-    const normalized = normalizeInboundTool({
-      name: 'bad',
-      annotations: { readOnlyHint: 'nope' },
       outputSchema: { type: 'string' },
+      annotations: { readOnlyHint: true },
+      icons: [{ src: 'https://example.com/icon.svg', mimeType: 'image/svg+xml' }],
+      execution: { taskSupport: 'forbidden' },
+      _meta: { 'example/key': 'value' },
     });
-    expect(normalized.annotations).toBeUndefined();
-    expect(normalized.outputSchema).toBeUndefined();
-  });
-});
 
-describe('BrowserHelloMessageSchema', () => {
-  it('accepts a hello with all fields', () => {
-    const result = BrowserHelloMessageSchema.safeParse({
-      type: 'hello',
-      tabId: 'abc-123',
-      origin: 'https://example.com',
-      url: 'https://example.com/page',
-      title: 'My Page',
-      iconUrl: 'https://example.com/icon.png',
-    });
-    expect(result.success).toBe(true);
+    expect(normalizeInboundTool(inbound)).toEqual(inbound);
   });
 
-  it('accepts a hello with only required fields', () => {
-    const result = BrowserHelloMessageSchema.safeParse({
-      type: 'hello',
-      tabId: 'abc-123',
-    });
-    expect(result.success).toBe(true);
+  it.each([
+    ['name', { name: '' }],
+    ['title', { name: 'search', title: 42 }],
+    ['description', { name: 'search', description: 42 }],
+    ['inputSchema', { name: 'search', inputSchema: 'not-a-schema' }],
+    ['outputSchema', { name: 'search', outputSchema: 'not-a-schema' }],
+    ['annotations', { name: 'search', annotations: { readOnlyHint: 'yes' } }],
+    ['icons', { name: 'search', icons: [{ src: 42 }] }],
+    ['execution', { name: 'search', execution: { taskSupport: 'later' } }],
+    ['_meta', { name: 'search', _meta: [] }],
+  ])('rejects invalid %s metadata', (_field, tool) => {
+    expect(InboundToolSchema.safeParse(tool).success).toBe(false);
   });
 
-  it('rejects a hello with empty tabId', () => {
-    const result = BrowserHelloMessageSchema.safeParse({
-      type: 'hello',
-      tabId: '',
-    });
-    expect(result.success).toBe(false);
-  });
+  it('filters task-required tools from both browser tool snapshots', () => {
+    for (const type of ['tools/list', 'tools/changed'] as const) {
+      const message = BrowserToRelayMessageSchema.parse({
+        type,
+        tools: [
+          { name: 'required', execution: { taskSupport: 'required' } },
+          { name: 'optional', execution: { taskSupport: 'optional' } },
+          { name: 'ordinary' },
+        ],
+      });
 
-  it('rejects a hello without tabId', () => {
-    const result = BrowserHelloMessageSchema.safeParse({
-      type: 'hello',
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('RelayDescriptorSchema', () => {
-  it('accepts relay descriptor metadata', () => {
-    const result = RelayDescriptorSchema.safeParse({
-      host: '127.0.0.1',
-      instanceId: 'relay-instance',
-      label: 'Desktop Relay',
-      port: 9333,
-      relayId: 'desktop',
-      workspace: 'default',
-    });
-
-    expect(result.success).toBe(true);
-  });
-});
-
-describe('ServerHelloMessageSchema', () => {
-  it('accepts a valid server-hello message', () => {
-    const result = ServerHelloMessageSchema.safeParse({
-      type: 'server-hello',
-      service: 'webmcp-local-relay',
-      version: 1,
-      host: '127.0.0.1',
-      instanceId: 'relay-instance',
-      label: 'Desktop Relay',
-      port: 9333,
-      relayId: 'desktop',
-      workspace: 'default',
-    });
-
-    expect(result.success).toBe(true);
-  });
-});
-
-describe('BrowserToolResultMessageSchema', () => {
-  it('accepts a result with a callId and unknown result', () => {
-    const result = BrowserToolResultMessageSchema.safeParse({
-      type: 'result',
-      callId: 'call-1',
-      result: { content: [{ type: 'text', text: 'done' }] },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects a result with empty callId', () => {
-    const result = BrowserToolResultMessageSchema.safeParse({
-      type: 'result',
-      callId: '',
-      result: {},
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a result without callId', () => {
-    const result = BrowserToolResultMessageSchema.safeParse({
-      type: 'result',
-      result: {},
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('BrowserToRelayMessageSchema', () => {
-  it('parses a hello message', () => {
-    const result = BrowserToRelayMessageSchema.safeParse({
-      type: 'hello',
-      tabId: 'tab-1',
-    });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('hello');
-  });
-
-  it('parses a tools/list message', () => {
-    const result = BrowserToRelayMessageSchema.safeParse({
-      type: 'tools/list',
-      tools: [{ name: 'search' }],
-    });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('tools/list');
-    if (result.success && result.data.type === 'tools/list') {
-      expect(result.data.tools[0]?.inputSchema).toEqual({ type: 'object', properties: {} });
+      expect(message).toMatchObject({
+        tools: [
+          { name: 'optional', inputSchema: DEFAULT_TOOL_INPUT_SCHEMA },
+          { name: 'ordinary', inputSchema: DEFAULT_TOOL_INPUT_SCHEMA },
+        ],
+      });
     }
   });
+});
 
-  it('parses a tools/changed message', () => {
-    const result = BrowserToRelayMessageSchema.safeParse({
-      type: 'tools/changed',
-      tools: [],
-    });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('tools/changed');
+describe('browser to relay wire contract', () => {
+  it.each([
+    [
+      'hello',
+      {
+        type: 'hello',
+        tabId: 'tab-1',
+        origin: 'https://example.com',
+        url: 'https://example.com/page',
+        title: 'Example',
+        iconUrl: 'https://example.com/icon.svg',
+      },
+    ],
+    ['tools/list', { type: 'tools/list', tools: [{ name: 'search' }] }],
+    ['tools/changed', { type: 'tools/changed', tools: [TOOL] }],
+    ['result', { type: 'result', callId: 'call-1', result: null }],
+    ['pong', { type: 'pong' }],
+  ])('accepts %s', (_type, message) => {
+    expect(BrowserToRelayMessageSchema.safeParse(message).success).toBe(true);
   });
 
-  it('parses a result message', () => {
-    const result = BrowserToRelayMessageSchema.safeParse({
-      type: 'result',
-      callId: 'c-1',
-      result: null,
-    });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('result');
-  });
-
-  it('parses a pong message', () => {
-    const result = BrowserToRelayMessageSchema.safeParse({ type: 'pong' });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('pong');
-  });
-
-  it('rejects an unknown message type', () => {
-    const result = BrowserToRelayMessageSchema.safeParse({
-      type: 'unknown',
-      data: 123,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('parses a server-hello relay message', () => {
-    const result = RelayToBrowserMessageSchema.safeParse({
-      type: 'server-hello',
-      service: 'webmcp-local-relay',
-      version: 1,
-      host: '127.0.0.1',
-      instanceId: 'relay-instance',
-      port: 9333,
-    });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('server-hello');
-  });
-
-  it('parses a hello/accepted relay message', () => {
-    const result = RelayHelloAcceptedMessageSchema.safeParse({
-      type: 'hello/accepted',
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('parses a hello/rejected relay message', () => {
-    const result = RelayHelloRejectedMessageSchema.safeParse({
-      type: 'hello/rejected',
-      reason: 'host-origin-not-allowed',
-      message: 'Host page origin is not allowed by this relay.',
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects a message without a type field', () => {
-    const result = BrowserToRelayMessageSchema.safeParse({ tabId: 'tab-1' });
-    expect(result.success).toBe(false);
+  it.each([
+    ['unknown type', { type: 'unknown' }],
+    ['missing type', { tabId: 'tab-1' }],
+    ['empty tab ID', { type: 'hello', tabId: '' }],
+    ['missing tools', { type: 'tools/list' }],
+    [
+      'invalid tool metadata',
+      { type: 'tools/list', tools: [{ name: 'search', annotations: { readOnlyHint: 'yes' } }] },
+    ],
+    ['empty result call ID', { type: 'result', callId: '', result: {} }],
+  ])('rejects %s', (_case, message) => {
+    expect(BrowserToRelayMessageSchema.safeParse(message).success).toBe(false);
   });
 });
 
-describe('BrowserToolsListMessageSchema', () => {
-  it('accepts a tools/list with empty tools array', () => {
-    const result = BrowserToolsListMessageSchema.safeParse({
-      type: 'tools/list',
-      tools: [],
-    });
-    expect(result.success).toBe(true);
+describe('relay to browser wire contract', () => {
+  it.each([
+    ['server-hello', SERVER_HELLO],
+    ['hello/accepted', { type: 'hello/accepted' }],
+    [
+      'hello/rejected',
+      { type: 'hello/rejected', reason: 'origin-not-allowed', message: 'Origin denied.' },
+    ],
+    ['invoke', { type: 'invoke', callId: 'call-1', toolName: 'search', args: { query: 'MCP' } }],
+    ['ping', { type: 'ping' }],
+    ['reload', { type: 'reload' }],
+  ])('accepts %s', (_type, message) => {
+    expect(RelayToBrowserMessageSchema.safeParse(message).success).toBe(true);
   });
 
-  it('rejects tools/list without tools array', () => {
-    const result = BrowserToolsListMessageSchema.safeParse({
-      type: 'tools/list',
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects tools/list with invalid tool entries', () => {
-    const result = BrowserToolsListMessageSchema.safeParse({
-      type: 'tools/list',
-      tools: [{ name: '' }],
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('BrowserToolsChangedMessageSchema', () => {
-  it('accepts a tools/changed with tools', () => {
-    const result = BrowserToolsChangedMessageSchema.safeParse({
-      type: 'tools/changed',
-      tools: [{ name: 'updated_tool' }],
-    });
-    expect(result.success).toBe(true);
+  it.each([
+    ['unknown type', { type: 'unknown' }],
+    ['browser message', { type: 'pong' }],
+    ['wrong server version', { ...SERVER_HELLO, version: 2 }],
+    ['empty rejection reason', { type: 'hello/rejected', reason: '', message: 'Denied.' }],
+    ['empty invoke call ID', { type: 'invoke', callId: '', toolName: 'search' }],
+    ['empty invoke tool name', { type: 'invoke', callId: 'call-1', toolName: '' }],
+  ])('rejects %s', (_case, message) => {
+    expect(RelayToBrowserMessageSchema.safeParse(message).success).toBe(false);
   });
 });
 
-describe('BrowserPongMessageSchema', () => {
-  it('accepts a pong with no extra fields', () => {
-    const result = BrowserPongMessageSchema.safeParse({ type: 'pong' });
-    expect(result.success).toBe(true);
+describe('relay client to server wire contract', () => {
+  it.each([
+    ['relay/hello', { type: 'relay/hello' }],
+    ['relay/list-tools', { type: 'relay/list-tools' }],
+    [
+      'relay/invoke',
+      { type: 'relay/invoke', callId: 'call-1', toolName: 'search', args: { query: 'MCP' } },
+    ],
+  ])('accepts %s', (_type, message) => {
+    expect(RelayClientToServerMessageSchema.safeParse(message).success).toBe(true);
+  });
+
+  it.each([
+    ['unknown type', { type: 'relay/unknown' }],
+    ['browser message', { type: 'hello', tabId: 'tab-1' }],
+    ['empty call ID', { type: 'relay/invoke', callId: '', toolName: 'search' }],
+    ['empty tool name', { type: 'relay/invoke', callId: 'call-1', toolName: '' }],
+  ])('rejects %s', (_case, message) => {
+    expect(RelayClientToServerMessageSchema.safeParse(message).success).toBe(false);
   });
 });
 
-describe('RelayInvokeMessageSchema', () => {
-  it('accepts an invoke with required fields', () => {
-    const result = RelayInvokeMessageSchema.safeParse({
-      type: 'invoke',
-      callId: 'call-1',
-      toolName: 'search',
-    });
-    expect(result.success).toBe(true);
+describe('relay server to client wire contract', () => {
+  it.each([
+    ['server-hello', SERVER_HELLO],
+    ['relay/tools', { type: 'relay/tools', ...TOOLS_PAYLOAD }],
+    [
+      'relay/result',
+      {
+        type: 'relay/result',
+        callId: 'call-1',
+        result: { content: [{ type: 'text', text: 'done' }] },
+      },
+    ],
+    ['relay/tools-changed', { type: 'relay/tools-changed', ...TOOLS_PAYLOAD }],
+  ])('accepts %s', (_type, message) => {
+    expect(RelayServerToClientMessageSchema.safeParse(message).success).toBe(true);
   });
 
-  it('accepts an invoke with args', () => {
-    const result = RelayInvokeMessageSchema.safeParse({
-      type: 'invoke',
-      callId: 'call-1',
-      toolName: 'search',
-      args: { query: 'test' },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects an invoke with empty callId', () => {
-    const result = RelayInvokeMessageSchema.safeParse({
-      type: 'invoke',
-      callId: '',
-      toolName: 'search',
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects an invoke with empty toolName', () => {
-    const result = RelayInvokeMessageSchema.safeParse({
-      type: 'invoke',
-      callId: 'call-1',
-      toolName: '',
-    });
-    expect(result.success).toBe(false);
+  it.each([
+    ['unknown type', { type: 'relay/unknown' }],
+    ['browser message', { type: 'tools/list', tools: [] }],
+    ['tools', { type: 'relay/tools', sources: [], toolSourceMap: {} }],
+    ['sources', { type: 'relay/tools', tools: [], toolSourceMap: {} }],
+    ['toolSourceMap', { type: 'relay/tools', tools: [], sources: [] }],
+    [
+      'normalized input schema',
+      { type: 'relay/tools', tools: [{ name: 'search' }], sources: [], toolSourceMap: {} },
+    ],
+    ['result', { type: 'relay/result', callId: 'call-1', result: null }],
+    ['tools-changed sources', { type: 'relay/tools-changed', tools: [], toolSourceMap: {} }],
+    ['tools-changed toolSourceMap', { type: 'relay/tools-changed', tools: [], sources: [] }],
+  ])('rejects missing or invalid %s', (_field, message) => {
+    expect(RelayServerToClientMessageSchema.safeParse(message).success).toBe(false);
   });
 });
 
-describe('RelayPingMessageSchema', () => {
-  it('accepts a ping message', () => {
-    const result = RelayPingMessageSchema.safeParse({ type: 'ping' });
-    expect(result.success).toBe(true);
-  });
-});
-
-describe('RelayReloadMessageSchema', () => {
-  it('accepts a reload message', () => {
-    const result = RelayReloadMessageSchema.safeParse({ type: 'reload' });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects wrong type', () => {
-    const result = RelayReloadMessageSchema.safeParse({ type: 'ping' });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('RelayToBrowserMessageSchema', () => {
-  it('parses a server-hello message', () => {
-    const result = RelayToBrowserMessageSchema.safeParse({
-      type: 'server-hello',
-      service: 'webmcp-local-relay',
-      version: 1,
-      host: '127.0.0.1',
-      instanceId: 'relay-instance',
-      port: 9333,
-    });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('server-hello');
+describe('standalone public schemas', () => {
+  it('accepts complete descriptor and source metadata', () => {
+    expect(
+      RelayDescriptorSchema.safeParse({
+        host: SERVER_HELLO.host,
+        instanceId: SERVER_HELLO.instanceId,
+        label: SERVER_HELLO.label,
+        port: SERVER_HELLO.port,
+        relayId: SERVER_HELLO.relayId,
+        workspace: SERVER_HELLO.workspace,
+      }).success
+    ).toBe(true);
+    expect(RelaySourceInfoSchema.safeParse(SOURCE).success).toBe(true);
+    expect(ServerHelloMessageSchema.safeParse(SERVER_HELLO).success).toBe(true);
+    expect(RelayHelloAcceptedMessageSchema.safeParse({ type: 'hello/accepted' }).success).toBe(
+      true
+    );
+    expect(
+      RelayHelloRejectedMessageSchema.safeParse({
+        type: 'hello/rejected',
+        reason: 'origin-not-allowed',
+        message: 'Origin denied.',
+      }).success
+    ).toBe(true);
   });
 
-  it('parses an invoke message', () => {
-    const result = RelayToBrowserMessageSchema.safeParse({
-      type: 'invoke',
-      callId: 'c-1',
-      toolName: 'search',
-    });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('invoke');
-  });
-
-  it('parses a ping message', () => {
-    const result = RelayToBrowserMessageSchema.safeParse({ type: 'ping' });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('ping');
-  });
-
-  it('parses a reload message', () => {
-    const result = RelayToBrowserMessageSchema.safeParse({ type: 'reload' });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('reload');
-  });
-
-  it('rejects an unknown relay message type', () => {
-    const result = RelayToBrowserMessageSchema.safeParse({
-      type: 'unknown',
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Relay source metadata
-// ---------------------------------------------------------------------------
-
-describe('RelaySourceInfoSchema', () => {
-  it('accepts valid source info with all fields', () => {
-    const result = RelaySourceInfoSchema.safeParse({
-      sourceId: 'conn-1',
-      tabId: 'tab-1',
-      origin: 'https://example.com',
-      url: 'https://example.com/page',
-      title: 'Test Page',
-      iconUrl: 'https://example.com/icon.png',
-      connectedAt: 1000,
-      lastSeenAt: 2000,
-      toolCount: 3,
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('accepts source info with only required fields', () => {
-    const result = RelaySourceInfoSchema.safeParse({
-      sourceId: 'conn-1',
-      tabId: 'tab-1',
-      connectedAt: 1000,
-      lastSeenAt: 2000,
-      toolCount: 0,
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects source info missing sourceId', () => {
-    const result = RelaySourceInfoSchema.safeParse({
-      tabId: 'tab-1',
-      connectedAt: 1000,
-      lastSeenAt: 2000,
-      toolCount: 0,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects source info missing toolCount', () => {
-    const result = RelaySourceInfoSchema.safeParse({
-      sourceId: 'conn-1',
-      tabId: 'tab-1',
-      connectedAt: 1000,
-      lastSeenAt: 2000,
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Relay-to-relay protocol schemas (client mode ↔ server mode)
-// ---------------------------------------------------------------------------
-
-describe('RelayClientHelloSchema', () => {
-  it('accepts a relay/hello message', () => {
-    const result = RelayClientHelloSchema.safeParse({ type: 'relay/hello' });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects a message with wrong type', () => {
-    const result = RelayClientHelloSchema.safeParse({ type: 'hello' });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('RelayClientListToolsSchema', () => {
-  it('accepts a relay/list-tools message', () => {
-    const result = RelayClientListToolsSchema.safeParse({ type: 'relay/list-tools' });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects a message with wrong type', () => {
-    const result = RelayClientListToolsSchema.safeParse({ type: 'list-tools' });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('RelayClientInvokeSchema', () => {
-  it('accepts a relay/invoke with required fields', () => {
-    const result = RelayClientInvokeSchema.safeParse({
-      type: 'relay/invoke',
-      callId: 'call-1',
-      toolName: 'search',
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('accepts a relay/invoke with args', () => {
-    const result = RelayClientInvokeSchema.safeParse({
-      type: 'relay/invoke',
-      callId: 'call-1',
-      toolName: 'search',
-      args: { query: 'test' },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects a relay/invoke with empty callId', () => {
-    const result = RelayClientInvokeSchema.safeParse({
-      type: 'relay/invoke',
-      callId: '',
-      toolName: 'search',
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a relay/invoke with empty toolName', () => {
-    const result = RelayClientInvokeSchema.safeParse({
-      type: 'relay/invoke',
-      callId: 'call-1',
-      toolName: '',
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a relay/invoke without callId', () => {
-    const result = RelayClientInvokeSchema.safeParse({
-      type: 'relay/invoke',
-      toolName: 'search',
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('RelayClientToServerMessageSchema', () => {
-  it('parses a relay/hello message', () => {
-    const result = RelayClientToServerMessageSchema.safeParse({ type: 'relay/hello' });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('relay/hello');
-  });
-
-  it('parses a relay/list-tools message', () => {
-    const result = RelayClientToServerMessageSchema.safeParse({ type: 'relay/list-tools' });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('relay/list-tools');
-  });
-
-  it('parses a relay/invoke message', () => {
-    const result = RelayClientToServerMessageSchema.safeParse({
-      type: 'relay/invoke',
-      callId: 'c-1',
-      toolName: 'search',
-    });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('relay/invoke');
-  });
-
-  it('rejects an unknown relay client message type', () => {
-    const result = RelayClientToServerMessageSchema.safeParse({ type: 'relay/unknown' });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a browser-protocol message', () => {
-    const result = RelayClientToServerMessageSchema.safeParse({
-      type: 'hello',
-      tabId: 'tab-1',
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('RelayServerToolsSchema', () => {
-  it('accepts a relay/tools with tools, sources, and toolSourceMap', () => {
-    const result = RelayServerToolsSchema.safeParse({
-      type: 'relay/tools',
-      tools: [
-        {
-          name: 'search',
-          description: 'Search tool',
-          inputSchema: { type: 'object', properties: {} },
-        },
-      ],
-      sources: [
-        {
-          sourceId: 'conn-1',
-          tabId: 'tab-1',
-          origin: 'https://example.com',
-          connectedAt: 1000,
-          lastSeenAt: 2000,
-          toolCount: 1,
-        },
-      ],
-      toolSourceMap: { search: ['conn-1'] },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('accepts a relay/tools with empty arrays', () => {
-    const result = RelayServerToolsSchema.safeParse({
-      type: 'relay/tools',
-      tools: [],
-      sources: [],
-      toolSourceMap: {},
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects relay/tools without tools array', () => {
-    const result = RelayServerToolsSchema.safeParse({
-      type: 'relay/tools',
-      sources: [],
-      toolSourceMap: {},
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('accepts relay/tools without sources (defaults to empty)', () => {
-    const result = RelayServerToolsSchema.safeParse({
-      type: 'relay/tools',
-      tools: [],
-      toolSourceMap: {},
-    });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.sources).toEqual([]);
-    }
-  });
-
-  it('accepts relay/tools without sources or toolSourceMap (both default)', () => {
-    const result = RelayServerToolsSchema.safeParse({
-      type: 'relay/tools',
-      tools: [],
-    });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.sources).toEqual([]);
-      expect(result.data.toolSourceMap).toEqual({});
-    }
-  });
-
-  it('rejects relay/tools with invalid tool entries', () => {
-    const result = RelayServerToolsSchema.safeParse({
-      type: 'relay/tools',
-      tools: [{ name: '' }],
-      sources: [],
-      toolSourceMap: {},
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('RelayServerResultSchema', () => {
-  it('accepts a relay/result with callId and result', () => {
-    const result = RelayServerResultSchema.safeParse({
-      type: 'relay/result',
-      callId: 'call-1',
-      result: { content: [{ type: 'text', text: 'done' }] },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects a relay/result with null result', () => {
-    const result = RelayServerResultSchema.safeParse({
-      type: 'relay/result',
-      callId: 'call-1',
-      result: null,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a relay/result with empty callId', () => {
-    const result = RelayServerResultSchema.safeParse({
-      type: 'relay/result',
-      callId: '',
-      result: {},
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a relay/result without callId', () => {
-    const result = RelayServerResultSchema.safeParse({
-      type: 'relay/result',
-      result: {},
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('RelayServerToolsChangedSchema', () => {
-  it('accepts a relay/tools-changed with tools, sources, and toolSourceMap', () => {
-    const result = RelayServerToolsChangedSchema.safeParse({
-      type: 'relay/tools-changed',
-      tools: [{ name: 'updated_tool', inputSchema: { type: 'object', properties: {} } }],
-      sources: [
-        {
-          sourceId: 'conn-1',
-          tabId: 'tab-1',
-          connectedAt: 1000,
-          lastSeenAt: 2000,
-          toolCount: 1,
-        },
-      ],
-      toolSourceMap: { updated_tool: ['conn-1'] },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('accepts a relay/tools-changed with empty arrays', () => {
-    const result = RelayServerToolsChangedSchema.safeParse({
-      type: 'relay/tools-changed',
-      tools: [],
-      sources: [],
-      toolSourceMap: {},
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects relay/tools-changed without tools', () => {
-    const result = RelayServerToolsChangedSchema.safeParse({
-      type: 'relay/tools-changed',
-      sources: [],
-      toolSourceMap: {},
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('RelayServerToClientMessageSchema', () => {
-  it('parses a server-hello message', () => {
-    const result = RelayServerToClientMessageSchema.safeParse({
-      type: 'server-hello',
-      service: 'webmcp-local-relay',
-      version: 1,
-      host: '127.0.0.1',
-      instanceId: 'relay-instance',
-      port: 9333,
-    });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('server-hello');
-  });
-
-  it('parses a relay/tools message', () => {
-    const result = RelayServerToClientMessageSchema.safeParse({
-      type: 'relay/tools',
-      tools: [{ name: 'search', inputSchema: { type: 'object', properties: {} } }],
-      sources: [],
-      toolSourceMap: {},
-    });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('relay/tools');
-  });
-
-  it('parses a relay/result message', () => {
-    const result = RelayServerToClientMessageSchema.safeParse({
-      type: 'relay/result',
-      callId: 'c-1',
-      result: { content: [] },
-    });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('relay/result');
-  });
-
-  it('parses a relay/tools-changed message', () => {
-    const result = RelayServerToClientMessageSchema.safeParse({
-      type: 'relay/tools-changed',
-      tools: [],
-      sources: [],
-      toolSourceMap: {},
-    });
-    expect(result.success).toBe(true);
-    expect(result.data?.type).toBe('relay/tools-changed');
-  });
-
-  it('rejects an unknown relay server message type', () => {
-    const result = RelayServerToClientMessageSchema.safeParse({ type: 'relay/unknown' });
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects a browser-protocol message', () => {
-    const result = RelayServerToClientMessageSchema.safeParse({
-      type: 'tools/list',
-      tools: [],
-    });
-    expect(result.success).toBe(false);
+  it.each([
+    [
+      'descriptor port',
+      RelayDescriptorSchema,
+      { host: '127.0.0.1', instanceId: 'relay-1', port: 0 },
+    ],
+    ['source ID', RelaySourceInfoSchema, { ...SOURCE, sourceId: undefined }],
+    ['server service', ServerHelloMessageSchema, { ...SERVER_HELLO, service: 'other' }],
+    [
+      'rejection message',
+      RelayHelloRejectedMessageSchema,
+      { type: 'hello/rejected', reason: 'denied', message: '' },
+    ],
+  ])('rejects invalid %s', (_case, schema, value) => {
+    expect(schema.safeParse(value).success).toBe(false);
   });
 });

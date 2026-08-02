@@ -1,5 +1,5 @@
 import { ContentDetection } from './content-detection';
-import type { SmartDOMReader as SmartDOMReaderClass } from './index';
+import { SmartDOMReader } from './smart-dom-reader';
 import { SelectorGenerator } from './selectors';
 import { DOMTraversal } from './traversal';
 import type {
@@ -10,46 +10,6 @@ import type {
   SmartDOMResult,
   StructuralOverview,
 } from './types';
-
-type SmartDomReaderNamespace = typeof import('./index');
-type SmartDomReaderCtor = new (options?: Partial<ExtractionOptions>) => SmartDOMReaderClass;
-
-type SmartDomReaderWindow = Window & {
-  SmartDOMReader?: SmartDomReaderCtor;
-  SmartDOMReaderNamespace?: SmartDomReaderNamespace;
-};
-
-function resolveSmartDomReader(): SmartDomReaderCtor | undefined {
-  if (typeof window !== 'undefined') {
-    const globalWindow = window as Partial<SmartDomReaderWindow>;
-    const direct = globalWindow.SmartDOMReader;
-    if (typeof direct === 'function') {
-      return direct;
-    }
-
-    const namespace = globalWindow.SmartDOMReaderNamespace;
-    if (namespace && typeof namespace.SmartDOMReader === 'function') {
-      return namespace.SmartDOMReader as SmartDomReaderCtor;
-    }
-  }
-
-  try {
-    if (typeof require === 'function') {
-      const moduleExports = require('./index') as SmartDomReaderNamespace;
-      if (moduleExports && typeof moduleExports.SmartDOMReader === 'function') {
-        return moduleExports.SmartDOMReader as SmartDomReaderCtor;
-      }
-
-      if (moduleExports && typeof moduleExports.default === 'function') {
-        return moduleExports.default as SmartDomReaderCtor;
-      }
-    }
-  } catch {
-    // Ignore resolution errors when require is unavailable (e.g. browser bundles)
-  }
-
-  return undefined;
-}
 
 export class ProgressiveExtractor {
   /**
@@ -134,19 +94,12 @@ export class ProgressiveExtractor {
   static extractRegion(
     selector: string,
     doc: Document,
-    options: Partial<ExtractionOptions> = {},
-    smartDomReaderCtor?: SmartDomReaderCtor
+    options: Partial<ExtractionOptions> = {}
   ): SmartDOMResult | null {
     const element = doc.querySelector(selector);
     if (!element) return null;
 
-    const SmartDOMReaderCtor = smartDomReaderCtor ?? resolveSmartDomReader();
-    if (!SmartDOMReaderCtor) {
-      throw new Error(
-        'SmartDOMReader is unavailable. Ensure the Smart DOM Reader module is loaded before calling extractRegion.'
-      );
-    }
-    const reader = new SmartDOMReaderCtor(options);
+    const reader = new SmartDOMReader(options);
 
     // Extract from the specific element/region
     return reader.extract(element, options);

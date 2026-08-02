@@ -2,10 +2,10 @@
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { onMount } from 'svelte';
 
-onMount(() => {
+onMount(async () => {
   initializeWebMCPPolyfill();
 
-  navigator.modelContext.registerTool({
+  await document.modelContext.registerTool({
     name: 'get_info',
     description: 'Returns basic app info',
     inputSchema: {

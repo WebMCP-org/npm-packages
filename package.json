@@ -28,11 +28,11 @@
     "preview:docs": "pnpm --filter @mcp-b/documentation-website preview",
     "preview:landing": "pnpm --filter @mcp-b/landing-page preview",
     "publish:all": "pnpm run build && pnpm publish -r --access public --no-git-checks",
-    "publish:order": "echo 'Publish order: webmcp-types → webmcp-polyfill → webmcp-ts-sdk → transports → global → react-webmcp'",
+    "publish:order": "echo 'Publish order: webmcp-types → webmcp-polyfill → webmcp-ts-sdk → transports → global → webmcp-extension → react-webmcp'",
     "syncpack:fix": "syncpack fix-mismatches",
     "syncpack:lint": "syncpack lint",
     "test": "pnpm test:unit && pnpm test:e2e",
-    "test:e2e": "pnpm --filter mcp-e2e-tests run test:runtime-contract && pnpm --filter @mcp-b/webmcp-local-relay test:e2e && pnpm --filter @mcp-b/extension-tools test:e2e",
+    "test:e2e": "pnpm --filter mcp-e2e-tests run test:runtime-contract && pnpm --filter @mcp-b/webmcp-local-relay test:e2e && pnpm --filter @mcp-b/transports test:e2e && pnpm --filter @mcp-b/webmcp-extension test:e2e",
     "test:e2e:debug": "pnpm --filter mcp-e2e-tests test:debug",
     "test:e2e:frameworks": "pnpm --filter mcp-e2e-tests run test:integration:frameworks",
     "test:e2e:headed": "pnpm --filter mcp-e2e-tests test:headed",
@@ -44,12 +44,11 @@
     "test:unit:coverage": "pnpm test:unit:packages:coverage && pnpm test:hooks:coverage",
     "test:unit:packages": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/landing-page' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' --filter '!usewebmcp' --filter '!@mcp-b/react-webmcp' run test",
     "test:unit:packages:coverage": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/landing-page' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' --filter '!usewebmcp' --filter '!@mcp-b/react-webmcp' run test -- --coverage",
-    "typecheck": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/landing-page' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' run typecheck",
+    "typecheck": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/landing-page' run typecheck",
     "validate:docs": "pnpm --filter @mcp-b/documentation-website validate",
     "validate:publish": "node ./scripts/validate-publish.js"
   },
   "dependencies": {
-    "dotenv": "^17.2.3",
     "tslib": "^2.0.0"
   },
   "devDependencies": {
@@ -68,17 +67,16 @@
   "packageManager": "pnpm@10.14.0",
   "pnpm": {
     "overrides": {
-      "ajv@8": ">=8.18.0",
-      "basic-ftp": ">=5.2.0",
-      "diff": ">=8.0.3",
-      "hono": ">=4.12.2",
+      "ajv@8": "^8.18.0",
+      "basic-ftp": "^5.2.0",
+      "diff": "^8.0.3",
+      "hono": "^4.12.2",
       "js-yaml@3": "^3.14.2",
-      "js-yaml@4": ">=4.1.1",
-      "lodash": ">=4.17.23",
-      "minimatch": ">=10.2.3",
-      "rollup@4": ">=4.59.0",
-      "svelte@5": ">=5.53.5",
-      "tmp": ">=0.2.4"
+      "js-yaml@4": "^4.1.1",
+      "lodash": "^4.17.23",
+      "minimatch": "^10.2.3",
+      "rollup@4": "^4.59.0",
+      "svelte@5": "^5.53.5"
     }
   }
 }

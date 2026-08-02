@@ -9,11 +9,11 @@
       "@mcp-b/webmcp-polyfill",
       "@mcp-b/webmcp-ts-sdk",
       "@mcp-b/transports",
-      "@mcp-b/extension-tools",
       "@mcp-b/mcp-iframe",
       "@mcp-b/global",
       "@mcp-b/react-webmcp",
       "usewebmcp",
+      "@mcp-b/webmcp-extension",
       "@mcp-b/webmcp-local-relay"
     ]
   ],

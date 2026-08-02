@@ -17,11 +17,10 @@ icon: 'code'
 ## When not to use this package
 
 - You only need to expose browser-page tools. Use the runtime packages instead.
-- You need Chrome extension API tools rather than DOM extraction. Use [`@mcp-b/extension-tools`](/packages/extension-tools/overview).
 
 ## Where it sits in the package graph
 
-This package sits in the tooling layer and can be used standalone. Other tooling packages, including [`@mcp-b/extension-tools`](/packages/extension-tools/overview), can build on top of it.
+This package sits in the tooling layer and can be used standalone.
 
 ## First step
 
@@ -33,18 +32,7 @@ Choose whether you need one-shot extraction or staged extraction. The [reference
   <Card title="Reference" icon="book-open" href="/packages/smart-dom-reader/reference">
     Extraction APIs, selector ranking, and result shapes.
   </Card>
-  <Card
-    title="@mcp-b/extension-tools overview"
-    icon="puzzle-piece"
-    href="/packages/extension-tools/overview"
-  >
-    Tool classes that build on smart-dom-reader in extension contexts.
-  </Card>
-  <Card
-    title="Chrome DevTools MCP overview"
-    icon="chrome"
-    href="/packages/chrome-devtools-mcp/overview"
-  >
+  <Card title="Chrome DevTools MCP overview" icon="chrome" href="/how-to/use-devtools-mcp">
     Tooling path when you want DevTools-based automation instead.
   </Card>
   <Card title="Tool design" icon="pencil-ruler" href="/how-to/use-schemas-and-structured-output">

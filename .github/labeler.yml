@@ -15,14 +15,6 @@ packages/webmcp-ts-sdk:
   - changed-files:
       - any-glob-to-any-file: 'packages/webmcp-ts-sdk/**'
 
-packages/chrome-devtools-mcp:
-  - changed-files:
-      - any-glob-to-any-file: 'packages/chrome-devtools-mcp/**'
-
-packages/extension-tools:
-  - changed-files:
-      - any-glob-to-any-file: 'packages/extension-tools/**'
-
 packages/mcp-iframe:
   - changed-files:
       - any-glob-to-any-file: 'packages/mcp-iframe/**'
@@ -34,6 +26,10 @@ packages/smart-dom-reader:
 packages/usewebmcp:
   - changed-files:
       - any-glob-to-any-file: 'packages/usewebmcp/**'
+
+packages/webmcp-extension:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/webmcp-extension/**'
 
 # Category labels
 documentation:

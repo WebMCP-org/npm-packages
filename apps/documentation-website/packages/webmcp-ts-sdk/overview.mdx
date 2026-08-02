@@ -1,37 +1,64 @@
 ---
 title: '@mcp-b/webmcp-ts-sdk overview'
-description: 'When to use BrowserMcpServer directly, why the browser-adapted SDK exists, and where it fits between the polyfill and application runtime.'
-keywords:
-  ['@mcp-b/webmcp-ts-sdk', 'overview', 'BrowserMcpServer', 'dynamic tool registration', 'SDK']
+description: 'When to use the thin BrowserMcpServer adapter over MCP TypeScript SDK v2 and which browser responsibilities it retains.'
+keywords: ['@mcp-b/webmcp-ts-sdk', 'overview', 'BrowserMcpServer', 'MCP SDK v2', 'WebMCP adapter']
 icon: 'layer-group'
 ---
 
-`@mcp-b/webmcp-ts-sdk` exposes `BrowserMcpServer`, the browser-adapted SDK layer that keeps the MCP transport model working even when tools register after the connection is already open.
+`@mcp-b/webmcp-ts-sdk` exposes `BrowserMcpServer`, a thin WebMCP adapter that composes the official MCP TypeScript SDK v2 server. It does not subclass or fork `McpServer`.
 
 ## When to use this package
 
-- You need direct control over the server instance instead of the automatic `@mcp-b/global` setup.
-- You are building a custom integration that needs to wrap or subclass the browser server behavior.
-- You need the SDK layer without the top-level global initializer.
+- You need direct control over the browser server instead of the automatic [`@mcp-b/global`](/packages/global/overview) setup.
+- You need to mirror MCP tools to an existing `document.modelContext`.
+- You need to backfill tools from native Chrome or expose MCP-B prompts and resources.
 
 ## When not to use this package
 
-- You are building a typical web application. Start with [`@mcp-b/global`](/packages/global/overview).
+- You are building a typical web application. Use [`@mcp-b/global`](/packages/global/overview).
 - You only need the strict WebMCP surface. Use [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview).
+- You only need an MCP server. Use the official [`@modelcontextprotocol/server`](https://ts.sdk.modelcontextprotocol.io/v2/api/%40modelcontextprotocol/server/).
 
-## Where it sits in the package graph
+## What changed in v2
 
-This package sits between the strict runtime and the app-facing entry point. `@mcp-b/global` uses it to replace `document.modelContext` with a `BrowserMcpServer`.
+Dynamic registration is no longer a reason to maintain a modified MCP server. SDK v2 owns dynamic tool, prompt, and resource registrations, plus MCP protocol and transport behavior.
 
-## First step
+SDK v2 also owns schema conversion and validation. It accepts Standard Schema implementations such as Zod 4.2 or newer and wraps raw JSON Schema with `fromJsonSchema`. Zod 3 is unsupported.
 
-Create a `BrowserMcpServer`, connect a transport, then register tools as your page state changes. The [reference page](/packages/webmcp-ts-sdk/reference) covers the server methods, backfill behavior, and transport lifecycle.
+`BrowserMcpServer` retains only the WebMCP boundary:
+
+| Official MCP SDK v2                                    | `BrowserMcpServer`                                |
+| ------------------------------------------------------ | ------------------------------------------------- |
+| MCP registration handles and list-change notifications | WebMCP `registerTool(tool, options?)`             |
+| Standard Schema, Zod 4.2+, and `fromJsonSchema`        | `document.modelContext` events and tool discovery |
+| MCP transport, validation, and protocol behavior       | Native Chrome mirroring and backfill              |
+| MCP prompts, resources, and client requests            | MCP-B descriptor helpers and `mcpServer` access   |
+
+<Note>
+  `BrowserMcpServer.connect(customTransport)` remains on SDK v2's legacy 2025-era route. Installing
+  v2 does not make tab, iframe, or other custom transports speak MCP 2026-07-28. Instance-level
+  sampling and elicitation requests live on `browserServer.mcpServer.server`. These SDK APIs are
+  legacy-only and throw on modern-era v2 instances. See [Supporting protocol revision
+  2026-07-28](https://ts.sdk.modelcontextprotocol.io/v2/migration/support-2026-07-28).
+</Note>
+
+<Note>
+  WebMCP can register an array-root input schema because arrays are JavaScript objects. MCP requires
+  tool input schemas to have an object root. The adapter keeps those tools on WebMCP, omits them
+  from the MCP tool list, and logs a warning.
+</Note>
+
+## Where it sits
+
+`@mcp-b/global` creates the adapter with the current `document.modelContext` as its `native` target. The adapter mirrors browser-facing registrations down to that target and delegates MCP work to its composed v2 `McpServer`.
+
+The [reference page](/packages/webmcp-ts-sdk/reference) describes the adapter methods and its native Chrome behavior. Use the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd) recommended by Chrome's WebMCP documentation to inspect mirrored tools. The [MCP TypeScript SDK v2 documentation](https://ts.sdk.modelcontextprotocol.io/v2/) owns the upstream server API.
 
 ## Related pages
 
 <CardGroup cols={2}>
   <Card title="Reference" icon="book-open" href="/packages/webmcp-ts-sdk/reference">
-    BrowserMcpServer APIs, dynamic registration behavior, and backfill helpers.
+    BrowserMcpServer APIs, native mirroring, and backfill helpers.
   </Card>
   <Card
     title="Runtime layering"
@@ -40,10 +67,14 @@ Create a `BrowserMcpServer`, connect a transport, then register tools as your pa
   >
     See how this layer fits between the polyfill and @mcp-b/global.
   </Card>
-  <Card title="WebMCP vs MCP" icon="arrows-left-right" href="/explanation/webmcp-vs-mcp">
-    Why browser runtimes need a different registration model.
+  <Card
+    title="Strict core and extensions"
+    icon="arrows-left-right"
+    href="/explanation/strict-core-vs-mcp-b-extensions"
+  >
+    Separate the standard browser API from MCP-B helpers.
   </Card>
-  <Card title="Transports overview" icon="network-wired" href="/packages/transports/overview">
-    Pick the transport that connects your server.
+  <Card title="WebMCP standard API" icon="globe" href="/reference/webmcp/standard-api">
+    Consult the browser surface and its upstream specification.
   </Card>
 </CardGroup>

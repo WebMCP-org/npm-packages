@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 
 export const DEFAULT_RELAY_PORT = 9333;
 export const DEFAULT_RELAY_PORT_RANGE_END = 9348;
-export const RELAY_PORT_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const RELAY_PORT_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 interface PersistedRelayPort {
   host: string;
@@ -46,7 +46,7 @@ export async function persistPort(
   await writeFile(path, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
 }
 
-export async function readPersistedPort(
+async function readPersistedPort(
   path = defaultRelayPortPersistPath(),
   options: {
     expectedHost?: string;

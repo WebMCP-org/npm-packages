@@ -33,7 +33,7 @@ This repo publishes runtime libraries and type contracts. Our tests are supposed
 When a test does this:
 
 ```ts
-const registerTool = mc.registerTool as unknown as (tool: unknown) => void;
+const registerTool = mc.registerTool as unknown as (tool: unknown) => Promise<void>;
 ```
 
 the test stops testing `registerTool`.
@@ -66,7 +66,7 @@ Do not use:
 Examples of banned patterns:
 
 ```ts
-const registerTool = mc.registerTool as unknown as (tool: unknown) => void;
+const registerTool = mc.registerTool as unknown as (tool: unknown) => Promise<void>;
 const ctx = document.modelContext as ModelContextWithExtensions;
 const testing = navigator.modelContextTesting as unknown as {
   executeTool: (name: string, inputArgsJson: string) => Promise<string | null>;
@@ -99,7 +99,7 @@ const testing = navigator.modelContextTesting;
 Preferred:
 
 ```ts
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'ping',
   description: 'Ping',
   execute() {
@@ -119,7 +119,7 @@ If `execute(args)` is supposed to infer from `inputSchema`, do not manually anno
 Bad:
 
 ```ts
-registerTool({
+await registerTool({
   inputSchema: SOME_SCHEMA,
   async execute(args: { query: string }) {
     return { content: [{ type: 'text', text: args.query }] };
@@ -130,7 +130,7 @@ registerTool({
 Good:
 
 ```ts
-registerTool({
+await registerTool({
   inputSchema: SOME_SCHEMA,
   async execute(args) {
     return { content: [{ type: 'text', text: args.query }] };
@@ -183,7 +183,7 @@ Preferred pattern:
 function hasModelContextExtensions(
   modelContext: Navigator['modelContext']
 ): modelContext is Navigator['modelContext'] & ModelContextExtensions {
-  return 'callTool' in modelContext && 'listTools' in modelContext;
+  return 'listTools' in modelContext;
 }
 ```
 
@@ -306,7 +306,7 @@ If the only way to register a schema is to cast it, fix the registration typing.
 Reject a change if it does any of the following:
 
 1. Casts `window`, `navigator`, or `globalThis` to reach a repo-owned property.
-2. Casts `registerTool`, `callTool`, `listTools`, `executeTool`, or similar public functions to broader signatures.
+2. Casts `registerTool`, `listTools`, `executeTool`, or similar public functions to broader signatures.
 3. Assigns repo-owned globals or public boundary methods to intermediate variables without a real need.
 4. Adds manual handler arg annotations because schema inference failed.
 5. Re-declares a public API locally with weaker types than the canonical package exports.
@@ -342,7 +342,7 @@ Fix it so the nearest example matches the canonical package story:
 - `@mcp-b/webmcp-types` provides the type contract
 - `@mcp-b/webmcp-polyfill` installs strict core runtime globals
 - `@mcp-b/global` installs MCP-B runtime/extension globals
-- native Chromium tests use the real `document.modelContext` / `navigator.modelContextTesting` browser APIs directly, with `navigator.modelContext` checked only as a deprecated alias
+- native Chromium tests use the real `document.modelContext.getTools()` surface and feature-detect Chrome's descriptor-based `executeTool()` extension; compatibility-shim coverage is kept in a separate lane
 
 When you encounter local code that manually wires globals, casts to extension shapes, or invents helper aliases around repo-owned boundaries, do not normalize it. Update the code or docs so the local example teaches the same contract as the package docs.
 

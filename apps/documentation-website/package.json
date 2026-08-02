@@ -10,6 +10,7 @@
     "validate": "mintlify validate"
   },
   "devDependencies": {
+    "@modelcontextprotocol/server": "catalog:",
     "mintlify": "^4.2.415"
   }
 }

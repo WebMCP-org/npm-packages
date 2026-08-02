@@ -18,7 +18,9 @@ const esmConfig: Options = {
   minify: false,
   target: 'esnext',
   platform: 'browser',
-  external: ['@mcp-b/transports', '@mcp-b/webmcp-ts-sdk'],
+  deps: {
+    neverBundle: ['@mcp-b/transports', '@mcp-b/webmcp-ts-sdk'],
+  },
   tsconfig: './tsconfig.json',
   outDir: 'dist',
 };
@@ -37,8 +39,9 @@ const iifeConfig: Options = {
   minify: true,
   target: 'esnext',
   platform: 'browser',
-  external: [], // Bundle everything - no externals for standalone script
-  noExternal: [/.*/], // Explicitly bundle all dependencies
+  deps: {
+    alwaysBundle: [/.*/],
+  },
   tsconfig: './tsconfig.json',
   outDir: 'dist',
   globalName: 'WebMCP',
@@ -60,10 +63,8 @@ export default defineConfig({
       instances: [{ browser: 'chromium' }],
     },
     // Test file patterns - exclude esm-resolution tests as they need Node.js
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
-    exclude: ['dist', 'node_modules', 'src/esm-resolution.test.ts', 'src/conformance/**/*.test.ts'],
-    // Enable globals for cleaner test syntax
-    globals: true,
+    include: ['src/**/*.{test,spec}.{ts,tsx}', 'conformance/global-runtime.e2e.test.ts'],
+    exclude: ['src/esm-resolution.test.ts'],
     // Limit concurrency in CI to prevent resource exhaustion
     maxConcurrency: isCI ? 2 : 10,
     fileParallelism: !isCI,

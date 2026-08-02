@@ -12,6 +12,21 @@ supplies the strict `document.modelContext` surface.
 operations while providing MCP-B-only capabilities. `@mcp-b/global`
 initializes those layers and connects the selected browser transport.
 
+Global initialization preserves the browser-shaped programming model:
+
+1. Install or adopt the strict `document.modelContext` implementation.
+2. Capture that implementation as the native context.
+3. Wrap it with `BrowserMcpServer`, which mirrors core registrations down to
+   the captured context.
+4. Replace `document.modelContext` with the wrapper and connect the selected
+   transport in the background.
+
+Initialization returns no server handle. Application and library code keeps
+using `document.modelContext` normally, whether the active implementation is
+native, polyfilled, or wrapped by MCP-B. Cleanup restores the property
+descriptors that existed before wrapping; it does not uninstall the separately
+owned polyfill.
+
 This separation allows a library to depend only on types, a site to use only
 the strict polyfill, or an application to install the complete MCP-B runtime.
 Core tool registrations remain visible to native browser tooling, while
@@ -20,4 +35,5 @@ cleanup can restore the context that existed before initialization.
 `navigator.modelContext` remains only as a deprecated compatibility alias. New
 integrations use `document.modelContext`.
 
-See the [`@mcp-b/global` reference](/packages/global/reference).
+See the [`@mcp-b/global` reference](/packages/global/reference) and [Choose a
+runtime](/how-to/choose-runtime).

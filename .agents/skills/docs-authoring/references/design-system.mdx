@@ -117,7 +117,7 @@ document.modelContext.registerTool({
   name: 'example_tool',
   description: 'An example tool',
   inputSchema: { type: 'object', properties: {} },
-  handler: async () => ({ content: [{ type: 'text', text: 'Hello' }] }),
+  execute: async () => ({ content: [{ type: 'text', text: 'Hello' }] }),
 });
 ```
 
@@ -137,7 +137,7 @@ npm install @mcp-b/global
       useWebMCP({
         name: 'my_tool',
         description: 'Does something',
-        handler: async () => ({ content: [{ type: 'text', text: 'Done' }] })
+        execute: async () => ({ content: [{ type: 'text', text: 'Done' }] })
       });
     }
     ```
@@ -152,7 +152,7 @@ npm install @mcp-b/global
       document.modelContext.registerTool({
         name: 'my_tool',
         description: 'Does something',
-        handler: async () => ({ content: [{ type: 'text', text: 'Done' }] })
+        execute: async () => ({ content: [{ type: 'text', text: 'Done' }] })
       });
     });
     </script>
@@ -164,7 +164,7 @@ npm install @mcp-b/global
     document.modelContext.registerTool({
       name: 'my_tool',
       description: 'Does something',
-      handler: async () => ({ content: [{ type: 'text', text: 'Done' }] })
+      execute: async () => ({ content: [{ type: 'text', text: 'Done' }] })
     });
     ```
   </Tab>

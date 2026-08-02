@@ -1,5 +1,5 @@
 import { IframeParentTransport } from '@mcp-b/transports';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { Client } from '@modelcontextprotocol/client';
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -22,7 +22,10 @@ function setStatus(status: 'pending' | 'ready' | 'error', text: string) {
 
 async function bootstrap() {
   const targetOrigin = window.location.origin;
-  const client = new Client({ name: 'runtime-contract-iframe-client', version: '1.0.0' });
+  const client = new Client(
+    { name: 'runtime-contract-iframe-client', version: '1.0.0' },
+    { versionNegotiation: { mode: 'auto' } }
+  );
   const transport = new IframeParentTransport({
     iframe: iframeEl,
     targetOrigin,

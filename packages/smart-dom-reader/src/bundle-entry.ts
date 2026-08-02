@@ -7,10 +7,20 @@
  */
 
 import type { ExtractionArgs, ExtractionMethod, ExtractionResult } from './bundle-types';
-import { SmartDOMReader } from './index';
+import { SmartDOMReader } from './smart-dom-reader';
 import { MarkdownFormatter } from './markdown-formatter';
 import { ProgressiveExtractor } from './progressive';
 import type { ContentExtractionOptions, ExtractionOptions } from './types';
+
+function resolveDocument(frameSelector?: string): Document {
+  if (!frameSelector) return document;
+
+  const iframe = document.querySelector(frameSelector);
+  if (!(iframe instanceof HTMLIFrameElement) || !iframe.contentDocument) {
+    throw new Error(`Cannot access iframe: ${frameSelector}`);
+  }
+  return iframe.contentDocument;
+}
 
 // Export a function that will be available after the script is loaded
 // This will be wrapped in an IIFE by the bundler
@@ -25,15 +35,7 @@ export function executeExtraction<M extends ExtractionMethod>(
       case 'extractStructure': {
         const structureArgs = args as ExtractionArgs['extractStructure'];
         const { selector, frameSelector, formatOptions } = structureArgs;
-        let doc: Document = document;
-
-        if (frameSelector) {
-          const iframe = document.querySelector(frameSelector);
-          if (!iframe || !(iframe instanceof HTMLIFrameElement) || !iframe.contentDocument) {
-            return { error: `Cannot access iframe: ${frameSelector}` };
-          }
-          doc = iframe.contentDocument;
-        }
+        const doc = resolveDocument(frameSelector);
 
         const target = selector ? (doc.querySelector(selector) ?? doc) : doc;
         const overview = ProgressiveExtractor.extractStructure(target);
@@ -51,26 +53,13 @@ export function executeExtraction<M extends ExtractionMethod>(
       case 'extractRegion': {
         const regionArgs = args as ExtractionArgs['extractRegion'];
         const { selector, mode, frameSelector, options, formatOptions } = regionArgs;
-        let doc: Document = document;
-
-        if (frameSelector) {
-          const iframe = document.querySelector(frameSelector);
-          if (!iframe || !(iframe instanceof HTMLIFrameElement) || !iframe.contentDocument) {
-            return { error: `Cannot access iframe: ${frameSelector}` };
-          }
-          doc = iframe.contentDocument;
-        }
+        const doc = resolveDocument(frameSelector);
 
         const extractOptions: ExtractionOptions = {
           ...options,
           mode: mode || 'interactive',
         };
-        const extractResult = ProgressiveExtractor.extractRegion(
-          selector,
-          doc,
-          extractOptions,
-          SmartDOMReader
-        );
+        const extractResult = ProgressiveExtractor.extractRegion(selector, doc, extractOptions);
 
         if (!extractResult) {
           return { error: `No element found matching selector: ${selector}` };
@@ -89,15 +78,7 @@ export function executeExtraction<M extends ExtractionMethod>(
       case 'extractContent': {
         const contentArgs = args as ExtractionArgs['extractContent'];
         const { selector, frameSelector, options, formatOptions } = contentArgs;
-        let doc: Document = document;
-
-        if (frameSelector) {
-          const iframe = document.querySelector(frameSelector);
-          if (!iframe || !(iframe instanceof HTMLIFrameElement) || !iframe.contentDocument) {
-            return { error: `Cannot access iframe: ${frameSelector}` };
-          }
-          doc = iframe.contentDocument;
-        }
+        const doc = resolveDocument(frameSelector);
 
         const extractOptions: ContentExtractionOptions = options || {};
         const extractResult = ProgressiveExtractor.extractContent(selector, doc, extractOptions);
@@ -119,15 +100,7 @@ export function executeExtraction<M extends ExtractionMethod>(
       case 'extractInteractive': {
         const interactiveArgs = args as ExtractionArgs['extractInteractive'];
         const { selector, frameSelector, options, formatOptions } = interactiveArgs;
-        let doc: Document = document;
-
-        if (frameSelector) {
-          const iframe = document.querySelector(frameSelector);
-          if (!iframe || !(iframe instanceof HTMLIFrameElement) || !iframe.contentDocument) {
-            return { error: `Cannot access iframe: ${frameSelector}` };
-          }
-          doc = iframe.contentDocument;
-        }
+        const doc = resolveDocument(frameSelector);
 
         const extractResult = selector
           ? SmartDOMReader.extractFromElement(
@@ -150,15 +123,7 @@ export function executeExtraction<M extends ExtractionMethod>(
       case 'extractFull': {
         const fullArgs = args as ExtractionArgs['extractFull'];
         const { selector, frameSelector, options, formatOptions } = fullArgs;
-        let doc: Document = document;
-
-        if (frameSelector) {
-          const iframe = document.querySelector(frameSelector);
-          if (!iframe || !(iframe instanceof HTMLIFrameElement) || !iframe.contentDocument) {
-            return { error: `Cannot access iframe: ${frameSelector}` };
-          }
-          doc = iframe.contentDocument;
-        }
+        const doc = resolveDocument(frameSelector);
 
         const extractResult = selector
           ? SmartDOMReader.extractFromElement(doc.querySelector(selector)!, 'full', options || {})
@@ -181,6 +146,3 @@ export function executeExtraction<M extends ExtractionMethod>(
     };
   }
 }
-
-// Export for direct execution without global attachment
-export const SmartDOMReaderBundle = { executeExtraction };

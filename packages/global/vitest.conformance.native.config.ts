@@ -1,66 +1,14 @@
-import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { playwright } from 'vite-plus/test/browser-playwright';
 import { defineConfig } from 'vite-plus';
+import {
+  LINUX_CHROME_EXECUTABLE_PATHS,
+  MACOS_CHROME_EXECUTABLE_PATHS,
+  resolveChromeExecutable,
+} from '../../e2e/chrome-executable.js';
 
 const isCI = process.env.CI === 'true';
 const MIN_NATIVE_CHROME_MAJOR = 152;
-const REQUIRED_WEBMCP_FEATURES = ['WebMCPTesting', 'DevToolsWebMCPSupport'];
-
-const chromeCandidates = [
-  process.env.CHROME_BIN,
-  '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
-  '/Applications/Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev',
-  '/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta',
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  '/usr/bin/google-chrome-unstable',
-  '/usr/bin/google-chrome-beta',
-  '/usr/bin/google-chrome',
-  '/usr/bin/chromium',
-].filter((candidate): candidate is string => Boolean(candidate));
-
-function readChromeVersion(executablePath: string): string | undefined {
-  try {
-    return execFileSync(executablePath, ['--version'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-  } catch {
-    return undefined;
-  }
-}
-
-function majorFromVersion(version: string | undefined): number | undefined {
-  const match = version?.match(/\b(\d+)\./);
-  const major = match?.[1];
-  return major ? Number.parseInt(major, 10) : undefined;
-}
-
-function resolveChrome152(): { executablePath: string; version: string } {
-  const explicitChromeBin = process.env.CHROME_BIN;
-
-  for (const executablePath of chromeCandidates) {
-    if (!existsSync(executablePath)) {
-      continue;
-    }
-
-    const version = readChromeVersion(executablePath);
-    const major = majorFromVersion(version);
-    if (major !== undefined && major >= MIN_NATIVE_CHROME_MAJOR) {
-      return { executablePath, version: version ?? executablePath };
-    }
-
-    if (explicitChromeBin && executablePath === explicitChromeBin) {
-      throw new Error(
-        `Native conformance requires Chrome ${MIN_NATIVE_CHROME_MAJOR}+; CHROME_BIN resolved to ${version ?? executablePath}.`
-      );
-    }
-  }
-
-  throw new Error(
-    `Native conformance requires Chrome ${MIN_NATIVE_CHROME_MAJOR}+ with WebMCP support. Set CHROME_BIN to a Chrome Dev/Canary executable.`
-  );
-}
+const REQUIRED_WEBMCP_FEATURES = ['WebMCP', 'DevToolsWebMCPSupport'];
 
 function resolveChromeFlags(): string[] {
   const rawFlags = process.env.CHROME_FLAGS?.split(/\s+/).filter(Boolean) ?? [];
@@ -83,7 +31,24 @@ function resolveChromeFlags(): string[] {
   return [...passthroughFlags, `--enable-features=${[...features].join(',')}`];
 }
 
-const nativeChrome = resolveChrome152();
+const nativeChrome = resolveChromeExecutable({
+  candidates: [
+    process.env.CHROME_BIN,
+    ...MACOS_CHROME_EXECUTABLE_PATHS,
+    ...LINUX_CHROME_EXECUTABLE_PATHS,
+  ],
+  minimumMajor: MIN_NATIVE_CHROME_MAJOR,
+  onRejectedCandidate: ({ executablePath, version }) =>
+    process.env.CHROME_BIN && executablePath === process.env.CHROME_BIN
+      ? new Error(
+          `Native conformance requires Chrome ${MIN_NATIVE_CHROME_MAJOR}+; CHROME_BIN resolved to ${version ?? executablePath}.`
+        )
+      : undefined,
+  unresolvedError: () =>
+    new Error(
+      `Native conformance requires Chrome ${MIN_NATIVE_CHROME_MAJOR}+ with WebMCP support. Set CHROME_BIN to a Chrome Dev/Canary executable.`
+    ),
+});
 const chromeFlags = resolveChromeFlags();
 
 export default defineConfig({
@@ -99,8 +64,6 @@ export default defineConfig({
       instances: [{ browser: 'chromium' }],
     },
     include: ['conformance/native-runtime.e2e.test.ts'],
-    exclude: ['dist', 'node_modules'],
-    globals: true,
     maxConcurrency: isCI ? 1 : 2,
     fileParallelism: false,
   },

@@ -1,22 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
-import { getModelContext, type ModelContextSurface } from './model-context.js';
-import type { ResourceContents, WebMCPResourceConfig, WebMCPResourceReturn } from './types.js';
-
-type ResourceModelContext = ModelContextSurface & {
-  registerResource: (descriptor: {
-    uri: string;
-    name: string;
-    description?: string;
-    mimeType?: string;
-    read: (uri: URL, params?: Record<string, string>) => Promise<{ contents: ResourceContents[] }>;
-  }) => { unregister: () => void } | undefined;
-};
+import { useCallback } from 'react';
+import { getBrowserMcpServer } from './model-context.js';
+import type { WebMCPResourceConfig, WebMCPResourceReturn } from './types.js';
+import { useCommittedRef } from './useCommittedRef.js';
+import { useMcpRegistration } from './useMcpRegistration.js';
 
 /**
  * React hook for registering Model Context Protocol (MCP) resources.
  *
  * This hook handles the complete lifecycle of an MCP resource:
- * - Registers the resource with `window.document.modelContext`
+ * - Registers the resource with the installed MCP-B `BrowserMcpServer`
  * - Supports both static URIs and URI templates with parameters
  * - Automatically unregisters on component unmount
  *
@@ -56,7 +48,7 @@ type ResourceModelContext = ModelContextSurface & {
  *     description: 'User profile data by ID',
  *     mimeType: 'application/json',
  *     read: async (uri, params) => {
- *       const userId = params?.userId ?? '';
+ *       const userId = typeof params?.userId === 'string' ? params.userId : '';
  *       const profile = await fetchUserProfile(userId);
  *       return {
  *         contents: [{
@@ -74,59 +66,25 @@ type ResourceModelContext = ModelContextSurface & {
 export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceReturn {
   const { uri, name, description, mimeType, read } = config;
 
-  const [isRegistered, setIsRegistered] = useState(false);
+  const readRef = useCommittedRef(read);
 
-  const readRef = useRef(read);
-
-  useEffect(() => {
-    readRef.current = read;
-  }, [read]);
-
-  useEffect(() => {
-    const modelContext = getModelContext() as ResourceModelContext | undefined;
+  const register = useCallback(() => {
+    const modelContext = getBrowserMcpServer();
     if (!modelContext) {
       console.warn(
-        `[ReactWebMCP] window.document.modelContext is not available. Resource "${uri}" will not be registered.`
+        `[ReactWebMCP] BrowserMcpServer is not available. Resource "${uri}" will not be registered.`
       );
       return;
     }
 
-    const resourceHandler = async (
-      resolvedUri: URL,
-      params?: Record<string, string>
-    ): Promise<{ contents: ResourceContents[] }> => {
-      return readRef.current(resolvedUri, params);
-    };
+    return modelContext.registerResource({
+      uri,
+      name,
+      ...(description !== undefined && { description }),
+      ...(mimeType !== undefined && { mimeType }),
+      read: (resolvedUri, params) => readRef.current(resolvedUri, params),
+    });
+  }, [uri, name, description, mimeType, readRef]);
 
-    let registration: { unregister: () => void } | undefined;
-    try {
-      registration = modelContext.registerResource({
-        uri,
-        name,
-        ...(description !== undefined && { description }),
-        ...(mimeType !== undefined && { mimeType }),
-        read: resourceHandler,
-      });
-    } catch (error) {
-      setIsRegistered(false);
-      throw error;
-    }
-
-    if (!registration) {
-      console.warn(`[ReactWebMCP] Resource "${uri}" did not return a registration handle.`);
-      setIsRegistered(false);
-      return;
-    }
-
-    setIsRegistered(true);
-
-    return () => {
-      registration.unregister();
-      setIsRegistered(false);
-    };
-  }, [uri, name, description, mimeType]);
-
-  return {
-    isRegistered,
-  };
+  return { isRegistered: useMcpRegistration(register) };
 }

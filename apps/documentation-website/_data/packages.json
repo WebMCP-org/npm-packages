@@ -36,7 +36,7 @@
     "sourcePackagePath": "packages/global",
     "skill": {
       "name": "mcp-b-global",
-      "description": "Use when writing code that registers AI tools on a webpage using document.modelContext, registerTool, provideContext, or the WebMCP / MCP-B browser runtime. Covers initialization, transport configuration, cleanup, and the full BrowserMcpServer API."
+      "description": "Use when writing code that registers AI tools on a webpage using document.modelContext, registerTool, or the WebMCP / MCP-B browser runtime. Covers initialization, transport configuration, cleanup, and the full BrowserMcpServer API."
     }
   },
   {
@@ -57,7 +57,7 @@
     "packageName": "@mcp-b/transports",
     "sidebarLabel": "transports",
     "category": "Core runtime",
-    "summary": "Tab, iframe, extension, and user-script transport classes for moving MCP messages through browser boundaries.",
+    "summary": "Tab, iframe, and extension transport classes for moving MCP messages through browser boundaries.",
     "installCommand": "npm install @mcp-b/transports",
     "overviewPath": "/packages/transports/overview",
     "referencePath": "/packages/transports/reference",
@@ -69,13 +69,13 @@
     "packageName": "@mcp-b/mcp-iframe",
     "sidebarLabel": "mcp-iframe",
     "category": "Core runtime",
-    "summary": "Custom element that exposes tools, prompts, and resources from an iframe to its parent page.",
-    "installCommand": "npm install @mcp-b/mcp-iframe @modelcontextprotocol/sdk",
+    "summary": "Custom element that connects to an iframe MCP server and mirrors its tools, prompts, and resources onto the parent context.",
+    "installCommand": "npm install @mcp-b/mcp-iframe",
     "overviewPath": "/packages/mcp-iframe/overview",
     "referencePath": "/packages/mcp-iframe/reference",
     "quickstartSnippet": "packages/mcp-iframe-quickstart.html",
     "sourcePackagePath": "packages/mcp-iframe",
-    "note": "The iframe content must already expose document.modelContext through @mcp-b/global or another compatible implementation.",
+    "note": "The iframe must run an MCP server over IframeChildTransport. @mcp-b/global supplies the child server and transport automatically; configure iframeServer.allowedOrigins for the parent.",
     "skill": {
       "name": "mcp-iframe",
       "description": "Use when bridging MCP tools, prompts, or resources from an iframe to its parent page using the <mcp-iframe> custom element. Covers attributes, events, name prefixing, lifecycle, and programmatic registration."
@@ -103,8 +103,8 @@
     "packageName": "@mcp-b/react-webmcp",
     "sidebarLabel": "react-webmcp",
     "category": "React",
-    "summary": "Full React integration for MCP-B, including tool hooks, prompts, resources, sampling, elicitation, and client providers.",
-    "installCommand": "npm install @mcp-b/react-webmcp zod",
+    "summary": "Full React integration for MCP-B, including tool hooks, prompts, resources, and client providers.",
+    "installCommand": "npm install @mcp-b/react-webmcp",
     "overviewPath": "/packages/react-webmcp/overview",
     "referencePath": "/packages/react-webmcp/reference",
     "quickstartSnippet": "packages/react-webmcp-quickstart.ts",
@@ -112,7 +112,7 @@
     "note": "Provider and client hooks assume @mcp-b/global or another BrowserMcpServer-based runtime is present.",
     "skill": {
       "name": "react-webmcp",
-      "description": "Use when building React apps with full MCP-B features: useWebMCP hook, prompts, resources, sampling, elicitation, and McpClientProvider. Supports Zod v3 object maps for input/output schemas."
+      "description": "Use when building React apps with useWebMCP, prompt and resource hooks, or McpClientProvider. Supports JSON Schema and Standard JSON Schema input schemas."
     }
   },
   {
@@ -130,18 +130,6 @@
       "name": "webmcp-local-relay",
       "description": "Use when connecting browser-hosted WebMCP tools to desktop MCP clients like Claude Code, Claude Desktop, or Cursor via the local relay server. Covers CLI options, embed script, static management tools, security, and troubleshooting."
     }
-  },
-  {
-    "id": "extension-tools",
-    "packageName": "@mcp-b/extension-tools",
-    "sidebarLabel": "extension-tools",
-    "category": "Tooling",
-    "summary": "Chrome Extension API tool classes for tabs, bookmarks, history, storage, scripting, and related agent workflows.",
-    "installCommand": "npm install @mcp-b/extension-tools @modelcontextprotocol/sdk",
-    "overviewPath": "/packages/extension-tools/overview",
-    "referencePath": "/packages/extension-tools/reference",
-    "quickstartSnippet": "packages/extension-tools-quickstart.ts",
-    "sourcePackagePath": "packages/extension-tools"
   },
   {
     "id": "smart-dom-reader",

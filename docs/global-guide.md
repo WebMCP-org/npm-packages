@@ -2,8 +2,8 @@
 
 `@mcp-b/global` installs the full MCP-B browser runtime. Use it when a page needs
 the WebMCP `document.modelContext` surface plus MCP-B transport and extension
-features such as prompts, resources, sampling, elicitation, or browser-to-MCP
-bridges.
+features such as prompts, resources, browser-to-MCP bridges, or direct access to
+the composed official MCP server.
 
 For the public docs site, see:
 
@@ -66,50 +66,66 @@ controller.abort();
 ```
 
 `registerTool()` resolves `undefined`. Do not depend on a registration handle.
-`unregisterTool(name)` remains only as deprecated MCP-B compatibility.
+Abort the registration signal to remove a tool. There is no name-based
+`unregisterTool()` method.
 
 ## Discover and execute tools
 
-The document-first producer path is:
+Discovery stays on the document surface. Chromium's execution method is
+optional, so feature-detect it there as well:
 
 ```ts
-const tools = await document.modelContext.getTools();
+import type { ChromeModelContext } from '@mcp-b/webmcp-types';
+
+const modelContext = document.modelContext as ChromeModelContext;
+if (typeof modelContext.executeTool !== 'function') {
+  throw new Error('Tool execution is unavailable');
+}
+
+const tools = await modelContext.getTools();
 const tool = tools.find((item) => item.name === 'counter_get');
 
 if (!tool) {
   throw new Error('counter_get is not registered');
 }
 
-const resultJson = await document.modelContext.executeTool(tool, '{}');
+const resultJson = await modelContext.executeTool(tool, '{}');
 const result = resultJson === null ? null : JSON.parse(resultJson);
 ```
 
-`listTools()` and `callTool()` are MCP-B compatibility helpers. MCP clients that
-connect through the MCP SDK still use the SDK's `client.listTools()` and
-`client.callTool(...)` APIs.
+`executeTool()` is a Chromium-compatible extension, not a strict WebMCP member.
+`listTools()` is an MCP-B metadata helper. MCP clients that connect through the
+MCP SDK use the client's `listTools()` and `callTool(...)` protocol APIs.
 
 ## Configure initialization
 
 ```ts
-import { initializeWebModelContext } from '@mcp-b/global';
+window.__webModelContextOptions = { autoInitialize: false };
+
+const { initializeWebModelContext } = await import('@mcp-b/global');
 
 initializeWebModelContext({
   transport: {
     tabServer: { allowedOrigins: ['https://app.example'] },
   },
-  installTestingShim: 'if-missing',
+  installTestingShim: true,
 });
 ```
 
+Set `autoInitialize` before the package loads. A static import runs package
+initialization before the module body can configure it.
+
 Useful options:
 
-| Option                       | Default        | Purpose                                                              |
-| ---------------------------- | -------------- | -------------------------------------------------------------------- |
-| `autoInitialize`             | `true`         | Disable when you want to call `initializeWebModelContext()` yourself |
-| `transport.tabServer`        | auto           | Configure or disable the tab transport                               |
-| `transport.iframeServer`     | auto           | Configure or disable iframe transport                                |
-| `nativeModelContextBehavior` | `'preserve'`   | Wrap an existing native/polyfill context                             |
-| `installTestingShim`         | `'if-missing'` | Install `navigator.modelContextTesting` for tests and tooling        |
+| Option                   | Default | Purpose                                                               |
+| ------------------------ | ------- | --------------------------------------------------------------------- |
+| `autoInitialize`         | `true`  | Disable when you want to call `initializeWebModelContext()` yourself  |
+| `transport.tabServer`    | auto    | Configure or disable the tab transport                                |
+| `transport.iframeServer` | auto    | Configure or disable iframe transport                                 |
+| `installTestingShim`     | `true`  | Install `navigator.modelContextTesting` when no implementation exists |
+
+The initializer is side-effect-only. Repeated and cross-bundle calls are no-ops;
+application code continues through `document.modelContext`.
 
 ## Runtime layering
 
@@ -126,27 +142,9 @@ runtimes. New code should use `document.modelContext`.
 
 ## Output schemas
 
-Tool responses can include `structuredContent` that matches `outputSchema`.
-`outputSchema` is MCP-B helper metadata, not part of the current W3C/Chrome
-WebMCP tool dictionary. Native browser WebMCP does not enforce it. MCP
-transport clients may still accept a narrower object-shaped `structuredContent`
-boundary, so object outputs remain the safest cross-client shape until
-downstream MCP clients fully adopt SEP-2106.
-
-```ts
-await document.modelContext.registerTool({
-  name: 'tags_list',
-  description: 'List tags on the current page',
-  inputSchema: { type: 'object', properties: {} },
-  outputSchema: {
-    type: 'array',
-    items: { type: 'string' },
-  },
-  async execute() {
-    return ['webmcp', 'runtime'];
-  },
-});
-```
+`outputSchema` is MCP-B helper metadata, not part of the current WebMCP tool
+dictionary. See [Use schemas and structured output](../apps/documentation-website/how-to/use-schemas-and-structured-output.mdx)
+for the canonical guidance.
 
 ## Testing
 
@@ -165,5 +163,6 @@ const tools = await document.modelContext.getTools();
 console.log(tools.map((tool) => tool.name));
 ```
 
-Use `navigator.modelContextTesting` only for native preview/testing flows and
-tool inspectors. It is not the author-facing runtime surface.
+Use `navigator.modelContextTesting` only for MCP-B compatibility tests and
+older tooling. Current native Chrome tests use `getTools()` and feature-detect
+the descriptor-based `executeTool()` extension.

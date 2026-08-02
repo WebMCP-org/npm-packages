@@ -1,4 +1,4 @@
-import type { TextContent } from '@mcp-b/webmcp-types';
+import type { CallToolResult, TextContent } from '@mcp-b/webmcp-types';
 import { expect, type Frame, type Page } from '@playwright/test';
 import {
   DYNAMIC_TOOL_NAME,
@@ -50,7 +50,7 @@ export async function callClientTool(
   page: Page,
   name: string,
   args: Record<string, unknown>
-): Promise<unknown> {
+): Promise<CallToolResult | undefined> {
   return page.evaluate(
     async ({ toolName, toolArgs }) => {
       return await window.mcpClient?.callTool({
@@ -92,8 +92,8 @@ export async function callClientToolForError(
 }
 
 export async function resetInvocations(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    window.__WEBMCP_E2E__?.resetInvocations();
+  await page.evaluate(async () => {
+    await window.__WEBMCP_E2E__?.resetInvocations();
   });
 }
 
@@ -104,8 +104,8 @@ export async function readInvocations(
 }
 
 export async function resetFrameInvocations(frame: Frame): Promise<void> {
-  await frame.evaluate(() => {
-    window.__WEBMCP_E2E__?.resetInvocations();
+  await frame.evaluate(async () => {
+    await window.__WEBMCP_E2E__?.resetInvocations();
   });
 }
 

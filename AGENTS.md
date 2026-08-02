@@ -73,12 +73,12 @@ the Diataxis framework.
 - **Formatter**: Oxfmt (via `vp fmt` / `vp check`)
 - **Bundler**: tsdown via `vp pack` (config in each package's `vite.config.ts` `pack` block)
 - **Test runner**: Vitest via `vp test` (config in each package's `vite.config.ts` `test` block)
-- **Zod version**: Optional peer dep. Supports ^3.25 || ^4.0 when present
+- **Zod version**: MCP SDK v2 requires Zod ^4.2 when used. Zod 3 is unsupported
 - **Commit format**: `<type>(<scope>): <subject>` (enforced by hook)
 
 ### Commit Scopes
 
-Package scopes: `codemode`, `extension-tools`, `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`, `webmcp-types`
+Package scopes: `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-extension`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`, `webmcp-types`
 
 Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
@@ -86,7 +86,7 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 ### Web Standard APIs
 
-- `document.modelContext` is the canonical WebMCP v3 surface.
+- `document.modelContext` is the canonical current-draft WebMCP surface.
 - `navigator.modelContext` is a deprecated compatibility alias.
 - `navigator.modelContextTesting` is a compatibility surface for testing only.
 - New examples and public documentation use `document.modelContext`.
@@ -101,9 +101,9 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 ├─────────────────────────────────────────────────────┤
 │  @mcp-b/webmcp-ts-sdk (BrowserMcpServer)            │
 │  Wraps the underlying modelContext. Extends it with  │
-│  MCP capabilities: registerPrompt, registerResource, │
-│  elicitation, sampling. Mirrors core tool ops down   │
-│  to the native/polyfill context.                     │
+│  listTools, prompt/resource helpers, and a composed  │
+│  MCP server. Mirrors core tool ops down to the       │
+│  native/polyfill context.                            │
 ├─────────────────────────────────────────────────────┤
 │  @mcp-b/webmcp-polyfill                             │
 │  Provides document.modelContext when the browser     │
@@ -120,72 +120,43 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 1. **Polyfill** — `initializeWebMCPPolyfill()` is called. If a native model context already exists, the polyfill returns early. Otherwise it installs `document.modelContext`, the deprecated navigator alias, and the optional testing shim.
 2. **Capture native** — A reference to the current document-first context is saved as `native`.
-3. **BrowserMcpServer** — Created with `{ native }`, so core tool operations (`registerTool`, `unregisterTool`, `clearContext`, `provideContext`) mirror down to the underlying context.
-4. **Replace** — Both compatibility surfaces expose the `BrowserMcpServer` instance, which adds `registerPrompt`, `registerResource`, `listTools`, `callTool`, and other MCP-B extensions.
+3. **BrowserMcpServer** — Created with `{ native }`, so standard tool registrations mirror down to the underlying context and native tools are reconciled through `getTools()`.
+4. **Replace** — Both compatibility surfaces expose the `BrowserMcpServer` instance, which adds `registerPrompt`, `registerResource`, `listTools`, and other MCP-B extensions. Browser-shaped execution uses `getTools()` plus feature-detected `executeTool(tool, inputJson)`.
 5. **Cleanup** — `cleanupWebModelContext()` restores the original native/polyfill context.
 
 ### What Lives Where
 
 | Method               | Web Standard | Polyfill |   BrowserMcpServer    |
 | -------------------- | :----------: | :------: | :-------------------: |
-| `provideContext()`   |      Y       |    Y     | Y (mirrors to native) |
 | `registerTool()`     |      Y       |    Y     | Y (mirrors to native) |
-| `unregisterTool()`   |      Y       |    Y     | Y (mirrors to native) |
-| `clearContext()`     |      Y       |    Y     | Y (mirrors to native) |
+| `getTools()`         |      Y       |    Y     | Y (delegates native)  |
+| `ontoolchange`       |      Y       |    Y     |           Y           |
+| `executeTool(tool)`  | Chrome only  |  compat  |           Y           |
 | `registerPrompt()`   |      -       |    -     |           Y           |
 | `registerResource()` |      -       |    -     |           Y           |
 | `listTools()`        |      -       |    -     |           Y           |
-| `callTool()`         |      -       |    -     |           Y           |
-| `createMessage()`    |      -       |    -     |           Y           |
-| `elicitInput()`      |      -       |    -     |           Y           |
+
+### Extension Integration (`@mcp-b/webmcp-extension`)
+
+- A MAIN-world content script imports `@mcp-b/global`; page code still uses `document.modelContext` normally.
+- The isolated content script calls `connectWebMCPClient()` and receives the official MCP `Client`.
+- Keep privileged extension APIs and secrets out of the MAIN-world bundle.
+- The template is top-frame only. Do not add `all_frames` while `@mcp-b/global` selects the iframe-child transport in child frames.
 
 ### Key Type Interfaces (`@mcp-b/webmcp-types`)
 
-- `ModelContextCore` — the strict web standard surface (provideContext, registerTool, unregisterTool, clearContext)
-- `ModelContextExtensions` — MCPB extensions (listTools, callTool, events)
-- `ModelContext` = `ModelContextCore` (the type for `document.modelContext`)
-- `ModelContextWithExtensions` = `ModelContextCore & ModelContextExtensions`
+- `ModelContext` — the strict web standard surface (`registerTool`, `getTools`, `ontoolchange`)
+- `ModelContextExtensions` — schema-aware MCP-B `registerTool` overloads plus `listTools`
+- `ModelContextWithExtensions` = `Omit<ModelContext, 'registerTool'> & ModelContextExtensions`
 
 ## Reference Repos (`.reference/`)
 
 The `.reference/` directory (gitignored) holds shallow clones of upstream repos we track for sync. These are NOT dependencies — they are for human/AI reference when syncing with upstream changes.
 
-| Directory            | Upstream                                                                                      | Tracked By            |
-| -------------------- | --------------------------------------------------------------------------------------------- | --------------------- |
-| `cloudflare-agents/` | [cloudflare/agents](https://github.com/cloudflare/agents)                                     | `@mcp-b/codemode`     |
-| `standard-schema/`   | [standard-schema/standard-schema](https://github.com/standard-schema/standard-schema)         | `@mcp-b/webmcp-types` |
-| `typescript-sdk/`    | [anthropics/anthropic-sdk-typescript](https://github.com/anthropics/anthropic-sdk-typescript) | General reference     |
-
-To clone or refresh:
-
-```bash
-cd .reference
-git clone --depth 1 https://github.com/cloudflare/agents.git cloudflare-agents
-```
-
-### Codemode Upstream Sync
-
-`@mcp-b/codemode` is a browser-native port of `@cloudflare/codemode`. The file structure mirrors upstream for easy diffing:
-
-| Our file               | Upstream equivalent    | Notes                                                |
-| ---------------------- | ---------------------- | ---------------------------------------------------- |
-| `utils.ts`             | `utils.ts`             | Direct port                                          |
-| `json-schema-types.ts` | `json-schema-types.ts` | Direct port                                          |
-| `normalize.ts`         | `normalize.ts`         | Direct port                                          |
-| `tool-types.ts`        | `tool-types.ts`        | Direct port (AI SDK schema introspection)            |
-| `tool.ts`              | `tool.ts`              | Direct port (createCodeTool)                         |
-| `ai.ts`                | `ai.ts`                | Re-exports (matches upstream)                        |
-| `types.ts`             | `executor.ts`          | Executor/ExecuteResult interfaces only               |
-| `iframe-executor.ts`   | —                      | Browser-native (replaces CF's DynamicWorkerExecutor) |
-| `worker-executor.ts`   | —                      | Browser-native fallback                              |
-| `messages.ts`          | —                      | Typed postMessage protocol                           |
-| `webmcp.ts`            | —                      | WebMCP bridge                                        |
-
-When upstream adds features, diff with:
-
-```bash
-diff -r .reference/cloudflare-agents/packages/codemode/src packages/codemode/src
-```
+| Directory          | Upstream                                                                                      | Tracked By            |
+| ------------------ | --------------------------------------------------------------------------------------------- | --------------------- |
+| `standard-schema/` | [standard-schema/standard-schema](https://github.com/standard-schema/standard-schema)         | `@mcp-b/webmcp-types` |
+| `typescript-sdk/`  | [anthropics/anthropic-sdk-typescript](https://github.com/anthropics/anthropic-sdk-typescript) | General reference     |
 
 ## Before Committing
 

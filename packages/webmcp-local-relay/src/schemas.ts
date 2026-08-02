@@ -8,10 +8,13 @@ import {
   type RelayTool,
 } from './protocol.js';
 
-/**
- * Schema for source identity bootstrap message.
- */
-export const BrowserHelloMessageSchema = z.object({
+function normalizeSupportedInboundTools(tools: z.infer<typeof InboundToolSchema>[]): RelayTool[] {
+  return tools
+    .map(normalizeInboundTool)
+    .filter((tool) => tool.execution?.taskSupport !== 'required');
+}
+
+const BrowserHelloMessageSchema = z.object({
   type: z.literal('hello'),
   tabId: z.string().min(1),
   origin: z.string().optional(),
@@ -20,64 +23,24 @@ export const BrowserHelloMessageSchema = z.object({
   iconUrl: z.string().optional(),
 });
 
-/**
- * Schema for full tool-list synchronization message.
- *
- * Inbound tools are permissively parsed then normalized to SDK Tool shape.
- */
-export const BrowserToolsListMessageSchema = z.object({
+const BrowserToolsListMessageSchema = z.object({
   type: z.literal('tools/list'),
-  tools: z
-    .array(InboundToolSchema)
-    .transform((tools): RelayTool[] => tools.map(normalizeInboundTool)),
+  tools: z.array(InboundToolSchema).transform(normalizeSupportedInboundTools),
 });
 
-/**
- * Schema for tool-set replacement notification pushed after initial registration.
- *
- * Processing is identical to `tools/list` — the full tool set replaces any
- * previously registered tools — but the distinct type signals a dynamic update
- * rather than an initial handshake.
- */
-export const BrowserToolsChangedMessageSchema = z.object({
+const BrowserToolsChangedMessageSchema = z.object({
   type: z.literal('tools/changed'),
-  tools: z
-    .array(InboundToolSchema)
-    .transform((tools): RelayTool[] => tools.map(normalizeInboundTool)),
+  tools: z.array(InboundToolSchema).transform(normalizeSupportedInboundTools),
 });
 
-/**
- * Schema for invocation response payloads sent by browser sources.
- *
- * `result` remains permissive and is normalized later to preserve runtime
- * behavior for malformed tool responses.
- */
-export const BrowserToolResultMessageSchema = z.object({
+const BrowserToolResultMessageSchema = z.object({
   type: z.literal('result'),
   callId: z.string().min(1),
   result: z.unknown(),
 });
 
-/**
- * Schema for browser heartbeat acknowledgement.
- */
-export const BrowserPongMessageSchema = z.object({
+const BrowserPongMessageSchema = z.object({
   type: z.literal('pong'),
-});
-
-/**
- * Schema for elicitation request forwarded from a browser tool handler.
- *
- * When a WebMCP tool handler calls `elicitInput()`, the embed script
- * intercepts the call and forwards the parameters to the relay via this
- * message type. The relay then sends `elicitation/create` to the MCP
- * client (e.g. Claude Code) and returns the result via an
- * `elicitation-response` message.
- */
-export const BrowserElicitationRequestSchema = z.object({
-  type: z.literal('elicitation-request'),
-  callId: z.string().min(1),
-  params: z.record(z.string(), z.unknown()),
 });
 
 /**
@@ -89,7 +52,6 @@ export const BrowserToRelayMessageSchema = z.discriminatedUnion('type', [
   BrowserToolsChangedMessageSchema,
   BrowserToolResultMessageSchema,
   BrowserPongMessageSchema,
-  BrowserElicitationRequestSchema,
 ]);
 
 /**
@@ -160,39 +122,19 @@ export const RelayHelloRejectedMessageSchema = z.object({
  */
 export type RelayHelloRejectedMessage = z.infer<typeof RelayHelloRejectedMessageSchema>;
 
-/**
- * Schema for relay invocation messages sent to browser sources.
- */
-export const RelayInvokeMessageSchema = z.object({
+const RelayInvokeMessageSchema = z.object({
   type: z.literal('invoke'),
   callId: z.string().min(1),
   toolName: z.string().min(1),
   args: RelayInvokeArgsSchema,
 });
 
-/**
- * Schema for relay heartbeat messages sent to browser sources.
- */
-export const RelayPingMessageSchema = z.object({
+const RelayPingMessageSchema = z.object({
   type: z.literal('ping'),
 });
 
-/**
- * Schema for relay reload messages sent to browser sources.
- */
-export const RelayReloadMessageSchema = z.object({
+const RelayReloadMessageSchema = z.object({
   type: z.literal('reload'),
-});
-
-/**
- * Schema for elicitation response sent from relay to browser.
- *
- * Contains the MCP client's response to an `elicitation/create` request.
- */
-export const RelayElicitationResponseSchema = z.object({
-  type: z.literal('elicitation-response'),
-  callId: z.string().min(1),
-  result: z.record(z.string(), z.unknown()),
 });
 
 /**
@@ -205,17 +147,12 @@ export const RelayToBrowserMessageSchema = z.discriminatedUnion('type', [
   RelayInvokeMessageSchema,
   RelayPingMessageSchema,
   RelayReloadMessageSchema,
-  RelayElicitationResponseSchema,
 ]);
 
 /**
  * Relay-to-browser message payload.
  */
 export type RelayToBrowserMessage = z.infer<typeof RelayToBrowserMessageSchema>;
-
-/**
- * Relay-to-relay protocol (client mode <-> server mode).
- */
 
 /**
  * Schema for source metadata transmitted in relay-to-relay messages.
@@ -237,24 +174,15 @@ export const RelaySourceInfoSchema = z.object({
  */
 export type RelaySourceInfo = z.infer<typeof RelaySourceInfoSchema>;
 
-/**
- * Schema for relay client identification message.
- */
-export const RelayClientHelloSchema = z.object({
+const RelayClientHelloSchema = z.object({
   type: z.literal('relay/hello'),
 });
 
-/**
- * Schema for relay client tool list request.
- */
-export const RelayClientListToolsSchema = z.object({
+const RelayClientListToolsSchema = z.object({
   type: z.literal('relay/list-tools'),
 });
 
-/**
- * Schema for relay client tool invocation request.
- */
-export const RelayClientInvokeSchema = z.object({
+const RelayClientInvokeSchema = z.object({
   type: z.literal('relay/invoke'),
   callId: z.string().min(1),
   toolName: z.string().min(1),
@@ -277,31 +205,22 @@ export type RelayClientToServerMessage = z.infer<typeof RelayClientToServerMessa
 
 const RelayToolsPayloadFields = {
   tools: z.array(NormalizedToolSchema),
-  sources: z.array(RelaySourceInfoSchema).optional().default([]),
-  toolSourceMap: z.record(z.string(), z.array(z.string())).optional().default({}),
+  sources: z.array(RelaySourceInfoSchema),
+  toolSourceMap: z.record(z.string(), z.array(z.string())),
 };
 
-/**
- * Schema for relay server tool list response.
- */
-export const RelayServerToolsSchema = z.object({
+const RelayServerToolsSchema = z.object({
   type: z.literal('relay/tools'),
   ...RelayToolsPayloadFields,
 });
 
-/**
- * Schema for relay server invocation result response.
- */
-export const RelayServerResultSchema = z.object({
+const RelayServerResultSchema = z.object({
   type: z.literal('relay/result'),
   callId: z.string().min(1),
   result: CallToolResultSchema,
 });
 
-/**
- * Schema for relay server push notification when tools change.
- */
-export const RelayServerToolsChangedSchema = z.object({
+const RelayServerToolsChangedSchema = z.object({
   type: z.literal('relay/tools-changed'),
   ...RelayToolsPayloadFields,
 });

@@ -1,10 +1,11 @@
 {
-  "manifest_version": "0.3",
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/mcpb/main/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
   "name": "webmcp-local-relay",
   "display_name": "WebMCP Local Relay",
-  "version": "2.0.5",
+  "version": "4.0.0",
   "description": "Relay browser-registered WebMCP tools to any MCP client via localhost WebSocket bridge",
-  "long_description": "WebMCP Local Relay connects your browser tabs to AI agents like Claude. Websites that register WebMCP tools (via navigator.modelContext) are automatically discovered and relayed through a local WebSocket bridge, making them available as standard MCP tools. Tools are dynamically added and removed as you navigate between pages.",
+  "long_description": "WebMCP Local Relay connects your browser tabs to AI agents like Claude. Websites that register WebMCP tools through document.modelContext are automatically discovered and relayed through a local WebSocket bridge, making them available as standard MCP tools. Tools are dynamically added and removed as you navigate between pages.",
   "author": {
     "name": "WebMCP",
     "url": "https://github.com/WebMCP-org"
@@ -34,10 +35,6 @@
       "description": "List relayed tools available from connected browser sources"
     },
     {
-      "name": "webmcp_call_tool",
-      "description": "Call a browser-relayed tool by name with JSON arguments"
-    },
-    {
       "name": "webmcp_open_page",
       "description": "Open a URL in the default browser, or refresh a connected source by origin"
     }
@@ -45,26 +42,8 @@
   "tools_generated": true,
   "keywords": ["webmcp", "mcp", "relay", "browser", "tools", "model-context-protocol", "ai-agents"],
   "license": "MIT",
-  "user_config": {
-    "port": {
-      "type": "number",
-      "title": "WebSocket Port",
-      "description": "Local port for the WebSocket bridge that browser tabs connect to",
-      "default": 9333,
-      "min": 1024,
-      "max": 65535,
-      "required": false
-    },
-    "allowed_origins": {
-      "type": "string",
-      "title": "Allowed Origins",
-      "description": "Comma-separated list of allowed browser origins, or * to allow all",
-      "default": "*",
-      "required": false
-    }
-  },
   "compatibility": {
-    "claude_desktop": ">=0.10.0",
+    "claude_desktop": ">=1.0.0",
     "platforms": ["darwin", "win32", "linux"],
     "runtimes": {
       "node": ">=22.0.0"

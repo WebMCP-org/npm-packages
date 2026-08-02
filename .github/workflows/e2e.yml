@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
@@ -54,13 +54,10 @@ jobs:
       - name: Print Chrome version
         run: '"${{ steps.chrome.outputs.chrome-path }}" --version'
 
-      - name: Install Puppeteer Chrome (for chrome-devtools-mcp e2e)
-        run: pnpm --filter @mcp-b/chrome-devtools-mcp exec puppeteer browsers install chrome
-
       - name: Run runtime contract E2E tests
         env:
           PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
-        run: pnpm --filter mcp-e2e-tests run test:runtime-contract:transport
+        run: pnpm --filter mcp-e2e-tests run test:runtime-contract:transport && pnpm --filter mcp-e2e-tests run test:mcp-iframe
 
       - name: Run local relay E2E tests
         env:
@@ -97,12 +94,12 @@ jobs:
     name: Extension E2E (Playwright Chromium)
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.58.0-noble
+      image: mcr.microsoft.com/playwright:v1.60.0-noble
     timeout-minutes: 15
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
@@ -119,7 +116,7 @@ jobs:
       - name: Run extension E2E tests
         env:
           PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
-        run: pnpm --filter @mcp-b/extension-tools test:e2e
+        run: pnpm --filter @mcp-b/transports test:e2e && pnpm --filter @mcp-b/webmcp-extension test:e2e
 
   native-parity:
     name: Native API Parity (chrome-canary)
@@ -128,7 +125,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9

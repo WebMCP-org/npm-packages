@@ -1,10 +1,18 @@
+import type { ChromeModelContextExtensions } from '@mcp-b/webmcp-types';
 import { expect, type Page, test } from '@playwright/test';
 
-type RemovedContextApi = {
-  provideContext?: (value: unknown) => void;
-  clearContext?: () => void;
-  unregisterTool?: (name: string) => void;
-};
+type ChromeModelContext = NonNullable<Document['modelContext']> & ChromeModelContextExtensions;
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const target = window as Window & {
+      __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+      __WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__?: Navigator['modelContext'];
+    };
+    target.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = document.modelContext;
+    target.__WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__ = navigator.modelContext;
+  });
+});
 
 async function waitForNativeReady(page: Page): Promise<void> {
   await page.waitForSelector('#detection-status', { timeout: 10000 });
@@ -20,61 +28,16 @@ async function waitForIframeReady(page: Page): Promise<void> {
   });
 }
 
-function parseJsonIfPossible(value: unknown): unknown {
-  if (typeof value !== 'string') {
-    return value;
-  }
-
-  try {
-    return JSON.parse(value);
-  } catch {
-    return value;
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function getStructuredContent(value: unknown): unknown {
-  if (!isRecord(value)) {
-    return value;
-  }
-
-  if ('structuredContent' in value) {
-    return value.structuredContent;
-  }
-
-  return value;
-}
-
-function isCounterOutputResult(value: unknown): value is { counter: number; timestamp: string } {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return typeof value.counter === 'number' && typeof value.timestamp === 'string';
-}
-
-function isStructuredCounterResult(
-  value: unknown
-): value is { counter: number; previousValue: number; timestamp: string } {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return (
-    typeof value.counter === 'number' &&
-    typeof value.previousValue === 'number' &&
-    typeof value.timestamp === 'string'
-  );
-}
-
 async function getToolNames(page: Page): Promise<string[]> {
-  return page.evaluate(
-    () =>
-      navigator.modelContextTesting?.listTools().map((tool: { name: string }) => tool.name) ?? []
-  );
+  return page.evaluate(async () => {
+    const context =
+      (
+        window as Window & {
+          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+        }
+      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+    return (await context.getTools()).map((tool) => tool.name);
+  });
 }
 
 async function waitForToolPresent(page: Page, toolName: string): Promise<void> {
@@ -89,39 +52,6 @@ async function waitForToolSet(page: Page, toolNames: string[]): Promise<void> {
   await expect
     .poll(async () => await getToolNames(page))
     .toEqual(expect.arrayContaining(toolNames));
-}
-
-async function clearAllTools(page: Page): Promise<void> {
-  const canClean = await page.evaluate(() => {
-    const context = document.modelContext;
-    const testing = navigator.modelContextTesting;
-    if (!context || !testing) {
-      return false;
-    }
-
-    const removedContext = context as unknown as RemovedContextApi;
-    let cleaned = false;
-
-    for (const tool of testing.listTools()) {
-      try {
-        removedContext.unregisterTool?.(tool.name);
-        cleaned = true;
-      } catch {
-        // Some native snapshots only support AbortSignal based cleanup.
-      }
-    }
-
-    if (typeof removedContext.clearContext === 'function') {
-      removedContext.clearContext();
-      cleaned = true;
-    }
-
-    return cleaned;
-  });
-
-  if (canClean) {
-    await expect.poll(async () => await getToolNames(page)).toEqual([]);
-  }
 }
 
 async function openShowcase(page: Page): Promise<void> {
@@ -145,63 +75,68 @@ test.describe('Native API Detection', () => {
     );
   });
 
-  test('exposes modelContext and modelContextTesting', async ({ page }) => {
+  test('exposes the native document.modelContext surface', async ({ page }) => {
     await openShowcase(page);
 
-    const surface = await page.evaluate(() => ({
-      hasModelContext: typeof document.modelContext !== 'undefined',
-      documentNavigatorSameInstance: document.modelContext === navigator.modelContext,
-      rawSurface: (
-        window as Window & {
-          __WEBMCP_SHOWCASE_RAW_SURFACE__?: Record<string, boolean>;
-        }
-      ).__WEBMCP_SHOWCASE_RAW_SURFACE__,
-      hasModelContextTesting: typeof navigator.modelContextTesting !== 'undefined',
-      hasUnregisterTool:
-        typeof (document.modelContext as unknown as RemovedContextApi | undefined)
-          ?.unregisterTool === 'function',
-      hasClearContext:
-        typeof (document.modelContext as unknown as RemovedContextApi | undefined)?.clearContext ===
-        'function',
-      hasProvideContext:
-        typeof (document.modelContext as unknown as RemovedContextApi | undefined)
-          ?.provideContext === 'function',
-      hasListTools: typeof navigator.modelContextTesting?.listTools === 'function',
-      hasExecuteTool: typeof navigator.modelContextTesting?.executeTool === 'function',
-    }));
+    const surface = await page.evaluate(() => {
+      const captured = window as Window & {
+        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: ChromeModelContext;
+        __WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__?: Navigator['modelContext'];
+        __WEBMCP_SHOWCASE_RAW_SURFACE__?: Record<string, boolean>;
+      };
+      const context = captured.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+
+      return {
+        hasModelContext: Boolean(context),
+        hasRegisterTool: typeof context?.registerTool === 'function',
+        hasGetTools: typeof context?.getTools === 'function',
+        hasAddEventListener: typeof context?.addEventListener === 'function',
+        executeToolType: typeof context?.executeTool,
+        hasDeprecatedNavigatorAlias:
+          typeof captured.__WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__ !== 'undefined',
+        rawSurface: captured.__WEBMCP_SHOWCASE_RAW_SURFACE__,
+      };
+    });
 
     expect(surface.hasModelContext).toBe(true);
-    expect(surface.documentNavigatorSameInstance).toBe(true);
+    expect(surface.hasRegisterTool).toBe(true);
+    expect(surface.hasGetTools).toBe(true);
+    expect(surface.hasAddEventListener).toBe(true);
+    expect(['function', 'undefined']).toContain(surface.executeToolType);
+    expect(surface.hasDeprecatedNavigatorAlias).toBe(false);
     expect(surface.rawSurface).toMatchObject({
       hasModelContext: true,
       hasGetTools: true,
-      hasExecuteTool: true,
+      hasUnregisterTool: false,
       hasClearContext: false,
       hasProvideContext: false,
     });
-    expect(surface.hasModelContextTesting).toBe(true);
-    expect(typeof surface.hasUnregisterTool).toBe('boolean');
-    expect(typeof surface.hasClearContext).toBe('boolean');
-    expect(typeof surface.hasProvideContext).toBe('boolean');
-    expect(surface.hasListTools).toBe(true);
-    expect(surface.hasExecuteTool).toBe(true);
   });
 
   test('verifies native implementation (not polyfill)', async ({ page }) => {
     await openShowcase(page);
 
-    const constructorName = await page.evaluate(
-      () => navigator.modelContextTesting?.constructor.name
-    );
-    expect(constructorName).toBeTruthy();
-    expect(constructorName).not.toContain('WebModelContext');
+    const implementation = await page.evaluate(() => {
+      const context = (
+        window as Window & {
+          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'] & {
+            __isWebMCPPolyfill?: boolean;
+          };
+        }
+      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      return {
+        constructorName: context?.constructor.name,
+        isPolyfill: context?.__isWebMCPPolyfill === true,
+      };
+    });
+    expect(implementation.constructorName).toBeTruthy();
+    expect(implementation.isPolyfill).toBe(false);
   });
 });
 
 test.describe('Live Tool Editor', () => {
   test.beforeEach(async ({ page }) => {
     await openShowcase(page);
-    await clearAllTools(page);
   });
 
   test('loads and executes counter template', async ({ page }) => {
@@ -257,14 +192,17 @@ test.describe('Live Tool Editor', () => {
 test.describe('Native API Semantics', () => {
   test.beforeEach(async ({ page }) => {
     await openShowcase(page);
-    await clearAllTools(page);
   });
 
   test('registerTool exposes registered tools and abort cleanup removes them', async ({ page }) => {
     const state = await page.evaluate(async () => {
-      const context = document.modelContext;
-      const testing = navigator.modelContextTesting;
-      if (!context || !testing) {
+      const context =
+        (
+          window as Window & {
+            __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+          }
+        ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      if (!context) {
         return { missingApi: true };
       }
 
@@ -285,7 +223,7 @@ test.describe('Native API Semantics', () => {
         { signal: firstController.signal }
       );
 
-      const beforeAbort = testing.listTools().map((tool: { name: string }) => tool.name);
+      const beforeAbort = (await context.getTools()).map((tool) => tool.name);
       firstController.abort();
 
       await context.registerTool(
@@ -300,7 +238,7 @@ test.describe('Native API Semantics', () => {
         { signal: secondController.signal }
       );
 
-      const afterAbort = testing.listTools().map((tool: { name: string }) => tool.name);
+      const afterAbort = (await context.getTools()).map((tool) => tool.name);
       secondController.abort();
 
       return {
@@ -325,9 +263,13 @@ test.describe('Native API Semantics', () => {
 
   test('multiple registered tools clean up through AbortSignal', async ({ page }) => {
     const state = await page.evaluate(async () => {
-      const context = document.modelContext;
-      const testing = navigator.modelContextTesting;
-      if (!context || !testing) {
+      const context =
+        (
+          window as Window & {
+            __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+          }
+        ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      if (!context) {
         return { missingApi: true };
       }
 
@@ -360,7 +302,7 @@ test.describe('Native API Semantics', () => {
         { signal: secondController.signal }
       );
 
-      const before = testing.listTools().map((tool: { name: string }) => tool.name);
+      const before = (await context.getTools()).map((tool) => tool.name);
       firstController.abort();
       secondController.abort();
 
@@ -384,23 +326,31 @@ test.describe('Native API Semantics', () => {
     await waitForToolAbsent(page, state.secondToolName);
   });
 
-  test('testing API executeTool works and optionally tracks calls', async ({ page }) => {
+  test('executes a descriptor discovered through getTools when Chrome exposes executeTool', async ({
+    page,
+  }) => {
     const result = await page.evaluate(async () => {
-      const context = document.modelContext;
-      const testing = navigator.modelContextTesting;
-      if (!context || !testing) {
+      const context = ((
+        window as Window & {
+          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
+        }
+      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext) as
+        | ChromeModelContext
+        | undefined;
+      if (!context) {
         return { missingApi: true };
       }
+      if (typeof context.executeTool !== 'function') {
+        return { missingApi: false, missingExecuteTool: true };
+      }
 
-      const hasGetToolCalls = typeof testing.getToolCalls === 'function';
-      const toolName = `tracking_${Date.now()}`;
-
+      const toolName = `native_execute_${Date.now()}`;
       const controller = new AbortController();
 
       await context.registerTool(
         {
           name: toolName,
-          description: 'tracking test',
+          description: 'Native descriptor execution test',
           inputSchema: {
             type: 'object',
             properties: { value: { type: 'number' } },
@@ -414,98 +364,29 @@ test.describe('Native API Semantics', () => {
       );
 
       try {
-        const response = await testing.executeTool(toolName, JSON.stringify({ value: 42 }));
-        const calls = hasGetToolCalls ? (testing.getToolCalls?.() ?? []) : [];
-        return { missingApi: false, response, hasGetToolCalls, calls };
+        const tool = (await context.getTools()).find((candidate) => candidate.name === toolName);
+        if (!tool) {
+          return { missingApi: false, missingExecuteTool: false, missingTool: true };
+        }
+        const response = await context.executeTool(tool, JSON.stringify({ value: 42 }));
+        return {
+          missingApi: false,
+          missingExecuteTool: false,
+          missingTool: false,
+          response,
+        };
       } finally {
         controller.abort();
       }
     });
 
     expect(result.missingApi).toBe(false);
+    test.skip(
+      'missingExecuteTool' in result && result.missingExecuteTool === true,
+      'Chrome does not expose its optional executeTool extension'
+    );
+    expect(result.missingTool).toBe(false);
     expect(String(result.response)).toContain('42');
-
-    if (result.hasGetToolCalls) {
-      expect(result.calls.length).toBeGreaterThan(0);
-      expect(result.calls[0]?.toolName).toBeTruthy();
-    }
-  });
-
-  test('returns structured content for tools with outputSchema', async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const context = document.modelContext;
-      const testing = navigator.modelContextTesting;
-      if (!context || !testing) {
-        return { missingApi: true };
-      }
-
-      const toolName = `counter_get_${Date.now()}`;
-      const controller = new AbortController();
-
-      await context.registerTool(
-        {
-          name: toolName,
-          description: 'Get counter value',
-          inputSchema: { type: 'object', properties: {} },
-          outputSchema: {
-            type: 'object',
-            properties: {
-              counter: { type: 'number' },
-              timestamp: { type: 'string' },
-            },
-            required: ['counter', 'timestamp'],
-          },
-          async execute() {
-            const structuredContent = { counter: 0, timestamp: new Date().toISOString() };
-            return {
-              content: [{ type: 'text', text: JSON.stringify(structuredContent) }],
-              structuredContent,
-            };
-          },
-        },
-        { signal: controller.signal }
-      );
-
-      try {
-        const response = await testing.executeTool(toolName, '{}');
-        return { missingApi: false, type: typeof response, response };
-      } finally {
-        controller.abort();
-      }
-    });
-
-    expect(result.missingApi).toBe(false);
-    const parsed = parseJsonIfPossible(result.response);
-    const structured = getStructuredContent(parsed);
-    expect(result.type === 'object' || typeof structured === 'object').toBe(true);
-    expect(isCounterOutputResult(structured)).toBe(true);
-  });
-
-  test('output-schema template registers structured tool', async ({ page }) => {
-    await page.selectOption('#template-select', 'output-schema');
-    await page.click('#register-code');
-
-    await waitForToolPresent(page, 'structured_counter');
-
-    const response = await page.evaluate(async () => {
-      return await navigator.modelContextTesting?.executeTool(
-        'structured_counter',
-        JSON.stringify({ increment: 3 })
-      );
-    });
-
-    expect(response).toBeTruthy();
-    const parsed = parseJsonIfPossible(response);
-    const structured = getStructuredContent(parsed);
-    expect(isStructuredCounterResult(structured)).toBe(true);
-
-    if (!isStructuredCounterResult(structured)) {
-      return;
-    }
-
-    expect(structured.counter).toBe(3);
-    expect(structured.previousValue).toBe(0);
-    expect(structured.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });
 

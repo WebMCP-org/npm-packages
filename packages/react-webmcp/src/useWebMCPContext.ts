@@ -1,6 +1,4 @@
-import { useMemo, useRef } from 'react';
-import type { WebMCPReturn } from './types.js';
-import { useWebMCP } from './useWebMCP.js';
+import { useWebMCP, type WebMCPReturn } from 'usewebmcp';
 
 /**
  * Convenience hook for exposing read-only context data to AI assistants.
@@ -10,9 +8,7 @@ import { useWebMCP } from './useWebMCP.js';
  * configures appropriate annotations (read-only, idempotent) and handles value
  * serialization.
  *
- * Note: This hook does not use an output schema, so the result will not include
- * `structuredContent` in the MCP response. Use {@link useWebMCP} directly with
- * `outputSchema` if you need structured output for MCP compliance.
+ * JSON-compatible values are normalized to text plus `structuredContent`.
  *
  * @template T - The type of context data to expose
  *
@@ -72,36 +68,16 @@ export function useWebMCPContext<T>(
   description: string,
   getValue: () => T
 ): WebMCPReturn {
-  const getValueRef = useRef(getValue);
-  getValueRef.current = getValue;
-  const annotations = useMemo(
-    () => ({
+  return useWebMCP({
+    name,
+    description,
+    annotations: {
       title: `Context: ${name}`,
       readOnlyHint: true,
       idempotentHint: true,
       destructiveHint: false,
       openWorldHint: false,
-    }),
-    [name]
-  );
-
-  // Use default generics (no input/output schema) since context tools
-  // don't define structured schemas. The handler returns T but it's
-  // treated as `unknown` in the return type since no outputSchema is defined.
-  return useWebMCP({
-    name,
-    description,
-    annotations,
-    // Cast to unknown since context tools return arbitrary types
-    // that don't need to conform to a specific schema
-    handler: async (_input: Record<string, unknown>) => {
-      return getValueRef.current() as Record<string, unknown>;
     },
-    formatOutput: (output) => {
-      if (typeof output === 'string') {
-        return output as string;
-      }
-      return JSON.stringify(output, null, 2);
-    },
+    execute: getValue,
   });
 }

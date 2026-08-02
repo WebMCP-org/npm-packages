@@ -177,8 +177,30 @@
         );
       }
 
+      async function executeRegisteredTool(modelContext, name, args) {
+        if (typeof modelContext.executeTool !== 'function') {
+          throw new Error('Chrome descriptor execution is unavailable');
+        }
+
+        const tool = (await modelContext.getTools()).find((candidate) => candidate.name === name);
+        if (!tool) {
+          throw new Error(`Tool not found: ${name}`);
+        }
+
+        const serialized = await modelContext.executeTool(tool, JSON.stringify(args));
+        if (serialized === null) {
+          throw new Error('Tool execution was interrupted');
+        }
+
+        try {
+          return JSON.parse(serialized);
+        } catch {
+          return { content: [{ type: 'text', text: serialized }] };
+        }
+      }
+
       async function runTests() {
-        if (!window.navigator.modelContext) {
+        if (!document.modelContext) {
           statusEl.className = 'error';
           statusEl.textContent = 'modelContext not available';
           return;
@@ -187,11 +209,11 @@
         statusEl.className = 'success';
         statusEl.textContent = 'modelContext available - Running tests...';
 
-        const mc = window.navigator.modelContext;
+        const mc = document.modelContext;
 
         // Register tool with pure JSON Schema
         try {
-          mc.registerTool({
+          await mc.registerTool({
             name: 'json-user-validator',
             description: 'Validate user data using JSON Schema',
             inputSchema: {
@@ -236,7 +258,7 @@
           log('Tool "json-user-validator" registered successfully', 'success');
 
           // Update tools list
-          const tools = await mc.listTools();
+          const tools = await mc.getTools();
           toolsListEl.innerHTML = tools
             .map(
               (t) =>
@@ -248,7 +270,7 @@
 
           // Test 1: Valid input
           log('Test 1: Valid input...', 'info');
-          const r1 = await mc.executeTool('json-user-validator', {
+          const r1 = await executeRegisteredTool(mc, 'json-user-validator', {
             username: 'validuser',
             email: 'test@example.com',
             age: 25,
@@ -262,7 +284,7 @@
           // Test 2: Missing required field
           log('Test 2: Missing required field (email)...', 'info');
           await expectRejected('Missing email', () =>
-            mc.executeTool('json-user-validator', {
+            executeRegisteredTool(mc, 'json-user-validator', {
               username: 'testuser',
               age: 30,
             })
@@ -271,7 +293,7 @@
           // Test 3: Invalid type (age as string)
           log('Test 3: Invalid type (age as string)...', 'info');
           await expectRejected('Invalid type', () =>
-            mc.executeTool('json-user-validator', {
+            executeRegisteredTool(mc, 'json-user-validator', {
               username: 'testuser',
               email: 'test@example.com',
               age: 'twenty-five',
@@ -281,7 +303,7 @@
           // Test 4: Value out of range (age too low)
           log('Test 4: Value out of range (age=15)...', 'info');
           await expectRejected('Age too low', () =>
-            mc.executeTool('json-user-validator', {
+            executeRegisteredTool(mc, 'json-user-validator', {
               username: 'testuser',
               email: 'test@example.com',
               age: 15,
@@ -291,7 +313,7 @@
           // Test 5: String too short (username)
           log('Test 5: String too short (username="ab")...', 'info');
           await expectRejected('Username too short', () =>
-            mc.executeTool('json-user-validator', {
+            executeRegisteredTool(mc, 'json-user-validator', {
               username: 'ab',
               email: 'test@example.com',
               age: 25,
@@ -301,7 +323,7 @@
           // Test 6: Invalid enum value
           log('Test 6: Invalid enum value (role="superuser")...', 'info');
           await expectRejected('Invalid enum', () =>
-            mc.executeTool('json-user-validator', {
+            executeRegisteredTool(mc, 'json-user-validator', {
               username: 'testuser',
               email: 'test@example.com',
               age: 25,
@@ -312,7 +334,7 @@
           // Test 7: Invalid email format
           log('Test 7: Invalid email format...', 'info');
           await expectRejected('Invalid email', () =>
-            mc.executeTool('json-user-validator', {
+            executeRegisteredTool(mc, 'json-user-validator', {
               username: 'testuser',
               email: 'not-an-email',
               age: 25,

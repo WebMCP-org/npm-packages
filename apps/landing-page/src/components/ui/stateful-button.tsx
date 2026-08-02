@@ -3,10 +3,14 @@ import { cn } from '@/lib/utils';
 import React from 'react';
 import { motion, useAnimate } from 'motion/react';
 
-interface StatefulButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface StatefulButtonProps extends Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  'onClick'
+> {
   className?: string;
   children: React.ReactNode;
   href?: string;
+  onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void | Promise<void>;
   target?: string;
   rel?: string;
 }
@@ -46,12 +50,12 @@ export const StatefulButton = ({
   };
 
   const {
-    onClick,
-    onDrag,
-    onDragStart,
-    onDragEnd,
-    onAnimationStart,
-    onAnimationEnd,
+    onClick: _onClick,
+    onDrag: _onDrag,
+    onDragStart: _onDragStart,
+    onDragEnd: _onDragEnd,
+    onAnimationStart: _onAnimationStart,
+    onAnimationEnd: _onAnimationEnd,
     ...buttonProps
   } = props;
 

@@ -6,14 +6,22 @@ import {
   useWebMCPResource,
 } from '@mcp-b/react-webmcp';
 import { useState } from 'react';
-import { z } from 'zod';
 
 // Counter state (shared across the app)
 let globalCounter = 0;
 
 const COUNTER_AMOUNT_INPUT_SCHEMA = {
-  amount: z.number().min(1).max(100).default(1).describe('Amount to increment'),
-};
+  type: 'object',
+  properties: {
+    amount: {
+      type: 'number',
+      minimum: 1,
+      maximum: 100,
+      description: 'Amount to increment',
+    },
+  },
+  required: ['amount'],
+} as const;
 
 const INCREMENT_ANNOTATIONS = {
   title: 'Increment Counter',
@@ -49,8 +57,12 @@ const GET_COUNTER_ANNOTATIONS = {
 };
 
 const LIKE_POST_INPUT_SCHEMA = {
-  postId: z.string().describe('The post ID to like'),
-};
+  type: 'object',
+  properties: {
+    postId: { type: 'string', description: 'The post ID to like' },
+  },
+  required: ['postId'],
+} as const;
 
 const LIKE_POST_ANNOTATIONS = {
   title: 'Like Post',
@@ -59,9 +71,13 @@ const LIKE_POST_ANNOTATIONS = {
 };
 
 const SEARCH_POSTS_INPUT_SCHEMA = {
-  query: z.string().min(1).describe('Search query'),
-  limit: z.number().min(1).max(10).default(10).describe('Max results'),
-};
+  type: 'object',
+  properties: {
+    query: { type: 'string', minLength: 1, description: 'Search query' },
+    limit: { type: 'number', minimum: 1, maximum: 10, description: 'Max results' },
+  },
+  required: ['query', 'limit'],
+} as const;
 
 const SEARCH_POSTS_ANNOTATIONS = {
   title: 'Search Posts',
@@ -70,14 +86,22 @@ const SEARCH_POSTS_ANNOTATIONS = {
 };
 
 const CODE_REVIEW_ARGS_SCHEMA = {
-  code: z.string().describe('The code to review'),
-  language: z.string().optional().describe('Programming language (optional)'),
-};
+  type: 'object',
+  properties: {
+    code: { type: 'string', description: 'The code to review' },
+    language: { type: 'string', description: 'Programming language (optional)' },
+  },
+  required: ['code'],
+} as const;
 
 const SUMMARIZE_ARGS_SCHEMA = {
-  text: z.string().min(1).describe('The text to summarize'),
-  maxLength: z.number().optional().describe('Maximum summary length'),
-};
+  type: 'object',
+  properties: {
+    text: { type: 'string', minLength: 1, description: 'The text to summarize' },
+    maxLength: { type: 'number', description: 'Maximum summary length' },
+  },
+  required: ['text'],
+} as const;
 
 function App() {
   const [posts, setPosts] = useState([
@@ -106,14 +130,11 @@ function App() {
     description: 'Increment the counter by a specified amount',
     inputSchema: COUNTER_AMOUNT_INPUT_SCHEMA,
     annotations: INCREMENT_ANNOTATIONS,
-    handler: async (input) => {
+    execute: async (input) => {
       await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate async
       globalCounter += input.amount;
       addLog(`Incremented counter by ${input.amount}. New value: ${globalCounter}`, 'success');
       return { counter: globalCounter, incremented: input.amount };
-    },
-    onError: (error) => {
-      addLog(`Error incrementing: ${error.message}`, 'error');
     },
   });
 
@@ -123,7 +144,7 @@ function App() {
     description: 'Decrement the counter by a specified amount',
     inputSchema: COUNTER_AMOUNT_INPUT_SCHEMA,
     annotations: DECREMENT_ANNOTATIONS,
-    handler: async (input) => {
+    execute: async (input) => {
       await new Promise((resolve) => setTimeout(resolve, 500));
       globalCounter -= input.amount;
       addLog(`Decremented counter by ${input.amount}. New value: ${globalCounter}`, 'success');
@@ -136,7 +157,7 @@ function App() {
     name: 'counter_reset',
     description: 'Reset the counter to zero. This action cannot be undone.',
     annotations: RESET_ANNOTATIONS,
-    handler: async () => {
+    execute: async () => {
       const oldValue = globalCounter;
       globalCounter = 0;
       addLog(`Reset counter from ${oldValue} to 0`, 'success');
@@ -150,7 +171,7 @@ function App() {
     description: 'Get the current counter value',
     outputSchema: GET_COUNTER_OUTPUT_SCHEMA,
     annotations: GET_COUNTER_ANNOTATIONS,
-    handler: async () => {
+    execute: async () => {
       const timestamp = new Date().toISOString();
       addLog(`Retrieved counter value: ${globalCounter}`, 'info');
       return { counter: globalCounter, timestamp };
@@ -163,7 +184,7 @@ function App() {
     description: 'Like a post by ID. Increments the like count.',
     inputSchema: LIKE_POST_INPUT_SCHEMA,
     annotations: LIKE_POST_ANNOTATIONS,
-    handler: async (input) => {
+    execute: async (input) => {
       await new Promise((resolve) => setTimeout(resolve, 300));
       setPosts((prev) =>
         prev.map((post) => (post.id === input.postId ? { ...post, likes: post.likes + 1 } : post))
@@ -183,7 +204,7 @@ function App() {
     description: 'Search posts by keyword',
     inputSchema: SEARCH_POSTS_INPUT_SCHEMA,
     annotations: SEARCH_POSTS_ANNOTATIONS,
-    handler: async (input) => {
+    execute: async (input) => {
       await new Promise((resolve) => setTimeout(resolve, 400));
       const results = posts
         .filter((post) => post.title.toLowerCase().includes(input.query.toLowerCase()))
@@ -195,14 +216,6 @@ function App() {
         results: results.map((p) => ({ id: p.id, title: p.title, likes: p.likes })),
         count: results.length,
       };
-    },
-    formatOutput: (output) => {
-      const typedOutput = output as {
-        count: number;
-        results: Array<{ title: string; likes: number }>;
-      };
-      const results = typedOutput.results;
-      return `Found ${typedOutput.count} posts:\n${results.map((r) => `• ${r.title} (${r.likes} likes)`).join('\n')}`;
     },
   });
 
@@ -314,7 +327,7 @@ function App() {
     description: 'Get user profile data by user ID',
     mimeType: 'application/json',
     read: async (uri, params) => {
-      const userId = params?.userId ?? 'unknown';
+      const userId = typeof params?.userId === 'string' ? params.userId : 'unknown';
       // Simulated user data
       const users: Record<string, { name: string; email: string; role: string }> = {
         '1': { name: 'Alice Johnson', email: 'alice@example.com', role: 'admin' },

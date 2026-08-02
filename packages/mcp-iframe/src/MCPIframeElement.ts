@@ -5,21 +5,21 @@
  * resources, and prompts registered in the iframe's MCP server to the
  * parent page's Model Context API.
  *
- * The iframe should have the MCP polyfill installed, which creates an MCP server
- * that exposes items registered via `navigator.modelContext`.
+ * The iframe should expose its MCP server through `document.modelContext`.
+ * Older runtimes that only expose `navigator.modelContext` remain supported.
  *
  * @example
  * ```html
  * <mcp-iframe src="./child-app.html" id="my-app"></mcp-iframe>
  * ```
  *
- * Items from the iframe will be exposed with the element's ID as prefix:
+ * Tool and prompt names use the element's ID as a prefix. Resources use a wrapper URI:
  * - Child registers tool "calculate" -> Parent sees "my-app_calculate"
- * - Child registers resource "config://settings" -> Parent sees "my-app_config://settings"
+ * - Child registers resource "config://settings" -> Parent sees an "mcp-iframe:" wrapper URI
  * - Child registers prompt "help" -> Parent sees "my-app_help"
  *
- * Note: The prefix separator defaults to underscore (_) to ensure MCP compatibility.
- * Tool and prompt names must match the pattern: ^[a-zA-Z0-9_-]{1,128}$
+ * Note: The prefix separator defaults to underscore (_) to ensure WebMCP compatibility.
+ * The parent model context validates the final prefixed tool name.
  *
  * @example
  * ```typescript
@@ -33,25 +33,29 @@
  */
 
 import { IframeParentTransport } from '@mcp-b/transports';
-import type {
-  GetPromptResult,
-  Prompt,
-  ReadResourceResult,
-  Resource,
-  Tool,
-} from '@mcp-b/webmcp-ts-sdk';
 import {
   type BrowserMcpServer,
-  Client,
   type PromptDescriptor,
   type ResourceDescriptor,
 } from '@mcp-b/webmcp-ts-sdk';
 import type {
   CallToolResult,
   InputSchema,
+  ModelContext,
+  ModelContextTool,
   RegistrationHandle,
-  ToolDescriptor,
 } from '@mcp-b/webmcp-types';
+import {
+  Client,
+  UriTemplate,
+  type GetPromptResult,
+  type Prompt,
+  type ReadResourceResult,
+  type Resource,
+  type ResourceTemplateType,
+  type Tool,
+  type Variables,
+} from '@modelcontextprotocol/client';
 
 // ============================================================================
 // Configuration
@@ -61,27 +65,49 @@ const DEFAULT_CALL_TIMEOUT = 30000;
 const DEFAULT_PREFIX_SEPARATOR = '_';
 const DEFAULT_CHANNEL_ID = 'mcp-iframe';
 
-/**
- * MCP name validation pattern.
- * Tool/prompt names must match: ^[a-zA-Z0-9_-]{1,128}$
- */
-const MCP_NAME_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
-const MCP_NAME_MAX_LENGTH = 128;
+type McpBRegistrationExtensions = Pick<BrowserMcpServer, 'registerPrompt' | 'registerResource'>;
+type NativeToolSyncExtension = Pick<BrowserMcpServer, 'syncNativeTools'>;
 
-/**
- * Validates that a string contains only valid MCP name characters.
- * Valid characters: a-z, A-Z, 0-9, underscore (_), hyphen (-)
- */
-function isValidMCPNameChars(str: string): boolean {
-  return /^[a-zA-Z0-9_-]*$/.test(str);
+interface McpItems {
+  tools: Tool[];
+  resources: Resource[];
+  resourceTemplates: ResourceTemplateType[];
+  prompts: Prompt[];
 }
 
-/**
- * Validates a complete MCP name (tool name, prompt name).
- * Must be 1-128 characters and contain only valid characters.
- */
-function isValidMCPName(name: string): boolean {
-  return MCP_NAME_PATTERN.test(name);
+interface Connection {
+  client: Client;
+  ready: boolean;
+  refreshRevision: number;
+  refreshQueue: Promise<void>;
+  items: McpItems;
+  toolRegistrations: Map<string, AbortController>;
+  resourceRegistrations: Map<string, RegistrationHandle>;
+  promptRegistrations: Map<string, RegistrationHandle>;
+}
+
+const emptyItems = (): McpItems => ({
+  tools: [],
+  resources: [],
+  resourceTemplates: [],
+  prompts: [],
+});
+
+function hasMcpBRegistrationExtensions(
+  modelContext: ModelContext
+): modelContext is ModelContext & McpBRegistrationExtensions {
+  return (
+    'registerResource' in modelContext &&
+    typeof modelContext.registerResource === 'function' &&
+    'registerPrompt' in modelContext &&
+    typeof modelContext.registerPrompt === 'function'
+  );
+}
+
+function hasNativeToolSync(
+  modelContext: ModelContext
+): modelContext is ModelContext & NativeToolSyncExtension {
+  return 'syncNativeTools' in modelContext && typeof modelContext.syncNativeTools === 'function';
 }
 
 /**
@@ -89,7 +115,30 @@ function isValidMCPName(name: string): boolean {
  * Replaces invalid characters with underscores.
  */
 function sanitizeMCPNamePart(str: string): string {
-  return str.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return str.replace(/[^a-zA-Z0-9_.-]/g, '_');
+}
+
+function createParentResourceUri(
+  source: string,
+  childUri: string,
+  variables: readonly string[] = []
+): string {
+  const parentUri = new URL('mcp-iframe:');
+  parentUri.searchParams.set('source', source);
+  parentUri.searchParams.set('uri', childUri);
+  return [...new Set(variables)].reduce(
+    (uri, variable, index) => `${uri}&variable-${index}={${variable}*}`,
+    parentUri.href
+  );
+}
+
+function decodeTemplateVariables(variables: Variables): Variables {
+  return Object.fromEntries(
+    Object.entries(variables).map(([name, value]) => [
+      name,
+      Array.isArray(value) ? value.map(decodeURIComponent) : decodeURIComponent(value),
+    ])
+  );
 }
 
 /** Standard iframe attributes that are mirrored to the internal iframe */
@@ -105,29 +154,31 @@ const IFRAME_ATTRIBUTES = [
   'loading',
   'referrerpolicy',
   'credentialless',
-] as const;
+] satisfies readonly string[];
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/** Custom event detail for mcp-iframe-ready */
-export interface MCPIframeReadyEventDetail {
+/** Names of items currently exposed on the parent model context. */
+export interface MCPIframeItemsEventDetail {
   tools: string[];
   resources: string[];
   prompts: string[];
 }
+
+/** Custom event detail for mcp-iframe-ready */
+export type MCPIframeReadyEventDetail = MCPIframeItemsEventDetail;
 
 /** Custom event detail for mcp-iframe-error */
 export interface MCPIframeErrorEventDetail {
   error: unknown;
 }
 
-/** Custom event detail for mcp-iframe-tools-changed */
-export interface MCPIframeToolsChangedEventDetail {
-  tools: string[];
-  resources: string[];
-  prompts: string[];
+export interface MCPIframeEventMap {
+  'mcp-iframe-ready': CustomEvent<MCPIframeReadyEventDetail>;
+  'mcp-iframe-error': CustomEvent<MCPIframeErrorEventDetail>;
+  'mcp-iframe-items-changed': CustomEvent<MCPIframeItemsEventDetail>;
 }
 
 // ============================================================================
@@ -141,35 +192,39 @@ export interface MCPIframeToolsChangedEventDetail {
  * to the parent's Model Context API.
  *
  * @fires mcp-iframe-ready - When connected to iframe's MCP server
- * @fires mcp-iframe-error - When connection fails
- * @fires mcp-iframe-tools-changed - When items are refreshed
+ * @fires mcp-iframe-error - When the connection or an item refresh fails
+ * @fires mcp-iframe-items-changed - When items are refreshed
  */
 export class MCPIframeElement extends HTMLElement {
-  // Internal state
+  declare addEventListener: (<K extends keyof MCPIframeEventMap>(
+    type: K,
+    listener: (this: MCPIframeElement, event: MCPIframeEventMap[K]) => unknown,
+    options?: boolean | AddEventListenerOptions
+  ) => void) &
+    HTMLElement['addEventListener'];
+
+  declare removeEventListener: (<K extends keyof MCPIframeEventMap>(
+    type: K,
+    listener: (this: MCPIframeElement, event: MCPIframeEventMap[K]) => unknown,
+    options?: boolean | EventListenerOptions
+  ) => void) &
+    HTMLElement['removeEventListener'];
+
   #iframe: HTMLIFrameElement | null = null;
-  #client: Client | null = null;
-  #transport: IframeParentTransport | null = null;
-  #ready = false;
-  #connecting = false;
-
-  // MCP items from iframe
-  #mcpTools: Tool[] = [];
-  #mcpResources: Resource[] = [];
-  #mcpPrompts: Prompt[] = [];
-
-  // Registered items on parent
-  #registeredTools = new Set<string>();
-  #registeredResources = new Map<string, RegistrationHandle>();
-  #registeredPrompts = new Map<string, RegistrationHandle>();
-
-  // Configuration
-  #callTimeout = DEFAULT_CALL_TIMEOUT;
-  #prefixSeparator = DEFAULT_PREFIX_SEPARATOR;
-  #channelId = DEFAULT_CHANNEL_ID;
-  #targetOrigin: string | null = null;
+  #connection: Connection | null = null;
+  #connectionAttempt: Promise<void> | null = null;
+  #connectionRequestGeneration = 0;
+  #nativeToolSyncPending = false;
 
   static get observedAttributes(): string[] {
-    return [...IFRAME_ATTRIBUTES, 'target-origin', 'channel', 'call-timeout', 'prefix-separator'];
+    return [
+      ...IFRAME_ATTRIBUTES,
+      'id',
+      'target-origin',
+      'channel',
+      'call-timeout',
+      'prefix-separator',
+    ];
   }
 
   constructor() {
@@ -180,63 +235,63 @@ export class MCPIframeElement extends HTMLElement {
   // ==================== Lifecycle ====================
 
   connectedCallback(): void {
-    this.#createIframe();
+    if (this.#iframe) {
+      void this.#reconnect();
+    } else {
+      this.#createIframe();
+    }
   }
 
   disconnectedCallback(): void {
-    void this.#cleanup();
+    ++this.#connectionRequestGeneration;
+    void this.#disconnect();
   }
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
     if (oldValue === newValue) return;
 
-    switch (name) {
-      case 'target-origin':
-        this.#targetOrigin = newValue;
-        if (this.#ready) void this.#reconnect();
-        break;
+    if (name === 'target-origin' || name === 'channel') {
+      if (this.#iframe && this.isConnected) void this.#reconnect();
+      return;
+    }
 
-      case 'channel':
-        this.#channelId = newValue ?? DEFAULT_CHANNEL_ID;
-        if (this.#ready) void this.#reconnect();
-        break;
-
-      case 'call-timeout':
-        this.#callTimeout = newValue ? Number.parseInt(newValue, 10) : DEFAULT_CALL_TIMEOUT;
-        break;
-
-      case 'prefix-separator': {
-        const separator = newValue ?? DEFAULT_PREFIX_SEPARATOR;
-        if (!isValidMCPNameChars(separator)) {
-          console.warn(
-            `[MCPIframe] Invalid prefix-separator "${separator}". ` +
-              'Only alphanumeric characters, underscores, and hyphens are allowed. ' +
-              `Using sanitized value: "${sanitizeMCPNamePart(separator)}"`
-          );
-          this.#prefixSeparator = sanitizeMCPNamePart(separator);
-        } else {
-          this.#prefixSeparator = separator;
-        }
-        if (this.#ready) {
-          this.#unregisterAll();
-          this.#registerAllOnModelContext();
-        }
-        break;
+    if (name === 'call-timeout') {
+      const timeout = Number(newValue);
+      if (newValue !== null && (!Number.isSafeInteger(timeout) || timeout <= 0)) {
+        console.warn(
+          `[MCPIframe] Invalid call-timeout "${newValue}". Using ${DEFAULT_CALL_TIMEOUT}.`
+        );
       }
+      return;
+    }
 
-      default:
-        // Mirror standard iframe attributes
-        if (this.#iframe && (IFRAME_ATTRIBUTES as readonly string[]).includes(name)) {
-          if (newValue === null) {
-            this.#iframe.removeAttribute(name);
-          } else {
-            this.#iframe.setAttribute(name, newValue);
-          }
-          // Reconnect when source changes
-          if (name === 'src' || name === 'srcdoc') {
-            void this.#reconnect();
-          }
-        }
+    if (name === 'id' || name === 'prefix-separator') {
+      const separator = newValue ?? DEFAULT_PREFIX_SEPARATOR;
+      const sanitized = name === 'prefix-separator' ? sanitizeMCPNamePart(separator) : separator;
+      if (name === 'prefix-separator' && sanitized !== separator) {
+        console.warn(`[MCPIframe] Invalid prefix-separator "${separator}". Using "${sanitized}".`);
+      }
+      const connection = this.#connection;
+      if (connection) {
+        this.#requestRefresh(connection, 'Failed to update parent registrations');
+      }
+      return;
+    }
+
+    if (!this.#iframe || !IFRAME_ATTRIBUTES.includes(name)) return;
+    if (newValue === null) {
+      this.#iframe.removeAttribute(name);
+    } else {
+      this.#iframe.setAttribute(name, newValue);
+    }
+    if (name === 'src' || name === 'srcdoc') {
+      ++this.#connectionRequestGeneration;
+      void this.#disconnect();
+    } else if (name === 'name') {
+      const connection = this.#connection;
+      if (connection) {
+        this.#requestRefresh(connection, 'Failed to update parent registrations');
+      }
     }
   }
 
@@ -247,93 +302,55 @@ export class MCPIframeElement extends HTMLElement {
     return this.#iframe;
   }
 
-  /** The MCP client (if connected) */
-  get client(): Client | null {
-    return this.#client;
-  }
-
   /** Whether the element is connected to the iframe's MCP server */
   get ready(): boolean {
-    return this.#ready;
+    return this.#connection?.ready ?? false;
   }
 
   /** List of exposed tool names (with prefix) */
   get exposedTools(): string[] {
-    return Array.from(this.#registeredTools.values());
+    return Array.from(this.#connection?.toolRegistrations.keys() ?? []);
   }
 
-  /** List of exposed resource URIs (with prefix) */
+  /** List of exposed parent-side resource wrapper URIs */
   get exposedResources(): string[] {
-    return Array.from(this.#registeredResources.keys());
+    return Array.from(this.#connection?.resourceRegistrations.keys() ?? []);
   }
 
   /** List of exposed prompt names (with prefix) */
   get exposedPrompts(): string[] {
-    return Array.from(this.#registeredPrompts.keys());
-  }
-
-  /** Raw tools from the iframe's MCP server (without prefix) */
-  get mcpTools(): Tool[] {
-    return [...this.#mcpTools];
-  }
-
-  /** Raw resources from the iframe's MCP server (without prefix) */
-  get mcpResources(): Resource[] {
-    return [...this.#mcpResources];
-  }
-
-  /** Raw prompts from the iframe's MCP server (without prefix) */
-  get mcpPrompts(): Prompt[] {
-    return [...this.#mcpPrompts];
+    return Array.from(this.#connection?.promptRegistrations.keys() ?? []);
   }
 
   /** The item name prefix (id + separator), sanitized for MCP compatibility */
   get itemPrefix(): string {
     const rawId = this.id || this.getAttribute('name') || 'iframe';
     const id = sanitizeMCPNamePart(rawId);
-    if (id !== rawId) {
-      console.warn(
-        `[MCPIframe] ID/name "${rawId}" contains invalid characters for MCP names. ` +
-          `Using sanitized value: "${id}"`
-      );
-    }
-    return `${id}${this.#prefixSeparator}`;
-  }
-
-  /** @deprecated Use itemPrefix instead */
-  get toolPrefix(): string {
-    return this.itemPrefix;
+    const separator = sanitizeMCPNamePart(
+      this.getAttribute('prefix-separator') ?? DEFAULT_PREFIX_SEPARATOR
+    );
+    return `${id}${separator}`;
   }
 
   /** Manually refresh all items from the iframe */
   async refresh(): Promise<void> {
-    if (!this.#client || !this.#ready) {
+    const connection = this.#connection;
+    if (!connection?.ready) {
       throw new Error('Not connected to iframe MCP server');
     }
 
-    await this.#fetchAllFromIframe();
-    this.#unregisterAll();
-    this.#registerAllOnModelContext();
-
-    this.dispatchEvent(
-      new CustomEvent<MCPIframeToolsChangedEventDetail>('mcp-iframe-tools-changed', {
-        detail: {
-          tools: this.exposedTools,
-          resources: this.exposedResources,
-          prompts: this.exposedPrompts,
-        },
-      })
-    );
-  }
-
-  /** @deprecated Use refresh() instead */
-  async refreshTools(): Promise<void> {
-    return this.refresh();
+    await this.#queueRefresh(connection, true, 'Failed to refresh iframe items');
+    await this.#waitForRefreshQueue(connection);
+    if (!this.#isCurrentConnection(connection) || !connection.ready) {
+      throw new Error('Iframe connection changed before refresh completed');
+    }
   }
 
   // ==================== Private Methods ====================
 
   #createIframe(): void {
+    if (this.#iframe) return;
+
     this.#iframe = document.createElement('iframe');
 
     // Mirror all iframe attributes
@@ -344,196 +361,357 @@ export class MCPIframeElement extends HTMLElement {
       }
     }
 
-    // Default styling
     this.#iframe.style.border = 'none';
-    this.#iframe.style.width = this.getAttribute('width') ?? '100%';
-    this.#iframe.style.height = this.getAttribute('height') ?? '100%';
 
-    // Connect when iframe loads
-    this.#iframe.addEventListener('load', () => void this.#connect());
+    // A load is the single source of truth for replacing the iframe connection.
+    this.#iframe.addEventListener('load', () => void this.#handleIframeLoad());
 
     this.shadowRoot?.appendChild(this.#iframe);
   }
 
-  async #connect(): Promise<void> {
-    if (this.#connecting || !this.#iframe) return;
-    this.#connecting = true;
+  async #handleIframeLoad(): Promise<void> {
+    const requestGeneration = ++this.#connectionRequestGeneration;
+    await this.#disconnect();
+    if (requestGeneration !== this.#connectionRequestGeneration || !this.isConnected) return;
+    await this.#connect(requestGeneration);
+  }
+
+  async #connect(requestGeneration: number): Promise<void> {
+    const activeAttempt = this.#connectionAttempt;
+    if (activeAttempt) {
+      await activeAttempt.catch(() => undefined);
+    }
+    const iframe = this.#iframe;
+    if (requestGeneration !== this.#connectionRequestGeneration || !iframe || !this.isConnected) {
+      return;
+    }
+
+    const attempt = this.#connectCurrent(requestGeneration, iframe);
+    this.#connectionAttempt = attempt;
+    try {
+      await attempt;
+    } finally {
+      if (this.#connectionAttempt === attempt) {
+        this.#connectionAttempt = null;
+      }
+    }
+  }
+
+  async #connectCurrent(requestGeneration: number, iframe: HTMLIFrameElement): Promise<void> {
+    let connection: Connection | undefined;
 
     try {
-      const targetOrigin = this.#getTargetOrigin();
-      if (!targetOrigin) {
-        console.warn('[MCPIframe] Cannot determine target origin. Set target-origin attribute.');
+      const transport = new IframeParentTransport({
+        iframe,
+        targetOrigin: this.#getTargetOrigin(),
+        channelId: this.getAttribute('channel') ?? DEFAULT_CHANNEL_ID,
+      });
+      const onListChanged = () => {
+        if (connection) this.#requestRefresh(connection, 'Failed to refresh iframe items');
+      };
+      const listChanged = { autoRefresh: false, debounceMs: 0, onChanged: onListChanged };
+      const client = new Client(
+        { name: `MCPIframe:${this.id || 'anonymous'}`, version: '1.0.0' },
+        {
+          versionNegotiation: { mode: 'auto' },
+          listChanged: { tools: listChanged, resources: listChanged, prompts: listChanged },
+        }
+      );
+      const currentConnection: Connection = {
+        client,
+        ready: false,
+        refreshRevision: 0,
+        refreshQueue: Promise.resolve(),
+        items: emptyItems(),
+        toolRegistrations: new Map(),
+        resourceRegistrations: new Map(),
+        promptRegistrations: new Map(),
+      };
+      connection = currentConnection;
+      this.#connection = currentConnection;
+      client.onclose = () => {
+        if (currentConnection.ready) void this.#disconnect(currentConnection);
+      };
+      client.onerror = (error) => {
+        this.#failConnection(currentConnection, error, 'Iframe MCP client error');
+      };
+
+      await client.connect(transport);
+      if (
+        requestGeneration !== this.#connectionRequestGeneration ||
+        !this.#isCurrentConnection(currentConnection)
+      ) {
         return;
       }
 
-      // Create transport and client
-      this.#transport = new IframeParentTransport({
-        iframe: this.#iframe,
-        targetOrigin,
-        channelId: this.#channelId,
-      });
-
-      this.#client = new Client({
-        name: `MCPIframe:${this.id || 'anonymous'}`,
-        version: '1.0.0',
-      });
-
-      // Connect to iframe's MCP server
-      await this.#client.connect(this.#transport);
-      this.#ready = true;
-
-      // Fetch all items from iframe
-      await this.#fetchAllFromIframe();
-
-      // Register on parent's Model Context
-      this.#registerAllOnModelContext();
-
-      this.dispatchEvent(
-        new CustomEvent<MCPIframeReadyEventDetail>('mcp-iframe-ready', {
-          detail: {
-            tools: this.exposedTools,
-            resources: this.exposedResources,
-            prompts: this.exposedPrompts,
-          },
-        })
-      );
+      await this.#queueRefresh(currentConnection, false, 'Failed to connect');
+      await this.#waitForRefreshQueue(currentConnection);
+      if (!this.#isCurrentConnection(currentConnection)) return;
+      currentConnection.ready = true;
+      this.#dispatchItems('mcp-iframe-ready');
     } catch (error) {
-      console.error('[MCPIframe] Failed to connect:', error);
-      this.dispatchEvent(
-        new CustomEvent<MCPIframeErrorEventDetail>('mcp-iframe-error', {
-          detail: { error },
-        })
-      );
-    } finally {
-      this.#connecting = false;
+      if (
+        requestGeneration !== this.#connectionRequestGeneration ||
+        !this.isConnected ||
+        (connection && !this.#isCurrentConnection(connection))
+      ) {
+        return;
+      }
+      if (connection) {
+        this.#failConnection(connection, error, 'Failed to connect');
+      } else {
+        this.#dispatchError(error, 'Failed to connect');
+      }
     }
   }
 
-  async #fetchAllFromIframe(): Promise<void> {
-    if (!this.#client) return;
-
-    // Fetch tools, resources, and prompts in parallel
-    const [toolsResult, resourcesResult, promptsResult] = await Promise.all([
-      this.#client.listTools(),
-      this.#client.listResources().catch((err) => {
-        console.warn('[MCPIframeElement] listResources failed, defaulting to empty:', err);
-        return { resources: [] };
-      }),
-      this.#client.listPrompts().catch((err) => {
-        console.warn('[MCPIframeElement] listPrompts failed, defaulting to empty:', err);
-        return { prompts: [] };
-      }),
+  async #fetchAllFromIframe(client: Client): Promise<McpItems> {
+    const capabilities = client.getServerCapabilities();
+    const [tools, resources, resourceTemplates, prompts] = await Promise.all([
+      capabilities?.tools
+        ? client.listTools(undefined, { cacheMode: 'refresh' }).then((result) => result.tools)
+        : [],
+      capabilities?.resources
+        ? client
+            .listResources(undefined, { cacheMode: 'refresh' })
+            .then((result) => result.resources)
+        : [],
+      capabilities?.resources
+        ? client
+            .listResourceTemplates(undefined, { cacheMode: 'refresh' })
+            .then((result) => result.resourceTemplates)
+        : [],
+      capabilities?.prompts
+        ? client.listPrompts(undefined, { cacheMode: 'refresh' }).then((result) => result.prompts)
+        : [],
     ]);
-
-    this.#mcpTools = toolsResult.tools;
-    this.#mcpResources = resourcesResult.resources;
-    this.#mcpPrompts = promptsResult.prompts;
+    return { tools, resources, resourceTemplates, prompts };
   }
 
-  #getTargetOrigin(): string | null {
-    // Use explicit attribute if set
-    if (this.#targetOrigin) {
-      return this.#targetOrigin;
-    }
-
-    // Infer from src attribute
-    const src = this.getAttribute('src');
-    if (src) {
-      try {
-        return new URL(src, window.location.href).origin;
-      } catch (error) {
-        console.warn('[MCPIframeElement] Invalid src URL for origin detection:', src, error);
-      }
-    }
-
-    // Default to same origin
-    return window.location.origin;
+  #isCurrentConnection(connection: Connection): boolean {
+    return this.#connection === connection;
   }
 
-  #registerAllOnModelContext(): void {
-    const mc = navigator.modelContext;
-    if (!mc) {
-      console.warn('[MCPIframe] Model Context API not available on parent');
-      return;
-    }
-    const modelContext = mc as unknown as BrowserMcpServer;
-
-    this.#registerToolsOnModelContext(modelContext);
-    this.#registerResourcesOnModelContext(modelContext);
-    this.#registerPromptsOnModelContext(modelContext);
+  #requestRefresh(connection: Connection, context: string): void {
+    void this.#queueRefresh(connection, true, context).catch(() => undefined);
   }
 
-  #registerToolsOnModelContext(modelContext: BrowserMcpServer): void {
-    for (const tool of this.#mcpTools) {
-      const prefixedName = `${this.itemPrefix}${tool.name}`;
+  #queueRefresh(connection: Connection, notify: boolean, context: string): Promise<void> {
+    const refreshRevision = ++connection.refreshRevision;
+    let registrationsReplaced = false;
+    const refresh = connection.refreshQueue
+      .catch(() => undefined)
+      .then(async () => {
+        const isActive = () =>
+          this.#isCurrentConnection(connection) && refreshRevision === connection.refreshRevision;
+        if (!isActive()) return;
 
-      // Validate the final tool name
-      if (!isValidMCPName(prefixedName)) {
-        if (prefixedName.length > MCP_NAME_MAX_LENGTH) {
-          console.error(
-            `[MCPIframe] Cannot register tool "${tool.name}": ` +
-              `prefixed name "${prefixedName}" exceeds ${MCP_NAME_MAX_LENGTH} characters ` +
-              `(${prefixedName.length} chars). Skipping registration.`
-          );
-        } else {
-          console.error(
-            `[MCPIframe] Cannot register tool "${tool.name}": ` +
-              `prefixed name "${prefixedName}" contains invalid characters. ` +
-              'Tool names must match pattern: ^[a-zA-Z0-9_-]{1,128}$. Skipping registration.'
-          );
+        try {
+          const items = await this.#fetchAllFromIframe(connection.client);
+          if (!isActive()) return;
+
+          this.#unregisterAll(connection);
+          registrationsReplaced = true;
+          connection.items = items;
+          await this.#registerAllOnModelContext(connection, this.itemPrefix, isActive);
+        } catch (error) {
+          if (!isActive()) {
+            if (registrationsReplaced) this.#unregisterAll(connection);
+            return;
+          }
+          this.#failConnection(connection, error, context);
+          throw error;
         }
-        continue;
-      }
 
-      (modelContext.registerTool as (tool: ToolDescriptor) => void)({
-        name: prefixedName,
-        description: tool.description ?? `Tool from iframe: ${tool.name}`,
-        ...(tool.inputSchema && { inputSchema: tool.inputSchema as InputSchema }),
-        execute: (args) => this.#callIframeTool(tool.name, args),
+        if (!isActive()) {
+          this.#unregisterAll(connection);
+          return;
+        }
+        if (notify && connection.ready) this.#dispatchItems('mcp-iframe-items-changed');
       });
+    connection.refreshQueue = refresh;
+    return refresh;
+  }
 
-      this.#registeredTools.add(prefixedName);
+  async #waitForRefreshQueue(connection: Connection): Promise<void> {
+    while (this.#isCurrentConnection(connection)) {
+      const refresh = connection.refreshQueue;
+      await refresh;
+      if (refresh === connection.refreshQueue) return;
     }
   }
 
-  #registerResourcesOnModelContext(modelContext: BrowserMcpServer): void {
-    for (const resource of this.#mcpResources) {
-      const prefixedUri = `${this.itemPrefix}${resource.uri}`;
+  #dispatchItems(type: 'mcp-iframe-ready' | 'mcp-iframe-items-changed'): void {
+    this.dispatchEvent(
+      new CustomEvent<MCPIframeReadyEventDetail>(type, {
+        detail: {
+          tools: this.exposedTools,
+          resources: this.exposedResources,
+          prompts: this.exposedPrompts,
+        },
+      })
+    );
+  }
+
+  #dispatchError(error: unknown, context: string): void {
+    console.error(`[MCPIframe] ${context}:`, error);
+    this.dispatchEvent(
+      new CustomEvent<MCPIframeErrorEventDetail>('mcp-iframe-error', { detail: { error } })
+    );
+  }
+
+  #failConnection(connection: Connection, error: unknown, context: string): void {
+    if (!this.#invalidateConnection(connection)) return;
+    this.#dispatchError(error, context);
+    void this.#closeConnection(connection);
+  }
+
+  #getTargetOrigin(): string {
+    const explicit = this.getAttribute('target-origin');
+    if (explicit !== null) {
+      if (!explicit) throw new Error('target-origin cannot be empty');
+      return explicit;
+    }
+
+    if (
+      this.#iframe?.hasAttribute('sandbox') &&
+      !this.#iframe.sandbox.contains('allow-same-origin')
+    ) {
+      throw new Error('Opaque sandboxed iframes require target-origin="*"');
+    }
+    if (this.hasAttribute('srcdoc')) return window.location.origin;
+
+    const src = this.getAttribute('src');
+    if (!src) return window.location.origin;
+    const url = new URL(src, window.location.href);
+    if (url.protocol === 'about:') return window.location.origin;
+    if (url.origin === 'null') {
+      throw new Error('Opaque iframe sources require target-origin="*"');
+    }
+    return url.origin;
+  }
+
+  async #registerAllOnModelContext(
+    connection: Connection,
+    prefix: string,
+    isActive: () => boolean
+  ): Promise<void> {
+    const modelContext: ModelContext | undefined = document.modelContext ?? navigator.modelContext;
+    if (!modelContext) {
+      throw new Error('Model Context API not available on parent');
+    }
+
+    if (this.#nativeToolSyncPending && hasNativeToolSync(modelContext)) {
+      // Drain native reconciliation queued by the aborted registrations before reusing names.
+      await modelContext.syncNativeTools();
+      if (!isActive()) return;
+      this.#nativeToolSyncPending = false;
+    }
+
+    await this.#registerToolsOnModelContext(connection, modelContext, prefix, isActive);
+    if (!isActive()) return;
+    if (hasMcpBRegistrationExtensions(modelContext)) {
+      this.#registerResourcesOnModelContext(connection, modelContext, prefix);
+      this.#registerPromptsOnModelContext(connection, modelContext, prefix);
+    } else if (
+      connection.items.resources.length > 0 ||
+      connection.items.resourceTemplates.length > 0 ||
+      connection.items.prompts.length > 0
+    ) {
+      console.warn(
+        '[MCPIframe] Parent modelContext does not provide the MCP-B resource and prompt extensions'
+      );
+    }
+  }
+
+  async #registerToolsOnModelContext(
+    connection: Connection,
+    modelContext: ModelContext,
+    prefix: string,
+    isActive: () => boolean
+  ): Promise<void> {
+    for (const tool of connection.items.tools) {
+      if (!isActive()) return;
+      const prefixedName = `${prefix}${tool.name}`;
+
+      const descriptor: ModelContextTool<Record<string, unknown>, CallToolResult> & {
+        inputSchema: InputSchema;
+      } = {
+        name: prefixedName,
+        ...(tool.title !== undefined && { title: tool.title }),
+        description: tool.description ?? `Tool from iframe: ${tool.name}`,
+        inputSchema: tool.inputSchema,
+        ...(tool.annotations?.readOnlyHint !== undefined && {
+          annotations: { readOnlyHint: tool.annotations.readOnlyHint },
+        }),
+        execute: (args) => this.#callIframeTool(tool.name, args),
+      };
+      const controller = new AbortController();
+      connection.toolRegistrations.set(prefixedName, controller);
+      try {
+        await modelContext.registerTool(descriptor, { signal: controller.signal });
+      } catch (error) {
+        const wasAborted = controller.signal.aborted;
+        if (!wasAborted) {
+          this.#nativeToolSyncPending = true;
+          controller.abort();
+        }
+        if (connection.toolRegistrations.get(prefixedName) === controller) {
+          connection.toolRegistrations.delete(prefixedName);
+        }
+        if (!wasAborted) throw error;
+      }
+    }
+  }
+
+  #registerResourcesOnModelContext(
+    connection: Connection,
+    modelContext: McpBRegistrationExtensions,
+    prefix: string
+  ): void {
+    for (const resource of connection.items.resources) {
+      const parentUri = createParentResourceUri(prefix, resource.uri);
 
       const descriptor: ResourceDescriptor = {
-        uri: prefixedUri,
+        uri: parentUri,
         name: resource.name,
         ...(resource.description !== undefined && { description: resource.description }),
         ...(resource.mimeType !== undefined && { mimeType: resource.mimeType }),
-        read: (_uri, _params) =>
-          this.#readIframeResource(resource.uri) as ReturnType<ResourceDescriptor['read']>,
+        read: (_uri, _params) => this.#readIframeResource(resource.uri),
       };
       const registration = modelContext.registerResource(descriptor);
-      this.#registeredResources.set(prefixedUri, registration);
+      connection.resourceRegistrations.set(parentUri, registration);
+    }
+
+    for (const resourceTemplate of connection.items.resourceTemplates) {
+      const childTemplate = new UriTemplate(resourceTemplate.uriTemplate);
+      const parentUri = createParentResourceUri(
+        prefix,
+        resourceTemplate.uriTemplate,
+        childTemplate.variableNames
+      );
+      const descriptor: ResourceDescriptor = {
+        uri: parentUri,
+        name: resourceTemplate.name,
+        ...(resourceTemplate.description !== undefined && {
+          description: resourceTemplate.description,
+        }),
+        ...(resourceTemplate.mimeType !== undefined && { mimeType: resourceTemplate.mimeType }),
+        read: (_uri, params) =>
+          this.#readIframeResource(childTemplate.expand(decodeTemplateVariables(params ?? {}))),
+      };
+      const registration = modelContext.registerResource(descriptor);
+      connection.resourceRegistrations.set(parentUri, registration);
     }
   }
 
-  #registerPromptsOnModelContext(modelContext: BrowserMcpServer): void {
-    for (const prompt of this.#mcpPrompts) {
-      const prefixedName = `${this.itemPrefix}${prompt.name}`;
-
-      // Validate the final prompt name
-      if (!isValidMCPName(prefixedName)) {
-        if (prefixedName.length > MCP_NAME_MAX_LENGTH) {
-          console.error(
-            `[MCPIframe] Cannot register prompt "${prompt.name}": ` +
-              `prefixed name "${prefixedName}" exceeds ${MCP_NAME_MAX_LENGTH} characters ` +
-              `(${prefixedName.length} chars). Skipping registration.`
-          );
-        } else {
-          console.error(
-            `[MCPIframe] Cannot register prompt "${prompt.name}": ` +
-              `prefixed name "${prefixedName}" contains invalid characters. ` +
-              'Prompt names must match pattern: ^[a-zA-Z0-9_-]{1,128}$. Skipping registration.'
-          );
-        }
-        continue;
-      }
+  #registerPromptsOnModelContext(
+    connection: Connection,
+    modelContext: McpBRegistrationExtensions,
+    prefix: string
+  ): void {
+    for (const prompt of connection.items.prompts) {
+      const prefixedName = `${prefix}${prompt.name}`;
 
       const descriptor: PromptDescriptor = {
         name: prefixedName,
@@ -557,141 +735,110 @@ export class MCPIframeElement extends HTMLElement {
         get: (args) => this.#getIframePrompt(prompt.name, args),
       };
       const registration = modelContext.registerPrompt(descriptor);
-      this.#registeredPrompts.set(prefixedName, registration);
+      connection.promptRegistrations.set(prefixedName, registration);
     }
   }
 
-  #unregisterAll(): void {
-    const mc = navigator.modelContext;
-    if (mc) {
-      const modelContext = mc as unknown as BrowserMcpServer;
-      for (const toolName of this.#registeredTools.values()) {
-        try {
-          modelContext.unregisterTool(toolName);
-        } catch (error) {
-          console.warn(
-            `[MCPIframeElement] Failed to unregister tool "${toolName}" during cleanup:`,
-            error
-          );
-        }
+  #unregisterAll(connection: Connection): void {
+    const tools = [...connection.toolRegistrations.values()];
+    const registrations = [
+      ...connection.resourceRegistrations.values(),
+      ...connection.promptRegistrations.values(),
+    ];
+    connection.toolRegistrations.clear();
+    connection.resourceRegistrations.clear();
+    connection.promptRegistrations.clear();
+    connection.items = emptyItems();
+    if (tools.length > 0) this.#nativeToolSyncPending = true;
+
+    for (const controller of tools) {
+      try {
+        controller.abort();
+      } catch (error) {
+        console.warn('[MCPIframe] Failed to unregister a parent tool:', error);
       }
     }
-    this.#registeredTools.clear();
-
-    for (const registration of this.#registeredResources.values()) {
-      registration.unregister();
+    for (const registration of registrations) {
+      try {
+        registration.unregister();
+      } catch (error) {
+        console.warn('[MCPIframe] Failed to unregister a parent item:', error);
+      }
     }
-    this.#registeredResources.clear();
+  }
 
-    for (const registration of this.#registeredPrompts.values()) {
-      registration.unregister();
+  #requireClient(): Client {
+    const connection = this.#connection;
+    if (!connection?.ready) {
+      throw new Error('Not connected to iframe MCP server');
     }
-    this.#registeredPrompts.clear();
+    return connection.client;
+  }
+
+  #getCallTimeout(): number {
+    const timeout = Number(this.getAttribute('call-timeout'));
+    return Number.isSafeInteger(timeout) && timeout > 0 ? timeout : DEFAULT_CALL_TIMEOUT;
   }
 
   async #callIframeTool(toolName: string, args: Record<string, unknown>): Promise<CallToolResult> {
-    if (!this.#client || !this.#ready) {
-      throw new Error('Not connected to iframe MCP server');
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.#callTimeout);
-
-    try {
-      const result = await this.#client.callTool({ name: toolName, arguments: args }, undefined, {
-        signal: controller.signal,
-      });
-      return result as CallToolResult;
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    return this.#requireClient().callTool(
+      { name: toolName, arguments: args },
+      { timeout: this.#getCallTimeout() }
+    );
   }
 
   async #readIframeResource(uri: string): Promise<ReadResourceResult> {
-    if (!this.#client || !this.#ready) {
-      throw new Error('Not connected to iframe MCP server');
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.#callTimeout);
-
-    try {
-      const result = await this.#client.readResource({ uri }, { signal: controller.signal });
-      return result as ReadResourceResult;
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    return this.#requireClient().readResource({ uri }, { timeout: this.#getCallTimeout() });
   }
 
-  async #getIframePrompt(name: string, args: Record<string, unknown>): Promise<GetPromptResult> {
-    if (!this.#client || !this.#ready) {
-      throw new Error('Not connected to iframe MCP server');
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.#callTimeout);
-
-    try {
-      const result = await this.#client.getPrompt(
-        { name, arguments: args as Record<string, string> },
-        { signal: controller.signal }
-      );
-      return result as GetPromptResult;
-    } finally {
-      clearTimeout(timeoutId);
-    }
+  async #getIframePrompt(name: string, args: Record<string, string>): Promise<GetPromptResult> {
+    return this.#requireClient().getPrompt(
+      { name, arguments: args },
+      { timeout: this.#getCallTimeout() }
+    );
   }
 
   async #reconnect(): Promise<void> {
+    const requestGeneration = ++this.#connectionRequestGeneration;
     await this.#disconnect();
-    // Brief delay for iframe to be ready
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    await this.#connect();
+    if (requestGeneration !== this.#connectionRequestGeneration || !this.isConnected) return;
+    await this.#connect(requestGeneration);
   }
 
-  async #disconnect(): Promise<void> {
-    this.#ready = false;
-    this.#mcpTools = [];
-    this.#mcpResources = [];
-    this.#mcpPrompts = [];
-    this.#unregisterAll();
-
-    if (this.#client) {
-      try {
-        await this.#client.close();
-      } catch (error) {
-        console.warn('[MCPIframeElement] Error closing client during disconnect:', error);
-      }
-      this.#client = null;
-    }
-
-    if (this.#transport) {
-      try {
-        await this.#transport.close();
-      } catch (error) {
-        console.warn('[MCPIframeElement] Error closing transport during disconnect:', error);
-      }
-      this.#transport = null;
-    }
+  async #disconnect(connection = this.#connection): Promise<void> {
+    if (!connection || !this.#invalidateConnection(connection)) return;
+    await this.#closeConnection(connection);
   }
 
-  async #cleanup(): Promise<void> {
-    await this.#disconnect();
+  #invalidateConnection(connection: Connection): boolean {
+    if (!this.#isCurrentConnection(connection)) return false;
+    this.#connection = null;
+    ++connection.refreshRevision;
+    connection.ready = false;
+    delete connection.client.onclose;
+    delete connection.client.onerror;
+    this.#unregisterAll(connection);
+    return true;
+  }
+
+  async #closeConnection(connection: Connection): Promise<void> {
+    try {
+      await connection.client.close();
+    } catch (error) {
+      console.warn('[MCPIframeElement] Error closing client during disconnect:', error);
+    }
   }
 }
 
-// ============================================================================
-// Registration
-// ============================================================================
+declare global {
+  interface HTMLElementTagNameMap {
+    'mcp-iframe': MCPIframeElement;
+  }
+}
 
 /** Register the custom element with a custom tag name */
 export function registerMCPIframeElement(tagName = 'mcp-iframe'): void {
   if (typeof customElements !== 'undefined' && !customElements.get(tagName)) {
     customElements.define(tagName, MCPIframeElement);
   }
-}
-
-// Auto-register in browser environments
-if (typeof window !== 'undefined' && typeof customElements !== 'undefined') {
-  registerMCPIframeElement();
 }

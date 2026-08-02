@@ -5,12 +5,5 @@
     "declaration": true,
     "declarationMap": true
   },
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/*.test.*",
-    "**/*.spec.*",
-    "**/*.test-d.*",
-    "**/*.conformance-d.ts"
-  ]
+  "exclude": ["node_modules", "dist", "**/*.test.*", "**/*.test-d.*", "**/*.spec.*"]
 }

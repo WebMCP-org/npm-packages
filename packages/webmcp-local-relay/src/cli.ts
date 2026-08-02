@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { parseCliOptions } from './cli-utils.js';
+import { parseCliOptions, printHelp } from './cli-utils.js';
 import { LocalRelayMcpServer } from './mcpRelayServer.js';
 
 let options: ReturnType<typeof parseCliOptions>;
@@ -13,25 +13,19 @@ try {
   process.exit(1);
 }
 
+if (options.help) {
+  printHelp();
+  process.exit(0);
+}
+
 if (options.allowedOrigins.includes('*')) {
   process.stderr.write(
     '[webmcp-local-relay] WARNING: accepting connections from ALL host page origins. Use --widget-origin to restrict.\n'
   );
 }
 
-const bridgeOptions = {
-  host: options.host,
-  port: options.port,
-  portExplicitlySet: options.portExplicitlySet,
-  allowedOrigins: options.allowedOrigins,
-  ...(options.label ? { label: options.label } : {}),
-  ...(options.relayId ? { relayId: options.relayId } : {}),
-  ...(options.workspace ? { workspace: options.workspace } : {}),
-  ...(options.maxPayloadBytes ? { maxPayloadBytes: options.maxPayloadBytes } : {}),
-};
-
 const relay = new LocalRelayMcpServer({
-  bridgeOptions,
+  bridgeOptions: options,
 });
 
 try {

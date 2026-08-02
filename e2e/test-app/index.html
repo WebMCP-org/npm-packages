@@ -95,7 +95,7 @@
   <body>
     <h1>Web Model Context API E2E Test</h1>
     <p class="subtitle">
-      Testing <code>window.navigator.modelContext</code> with two-bucket tool management
+      Testing <code>document.modelContext</code> with MCP-B compatibility extensions
     </p>
 
     <div class="section">
@@ -104,9 +104,10 @@
     </div>
 
     <div class="section">
-      <h2>Base Tools (Bucket A - provideContext)</h2>
+      <h2>Base Tools (MCP-B context group)</h2>
       <p>
-        These tools are registered via <code>provideContext()</code> and cleared when called again.
+        These tools are registered through a local MCP-B grouping helper and cleaned up with
+        retained abort controllers.
       </p>
       <div class="counter" id="counter-display">0</div>
       <div style="text-align: center">
@@ -120,8 +121,8 @@
     <div class="section">
       <h2>Dynamic Tools (Bucket B - registerTool)</h2>
       <p>
-        These tools are registered via <code>registerTool()</code> and can be removed when
-        <code>provideContext()</code> replaces tool context in strict core mode.
+        These tools are registered via <code>registerTool()</code> and cleaned up with their
+        registration signal.
       </p>
       <div style="text-align: center">
         <button id="register-dynamic">Register Dynamic Tool</button>
@@ -137,21 +138,18 @@
     </div>
 
     <div class="section">
-      <h2>Test Two-Bucket System</h2>
+      <h2>Test MCP-B context grouping</h2>
       <p>
-        Test strict replacement behavior: <code>provideContext()</code> replaces tool context,
-        including dynamic tools.
+        Test the local compatibility helper that replaces its owned registrations, including dynamic
+        tools.
       </p>
-      <button id="replace-base-tools">Replace Base Tools (provideContext)</button>
+      <button id="replace-base-tools">Replace Owned Base Tools</button>
       <button id="list-all-tools">List All Tools</button>
     </div>
 
     <div class="section">
       <h2>Resources (Bucket A & B)</h2>
-      <p>
-        Test <code>provideContext({ resources })</code> and <code>registerResource()</code> for
-        exposing data to AI models.
-      </p>
+      <p>Test the MCP-B resource grouping helper and <code>registerResource()</code>.</p>
       <div
         id="resources-status"
         style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px"
@@ -163,20 +161,11 @@
         <button id="register-dynamic-resource">Register Dynamic Resource (Bucket B)</button>
         <button id="unregister-dynamic-resource" disabled>Unregister Dynamic Resource</button>
       </div>
-      <div style="text-align: center; margin-top: 10px">
-        <button id="list-resources">List Resources</button>
-        <button id="list-resource-templates">List Resource Templates</button>
-        <button id="read-static-resource">Read Static Resource</button>
-        <button id="read-template-resource">Read Template Resource</button>
-      </div>
     </div>
 
     <div class="section">
       <h2>Prompts (Bucket A & B)</h2>
-      <p>
-        Test <code>provideContext({ prompts })</code> and <code>registerPrompt()</code> for reusable
-        prompt templates.
-      </p>
+      <p>Test the MCP-B prompt grouping helper and <code>registerPrompt()</code>.</p>
       <div
         id="prompts-status"
         style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px"
@@ -188,15 +177,10 @@
         <button id="register-dynamic-prompt">Register Dynamic Prompt (Bucket B)</button>
         <button id="unregister-dynamic-prompt" disabled>Unregister Dynamic Prompt</button>
       </div>
-      <div style="text-align: center; margin-top: 10px">
-        <button id="list-prompts">List Prompts</button>
-        <button id="get-prompt-without-args">Get Prompt (no args)</button>
-        <button id="get-prompt-with-args">Get Prompt (with args)</button>
-      </div>
     </div>
 
     <div class="section">
-      <h2>Model Context Testing API</h2>
+      <h2>Deprecated MCP-B testing shim</h2>
       <p>
         Test <code>navigator.modelContextTesting</code> for debugging and testing tool execution.
       </p>
@@ -208,43 +192,20 @@
       </div>
       <div style="text-align: center">
         <button id="check-testing-api">Check Testing API</button>
-        <button id="test-tool-tracking">Test Tool Call Tracking</button>
-        <button id="test-mock-response">Test Mock Response</button>
-        <button id="test-reset">Test Reset</button>
       </div>
     </div>
 
     <div class="section">
-      <h2>Sampling & Elicitation API</h2>
+      <h2>MCP-B compatibility API tests</h2>
       <p>
-        Test <code>createMessage()</code> and <code>elicitInput()</code> methods for
-        server-to-client requests.
-      </p>
-      <div
-        id="sampling-status"
-        style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px"
-      >
-        Sampling/Elicitation: Not tested
-      </div>
-      <div style="text-align: center">
-        <button id="check-sampling-api">Check Sampling API</button>
-        <button id="test-sampling-call">Test createMessage()</button>
-        <button id="test-elicitation-call">Test elicitInput()</button>
-      </div>
-    </div>
-
-    <div class="section">
-      <h2>Chromium Native API Tests</h2>
-      <p>
-        Test Chromium-compatible APIs: <code>unregisterTool()</code>, <code>clearContext()</code>,
-        <code>executeTool()</code>, <code>listTools()</code>, and
-        <code>registerToolsChangedCallback()</code>.
+        Test MCP-B-only removal, listing, execution, and testing-shim callbacks. These are not the
+        current native Chrome WebMCP surface.
       </p>
       <div id="chromium-callback-status" style="display: none"></div>
 
       <h3>ModelContext APIs</h3>
       <div style="text-align: center">
-        <button id="chromium-unregister-tool">Test unregisterTool()</button>
+        <button id="chromium-unregister-tool">Test AbortSignal cleanup</button>
         <button id="chromium-clear-context">Test clearContext()</button>
       </div>
 
@@ -257,9 +218,9 @@
       <h3>Tools Changed Callbacks</h3>
       <div style="text-align: center">
         <button id="chromium-test-callback-register">Test Callback: registerTool()</button>
-        <button id="chromium-test-callback-unregister">Test Callback: unregisterTool()</button>
-        <button id="chromium-test-callback-provide">Test Callback: provideContext()</button>
-        <button id="chromium-test-callback-clear">Test Callback: clearContext()</button>
+        <button id="chromium-test-callback-unregister">Test Event: AbortSignal cleanup</button>
+        <button id="chromium-test-callback-provide">Test Callback: grouped registration</button>
+        <button id="chromium-test-callback-clear">Test Callback: signal cleanup</button>
       </div>
     </div>
 

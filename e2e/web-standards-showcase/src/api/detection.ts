@@ -10,12 +10,14 @@ export function detectNativeAPI(): DetectionResult {
     available: false,
     isNative: false,
     isPolyfill: false,
-    testingAvailable: false,
     message: '',
   };
 
-  // Check if modelContext exists
-  if (!document.modelContext) {
+  const context = document.modelContext as
+    | (Document['modelContext'] & { __isWebMCPPolyfill?: boolean })
+    | undefined;
+
+  if (!context) {
     result.message =
       'document.modelContext not found. Please launch Chromium with --enable-experimental-web-platform-features';
     return result;
@@ -23,21 +25,20 @@ export function detectNativeAPI(): DetectionResult {
 
   result.available = true;
 
-  // Check if it's a polyfill by examining constructor names
-  const testingAPI = navigator.modelContextTesting;
+  result.isPolyfill = context.__isWebMCPPolyfill === true;
+  if (result.isPolyfill) {
+    result.message =
+      'WebMCP polyfill detected. This app requires Chromium document.modelContext with no polyfill loaded.';
+    return result;
+  }
 
-  if (testingAPI) {
-    result.testingAvailable = true;
-
-    // Native implementations won't have "WebModelContext" in constructor name
-    const constructorName = testingAPI.constructor.name;
-    result.isPolyfill = constructorName.includes('WebModelContext');
-    result.isNative = !result.isPolyfill;
-
-    if (result.isPolyfill) {
-      result.message = `Polyfill detected (${constructorName}). This app requires the NATIVE Chromium implementation. Please ensure you've launched with --enable-experimental-web-platform-features and no polyfill is loaded.`;
-      return result;
-    }
+  if (
+    typeof context.registerTool !== 'function' ||
+    typeof context.getTools !== 'function' ||
+    typeof context.addEventListener !== 'function'
+  ) {
+    result.message = 'document.modelContext is missing required WebMCP methods';
+    return result;
   }
 
   result.isNative = true;
@@ -50,18 +51,12 @@ export function detectNativeAPI(): DetectionResult {
  */
 export function getAPIInfo(): Record<string, unknown> {
   const ctx = document.modelContext;
-  const testing = navigator.modelContextTesting;
 
   return {
     modelContext: {
       available: !!ctx,
       methods: ctx ? Object.getOwnPropertyNames(Object.getPrototypeOf(ctx)) : [],
       constructorName: ctx?.constructor.name,
-    },
-    modelContextTesting: {
-      available: !!testing,
-      methods: testing ? Object.getOwnPropertyNames(Object.getPrototypeOf(testing)) : [],
-      constructorName: testing?.constructor.name,
     },
   };
 }

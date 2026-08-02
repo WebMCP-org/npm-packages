@@ -14,18 +14,30 @@ application context.
 
 The current registration pattern ties a tool to an `AbortSignal`:
 
-```ts
+```ts title="Registration lifetime"
 const controller = new AbortController();
-document.modelContext.registerTool(tool, { signal: controller.signal });
+await document.modelContext.registerTool(tool, { signal: controller.signal });
 
 // Remove the registration during route or component cleanup.
 controller.abort();
 ```
 
-Descriptions and schemas must be replaced when application context changes;
-stale or duplicate registrations make discovery ambiguous. Tool-change
-notifications allow consumers to refresh the catalog after registration or
-cleanup.
+Duplicate names reject instead of replacing the existing tool. When a route,
+description, schema, or permission boundary changes, abort the old registration
+before publishing the replacement:
+
+```ts title="Replace a registration"
+controller.abort();
+
+const nextController = new AbortController();
+await document.modelContext.registerTool(nextTool, {
+  signal: nextController.signal,
+});
+```
+
+The document remains the owner of this lifecycle. Callers do not retain a
+separate runtime or server handle. The `toolchange` event lets consumers refresh
+their catalog after registration or cleanup.
 
 See [Build your first React tool](/tutorials/first-react-tool) and the
 [WebMCP standard API](/reference/webmcp/standard-api).

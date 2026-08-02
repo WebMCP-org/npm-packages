@@ -9,13 +9,13 @@ icon: 'puzzle-piece'
 
 ## When to use this package
 
-- You want `registerTool`, `getTools`, and `executeTool` in browsers today.
+- You want the standard `registerTool` and `getTools` APIs, plus a feature-detectable Chrome-compatible `executeTool` extension, in browsers today.
 - You are building a site or reusable library that wants to stay close to the W3C surface.
 - You want to pair runtime behavior with [`@mcp-b/webmcp-types`](/packages/webmcp-types/overview) for type inference.
 
 ## When not to use this package
 
-- You need prompts, resources, transport, sampling, or elicitation. Use [`@mcp-b/global`](/packages/global/overview).
+- You need prompts, resources, browser transport, or direct access to an MCP server. Use [`@mcp-b/global`](/packages/global/overview).
 - You only need types at build time. Use [`@mcp-b/webmcp-types`](/packages/webmcp-types/overview).
 
 ## Where it sits in the package graph
@@ -24,7 +24,7 @@ This package sits directly above `@mcp-b/webmcp-types`. The full runtime in [`@m
 
 ## First step
 
-Initialize the polyfill before your app registers tools. The [reference page](/packages/webmcp-polyfill/reference) documents the initialization options, testing shim behavior, and the strict-core lifecycle.
+Initialize the polyfill before your app registers tools. The [reference page](/packages/webmcp-polyfill/reference) documents initialization, declarative forms, testing shim behavior, and the strict-core lifecycle.
 
 ## Related pages
 

@@ -1,7 +1,10 @@
+import { parseArgs } from 'node:util';
+
 /**
  * Parsed CLI options for relay startup.
  */
 export interface CliOptions {
+  help: boolean;
   host: string;
   port: number;
   portExplicitlySet: boolean;
@@ -10,111 +13,72 @@ export interface CliOptions {
   workspace?: string;
   relayId?: string;
   maxPayloadBytes?: number;
+  invokeTimeoutMs?: number;
+}
+
+function parsePositiveInteger(name: string, value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`Invalid ${name} "${value}". Must be a positive integer.`);
+  }
+  return parsed;
 }
 
 /**
  * Parses supported CLI flags for relay startup.
  */
 export function parseCliOptions(argv: string[]): CliOptions {
-  const options: CliOptions = {
-    host: '127.0.0.1',
-    port: 9333,
-    portExplicitlySet: false,
-    // Permissive by default for zero-config local development: any browser page can connect.
-    // Use --widget-origin to restrict to trusted origins on shared machines or in production.
-    allowedOrigins: ['*'],
-  };
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      help: { type: 'boolean', short: 'h' },
+      host: { type: 'string', short: 'H' },
+      'allowed-origin': { type: 'string' },
+      'invoke-timeout': { type: 'string' },
+      label: { type: 'string' },
+      'max-payload': { type: 'string' },
+      port: { type: 'string', short: 'p' },
+      'relay-id': { type: 'string' },
+      'widget-origin': { type: 'string' },
+      workspace: { type: 'string' },
+      'ws-origin': { type: 'string' },
+    },
+    strict: true,
+  });
 
-  const readFlagValue = (flag: string, index: number): string => {
-    const next = argv[index + 1];
-    if (!next || next.startsWith('-')) {
-      throw new Error(`Missing value for ${flag}`);
-    }
-    return next;
-  };
-
-  for (let i = 0; i < argv.length; i++) {
-    const token = argv[i];
-    if (!token) {
-      continue;
-    }
-
-    if (token === '--host' || token === '-H') {
-      options.host = readFlagValue(token, i);
-      i += 1;
-      continue;
-    }
-
-    if (token === '--port' || token === '-p') {
-      const raw = readFlagValue(token, i);
-      i += 1;
-      const value = Number.parseInt(raw, 10);
-      if (!Number.isFinite(value) || value <= 0 || value > 65535) {
-        throw new Error(`Invalid port "${raw}". Port must be a number between 1 and 65535.`);
-      }
-      options.port = value;
-      options.portExplicitlySet = true;
-      continue;
-    }
-
-    if (token === '--widget-origin' || token === '--allowed-origin' || token === '--ws-origin') {
-      const raw = readFlagValue(token, i);
-      i += 1;
-      const split = raw
-        .split(',')
-        .map((part) => part.trim())
-        .filter(Boolean);
-
-      if (split.length > 0) {
-        options.allowedOrigins = split;
-      }
-      continue;
-    }
-
-    if (token === '--label') {
-      options.label = readFlagValue(token, i);
-      i += 1;
-      continue;
-    }
-
-    if (token === '--workspace') {
-      options.workspace = readFlagValue(token, i);
-      i += 1;
-      continue;
-    }
-
-    if (token === '--relay-id') {
-      options.relayId = readFlagValue(token, i);
-      i += 1;
-      continue;
-    }
-
-    if (token === '--max-payload') {
-      const raw = readFlagValue(token, i);
-      i += 1;
-      const value = Number(raw);
-      if (!Number.isInteger(value) || value <= 0) {
-        throw new Error(`Invalid max-payload "${raw}". Must be a positive integer (bytes).`);
-      }
-      options.maxPayloadBytes = value;
-      continue;
-    }
-
-    if (token === '--help' || token === '-h') {
-      printHelp();
-      process.exit(0);
-    }
-
-    if (token.startsWith('-')) {
-      process.stderr.write(`[webmcp-local-relay] warn: unrecognized argument "${token}"\n`);
-    } else {
-      process.stderr.write(
-        `[webmcp-local-relay] warn: unrecognized argument "${token}" (positional arguments are not supported)\n`
-      );
-    }
+  const port = values.port === undefined ? 9333 : Number(values.port);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    throw new Error(`Invalid port "${values.port}". Port must be an integer between 1 and 65535.`);
   }
 
-  return options;
+  const invokeTimeoutMs = parsePositiveInteger('invoke-timeout', values['invoke-timeout']);
+  const maxPayloadBytes = parsePositiveInteger('max-payload', values['max-payload']);
+
+  const allowedOrigins = (
+    values['widget-origin'] ??
+    values['allowed-origin'] ??
+    values['ws-origin']
+  )
+    ?.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean) ?? ['*'];
+  if (allowedOrigins.length === 0) {
+    throw new Error('--widget-origin must include at least one origin.');
+  }
+
+  return {
+    allowedOrigins,
+    help: values.help ?? false,
+    host: values.host ?? '127.0.0.1',
+    port,
+    portExplicitlySet: values.port !== undefined,
+    ...(values.label === undefined ? {} : { label: values.label }),
+    ...(invokeTimeoutMs === undefined ? {} : { invokeTimeoutMs }),
+    ...(maxPayloadBytes === undefined ? {} : { maxPayloadBytes }),
+    ...(values['relay-id'] === undefined ? {} : { relayId: values['relay-id'] }),
+    ...(values.workspace === undefined ? {} : { workspace: values.workspace }),
+  };
 }
 
 /**
@@ -132,11 +96,12 @@ export function printHelp(): void {
       '  --host, -H               Bind host for local websocket relay (default: 127.0.0.1)',
       '  --port, -p               Preferred root port for the local relay cluster (default: 9333)',
       '  --widget-origin          Allowed host page origin(s), comma-separated (default: *)',
-      '  --allowed-origin         Alias for --widget-origin',
-      '  --ws-origin              Alias for --widget-origin',
+      '  --allowed-origin         Deprecated alias for --widget-origin',
+      '  --ws-origin              Deprecated alias for --widget-origin',
       '  --label                  Human-readable relay label reported during discovery',
       '  --workspace              Optional workspace name reported during discovery',
       '  --relay-id               Stable relay identifier reported during discovery',
+      '  --invoke-timeout         Browser tool invocation timeout in milliseconds (default: 65000)',
       '  --max-payload            Maximum WebSocket payload size in bytes (default: 10000000)',
       '  --help, -h               Show help',
       '',

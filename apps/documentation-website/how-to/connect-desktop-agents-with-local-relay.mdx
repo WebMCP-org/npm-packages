@@ -53,7 +53,7 @@ Add the relay server to your MCP client configuration. This works with Claude De
 ```
 
 ```bash "Claude Code"
-claude mcp add webmcp-local-relay npx @mcp-b/webmcp-local-relay@latest
+claude mcp add webmcp-local-relay -- npx -y @mcp-b/webmcp-local-relay@latest
 ```
 
 </CodeGroup>
@@ -73,31 +73,38 @@ The relay discovers tools through a hidden iframe injected by `embed.js`. Add a 
 ```
 
 If your page already registers tools on `document.modelContext`, they are picked up automatically.
+Tools registered after `embed.js` loads are also discovered through `toolchange` events and a polling
+fallback; script order does not control discovery.
 
-If you are new to WebMCP, register tools first with `@mcp-b/global`, then load the embed script:
+If you are new to WebMCP, this complete example loads `@mcp-b/global`, registers a tool, and adds the
+embed:
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@latest/dist/index.iife.js"></script>
 <script>
-  document.modelContext.registerTool({
-    name: 'get_page_title',
-    description: 'Get the current page title',
-    inputSchema: { type: 'object', properties: {} },
-    execute: async () => ({ content: [{ type: 'text', text: document.title }] }),
-  });
+  void document.modelContext
+    .registerTool({
+      name: 'get_page_title',
+      description: 'Get the current page title',
+      inputSchema: { type: 'object', properties: {} },
+      execute: async () => ({ content: [{ type: 'text', text: document.title }] }),
+    })
+    .catch(console.error);
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
 ```
 
+Serve local pages from an HTTP origin such as `http://localhost:3000`. Do not open them as `file:`
+URLs, whose opaque origin cannot be used for descriptor-based tool execution.
+
 ## Verify the connection
 
-Once the relay is running and your page has loaded `embed.js`, your AI agent has access to four management tools:
+Once the relay is running and your page has loaded `embed.js`, your AI agent has access to three management tools:
 
 | Tool                  | What it does                                                                               |
 | --------------------- | ------------------------------------------------------------------------------------------ |
 | `webmcp_list_sources` | Lists connected browser tabs with metadata (tab ID, origin, URL, title, tool count)        |
 | `webmcp_list_tools`   | Lists all relayed tools with source info                                                   |
-| `webmcp_call_tool`    | Invokes a relayed tool by name (for clients that do not support dynamic tool registration) |
 | `webmcp_open_page`    | Opens a URL in the default browser or refreshes a connected source page by matching origin |
 
 Tools also register as first-class MCP tools using their original name. When multiple tabs register a tool with the same name, the relay appends a short tab-ID suffix for disambiguation (e.g. `search_ed93`, `search_a1b2`).
@@ -113,7 +120,7 @@ Ask your agent to list sources or tools to confirm the connection is working. Tr
 
 ## Use a custom port
 
-The relay defaults to WebSocket port `9333` on `127.0.0.1`. If you need a different port, configure both sides:
+The relay prefers WebSocket port `9333` on `127.0.0.1`. If you need a fixed port, configure both sides:
 
 **Relay CLI:**
 
@@ -130,6 +137,9 @@ npx @mcp-b/webmcp-local-relay --port 9444
 ></script>
 ```
 
+An explicit `--port` selects that exact root port. A compatible relay already using it is shared in
+client mode; an unrelated process using it causes startup to fail.
+
 ## Restrict allowed origins
 
 By default, the relay accepts connections from any browser page (`*`). For production or shared machines, restrict which origins can register tools:
@@ -142,24 +152,32 @@ npx @mcp-b/webmcp-local-relay --widget-origin https://myapp.com
 npx @mcp-b/webmcp-local-relay --widget-origin https://app1.com,https://app2.com
 ```
 
-The `--widget-origin` flag validates the host page origin reported in the browser handshake. It does not restrict local processes from connecting to the WebSocket.
+The `--widget-origin` flag validates the browser's WebSocket `Origin` header. The injected widget
+inherits the host page origin, so browser code cannot replace it with a different value in the
+handshake. This flag is not local-process authentication; keep the relay bound to loopback unless
+you provide another trusted boundary.
 
 ## Handle multiple MCP clients
 
-If you start a second relay instance while one is already running, the second instance detects the port conflict (`EADDRINUSE`) and falls back to **client mode**. In client mode it connects as a WebSocket client to the existing server relay and proxies tool operations through it.
+If a candidate port belongs to a compatible WebMCP relay, a second instance joins it in **client
+mode** and proxies tool operations through it. During default discovery, an unrelated service is
+skipped and the relay tries the next port in `9333–9348`; an explicitly selected occupied port fails.
 
-If the server relay stops, the client promotes itself back to server mode. This lets multiple MCP clients share the same browser connections without manual configuration.
+If the server relay stops, the client promotes itself back to server mode after a reconnection cycle.
+This lets multiple MCP clients share the same browser connections without manual configuration.
 
 ## Troubleshoot common issues
 
-| Problem                | Fix                                                                                                                                                 |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected` | Confirm the page loaded `embed.js` and the relay process is running                                                                                 |
-| `No tools listed`      | Confirm tools are registered on the page before `embed.js` loads. If tools register after load, ensure your runtime emits tool-change notifications |
-| `Tool not found`       | The tab reloaded or disconnected. Call `webmcp_list_tools` to refresh                                                                               |
-| Connection blocked     | Verify `--widget-origin` matches your host page origin and the relay port matches `data-relay-port`                                                 |
+| Problem                | Fix                                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `No sources connected` | Confirm the page loaded `embed.js` and the relay process is running                                                          |
+| `No tools listed`      | Confirm tools are registered on the page. The embed detects changes and polls every two seconds, regardless of script order. |
+| `Tool not found`       | The tab reloaded or disconnected. Call `webmcp_list_tools` to refresh                                                        |
+| Connection blocked     | Verify `--widget-origin` matches the WebSocket origin and the relay port matches `data-relay-port`                           |
 
-If the relay is temporarily unavailable, the embed widget reconnects automatically with exponential backoff (500 ms to 3 s, up to 100 attempts).
+After a disconnect, the widget retries the last endpoint once after about `500ms`, then scans after
+`10s`, `20s`, and `30s`. It then enters a dormant state that probes every two minutes; returning to
+the tab triggers immediate rediscovery. See the [relay reference](/packages/webmcp-local-relay/reference#reconnection-and-client-mode) for the complete behavior.
 
 ## Related pages
 

@@ -1,12 +1,11 @@
 ---
 title: '@mcp-b/webmcp-types'
-description: 'Reference for WebMCP TypeScript type definitions, schema inference, and document.modelContext augmentation.'
+description: 'Reference for WebMCP TypeScript contracts, schema inference, and document.modelContext augmentation.'
 keywords:
   [
     '@mcp-b/webmcp-types',
     'typescript',
     'ModelContext',
-    'ModelContextCore',
     'ToolDescriptor',
     'InferArgsFromInputSchema',
     'JsonSchemaForInference',
@@ -15,19 +14,25 @@ keywords:
 icon: 'brackets-curly'
 ---
 
-`@mcp-b/webmcp-types` provides TypeScript type definitions for the WebMCP API. Zero runtime. Zero side effects. Install as a dev dependency.
+`@mcp-b/webmcp-types` emits TypeScript declarations only. It defines the standard browser surface separately from MCP-B and Chromium extensions.
 
-```
+The [WebMCP draft](https://webmachinelearning.github.io/webmcp/) is authoritative for the browser API.
+
+## Installation
+
+```bash "Terminal"
 npm install --save-dev @mcp-b/webmcp-types
 ```
 
-## Activation
+Use a production dependency when a published library exposes these types in its declarations.
 
-TypeScript may not automatically include global declarations from npm packages. Use one of these methods:
+## Global activation
+
+Choose one activation method:
 
 <Tabs>
   <Tab title="tsconfig.json">
-    ```json
+    ```json "tsconfig.json"
     {
       "compilerOptions": {
         "types": ["@mcp-b/webmcp-types"]
@@ -36,320 +41,172 @@ TypeScript may not automatically include global declarations from npm packages. 
     ```
   </Tab>
   <Tab title="Triple-slash reference">
-    ```ts
+    ```ts "global.d.ts"
     /// <reference types="@mcp-b/webmcp-types" />
     ```
   </Tab>
   <Tab title="Type-only import">
-    ```ts
+    ```ts "types.ts"
     import type {} from '@mcp-b/webmcp-types';
     ```
   </Tab>
 </Tabs>
 
-After activation, `document.modelContext` is typed as `ModelContext` and `navigator.modelContextTesting` as `ModelContextTesting | undefined`.
+Activation adds these globals:
 
----
+| Property                        | Type                               | Status                                   |
+| ------------------------------- | ---------------------------------- | ---------------------------------------- |
+| `document.modelContext`         | `ModelContext`                     | Canonical                                |
+| `navigator.modelContext`        | `ModelContext \| undefined`        | Deprecated compatibility alias           |
+| `navigator.modelContextTesting` | `ModelContextTesting \| undefined` | Deprecated testing compatibility surface |
 
-## Minimal example
+## Example
 
 <Snippet file="snippets/packages/webmcp-types-quickstart.ts" />
 
----
-
-## Global augmentation
-
-| Property                        | Type                               | Description                |
-| ------------------------------- | ---------------------------------- | -------------------------- |
-| `document.modelContext`         | `ModelContext`                     | Strict core WebMCP surface |
-| `navigator.modelContextTesting` | `ModelContextTesting \| undefined` | Testing API (optional)     |
-
----
-
-## Core interfaces
+## Browser contracts
 
 ### `ModelContext`
 
-Alias for `ModelContextCore`. This is the type of `document.modelContext`.
+`ModelContext` is the type of `document.modelContext`.
 
-### `ModelContextCore`
+| Member                         | Type                         |
+| ------------------------------ | ---------------------------- |
+| `registerTool(tool, options?)` | `Promise<void>`              |
+| `getTools(options?)`           | `Promise<RegisteredTool[]>`  |
+| `ontoolchange`                 | Event handler or `null`      |
+| EventTarget methods            | Inherited from `EventTarget` |
 
-The strict specification surface.
+| Option type                            | Field         | Type           | Meaning                                      |
+| -------------------------------------- | ------------- | -------------- | -------------------------------------------- |
+| `ModelContextRegisterToolOptions`      | `signal`      | `AbortSignal?` | Owns the registration lifetime               |
+| `ModelContextRegisterToolOptions`      | `exposedTo`   | `string[]?`    | Requests exposure to descendant origins      |
+| `ModelContextGetToolOptions`           | `fromOrigins` | `string[]?`    | Requests tools exposed by descendant origins |
+| `ChromeModelContextExecuteToolOptions` | `signal`      | `AbortSignal?` | Aborts a Chromium descriptor execution       |
 
-| Method                | Signature                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------------ |
-| `registerTool`        | Multiple overloads (see below)                                                             |
-| `getTools`            | `() => Promise<ModelContextToolInfo[]>`                                                    |
-| `executeTool`         | `(tool: ModelContextToolInfo, inputArgsJson: string, options?) => Promise<string \| null>` |
-| `addEventListener`    | `(type: 'toolchange', listener, options?) => void`                                         |
-| `removeEventListener` | `(type: 'toolchange', listener, options?) => void`                                         |
-| `dispatchEvent`       | `(event: Event) => boolean`                                                                |
+Aborting the registration signal removes that registration.
+
+`RegisteredTool` contains `name`, optional `title`, `description`, optional serialized `inputSchema`, `window`, `origin`, and optional standard annotations.
+
+### `ChromeModelContext`
+
+`ChromeModelContextExtensions` declares the optional Chromium `executeTool()` method. `ChromeModelContext` combines that extension with `ModelContext`. Feature-detect the method before calling it.
+
+```ts "execute-chrome-tool.ts"
+import type { ChromeModelContext } from '@mcp-b/webmcp-types';
+
+const modelContext = document.modelContext as ChromeModelContext;
+const tool = (await modelContext.getTools()).find(({ name }) => name === 'search');
+
+if (tool && modelContext.executeTool) {
+  await modelContext.executeTool(tool, '{"query":"webmcp"}');
+}
+```
 
 ### `ModelContextExtensions`
 
-MCP-B extension methods. Not part of the WebMCP specification.
+The MCP-B extension surface provides schema-aware `registerTool()` overloads and `listTools()`. It does not add removed name-based unregistration.
 
-| Method           | Signature                                                                                  |
-| ---------------- | ------------------------------------------------------------------------------------------ |
-| `unregisterTool` | `(nameOrTool: string \| ModelContextToolReference) => void`                                |
-| `listTools`      | `() => ToolListItem[]`                                                                     |
-| `callTool`       | `(params: { name: string; arguments?: Record<string, unknown> }) => Promise<ToolResponse>` |
+`ModelContextWithExtensions` keeps the standard event and discovery members while replacing standard registration with the MCP-B descriptor overloads.
 
-### `ModelContextWithExtensions`
+## Tool contracts
 
-Combines `ModelContextCore & ModelContextExtensions`. Use when you need both strict core and extension methods.
+### `ModelContextTool<TArgs, TResult, TName>`
 
-```ts
-import type { ModelContextWithExtensions } from '@mcp-b/webmcp-types';
+The standard tool dictionary.
 
-const ctx = document.modelContext as unknown as ModelContextWithExtensions;
-const tools = ctx.listTools();
-```
-
----
-
-## Tool types
+| Property      | Type                                      | Required |
+| ------------- | ----------------------------------------- | -------- |
+| `name`        | `TName`                                   | Yes      |
+| `description` | `string`                                  | Yes      |
+| `title`       | `string`                                  | No       |
+| `inputSchema` | `InputSchema`                             | No       |
+| `annotations` | `WebMcpToolAnnotations`                   | No       |
+| `execute`     | `(input: TArgs) => MaybePromise<TResult>` | Yes      |
 
 ### `ToolDescriptor<TArgs, TResult, TName>`
 
-Explicitly typed tool descriptor.
+The MCP-B descriptor adds `outputSchema` and MCP annotations.
 
-| Property       | Type                                                                                    | Required |
-| -------------- | --------------------------------------------------------------------------------------- | -------- |
-| `name`         | `TName`                                                                                 | Yes      |
-| `description`  | `string`                                                                                | Yes      |
-| `inputSchema`  | `InputSchema`                                                                           | No       |
-| `outputSchema` | `InputSchema`                                                                           | No       |
-| `annotations`  | `ToolAnnotations`                                                                       | No       |
-| `stream`       | `boolean`                                                                               | No       |
-| `execute`      | `(args: TArgs, client: ModelContextClient) => MaybePromise<ToolExecuteResult<TResult>>` | Yes      |
+| Property       | Type                                     | Required |
+| -------------- | ---------------------------------------- | -------- |
+| `name`         | `TName`                                  | Yes      |
+| `description`  | `string`                                 | Yes      |
+| `title`        | `string`                                 | No       |
+| `inputSchema`  | `InputSchema`                            | No       |
+| `outputSchema` | `JsonSchemaForInference`                 | No       |
+| `annotations`  | `ToolAnnotations`                        | No       |
+| `execute`      | `(args: TArgs) => MaybePromise<TResult>` | Yes      |
 
-### `StreamedToolDescriptor<TArgs, TResult, TName>`
+`ToolDescriptorFromSchema<TInput, TOutput, TName>` infers callback input and output from literal schemas. `ToolListItem<TName>` describes the metadata returned by `listTools()`.
 
-Like `ToolDescriptor` but `stream` is `true` and `execute` receives a `StreamedToolCall<TArgs>`.
+### Annotation types
 
-### `ToolListItem<TName>`
+`WebMcpToolAnnotations` contains the standard `readOnlyHint` and `untrustedContentHint` fields. `ToolAnnotations` combines those fields with the annotation contract from `@modelcontextprotocol/server` for MCP-B descriptors.
 
-Tool metadata returned by `listTools()`. Same shape as `ToolDescriptor` without `execute`.
+### Result types
 
-### `ToolAnnotations`
-
-| Property          | Type                           | Description                      |
-| ----------------- | ------------------------------ | -------------------------------- |
-| `title`           | `string?`                      | Display title                    |
-| `readOnlyHint`    | `boolean \| 'true' \| 'false'` | Read-only indicator              |
-| `destructiveHint` | `boolean \| 'true' \| 'false'` | Destructive action indicator     |
-| `idempotentHint`  | `boolean \| 'true' \| 'false'` | Idempotent action indicator      |
-| `openWorldHint`   | `boolean \| 'true' \| 'false'` | External system access indicator |
-
-### `CallToolResult` / `ToolResponse`
-
-```ts
-interface CallToolResult {
-  content: Array<ContentBlock | LooseContentBlock>;
-  structuredContent?: JsonObject;
-  isError?: boolean;
-}
-
-type ToolResponse = CallToolResult;
-```
-
----
+`CallToolResult`, `ContentBlock`, and `TextContent` come from the official MCP TypeScript SDK. `ToolResultFromOutputSchema<T>` replaces `structuredContent` with the type inferred from `T`.
 
 ## Schema inference
 
 ### `JsonSchemaForInference`
 
-The supported JSON Schema subset for type inference. Use with `as const satisfies JsonSchemaForInference` for best results.
+`JsonSchemaForInference` is the `JsonSchemaType` owned by `@modelcontextprotocol/server`. Use `as const satisfies JsonSchemaForInference` to preserve literal information.
 
-```ts
-import type { JsonSchemaForInference } from '@mcp-b/webmcp-types';
+### `InferJsonSchema<T>`
 
-const schema = {
-  type: 'object',
-  properties: {
-    query: { type: 'string' },
-    limit: { type: 'integer', minimum: 1 },
-  },
-  required: ['query'],
-  additionalProperties: false,
-} as const satisfies JsonSchemaForInference;
-```
+| Schema keyword         | Inference                                          |
+| ---------------------- | -------------------------------------------------- |
+| `type`                 | Primitive, object, array, or multi-type union      |
+| `properties`           | Named object fields                                |
+| `required`             | Required named fields when the key list is literal |
+| `additionalProperties` | Closed object, unknown extras, or map values       |
+| `items`                | Array element type                                 |
+| `enum`                 | Literal union                                      |
+| `const`                | Literal value                                      |
+| Boolean schema         | `false` becomes `never`; `true` becomes `unknown`  |
+
+Typeless `properties`, `required`, or `additionalProperties` imply an object. Unsupported compositions such as `$ref` and `oneOf` remain `unknown`.
+
+Use `type: ['string', 'null']` for nullable values.
 
 ### `InferArgsFromInputSchema<T>`
 
-Derives the argument type from a JSON Schema type.
+Tool callbacks accept object or array inputs. The helper keeps an inferred object or array and otherwise falls back to `WebMcpToolInput`:
 
-```ts
-import type { InferArgsFromInputSchema } from '@mcp-b/webmcp-types';
-
-type Args = InferArgsFromInputSchema<typeof schema>;
-// { query: string; limit?: number }
+```ts "runtime-schema.ts"
+type WebMcpToolInput = Record<string, unknown> | unknown[];
 ```
 
-### Inference rules
+That fallback applies to widened `InputSchema`, unknown compositions, and scalar-only schemas.
 
-Supported JSON Schema keywords for inference:
+## Deprecated testing contracts
 
-| Keyword                | Effect                          |
-| ---------------------- | ------------------------------- |
-| `type`                 | Determines base TypeScript type |
-| `properties`           | Creates named fields            |
-| `required`             | Marks fields as non-optional    |
-| `items`                | Array element type              |
-| `enum`                 | Union of literal values         |
-| `const`                | Single literal value            |
-| `nullable`             | Adds `null` to the type         |
-| `additionalProperties` | Controls extra key acceptance   |
+`ModelContextTesting` retains the optional older Chromium testing shape used by compatibility runtimes:
 
-Other keywords are accepted as metadata but do not affect inferred types.
+| Member                                   | Type                            |
+| ---------------------------------------- | ------------------------------- |
+| `listTools()`                            | `ModelContextTestingToolInfo[]` |
+| `executeTool(name, inputJson, options?)` | `Promise<string \| null>`       |
+| `ontoolchange`                           | Event handler or `null`         |
 
-### `additionalProperties` behavior
+New native integrations use `document.modelContext.getTools()` and feature-detect Chromium `executeTool()`.
 
-| Schema Shape                                               | Inferred Extras                                |
-| ---------------------------------------------------------- | ---------------------------------------------- |
-| `additionalProperties: false`                              | No extra keys                                  |
-| `additionalProperties` omitted or `true`                   | Extra keys as `unknown`                        |
-| `additionalProperties: { ... }` with no named `properties` | `Record<string, ...>`                          |
-| `additionalProperties: { ... }` with named `properties`    | Named properties inferred, extras as `unknown` |
+`ModelContextTestingToolInfo` contains `name`, `description`, and an optional serialized `inputSchema`.
 
-### Widened schemas
+## Public utility types
 
-If schema types are widened (e.g., `InputSchema` loaded at runtime instead of a literal `as const`), inference falls back to `Record<string, unknown>`. This is by design for safety.
-
----
-
-## Output schema inference
-
-### `ToolResultFromOutputSchema<T>`
-
-When `outputSchema` is a literal JSON Schema, `structuredContent` is narrowed to
-that schema. Object, array, string, number, boolean, and null schemas are
-supported for MCP-B type inference. Native Chrome WebMCP does not currently
-define or enforce `outputSchema`.
-
-```ts
-import type { JsonSchemaForInference } from '@mcp-b/webmcp-types';
-
-const outputSchema = {
-  type: 'object',
-  properties: {
-    total: { type: 'integer' },
-    items: { type: 'array', items: { type: 'string' } },
-  },
-  required: ['total'],
-  additionalProperties: false,
-} as const satisfies JsonSchemaForInference;
-
-document.modelContext.registerTool({
-  name: 'search',
-  description: 'Search docs',
-  inputSchema,
-  outputSchema,
-  async execute(args) {
-    return {
-      content: [{ type: 'text', text: 'done' }],
-      structuredContent: {
-        total: 1, // required, inferred as number
-        items: ['result'], // optional, inferred as string[]
-      },
-    };
-  },
-});
-```
-
-### `ToolDescriptorFromSchema<TInput, TOutput, TName>`
-
-Schema-driven descriptor type. Both `execute` args and `structuredContent` are inferred from the schemas.
-
----
-
-## Typed model context
-
-### `TypedModelContext<TTools>`
-
-Provides name-aware `callTool` and `listTools` typing for known tool registries.
-
-```ts
-import type { CallToolResult, ToolDescriptor, TypedModelContext } from '@mcp-b/webmcp-types';
-
-type SearchTool = ToolDescriptor<
-  { query: string; limit?: number },
-  CallToolResult & { structuredContent: { total: number } },
-  'search'
->;
-
-type PingTool = ToolDescriptor<Record<string, never>, CallToolResult, 'ping'>;
-
-type AppContext = TypedModelContext<readonly [SearchTool, PingTool]>;
-
-declare const ctx: AppContext;
-
-// Deprecated MCP-B compatibility helper: name is narrowed; arguments are inferred
-await ctx.callTool({ name: 'search', arguments: { query: 'webmcp' } });
-
-// Deprecated MCP-B compatibility helper: arguments optional for Record<string, never> tools
-await ctx.callTool({ name: 'ping' });
-```
-
-For WebMCP DOM callers, prefer `getTools()` and `executeTool(tool, inputArgsJson)`. The standard execution method accepts JSON strings and returns JSON strings, so it does not provide the name-aware argument inference that the compatibility `callTool` overloads provide.
-
-### Helper types
-
-| Type                              | Description                                 |
-| --------------------------------- | ------------------------------------------- |
-| `InferToolArgs<T>`                | Extract args type from a tool descriptor    |
-| `InferToolResult<T>`              | Extract result type from a tool descriptor  |
-| `ToolName<TTools>`                | Union of tool names from a descriptor array |
-| `ToolByName<TTools, TName>`       | Extract a descriptor by name                |
-| `ToolArgsByName<TTools, TName>`   | Args type by tool name                      |
-| `ToolResultByName<TTools, TName>` | Result type by tool name                    |
-| `ToolCallParams<TName, TArgs>`    | Typed parameters for `callTool`             |
-
----
-
-## Testing types
-
-### `ModelContextTesting`
-
-| Method                             | Signature                                  |
-| ---------------------------------- | ------------------------------------------ |
-| `listTools`                        | `() => ModelContextTestingToolInfo[]`      |
-| `executeTool`                      | Overloaded: JSON string or streamed source |
-| `registerToolsChangedCallback`     | `(callback: () => void) => void`           |
-| `getCrossDocumentScriptToolResult` | `() => Promise<string>`                    |
-
-### `ModelContextTestingToolInfo`
-
-| Property      | Type                        |
-| ------------- | --------------------------- |
-| `name`        | `string`                    |
-| `description` | `string`                    |
-| `inputSchema` | `string?` (JSON-serialized) |
-| `stream`      | `boolean?`                  |
-
----
-
-## Other exports
-
-| Export                 | Description                                            |
-| ---------------------- | ------------------------------------------------------ |
-| `InputSchema`          | JSON Schema interface for tool parameters              |
-| `ContentBlock`         | Discriminated union of content types                   |
-| `LooseContentBlock`    | Permissive content block type                          |
-| `MaybePromise<T>`      | `T \| Promise<T>`                                      |
-| `ModelContextClient`   | Execute callback client with `requestUserInteraction`  |
-| `ToolExecutionContext` | Extended client with `elicitInput`                     |
-| `ModelContextInput`    | Legacy options type (kept for backwards compatibility) |
-| `ModelContextOptions`  | Alias for `ModelContextInput`                          |
-| `ElicitationParams`    | Elicitation request parameters                         |
-| `ElicitationResult`    | Elicitation response                                   |
-| `ToolCallEvent`        | Event dispatched on tool invocation                    |
-
----
+| Export                    | Description                         |
+| ------------------------- | ----------------------------------- |
+| `InputSchema`             | Broad runtime JSON Schema boundary  |
+| `WebMcpToolInput`         | Object or array callback input      |
+| `MaybePromise<T>`         | `T \| Promise<T>`                   |
+| `RegistrationHandle`      | Prompt/resource registration handle |
+| `JsonObject`, `JsonValue` | Canonical MCP JSON values           |
 
 ## Related pages
 
-- [WebMCP standard API](/reference/webmcp/standard-api) for the API these types describe
-- [Use Schemas and Structured Output](/how-to/use-schemas-and-structured-output) for practical schema usage patterns
-- [Strict Core vs MCP-B Extensions](/explanation/strict-core-vs-mcp-b-extensions) for the boundary between `ModelContextCore` and `ModelContextExtensions`
+- [WebMCP standard API](/reference/webmcp/standard-api)
+- [Use schemas and structured output](/how-to/use-schemas-and-structured-output)
+- [Strict core versus MCP-B extensions](/explanation/strict-core-vs-mcp-b-extensions)

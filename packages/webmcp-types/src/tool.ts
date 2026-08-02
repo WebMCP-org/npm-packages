@@ -1,248 +1,105 @@
-import type {
-  CallToolResult,
-  ElicitationParams,
-  ElicitationResult,
-  InputSchema,
-} from './common.js';
+import type { CallToolResult, InputSchema, WebMcpToolInput } from './common.js';
 import type {
   InferArgsFromInputSchema,
   InferJsonSchema,
   JsonSchemaForInference,
 } from './json-schema.js';
-
-// ============================================================================
-// Tool Annotations
-// ============================================================================
+import type { ToolAnnotations as McpToolAnnotations } from '@modelcontextprotocol/server';
 
 /**
- * Annotations providing hints about tool behavior.
- *
- * @see {@link https://webmachinelearning.github.io/webmcp/#dictdef-toolannotations}
- * @see {@link https://spec.modelcontextprotocol.io/specification/server/tools/}
+ * Annotations in the WebMCP tool dictionary.
+ * @see https://webmachinelearning.github.io/webmcp/#dictdef-toolannotations
  */
-export interface ToolAnnotations {
-  /**
-   * Optional display title.
-   */
-  title?: string;
-
-  /**
-   * Indicates the tool is read-only.
-   */
-  readOnlyHint?: boolean | 'true' | 'false';
-
-  /**
-   * Indicates the tool's output may include content from outside the page's trust boundary.
-   */
-  untrustedContentHint?: boolean | 'true' | 'false';
-
-  /**
-   * Indicates the tool may perform destructive actions.
-   */
-  destructiveHint?: boolean | 'true' | 'false';
-
-  /**
-   * Indicates the tool can be called repeatedly without changing outcome.
-   */
-  idempotentHint?: boolean | 'true' | 'false';
-
-  /**
-   * Indicates the tool may reach beyond local context (network, external systems, etc.).
-   */
-  openWorldHint?: boolean | 'true' | 'false';
+export interface WebMcpToolAnnotations {
+  readOnlyHint?: boolean;
+  untrustedContentHint?: boolean;
 }
 
-/**
- * Raw tool result values accepted by execute handlers before runtime normalization.
- */
-export type ToolRawResult = unknown;
+/** MCP annotations plus WebMCP's untrusted-content hint. */
+export type ToolAnnotations = McpToolAnnotations & WebMcpToolAnnotations;
 
-/**
- * Tool execute return value accepted by WebMCP descriptor types.
- */
-export type ToolExecuteResult<TResult = ToolRawResult> = TResult extends CallToolResult
-  ? TResult
-  : CallToolResult | TResult;
-
-// ============================================================================
-// Tool Descriptor
-// ============================================================================
-
-/**
- * Per-call client provided to tool handlers.
- */
-export interface ModelContextClient {
-  /**
-   * Requests user interaction during the current tool call.
-   */
-  requestUserInteraction(callback: () => Promise<unknown>): Promise<unknown>;
-}
-
-/**
- * MCPB extension context with additional elicitation helper.
- */
-export interface ToolExecutionContext extends ModelContextClient {
-  /**
-   * Requests user input for the current tool call.
-   *
-   * This function is bound to the active tool call and should only be used
-   * during execution of that call.
-   */
-  elicitInput(params: ElicitationParams): Promise<ElicitationResult>;
-}
-
-/**
- * Value that may be returned synchronously or via Promise.
- */
 export type MaybePromise<T> = T | Promise<T>;
 
 /**
- * Tool descriptor for the Web Model Context API.
- *
- * Tools are functions that AI models can call to perform actions or retrieve
- * information. This interface uses JSON Schema for input/output typing.
- *
- * @template TArgs - Tool input arguments.
- * @template TResult - Tool execution raw result shape (or full CallToolResult).
- * @template TName - Tool name literal type.
- *
- * @see {@link https://spec.modelcontextprotocol.io/specification/server/tools/}
+ * Tool dictionary accepted by the standard browser API.
+ * @see https://webmachinelearning.github.io/webmcp/#dictdef-modelcontexttool
  */
-export interface ToolDescriptor<
-  TArgs extends Record<string, unknown> = Record<string, unknown>,
-  TResult = ToolRawResult,
+export interface ModelContextTool<
+  TArgs extends WebMcpToolInput = Record<string, unknown>,
+  TResult = unknown,
   TName extends string = string,
 > {
-  /**
-   * Unique tool identifier.
-   */
   name: TName;
-
-  /**
-   * Optional user-facing label.
-   */
   title?: string;
-
-  /**
-   * Human-readable summary of what the tool does.
-   */
   description: string;
-
-  /**
-   * Schema describing accepted input arguments.
-   */
-  inputSchema?: InputSchema;
-
-  /**
-   * Optional schema describing output payload shape.
-   */
-  outputSchema?: JsonSchemaForInference;
-
-  /**
-   * Optional behavior hints for LLM planners.
-   */
-  annotations?: ToolAnnotations;
-
-  /**
-   * Tool execution function.
-   */
-  execute: (args: TArgs, client: ModelContextClient) => MaybePromise<ToolExecuteResult<TResult>>;
+  inputSchema?: InputSchema | undefined;
+  annotations?: WebMcpToolAnnotations;
+  execute: (input: TArgs) => MaybePromise<TResult>;
 }
 
-/**
- * Tool response shape inferred from an `outputSchema`.
- *
- * When a literal object output schema is provided, `structuredContent` is
- * narrowed to the inferred schema type for wrapped MCP responses.
- *
- * @template TOutputSchema - Optional literal JSON object schema.
- */
+/** Standard tool dictionary with input inferred from a JSON Schema literal. */
+export type ModelContextToolFromSchema<
+  TInputSchema extends InputSchema,
+  TResult = unknown,
+  TName extends string = string,
+> = Omit<
+  ModelContextTool<InferArgsFromInputSchema<TInputSchema>, TResult, TName>,
+  'inputSchema'
+> & {
+  inputSchema: TInputSchema;
+};
+
+/** MCP-B tool dictionary with output metadata. */
+export type ToolDescriptor<
+  TArgs extends WebMcpToolInput = Record<string, unknown>,
+  TResult = unknown,
+  TName extends string = string,
+> = Omit<ModelContextTool<TArgs, TResult, TName>, 'annotations' | 'execute'> & {
+  outputSchema?: JsonSchemaForInference;
+  annotations?: ToolAnnotations;
+  execute: (args: TArgs) => MaybePromise<TResult>;
+};
+
+/** MCP response with `structuredContent` inferred from an output schema. */
 export type ToolResultFromOutputSchema<
   TOutputSchema extends JsonSchemaForInference | undefined = undefined,
-> = TOutputSchema extends JsonSchemaForInference
-  ? Omit<CallToolResult, 'structuredContent'> & {
-      structuredContent: InferJsonSchema<TOutputSchema>;
-    }
-  : CallToolResult;
+> = [TOutputSchema] extends [undefined]
+  ? CallToolResult
+  : TOutputSchema extends JsonSchemaForInference
+    ? Omit<CallToolResult, 'structuredContent'> & {
+        structuredContent: InferJsonSchema<TOutputSchema>;
+      }
+    : never;
 
-/**
- * Execute result typing derived from an optional output schema.
- */
-export type ToolExecuteResultFromOutputSchema<
-  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
-> = TOutputSchema extends JsonSchemaForInference
-  ? InferJsonSchema<TOutputSchema> | ToolResultFromOutputSchema<TOutputSchema>
-  : ToolExecuteResult;
+type ExecuteResult<TOutputSchema extends JsonSchemaForInference | undefined> = [
+  TOutputSchema,
+] extends [undefined]
+  ? unknown
+  : TOutputSchema extends JsonSchemaForInference
+    ? InferJsonSchema<TOutputSchema> | ToolResultFromOutputSchema<TOutputSchema>
+    : never;
 
-/**
- * Tool descriptor whose `execute` args are inferred from a JSON Schema.
- *
- * For widened/non-literal schemas, arguments fall back to `Record<string, unknown>`.
- * When `outputSchema` is an inferable literal object schema, `structuredContent` is inferred.
- *
- * @template TInputSchema - JSON Schema for tool arguments.
- * @template TOutputSchema - Optional JSON schema for `structuredContent`.
- * @template TName - Tool name literal type.
- * @template TResult - Optional result type override constrained by inferred output schema.
- */
+/** Tool dictionary with input and output inferred from JSON Schema literals. */
 export type ToolDescriptorFromSchema<
-  TInputSchema extends { type?: string | readonly string[] },
+  TInputSchema extends InputSchema,
   TOutputSchema extends JsonSchemaForInference | undefined = undefined,
   TName extends string = string,
 > = Omit<
-  ToolDescriptor<
-    InferArgsFromInputSchema<TInputSchema>,
-    ToolExecuteResultFromOutputSchema<TOutputSchema>,
-    TName
-  >,
+  ToolDescriptor<InferArgsFromInputSchema<TInputSchema>, ExecuteResult<TOutputSchema>, TName>,
   'execute' | 'inputSchema' | 'outputSchema'
 > & {
   inputSchema: TInputSchema;
   execute: (
-    args: InferArgsFromInputSchema<TInputSchema>,
-    client: ModelContextClient
-  ) => MaybePromise<ToolExecuteResultFromOutputSchema<TOutputSchema>>;
-} & (TOutputSchema extends JsonSchemaForInference
-    ? {
-        outputSchema: TOutputSchema;
-      }
-    : {
-        outputSchema?: undefined;
-      });
+    args: InferArgsFromInputSchema<TInputSchema>
+  ) => MaybePromise<ExecuteResult<TOutputSchema>>;
+} & ([TOutputSchema] extends [undefined]
+    ? { outputSchema?: undefined }
+    : { outputSchema: TOutputSchema });
 
-// ============================================================================
-// Tool List Item
-// ============================================================================
-
-/**
- * Tool information returned by listTools().
- * Provides metadata about a registered tool without exposing the execute function.
- *
- * @template TName - Tool name literal type.
- */
-export interface ToolListItem<TName extends string = string> {
-  /**
-   * Unique tool identifier.
-   */
-  name: TName;
-
-  /**
-   * Human-readable summary of what the tool does.
-   */
-  description: string;
-
-  /**
-   * JSON Schema describing accepted input arguments.
-   */
+/** Tool metadata returned by the MCP-B `listTools()` extension. */
+export type ToolListItem<TName extends string = string> = Omit<
+  ToolDescriptor<Record<string, unknown>, unknown, TName>,
+  'execute' | 'inputSchema'
+> & {
   inputSchema: InputSchema;
-
-  /**
-   * Optional JSON Schema describing output payload shape.
-   */
-  outputSchema?: JsonSchemaForInference;
-
-  /**
-   * Optional behavior hints for LLM planners.
-   */
-  annotations?: ToolAnnotations;
-}
+};

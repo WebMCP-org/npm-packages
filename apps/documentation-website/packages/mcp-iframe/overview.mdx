@@ -1,30 +1,58 @@
 ---
 title: '@mcp-b/mcp-iframe overview'
-description: 'When to use the iframe custom element, how it differs from raw transports, and what assumptions it makes about the child page.'
+description: 'When to use the iframe MCP bridge, how it differs from native discovery, and what the child server must provide.'
 keywords: ['@mcp-b/mcp-iframe', 'overview', 'iframe bridge', 'custom element', 'tool forwarding']
 icon: 'frame'
 ---
 
-`@mcp-b/mcp-iframe` wraps the iframe transport flow in a custom element. It is the package to use when you want to expose an iframe's tools, prompts, or resources to the parent page without manually wiring transport classes.
+`@mcp-b/mcp-iframe` runs an MCP client in the parent, connects it to an MCP
+server inside the iframe, and republishes the child's capabilities on the
+parent. It wraps that transport flow in a custom element so applications do not
+have to wire the client and transport classes themselves.
 
 ## When to use this package
 
-- You want a parent page to surface capabilities from an iframe.
+- You want a parent page to mirror an iframe MCP server's capabilities.
 - You prefer a declarative element over manual `IframeParentTransport` and `IframeChildTransport` setup.
 - You want namespaced tool forwarding tied to an element ID.
 
 ## When not to use this package
 
 - You need low-level control over message flow or custom transport wiring. Use [`@mcp-b/transports`](/packages/transports/overview).
-- The iframe content does not expose `document.modelContext` or a compatible runtime.
+- The iframe does not run an MCP server connected through
+  `IframeChildTransport`. A standalone `document.modelContext` implementation
+  is not sufficient.
+- You only need native strict-tool discovery across a document tree. Use the
+  browser's `allow="tools"`, `exposedTo`, and `fromOrigins` surfaces instead.
+
+## MCP-B bridge versus native discovery
+
+| Concern       | Native cross-document WebMCP               | `<mcp-iframe>` MCP-B bridge                         |
+| ------------- | ------------------------------------------ | --------------------------------------------------- |
+| Connection    | Browser-managed document tree              | MCP client/server over iframe transports            |
+| Child setup   | `allow="tools"` delegation and `exposedTo` | MCP server connected to `IframeChildTransport`      |
+| Parent lookup | `getTools({ fromOrigins })`                | Namespaced registrations on `document.modelContext` |
+| Item types    | Strict WebMCP tools                        | Tools, plus MCP-B prompts and resources             |
+
+`allow="tools"` delegates the native browser feature. It does not create the
+MCP server or authorize transport messages.
 
 ## Where it sits in the package graph
 
-This package sits on top of the iframe transport pair from [`@mcp-b/transports`](/packages/transports/overview). It is a browser-facing convenience layer, not a separate transport protocol.
+This package sits on top of the iframe transport pair from
+[`@mcp-b/transports`](/packages/transports/overview). The parent element creates
+an `IframeParentTransport`; the child server must use the matching
+`IframeChildTransport`. It is a browser-facing convenience layer, not a separate
+transport protocol.
 
 ## First step
 
-Expose `document.modelContext` inside the iframe, then import `@mcp-b/mcp-iframe` in the parent page and add the `<mcp-iframe>` element. The [reference page](/packages/mcp-iframe/reference) documents events, attributes, methods, and namespacing behavior.
+Load `@mcp-b/global` inside the child and configure
+`transport.iframeServer.allowedOrigins` for the parent origin. The global runtime
+creates and connects the child MCP server automatically. Then import
+`@mcp-b/mcp-iframe` in the parent and add `<mcp-iframe>`. The
+[reference page](/packages/mcp-iframe/reference) documents the complete
+contract.
 
 ## Related pages
 
@@ -41,6 +69,12 @@ Expose `document.modelContext` inside the iframe, then import `@mcp-b/mcp-iframe
   </Card>
   <Card title="Transports overview" icon="network-wired" href="/packages/transports/overview">
     Inspect the underlying iframe transport classes.
+  </Card>
+  <Card title="Global runtime reference" icon="globe" href="/packages/global/reference">
+    Configure the child server transport and its allowed parent origins.
+  </Card>
+  <Card title="WebMCP standard API" icon="brackets-curly" href="/reference/webmcp/standard-api">
+    Use native cross-document discovery without an MCP-B bridge.
   </Card>
   <Card
     title="Spec status and limitations"

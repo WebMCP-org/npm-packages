@@ -27,9 +27,7 @@ test.describe('Runtime Contract - Tab Transport', () => {
     await resetInvocations(page);
 
     const result = await callClientTool(page, 'sum', { a: 4, b: 6 });
-    expect(firstTextContent(result as { content?: Array<{ type?: string; text?: string }> })).toBe(
-      'sum:10'
-    );
+    expect(firstTextContent(result)).toBe('sum:10');
 
     await expect
       .poll(async () => await readInvocations(page))
@@ -49,9 +47,7 @@ test.describe('Runtime Contract - Tab Transport', () => {
     await expect.poll(async () => await listClientToolNames(page)).toContain(DYNAMIC_TOOL_NAME);
 
     const result = await callClientTool(page, DYNAMIC_TOOL_NAME, { value: 'hello' });
-    expect(firstTextContent(result as { content?: Array<{ type?: string; text?: string }> })).toBe(
-      'dynamic:hello'
-    );
+    expect(firstTextContent(result)).toBe('dynamic:hello');
   });
 
   test('removes an unregistered tool from discovery and subsequent calls fail', async ({

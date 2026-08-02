@@ -1,242 +1,149 @@
-/**
- * Iframe Child - MCP Server
- *
- * This page registers tools, resources, and prompts via the polyfill.
- * The MCPIframeElement in the parent page will connect and expose these.
- */
-
-// Import the polyfill to create the MCP server
-import '@mcp-b/global';
-
-const modelContext = navigator.modelContext;
-
-type RegisterableContext = {
-  tools?: unknown[];
-  resources?: unknown[];
-  prompts?: unknown[];
-};
-
-function provideExtendedContext(options: RegisterableContext): void {
-  const register = (
-    item: unknown,
-    methodName: 'registerTool' | 'registerResource' | 'registerPrompt'
-  ) => {
-    const registerMethod = (modelContext as unknown as Record<string, unknown>)[methodName];
-    if (typeof registerMethod !== 'function') {
-      throw new Error(`${methodName} is not available`);
-    }
-    registerMethod.call(modelContext, item);
-  };
-
-  for (const tool of options.tools ?? []) {
-    register(tool, 'registerTool');
-  }
-  for (const resource of options.resources ?? []) {
-    register(resource, 'registerResource');
-  }
-  for (const prompt of options.prompts ?? []) {
-    register(prompt, 'registerPrompt');
-  }
+if (new URLSearchParams(location.search).has('allow-tools-policy')) {
+  Object.defineProperty(document, 'permissionsPolicy', {
+    configurable: true,
+    value: {
+      features: () => ['tools'],
+      allowsFeature: (feature: string) => feature === 'tools',
+    },
+  });
 }
+await import('@mcp-b/global');
 
-const statusEl = document.getElementById('status');
-const logEl = document.getElementById('log');
+import type { BrowserMcpServer, ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
+import type { RegistrationHandle } from '@mcp-b/webmcp-types';
 
-function log(message: string) {
-  const entry = document.createElement('div');
-  entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-  logEl?.appendChild(entry);
-  console.log(`[iframe-child] ${message}`);
-}
+const modelContext = document.modelContext as BrowserMcpServer;
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 
-function updateStatus(text: string) {
-  if (statusEl) statusEl.textContent = text;
-}
-
-// ==================== Register Tools, Resources, and Prompts ====================
-log('Registering tools, resources, and prompts...');
-
-provideExtendedContext({
-  tools: [
-    {
-      name: 'add',
-      description: 'Add two numbers',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          a: { type: 'number', description: 'First number' },
-          b: { type: 'number', description: 'Second number' },
-        },
-        required: ['a', 'b'],
-      },
-      async execute(args: Record<string, unknown>) {
-        const a = args.a as number;
-        const b = args.b as number;
-        const result = a + b;
-        log(`add(${a}, ${b}) = ${result}`);
-        return {
-          content: [{ type: 'text', text: String(result) }],
-        };
-      },
+await modelContext.registerTool({
+  name: 'calculate',
+  title: 'Add numbers',
+  description: 'Adds two numbers after an optional delay',
+  annotations: { readOnlyHint: true },
+  inputSchema: {
+    type: 'object',
+    properties: {
+      a: { type: 'number' },
+      b: { type: 'number' },
+      delayMs: { type: 'number' },
     },
-    {
-      name: 'multiply',
-      description: 'Multiply two numbers',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          a: { type: 'number', description: 'First number' },
-          b: { type: 'number', description: 'Second number' },
-        },
-        required: ['a', 'b'],
-      },
-      async execute(args: Record<string, unknown>) {
-        const a = args.a as number;
-        const b = args.b as number;
-        const result = a * b;
-        log(`multiply(${a}, ${b}) = ${result}`);
-        return {
-          content: [{ type: 'text', text: String(result) }],
-        };
-      },
-    },
-    {
-      name: 'greet',
-      description: 'Generate a greeting',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          name: { type: 'string', description: 'Name to greet' },
-        },
-        required: ['name'],
-      },
-      async execute(args: Record<string, unknown>) {
-        const name = args.name as string;
-        const greeting = `Hello, ${name}!`;
-        log(`greet("${name}") = "${greeting}"`);
-        return {
-          content: [{ type: 'text', text: greeting }],
-        };
-      },
-    },
-  ],
-  resources: [
-    {
-      uri: 'iframe://config',
-      name: 'Iframe Config',
-      description: 'Configuration from the iframe',
-      mimeType: 'application/json',
-      async read() {
-        log('Reading iframe://config');
-        return {
-          contents: [
-            {
-              uri: 'iframe://config',
-              text: JSON.stringify({ version: '1.0.0', name: 'iframe-child' }),
-              mimeType: 'application/json',
-            },
-          ],
-        };
-      },
-    },
-    {
-      uri: 'iframe://timestamp',
-      name: 'Current Timestamp',
-      description: 'Current server timestamp',
-      mimeType: 'text/plain',
-      async read() {
-        const timestamp = new Date().toISOString();
-        log(`Reading iframe://timestamp = ${timestamp}`);
-        return {
-          contents: [
-            {
-              uri: 'iframe://timestamp',
-              text: timestamp,
-              mimeType: 'text/plain',
-            },
-          ],
-        };
-      },
-    },
-  ],
-  prompts: [
-    {
-      name: 'summarize',
-      description: 'Create a summary prompt',
-      argsSchema: {
-        type: 'object',
-        properties: {
-          text: { type: 'string', description: 'Text to summarize' },
-        },
-        required: ['text'],
-      },
-      async get(args: Record<string, unknown>) {
-        const text = args.text as string;
-        log(`Getting summarize prompt for: "${text.substring(0, 30)}..."`);
-        return {
-          messages: [
-            {
-              role: 'user',
-              content: {
-                type: 'text',
-                text: `Please summarize the following text:\n\n${text}`,
-              },
-            },
-          ],
-        };
-      },
-    },
-    {
-      name: 'translate',
-      description: 'Create a translation prompt',
-      argsSchema: {
-        type: 'object',
-        properties: {
-          text: { type: 'string', description: 'Text to translate' },
-          language: { type: 'string', description: 'Target language' },
-        },
-        required: ['text', 'language'],
-      },
-      async get(args: Record<string, unknown>) {
-        const text = args.text as string;
-        const language = args.language as string;
-        log(`Getting translate prompt: "${text.substring(0, 20)}..." -> ${language}`);
-        return {
-          messages: [
-            {
-              role: 'user',
-              content: {
-                type: 'text',
-                text: `Please translate the following text to ${language}:\n\n${text}`,
-              },
-            },
-          ],
-        };
-      },
-    },
-  ],
+    required: ['a', 'b'],
+  },
+  async execute(args: Record<string, unknown>) {
+    await wait(Number(args.delayMs ?? 0));
+    return {
+      content: [{ type: 'text', text: String(Number(args.a) + Number(args.b)) }],
+    };
+  },
 });
 
-log('Registered: 3 tools, 2 resources, 2 prompts');
+modelContext.registerResource({
+  uri: 'iframe://config',
+  name: 'Iframe config',
+  mimeType: 'application/json',
+  async read() {
+    return {
+      contents: [
+        {
+          uri: 'iframe://config',
+          text: JSON.stringify({ name: 'iframe-child', version: '1.0.0' }),
+          mimeType: 'application/json',
+        },
+      ],
+    };
+  },
+});
 
-// ==================== Ready ====================
+const echoTemplate = (uri: string, name: string): ResourceDescriptor => ({
+  uri,
+  name,
+  async read(resolvedUri) {
+    return { contents: [{ uri: resolvedUri.href, text: resolvedUri.href }] };
+  },
+});
 
-updateStatus('MCP Server Ready - 3 tools, 2 resources, 2 prompts');
-log('Iframe child ready!');
+modelContext.registerResource(echoTemplate('iframe://values/{value}', 'Value'));
+modelContext.registerResource(echoTemplate('iframe://paths/{+path}', 'Path'));
+modelContext.registerResource(echoTemplate('iframe://segments/{segments*}', 'Segments'));
+modelContext.registerResource(echoTemplate('iframe://fragment{#value}', 'Fragment'));
+modelContext.registerResource(echoTemplate('iframe://query{?q,lang}', 'Query'));
 
-// Expose for testing
+modelContext.registerPrompt({
+  name: 'summarize',
+  description: 'Create a summary prompt',
+  argsSchema: {
+    type: 'object',
+    properties: { text: { type: 'string' } },
+    required: ['text'],
+  },
+  async get(args) {
+    return {
+      messages: [
+        {
+          role: 'user',
+          content: { type: 'text', text: `Summarize: ${args.text ?? ''}` },
+        },
+      ],
+    };
+  },
+});
+
+let dynamicTool: AbortController | undefined;
+let dynamicResource: RegistrationHandle | undefined;
+let dynamicPrompt: RegistrationHandle | undefined;
+
+async function setDynamicItems(enabled: boolean): Promise<void> {
+  if (!enabled) {
+    dynamicTool?.abort();
+    dynamicTool = undefined;
+    dynamicResource?.unregister();
+    dynamicResource = undefined;
+    dynamicPrompt?.unregister();
+    dynamicPrompt = undefined;
+    return;
+  }
+  if (dynamicTool) return;
+
+  dynamicTool = new AbortController();
+  await modelContext.registerTool(
+    {
+      name: 'dynamic',
+      description: 'Dynamically registered tool',
+      inputSchema: { type: 'object', properties: {} },
+      async execute() {
+        return { content: [{ type: 'text', text: 'dynamic tool' }] };
+      },
+    },
+    { signal: dynamicTool.signal }
+  );
+  dynamicResource = modelContext.registerResource({
+    uri: 'iframe://dynamic',
+    name: 'Dynamic resource',
+    async read() {
+      return { contents: [{ uri: 'iframe://dynamic', text: 'dynamic resource' }] };
+    },
+  });
+  dynamicPrompt = modelContext.registerPrompt({
+    name: 'dynamic',
+    async get() {
+      return {
+        messages: [{ role: 'user', content: { type: 'text', text: 'dynamic prompt' } }],
+      };
+    },
+  });
+}
+
 declare global {
   interface Window {
     iframeChild: {
-      getToolCount: () => number;
-      getResourceCount: () => number;
-      getPromptCount: () => number;
+      setDynamicItems: typeof setDynamicItems;
+      stopRuntime: () => Promise<void>;
     };
   }
 }
 
 window.iframeChild = {
-  getToolCount: () => modelContext.listTools().length,
-  getResourceCount: () => modelContext.listResources().length,
-  getPromptCount: () => modelContext.listPrompts().length,
+  setDynamicItems,
+  stopRuntime: () => modelContext.close(),
 };

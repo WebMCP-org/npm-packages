@@ -2,7 +2,7 @@
   "name": "web-standards-showcase",
   "version": "1.0.3",
   "private": true,
-  "description": "Native Chromium Web Model Context API Showcase with in-page demo compatibility helpers",
+  "description": "Native Chromium WebMCP showcase for registration, discovery, and execution",
   "type": "module",
   "scripts": {
     "build": "tsc && vp build",

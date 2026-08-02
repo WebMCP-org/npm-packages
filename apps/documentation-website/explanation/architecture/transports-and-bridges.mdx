@@ -5,19 +5,79 @@ keywords: ['transports', 'iframe', 'extension', 'relay', 'chrome devtools']
 icon: 'bridge'
 ---
 
-WebMCP tools execute inside a page, while a consumer may run in an iframe,
-browser extension, userscript, or desktop MCP client. A transport carries tool
-discovery, calls, results, and lifecycle notifications across that boundary
-without changing where the tool runs.
+WebMCP tools execute inside a document, while a consumer may run elsewhere in
+the document tree, a Chrome extension, or a desktop MCP client. The browser has
+a native mechanism for document-tree discovery. MCP-B transports solve a
+different problem: carrying MCP protocol messages between an explicit client
+and server.
 
-`@mcp-b/transports` implements low-level tab, iframe, extension, and userscript
-paths. `@mcp-b/mcp-iframe` wraps iframe forwarding.
+## Native cross-document discovery
+
+Native WebMCP stays within the browser's document model:
+
+1. A parent delegates the `tools` Permissions Policy feature to a child with
+   `allow="tools"`.
+2. The child registers a tool with `exposedTo` when another origin should be
+   able to discover it.
+3. The parent includes that origin in `getTools({ fromOrigins })`.
+
+The browser returns `RegisteredTool` values with their owning `window` and
+`origin`. This path needs no MCP client, server, or transport. It does not add
+MCP-B name prefixes or carry MCP prompts and resources.
+
+## MCP-B iframe bridging
+
+`@mcp-b/mcp-iframe` connects an MCP client in the parent to an MCP server in the
+child. The child server must be connected through `IframeChildTransport`;
+`@mcp-b/global` creates that server and selects the child transport
+automatically when loaded in an iframe.
+
+The parent element creates `IframeParentTransport`, lists the child server's
+items, and republishes them on the parent context. Tools and prompts receive an
+element-specific prefix. Resources receive `mcp-iframe:` wrapper URIs. A strict
+parent context can accept tools; prompts and resources require MCP-B extension
+methods.
+
+| Control          | Native document discovery | MCP-B iframe bridge           |
+| ---------------- | ------------------------- | ----------------------------- |
+| Browser policy   | `allow="tools"`           | Independent of MCP connection |
+| Child exposure   | `exposedTo`               | `allowedOrigins`              |
+| Parent selection | `fromOrigins`             | `target-origin`               |
+| Payload          | Strict WebMCP tools       | MCP protocol items            |
+
+These controls are complementary, not interchangeable. `allow="tools"` does
+not create an MCP server, and `allowedOrigins` does not grant the native browser
+feature.
+
+## Other MCP-B bridges
+
+`@mcp-b/transports` also provides:
+
+- `TabServerTransport` and `TabClientTransport` for an MCP client and server in
+  the same `Window`
+- extension transports for Chrome `runtime.Port` connections accepted by
+  extension code
+
+There is no dedicated user-script transport. Extension transports require the
+Chrome runtime messaging API and do not let an extension initiate a port into
+an ordinary web page.
+
 `@mcp-b/webmcp-local-relay` connects browser tools to desktop clients through
-localhost and stdio. Upstream `chrome-devtools-mcp` uses the Chrome DevTools
-Protocol for coding-agent workflows.
+localhost and stdio. Upstream `chrome-devtools-mcp` instead uses the Chrome
+DevTools Protocol for coding-agent workflows.
+
+## Security boundary
 
 Each bridge establishes a security boundary. Origin validation, connection
 identity, extension permissions, and relay exposure must be configured in the
-corresponding package. Tool execution remains in the page.
+corresponding package. For an iframe bridge, the parent validates
+`target-origin` and the child validates `allowedOrigins`. Tool execution remains
+in the child page even after the parent republishes its descriptor.
 
-Start with the [`@mcp-b/transports` reference](/packages/transports/reference).
+## Related pages
+
+- [Bridge tools across iframes](/how-to/bridge-tools-across-iframes) for the MCP-B setup
+- [mcp-iframe reference](/packages/mcp-iframe/reference) for element behavior and namespacing
+- [Transports reference](/packages/transports/reference) for low-level class contracts
+- [WebMCP standard API](/reference/webmcp/standard-api) for `exposedTo` and `fromOrigins`
+- [Connect desktop agents with local relay](/how-to/connect-desktop-agents-with-local-relay) for the localhost bridge

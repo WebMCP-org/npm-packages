@@ -1,15 +1,15 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { Client } from '@modelcontextprotocol/client';
 import { type Browser, chromium, type Page } from 'playwright';
+import { ModuleKind, ScriptTarget, transpileModule } from 'typescript';
 import { describe, expect, it } from 'vitest';
 
+import type { RuntimeContractController } from '../../../e2e/runtime-contract/core.js';
 import { sanitizeName } from './naming.js';
 
 const TEST_TOOL_NAME = 'sum';
@@ -19,17 +19,21 @@ const CLI_ENTRY_PATH = resolve(PACKAGE_DIR, 'dist/cli.mjs');
 
 const GLOBAL_RUNTIME_PATH = resolve(REPO_ROOT, 'packages/global/dist/index.iife.js');
 const POLYFILL_RUNTIME_PATH = resolve(REPO_ROOT, 'packages/webmcp-polyfill/dist/index.iife.js');
-const RUNTIME_CONTRACT_CORE_PATH = resolve(REPO_ROOT, 'e2e/runtime-contract/core.js');
-const RUNTIME_CONTRACT_MODULE_PATH = resolve(REPO_ROOT, 'e2e/runtime-contract/browser-contract.js');
+const RUNTIME_CONTRACT_CORE_PATH = resolve(REPO_ROOT, 'e2e/runtime-contract/core.ts');
+const RUNTIME_CONTRACT_MODULE_PATH = resolve(
+  REPO_ROOT,
+  'e2e/runtime-contract/model-context-contract.ts'
+);
 const REAL_EMBED_PATH = resolve(PACKAGE_DIR, 'dist/browser/embed.js');
 const REAL_WIDGET_PATH = resolve(PACKAGE_DIR, 'dist/browser/widget.html');
 
-type RuntimeMode = 'global' | 'polyfill-testing';
+type RuntimeMode = 'fixture-native' | 'global' | 'polyfill-testing';
 
 interface RuntimeCase {
   mode: RuntimeMode;
   scriptRoute: string;
-  scriptPath: string;
+  scriptPath?: string;
+  scriptSource?: string;
 }
 
 interface StartedHttpServer {
@@ -53,6 +57,23 @@ interface E2EHarness {
   cleanup: () => Promise<void>;
 }
 
+interface BridgeFixtureSnapshot {
+  executeTool: number;
+  getTools: number;
+  lastExecuteGeneration: number;
+}
+
+declare global {
+  interface Window {
+    __WEBMCP_E2E__?: RuntimeContractController;
+    __WEBMCP_RELAY_FIXTURE__?: {
+      replace: (name: string) => void;
+      reset: () => void;
+      snapshot: () => BridgeFixtureSnapshot;
+    };
+  }
+}
+
 const RUNTIME_CASES: RuntimeCase[] = [
   {
     mode: 'global',
@@ -68,6 +89,116 @@ const RUNTIME_CASES: RuntimeCase[] = [
 
 function jsonForInlineScript(value: unknown): string {
   return JSON.stringify(value).replaceAll('<', '\\u003c');
+}
+
+function buildBridgeFixtureScript(): string {
+  return `(() => {
+    const counts = {
+      executeTool: 0,
+      getTools: 0,
+      lastExecuteGeneration: -1,
+    };
+    let generation = 0;
+    const registrations = new Map();
+    let descriptors = [];
+
+    const makeDescriptor = (tool) => ({
+      name: tool.name,
+      ...(tool.name === 'sum'
+        ? { title: 'Add numbers', annotations: { readOnlyHint: true } }
+        : {}),
+      description: tool.description ?? '',
+      inputSchema: JSON.stringify(tool.inputSchema ?? { type: 'object', properties: {} }),
+      window,
+      origin: location.origin,
+      __execute: tool.execute,
+      __generation: generation,
+    });
+
+    const refreshDescriptors = () => {
+      descriptors = [...registrations.values()].map(makeDescriptor);
+    };
+
+    class FixtureContext extends EventTarget {
+      ontoolchange = null;
+
+      async registerTool(tool, options = {}) {
+        registrations.set(tool.name, tool);
+        refreshDescriptors();
+        options.signal?.addEventListener(
+          'abort',
+          () => {
+            registrations.delete(tool.name);
+            refreshDescriptors();
+            this.dispatchEvent(new Event('toolchange'));
+          },
+          { once: true }
+        );
+        this.dispatchEvent(new Event('toolchange'));
+      }
+
+      async getTools() {
+        counts.getTools++;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return descriptors;
+      }
+    }
+
+    const context = new FixtureContext();
+
+    const executeDescriptor = async (descriptor, inputJson) => {
+      counts.executeTool++;
+      if (!descriptors.includes(descriptor)) {
+        throw new Error('executeTool received a stale RegisteredTool descriptor');
+      }
+      counts.lastExecuteGeneration = descriptor.__generation;
+      if (descriptor.name === 'always_fail') {
+        return JSON.stringify({
+          resultType: 'input_required',
+          requestState: 'fixture-input-required',
+        });
+      }
+      const result = await descriptor.__execute(JSON.parse(inputJson));
+      if (descriptor.name === 'sum') {
+        return result.content[0].text;
+      }
+      return JSON.stringify(result);
+    };
+
+    context.executeTool = executeDescriptor;
+
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      value: context,
+    });
+    delete navigator.modelContext;
+
+    window.__WEBMCP_RELAY_FIXTURE__ = {
+      snapshot: () => ({ ...counts }),
+      reset: () => {
+        counts.executeTool = 0;
+        counts.getTools = 0;
+        counts.lastExecuteGeneration = -1;
+      },
+      replace: (name) => {
+        generation++;
+        descriptors = descriptors.map((descriptor) =>
+          descriptor.name === name
+            ? { ...descriptor, __generation: generation }
+            : descriptor
+        );
+        context.dispatchEvent(new Event('toolchange'));
+      },
+    };
+  })();`;
+}
+
+function createBridgeFixtureRuntimeCase(): RuntimeCase {
+  return {
+    mode: 'fixture-native',
+    scriptRoute: '/runtime/fixture-native.js',
+    scriptSource: buildBridgeFixtureScript(),
+  };
 }
 
 function sendHtml(response: ServerResponse, html: string): void {
@@ -96,6 +227,24 @@ function readRuntimeScriptOrThrow(filePath: string): string {
   return readRequiredFile(filePath, 'runtime bundle');
 }
 
+function readRuntimeCaseScript(runtimeCase: RuntimeCase): string {
+  if (runtimeCase.scriptSource !== undefined) {
+    return runtimeCase.scriptSource;
+  }
+  if (runtimeCase.scriptPath !== undefined) {
+    return readRuntimeScriptOrThrow(runtimeCase.scriptPath);
+  }
+  throw new Error(`Runtime case "${runtimeCase.mode}" has no script source`);
+}
+
+async function readBridgeFixtureSnapshot(page: Page): Promise<BridgeFixtureSnapshot> {
+  const snapshot = await page.evaluate(() => window.__WEBMCP_RELAY_FIXTURE__?.snapshot());
+  if (!snapshot) {
+    throw new Error('Bridge fixture snapshot is unavailable');
+  }
+  return snapshot;
+}
+
 async function startHttpServer(
   handler: (request: IncomingMessage, response: ServerResponse) => void
 ): Promise<StartedHttpServer> {
@@ -112,7 +261,7 @@ async function startHttpServer(
 
   return {
     server,
-    origin: `http://127.0.0.1:${(address as AddressInfo).port}`,
+    origin: `http://127.0.0.1:${address.port}`,
   };
 }
 
@@ -138,7 +287,7 @@ async function getOpenPort(): Promise<number> {
     throw new Error('Expected holder server to bind to an IP address');
   }
 
-  const port = (address as AddressInfo).port;
+  const port = address.port;
   await new Promise<void>((resolvePromise) => {
     holder.close(() => resolvePromise());
   });
@@ -166,7 +315,7 @@ async function waitForValue<T>(
 function contentTextItems(result: unknown): string[] {
   const content =
     typeof result === 'object' && result !== null && 'content' in result
-      ? (result as { content?: unknown }).content
+      ? Reflect.get(result, 'content')
       : undefined;
   if (!Array.isArray(content)) {
     return [];
@@ -176,7 +325,7 @@ function contentTextItems(result: unknown): string[] {
       if (!item || typeof item !== 'object') {
         return undefined;
       }
-      const text = (item as { text?: unknown }).text;
+      const text = Reflect.get(item, 'text');
       return typeof text === 'string' ? text : undefined;
     })
     .filter((text): text is string => typeof text === 'string');
@@ -207,16 +356,15 @@ function buildHostPageHtml(options: {
     <div id="status" data-state="booting">booting</div>
     <script src="${runtimeScriptRoute}"></script>
     <script type="module">
-      import { installBrowserRuntimeContract } from '${runtimeContractRoute}';
+      import { installModelContextRuntimeContract } from '${runtimeContractRoute}';
 
-      (() => {
+      void (async () => {
         const statusEl = document.getElementById('status');
         const runtimeMode = ${jsonForInlineScript(runtimeMode)};
 
         try {
-          installBrowserRuntimeContract(navigator.modelContext, {
+          await installModelContextRuntimeContract(document.modelContext, {
             runtimeLabel: runtimeMode,
-            registrationMode: runtimeMode === 'polyfill-testing' ? 'dynamic' : 'context',
           });
 
           statusEl.dataset.state = 'runtime_ready';
@@ -343,9 +491,7 @@ async function startWidgetAssetServer(options?: {
     if (url.startsWith('/widget.html')) {
       response.statusCode = 200;
       response.setHeader('content-type', `${mimeType}; charset=utf-8`);
-      if (mimeType === 'text/plain') {
-        response.setHeader('access-control-allow-origin', '*');
-      }
+      response.setHeader('access-control-allow-origin', '*');
       response.end(widgetHtml);
       return;
     }
@@ -361,15 +507,19 @@ async function setupE2EHarness(options: {
   clientName: string;
 }): Promise<E2EHarness> {
   const { runtimeCase, relayPort, widgetOrigin, clientName } = options;
-  const runtimeScript = readRuntimeScriptOrThrow(runtimeCase.scriptPath);
-  const runtimeContractCore = readRequiredFile(
-    RUNTIME_CONTRACT_CORE_PATH,
-    'shared runtime contract core module'
-  );
-  const runtimeContractModule = readRequiredFile(
-    RUNTIME_CONTRACT_MODULE_PATH,
-    'shared runtime contract module'
-  );
+  const runtimeScript = readRuntimeCaseScript(runtimeCase);
+  const compilerOptions = {
+    module: ModuleKind.ESNext,
+    target: ScriptTarget.ES2022,
+  } as const;
+  const runtimeContractCore = transpileModule(
+    readRequiredFile(RUNTIME_CONTRACT_CORE_PATH, 'shared runtime contract core module'),
+    { compilerOptions }
+  ).outputText;
+  const runtimeContractModule = transpileModule(
+    readRequiredFile(RUNTIME_CONTRACT_MODULE_PATH, 'shared runtime contract module'),
+    { compilerOptions }
+  ).outputText;
 
   let host: StartedHttpServer | null = null;
   let client: Client | null = null;
@@ -386,7 +536,7 @@ async function setupE2EHarness(options: {
         sendJavaScript(response, runtimeScript);
         return;
       }
-      if (url === '/runtime/browser-contract.js') {
+      if (url === '/runtime/model-context-contract.js') {
         sendJavaScript(response, runtimeContractModule);
         return;
       }
@@ -401,7 +551,7 @@ async function setupE2EHarness(options: {
             widgetOrigin,
             relayPort,
             runtimeScriptRoute: runtimeCase.scriptRoute,
-            runtimeContractRoute: '/runtime/browser-contract.js',
+            runtimeContractRoute: '/runtime/model-context-contract.js',
             runtimeMode: runtimeCase.mode,
           })
         );
@@ -437,6 +587,7 @@ async function setupE2EHarness(options: {
       },
       {
         capabilities: {},
+        versionNegotiation: { mode: 'auto' },
       }
     );
     await client.connect(stdioTransport);
@@ -486,6 +637,89 @@ async function setupE2EHarness(options: {
 }
 
 describe('relay e2e (real browser assets)', () => {
+  it('uses async document discovery, current descriptor identity, and document toolchange', async () => {
+    let widgetServer: StartedHttpServer | null = null;
+    let harness: E2EHarness | null = null;
+
+    try {
+      const relayPort = await getOpenPort();
+      widgetServer = await startWidgetAssetServer();
+      harness = await setupE2EHarness({
+        runtimeCase: createBridgeFixtureRuntimeCase(),
+        relayPort,
+        widgetOrigin: widgetServer.origin,
+        clientName: 'webmcp-local-relay-e2e-client-native-document',
+      });
+
+      const tools = await harness.client.listTools();
+      const sumTool = tools.tools.find((tool) => tool.name === harness?.expectedToolName);
+      expect(sumTool?.inputSchema).toMatchObject({
+        type: 'object',
+        properties: {
+          a: { type: 'number' },
+          b: { type: 'number' },
+        },
+      });
+      expect(sumTool?.title).toBe('Add numbers');
+      expect(sumTool?.annotations).toMatchObject({ readOnlyHint: true });
+      expect(tools.tools.some((tool) => tool.name === 'decoy_extension')).toBe(false);
+
+      let snapshot = await readBridgeFixtureSnapshot(harness.page);
+      expect(snapshot.getTools).toBeGreaterThan(0);
+      expect(snapshot.executeTool).toBe(0);
+
+      const initialResult = await harness.client.callTool({
+        name: harness.expectedToolName,
+        arguments: { a: 4, b: 6 },
+      });
+      expect(firstContentText(initialResult)).toBe('sum:10');
+      expect(initialResult.structuredContent).toEqual({ result: 'sum:10' });
+
+      snapshot = await readBridgeFixtureSnapshot(harness.page);
+      expect(snapshot.executeTool).toBe(1);
+      expect(snapshot.lastExecuteGeneration).toBe(0);
+
+      await harness.page.evaluate(() => {
+        window.__WEBMCP_RELAY_FIXTURE__?.reset();
+        window.__WEBMCP_RELAY_FIXTURE__?.replace('sum');
+      });
+
+      await waitForValue(
+        async () => {
+          const current = await readBridgeFixtureSnapshot(harness.page);
+          return current.getTools > 0 ? true : undefined;
+        },
+        1_000,
+        10
+      );
+
+      const refreshedResult = await harness.client.callTool({
+        name: harness.expectedToolName,
+        arguments: { a: 8, b: 3 },
+      });
+      expect(firstContentText(refreshedResult)).toBe('sum:11');
+
+      snapshot = await readBridgeFixtureSnapshot(harness.page);
+      expect(snapshot.executeTool).toBe(1);
+      expect(snapshot.lastExecuteGeneration).toBe(1);
+
+      const inputRequiredResult = await harness.client.callTool({
+        name: sanitizeName('always_fail'),
+        arguments: {},
+      });
+      expect(inputRequiredResult.isError).toBe(true);
+      expect(firstContentText(inputRequiredResult)).toContain(
+        'cannot forward MCP input_required results'
+      );
+      expect(inputRequiredResult).not.toHaveProperty('structuredContent.resultType');
+    } catch (error) {
+      throw formatE2EError('native document bridge', error, harness);
+    } finally {
+      await harness?.cleanup();
+      await stopHttpServer(widgetServer?.server ?? null);
+    }
+  });
+
   for (const runtimeCase of RUNTIME_CASES) {
     it(`executes page-registered WebMCP tools through dynamic tool (${runtimeCase.mode})`, async () => {
       let widgetServer: StartedHttpServer | null = null;
@@ -509,19 +743,8 @@ describe('relay e2e (real browser assets)', () => {
         const text = firstContentText(result);
         expect(text).toBe('sum:7');
 
-        const invocations = await harness.page.evaluate(() => {
-          return (
-            (
-              window as Window & {
-                __WEBMCP_E2E__?: {
-                  readInvocations: () => Array<{
-                    name: string;
-                    arguments: Record<string, unknown>;
-                  }>;
-                };
-              }
-            ).__WEBMCP_E2E__?.readInvocations() ?? []
-          );
+        const invocations = await harness.page.evaluate(async () => {
+          return (await window.__WEBMCP_E2E__?.readInvocations()) ?? [];
         });
         expect(invocations).toEqual([{ name: 'sum', arguments: { a: 2, b: 5 } }]);
       } catch (error) {
@@ -549,37 +772,9 @@ describe('relay e2e (real browser assets)', () => {
         const initialTools = await harness.client.listTools();
         expect(initialTools.tools.some((t) => t.name === harness?.expectedToolName)).toBe(true);
 
-        if (runtimeCase.mode === 'polyfill-testing') {
-          await harness.page.evaluate(() => {
-            const modelContext = (
-              navigator as unknown as { modelContext: { registerTool: (tool: unknown) => void } }
-            ).modelContext;
-            modelContext.registerTool({
-              name: 'dynamic_tool',
-              description: 'A dynamically registered contract tool.',
-              inputSchema: {
-                type: 'object',
-                properties: {
-                  value: { type: 'string' },
-                },
-                required: ['value'],
-              },
-              execute: async (args: Record<string, unknown>) => ({
-                content: [{ type: 'text' as const, text: `dynamic:${String(args.value ?? '')}` }],
-                structuredContent: {
-                  value: String(args.value ?? ''),
-                  runtime: 'polyfill-testing',
-                },
-              }),
-            });
-          });
-        } else {
-          await harness.page.evaluate(() => {
-            (
-              window as Window & { __WEBMCP_E2E__?: { registerDynamicTool: () => boolean } }
-            ).__WEBMCP_E2E__?.registerDynamicTool();
-          });
-        }
+        await harness.page.evaluate(async () => {
+          await window.__WEBMCP_E2E__?.registerDynamicTool();
+        });
 
         const dynamicToolName = await waitForValue(async () => {
           const toolList = await harness?.client.listTools();
@@ -596,20 +791,9 @@ describe('relay e2e (real browser assets)', () => {
         const text = firstContentText(result);
         expect(text).toContain('dynamic:hello');
 
-        if (runtimeCase.mode === 'polyfill-testing') {
-          await harness.page.evaluate(() => {
-            const modelContext = (
-              navigator as unknown as { modelContext: { unregisterTool: (name: string) => void } }
-            ).modelContext;
-            modelContext.unregisterTool('dynamic_tool');
-          });
-        } else {
-          await harness.page.evaluate(() => {
-            (
-              window as Window & { __WEBMCP_E2E__?: { unregisterDynamicTool: () => boolean } }
-            ).__WEBMCP_E2E__?.unregisterDynamicTool();
-          });
-        }
+        await harness.page.evaluate(async () => {
+          await window.__WEBMCP_E2E__?.unregisterDynamicTool();
+        });
 
         await waitForValue(async () => {
           const toolList = await harness?.client.listTools();
@@ -622,62 +806,6 @@ describe('relay e2e (real browser assets)', () => {
         expect(finalTools.tools.some((t) => t.name === sanitizeName('dynamic_tool'))).toBe(false);
       } catch (error) {
         throw formatE2EError(`${runtimeCase.mode} dynamic-tools`, error, harness);
-      } finally {
-        await harness?.cleanup();
-        await stopHttpServer(widgetServer?.server ?? null);
-      }
-    });
-
-    it(`executes page-registered WebMCP tools through webmcp_call_tool (${runtimeCase.mode})`, async () => {
-      let widgetServer: StartedHttpServer | null = null;
-      let harness: E2EHarness | null = null;
-
-      try {
-        const relayPort = await getOpenPort();
-        widgetServer = await startWidgetAssetServer();
-        harness = await setupE2EHarness({
-          runtimeCase,
-          relayPort,
-          widgetOrigin: widgetServer.origin,
-          clientName: `webmcp-local-relay-e2e-client-${runtimeCase.mode}-call-tool`,
-        });
-
-        const listResult = await harness.client.callTool({
-          name: 'webmcp_list_tools',
-          arguments: {},
-        });
-        const listText = firstContentText(listResult);
-        expect(listText).toContain(harness.expectedToolName);
-        expect(listText).toContain(TEST_TOOL_NAME);
-
-        const result = await harness.client.callTool({
-          name: 'webmcp_call_tool',
-          arguments: {
-            name: harness.expectedToolName,
-            arguments: { a: 10, b: 3 },
-          },
-        });
-
-        const texts = contentTextItems(result);
-        const combined = texts.join('\n');
-
-        expect(combined).toContain('sum:13');
-        expect(combined).toContain('Available tools:');
-        expect(combined).toContain(harness.expectedToolName);
-        expect(result.isError).toBeFalsy();
-
-        const errorResult = await harness.client.callTool({
-          name: 'webmcp_call_tool',
-          arguments: { name: 'nonexistent_tool_xyz' },
-        });
-
-        const errorText = firstContentText(errorResult);
-        expect(errorText).toContain('Tool "nonexistent_tool_xyz" not found');
-        expect(errorText).toContain('Available tools:');
-        expect(errorText).toContain(harness.expectedToolName);
-        expect(errorResult.isError).toBe(true);
-      } catch (error) {
-        throw formatE2EError(`${runtimeCase.mode} webmcp_call_tool`, error, harness);
       } finally {
         await harness?.cleanup();
         await stopHttpServer(widgetServer?.server ?? null);
@@ -697,6 +825,11 @@ describe('relay e2e (real browser assets)', () => {
           widgetOrigin: widgetServer.origin,
           clientName: `webmcp-local-relay-e2e-client-${runtimeCase.mode}-errors`,
         });
+
+        await waitForValue(async () => {
+          const toolList = await harness?.client.listTools();
+          return toolList?.tools.some((tool) => tool.name === 'always_fail') ? true : undefined;
+        }, 20_000);
 
         const errorResult = await harness.client.callTool({
           name: 'always_fail',

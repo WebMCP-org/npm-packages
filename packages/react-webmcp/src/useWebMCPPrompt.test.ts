@@ -1,29 +1,22 @@
 import { initializeWebModelContext } from '@mcp-b/global';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
-import { z } from 'zod';
-
+import { getBrowserMcpServer } from './model-context.js';
 import { useWebMCPPrompt } from './useWebMCPPrompt.js';
 
-const TEST_CHANNEL_ID = `useWebMCPPrompt-test-${Date.now()}`;
-const DEBUG_CONFIG_KEY = 'WEBMCP_DEBUG';
+const TEST_CHANNEL_ID = `useWebMCPPrompt-browser-${Date.now()}`;
 
-function enableDebugLogging(config = '*'): () => void {
-  const previous = window.localStorage.getItem(DEBUG_CONFIG_KEY);
-  window.localStorage.setItem(DEBUG_CONFIG_KEY, config);
-
-  return () => {
-    if (previous === null) {
-      window.localStorage.removeItem(DEBUG_CONFIG_KEY);
-      return;
-    }
-    window.localStorage.setItem(DEBUG_CONFIG_KEY, previous);
-  };
+function modelContext() {
+  const context = getBrowserMcpServer();
+  if (!context) {
+    throw new Error('MCP-B model context is unavailable');
+  }
+  return context;
 }
 
-describe('useWebMCPPrompt', () => {
+describe('useWebMCPPrompt in a browser runtime', () => {
   beforeAll(() => {
-    if (!navigator.modelContext) {
+    if (!document.modelContext) {
       initializeWebModelContext({
         transport: {
           tabServer: {
@@ -35,492 +28,134 @@ describe('useWebMCPPrompt', () => {
     }
   });
 
-  beforeEach(() => {
-    (
-      navigator.modelContextTesting as
-        | (Navigator['modelContextTesting'] & { reset?: () => void })
-        | undefined
-    )?.reset?.();
-    window.localStorage.removeItem(DEBUG_CONFIG_KEY);
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  describe('initial state', () => {
-    it('should return isRegistered as true when registered', async () => {
-      const { result } = await renderHook(() =>
-        useWebMCPPrompt({
-          name: 'test_prompt',
-          get: async () => ({
-            messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
-          }),
-        })
-      );
+  it('registers, executes, and unregisters a prompt', async () => {
+    const unregister = vi.fn();
+    const registerPrompt = vi
+      .spyOn(modelContext(), 'registerPrompt')
+      .mockReturnValue({ unregister });
+    const argsSchema = {
+      type: 'object',
+      properties: {
+        code: { type: 'string', description: 'Source to review' },
+        language: { type: 'string' },
+      },
+      required: ['code'],
+    } as const;
+    const hook = await renderHook(() =>
+      useWebMCPPrompt({
+        name: 'review_code',
+        description: 'Review source code',
+        argsSchema,
+        get: async ({ code, language }) => ({
+          messages: [
+            {
+              role: 'user',
+              content: {
+                type: 'text',
+                text: `Review this ${language ?? 'unknown'} code: ${code}`,
+              },
+            },
+          ],
+        }),
+      })
+    );
 
-      expect(result.current.isRegistered).toBe(true);
+    expect(hook.result.current.isRegistered).toBe(true);
+    expect(registerPrompt).toHaveBeenCalledOnce();
+    const descriptor = registerPrompt.mock.calls[0]?.[0];
+    if (!descriptor) throw new Error('Prompt was not registered');
+    expect(descriptor).toMatchObject({
+      name: 'review_code',
+      description: 'Review source code',
+      argsSchema: {
+        type: 'object',
+        properties: {
+          code: {
+            type: 'string',
+            description: 'Source to review',
+          },
+          language: { type: 'string' },
+        },
+        required: ['code'],
+      },
+      get: expect.any(Function),
     });
 
-    it('should keep isRegistered as false when registration handle is missing', async () => {
-      const registerPromptSpy = vi
-        .spyOn(navigator.modelContext, 'registerPrompt')
-        .mockImplementation(
-          () =>
-            undefined as unknown as ReturnType<(typeof navigator.modelContext)['registerPrompt']>
-        );
-
-      try {
-        const { result } = await renderHook(() =>
-          useWebMCPPrompt({
-            name: 'no_handle_prompt',
-            get: async () => ({
-              messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
-            }),
-          })
-        );
-
-        expect(registerPromptSpy).toHaveBeenCalledTimes(1);
-        expect(result.current.isRegistered).toBe(false);
-      } finally {
-        registerPromptSpy.mockRestore();
-      }
+    const response = await descriptor.get({
+      code: 'const answer = 42',
+      language: 'TypeScript',
     });
+    expect(response.messages[0]).toMatchObject({
+      role: 'user',
+      content: {
+        type: 'text',
+        text: 'Review this TypeScript code: const answer = 42',
+      },
+    });
+
+    await hook.unmount();
+    expect(unregister).toHaveBeenCalledOnce();
   });
 
-  describe('prompt registration', () => {
-    it('should register prompt with navigator.modelContext', async () => {
-      await renderHook(() =>
+  it('uses the latest callback while re-registering changed descriptor metadata', async () => {
+    const unregister = vi.fn();
+    const registerPrompt = vi
+      .spyOn(modelContext(), 'registerPrompt')
+      .mockReturnValue({ unregister });
+    const hook = await renderHook(
+      ({ description, version }) =>
         useWebMCPPrompt({
-          name: 'help_prompt',
-          description: 'Get help with the application',
+          name: 'latest_prompt',
+          description,
           get: async () => ({
-            messages: [{ role: 'user', content: { type: 'text', text: 'Help me' } }],
-          }),
-        })
-      );
-
-      const prompts = navigator.modelContext?.listPrompts();
-      expect(prompts).toHaveLength(1);
-      expect(prompts[0].name).toBe('help_prompt');
-      expect(prompts[0].description).toBe('Get help with the application');
-    });
-
-    it('should register prompt without description', async () => {
-      await renderHook(() =>
-        useWebMCPPrompt({
-          name: 'simple_prompt',
-          get: async () => ({
-            messages: [{ role: 'user', content: { type: 'text', text: 'Simple' } }],
-          }),
-        })
-      );
-
-      const prompts = navigator.modelContext?.listPrompts();
-      expect(prompts).toHaveLength(1);
-      expect(prompts[0].name).toBe('simple_prompt');
-    });
-
-    it('should register prompt with args schema', async () => {
-      await renderHook(() =>
-        useWebMCPPrompt({
-          name: 'code_review',
-          description: 'Review code',
-          argsSchema: {
-            type: 'object',
-            properties: { code: { type: 'string' }, language: { type: 'string' } },
-            required: ['code'],
-          } as const,
-          get: async ({ code, language }) => ({
             messages: [
               {
                 role: 'user',
-                content: { type: 'text', text: `Review this ${language ?? ''} code:\n${code}` },
+                content: { type: 'text', text: version },
               },
             ],
           }),
-        })
-      );
-
-      const prompts = navigator.modelContext?.listPrompts();
-      expect(prompts).toHaveLength(1);
-      expect(prompts[0].name).toBe('code_review');
-      // Check that arguments were registered
-      expect(prompts[0].arguments).toBeDefined();
-    });
-
-    it('converts zod-like argsSchema before prompt registration', async () => {
-      const registerPromptSpy = vi.spyOn(navigator.modelContext, 'registerPrompt');
-
-      try {
-        const zodSchema = { code: z.string() };
-        await renderHook(() =>
-          useWebMCPPrompt({
-            name: 'zod_args_prompt',
-            argsSchema: zodSchema as never,
-            get: async () => ({
-              messages: [{ role: 'user', content: { type: 'text', text: 'ok' } }],
-            }),
-          })
-        );
-
-        const descriptor = registerPromptSpy.mock.calls.at(-1)?.[0] as {
-          argsSchema?: {
-            type?: string;
-            properties?: Record<string, { type?: string }>;
-            required?: string[];
-          };
-        };
-        expect(descriptor.argsSchema?.type).toBe('object');
-        expect(descriptor.argsSchema?.properties).toHaveProperty('code');
-        expect(descriptor.argsSchema?.required).toContain('code');
-      } finally {
-        registerPromptSpy.mockRestore();
-      }
-    });
-
-    it('converts Standard JSON argsSchema before prompt registration', async () => {
-      const registerPromptSpy = vi.spyOn(navigator.modelContext, 'registerPrompt');
-
-      try {
-        const input = vi.fn(() => ({
-          type: 'object',
-          properties: { query: { type: 'string' } },
-          required: ['query'],
-        }));
-        const standardJsonSchema = {
-          '~standard': {
-            version: 1 as const,
-            vendor: 'test',
-            jsonSchema: {
-              input,
-              output: () => ({ type: 'object', properties: {} }),
-            },
-          },
-        };
-
-        await renderHook(() =>
-          useWebMCPPrompt({
-            name: 'standard_args_prompt',
-            argsSchema: standardJsonSchema as never,
-            get: async () => ({
-              messages: [{ role: 'user', content: { type: 'text', text: 'ok' } }],
-            }),
-          })
-        );
-
-        const descriptor = registerPromptSpy.mock.calls.at(-1)?.[0] as {
-          argsSchema?: {
-            type?: string;
-            properties?: Record<string, { type?: string }>;
-            required?: string[];
-          };
-        };
-        expect(input).toHaveBeenCalledWith({ target: 'draft-2020-12' });
-        expect(descriptor.argsSchema).toEqual({
-          type: 'object',
-          properties: { query: { type: 'string' } },
-          required: ['query'],
-        });
-      } finally {
-        registerPromptSpy.mockRestore();
-      }
-    });
-
-    it('should unregister prompt on unmount', async () => {
-      const { unmount } = await renderHook(() =>
-        useWebMCPPrompt({
-          name: 'test_prompt',
-          get: async () => ({
-            messages: [{ role: 'user', content: { type: 'text', text: 'Test' } }],
-          }),
-        })
-      );
-
-      expect(navigator.modelContext?.listPrompts()).toHaveLength(1);
-
-      unmount();
-
-      expect(navigator.modelContext?.listPrompts()).toHaveLength(0);
-    });
-  });
-
-  describe('prompt execution', () => {
-    it('should execute get function via internal API', async () => {
-      const getMessage = vi.fn().mockResolvedValue({
-        messages: [{ role: 'user', content: { type: 'text', text: 'Generated message' } }],
-      });
-
-      await renderHook(() =>
-        useWebMCPPrompt({
-          name: 'dynamic_prompt',
-          argsSchema: {
-            type: 'object',
-            properties: { topic: { type: 'string' } },
-            required: ['topic'],
-          } as const,
-          get: getMessage,
-        })
-      );
-
-      // Get the prompt and execute it via the internal model context
-      const prompts = navigator.modelContext?.listPrompts();
-      expect(prompts).toHaveLength(1);
-      expect(prompts[0].name).toBe('dynamic_prompt');
-    });
-
-    it('should invoke the promptHandler when getPrompt is called', async () => {
-      const getMessage = vi.fn().mockResolvedValue({
-        messages: [{ role: 'user', content: { type: 'text', text: 'Hello from prompt' } }],
-      });
-
-      await renderHook(() =>
-        useWebMCPPrompt({
-          name: 'invoke_prompt',
-          get: getMessage,
-        })
-      );
-
-      // Execute the prompt through the model context
-      const result = await navigator.modelContext?.getPrompt('invoke_prompt', {});
-
-      expect(getMessage).toHaveBeenCalled();
-      expect(result?.messages).toHaveLength(1);
-      expect(result?.messages[0]?.content).toEqual({
-        type: 'text',
-        text: 'Hello from prompt',
-      });
-    });
-  });
-
-  describe('re-registration behavior', () => {
-    it('should re-register when name changes', async () => {
-      const { rerender } = await renderHook(
-        ({ name }) =>
-          useWebMCPPrompt({
-            name,
-            get: async () => ({
-              messages: [{ role: 'user', content: { type: 'text', text: 'Test' } }],
-            }),
-          }),
-        { initialProps: { name: 'prompt_v1' } }
-      );
-
-      expect(navigator.modelContext?.listPrompts()[0].name).toBe('prompt_v1');
-
-      await rerender({ name: 'prompt_v2' });
-
-      expect(navigator.modelContext?.listPrompts()[0].name).toBe('prompt_v2');
-    });
-
-    it('should re-register when description changes', async () => {
-      const { rerender } = await renderHook(
-        ({ description }) =>
-          useWebMCPPrompt({
-            name: 'test_prompt',
-            description,
-            get: async () => ({
-              messages: [{ role: 'user', content: { type: 'text', text: 'Test' } }],
-            }),
-          }),
-        { initialProps: { description: 'Version 1' } }
-      );
-
-      expect(navigator.modelContext?.listPrompts()[0].description).toBe('Version 1');
-
-      await rerender({ description: 'Version 2' });
-
-      expect(navigator.modelContext?.listPrompts()[0].description).toBe('Version 2');
-    });
-
-    it('should not re-register when get function changes (ref-based)', async () => {
-      const firstPrompts = navigator.modelContext?.listPrompts();
-      expect(firstPrompts).toHaveLength(0);
-
-      const { rerender } = await renderHook(
-        ({ get }) =>
-          useWebMCPPrompt({
-            name: 'test_prompt',
-            get,
-          }),
-        {
-          initialProps: {
-            get: async () => ({
-              messages: [{ role: 'user', content: { type: 'text', text: 'v1' } }],
-            }),
-          },
-        }
-      );
-
-      expect(navigator.modelContext?.listPrompts()).toHaveLength(1);
-
-      await rerender({
-        get: async () => ({
-          messages: [{ role: 'user', content: { type: 'text', text: 'v2' } }],
         }),
-      });
-
-      // Should still have 1 prompt (not re-registered)
-      expect(navigator.modelContext?.listPrompts()).toHaveLength(1);
-    });
-  });
-
-  describe('debug logging', () => {
-    let cleanupDebugLogging: (() => void) | undefined;
-
-    afterEach(() => {
-      cleanupDebugLogging?.();
-      cleanupDebugLogging = undefined;
-    });
-
-    it('should log registration when debug logging is enabled', async () => {
-      cleanupDebugLogging = enableDebugLogging('*');
-      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-      try {
-        await renderHook(() =>
-          useWebMCPPrompt({
-            name: 'dev_log_prompt',
-            get: async () => ({
-              messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
-            }),
-          })
-        );
-
-        // Registration succeeded without errors
-        expect(true).toBe(true);
-      } finally {
-        infoSpy.mockRestore();
-        logSpy.mockRestore();
+      {
+        initialProps: {
+          description: 'First description',
+          version: 'first',
+        },
       }
+    );
+
+    await hook.rerender({
+      description: 'First description',
+      version: 'second',
     });
 
-    it('should not throw on unregistration', async () => {
-      cleanupDebugLogging = enableDebugLogging('*');
-      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-      try {
-        const { unmount } = await renderHook(() =>
-          useWebMCPPrompt({
-            name: 'dev_unlog_prompt',
-            get: async () => ({
-              messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
-            }),
-          })
-        );
-
-        unmount();
-
-        // Unregistration succeeded without errors
-        expect(true).toBe(true);
-      } finally {
-        infoSpy.mockRestore();
-        logSpy.mockRestore();
-      }
+    expect(registerPrompt).toHaveBeenCalledOnce();
+    expect(unregister).not.toHaveBeenCalled();
+    const firstDescriptor = registerPrompt.mock.calls[0]?.[0];
+    if (!firstDescriptor) throw new Error('Prompt was not registered');
+    const response = await firstDescriptor.get({});
+    expect(response.messages[0]?.content).toMatchObject({
+      type: 'text',
+      text: 'second',
     });
 
-    it('should warn when no registration handle is returned', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const registerPromptSpy = vi
-        .spyOn(navigator.modelContext, 'registerPrompt')
-        .mockImplementation(
-          () =>
-            undefined as unknown as ReturnType<(typeof navigator.modelContext)['registerPrompt']>
-        );
-
-      try {
-        await renderHook(() =>
-          useWebMCPPrompt({
-            name: 'no_handle_dev_prompt',
-            get: async () => ({
-              messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
-            }),
-          })
-        );
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('did not return a registration handle')
-        );
-      } finally {
-        warnSpy.mockRestore();
-        registerPromptSpy.mockRestore();
-      }
+    await hook.rerender({
+      description: 'Second description',
+      version: 'second',
     });
-  });
 
-  describe('modelContext unavailability', () => {
-    it('should warn when modelContext is not available', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const savedDocumentModelContext = document.modelContext;
-      const savedNavigatorModelContext = navigator.modelContext;
-
-      try {
-        Object.defineProperty(document, 'modelContext', {
-          value: undefined,
-          writable: true,
-          configurable: true,
-        });
-        Object.defineProperty(navigator, 'modelContext', {
-          value: undefined,
-          writable: true,
-          configurable: true,
-        });
-
-        const { result } = await renderHook(() =>
-          useWebMCPPrompt({
-            name: 'unavailable_prompt',
-            get: async () => ({
-              messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
-            }),
-          })
-        );
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('modelContext is not available')
-        );
-        expect(result.current.isRegistered).toBe(false);
-      } finally {
-        Object.defineProperty(document, 'modelContext', {
-          value: savedDocumentModelContext,
-          writable: true,
-          configurable: true,
-        });
-        Object.defineProperty(navigator, 'modelContext', {
-          value: savedNavigatorModelContext,
-          writable: true,
-          configurable: true,
-        });
-        warnSpy.mockRestore();
-      }
+    expect(registerPrompt).toHaveBeenCalledTimes(2);
+    expect(unregister).toHaveBeenCalledOnce();
+    expect(registerPrompt.mock.calls[1]?.[0]).toMatchObject({
+      name: 'latest_prompt',
+      description: 'Second description',
     });
-  });
 
-  describe('registration error handling', () => {
-    it('should set isRegistered to false and rethrow when registerPrompt throws', async () => {
-      const registerPromptSpy = vi
-        .spyOn(navigator.modelContext, 'registerPrompt')
-        .mockImplementation(() => {
-          throw new Error('Registration failed');
-        });
-
-      try {
-        let caughtError: Error | null = null;
-        try {
-          await renderHook(() =>
-            useWebMCPPrompt({
-              name: 'error_prompt',
-              get: async () => ({
-                messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
-              }),
-            })
-          );
-        } catch (e) {
-          caughtError = e as Error;
-        }
-
-        expect(caughtError).toBeInstanceOf(Error);
-        expect(caughtError?.message).toBe('Registration failed');
-      } finally {
-        registerPromptSpy.mockRestore();
-      }
-    });
+    await hook.unmount();
+    expect(unregister).toHaveBeenCalledTimes(2);
   });
 });

@@ -6,14 +6,13 @@ export default {
       'always',
       [
         // Packages (in packages/)
-        'codemode',
-        'extension-tools',
         'global',
         'mcp-iframe',
         'react-webmcp',
         'smart-dom-reader',
         'transports',
         'usewebmcp',
+        'webmcp-extension',
         'webmcp-local-relay',
         'webmcp-polyfill',
         'webmcp-ts-sdk',

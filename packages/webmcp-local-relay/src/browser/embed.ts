@@ -11,26 +11,28 @@
  * chain multiple API calls:
  * `<script src=".../embed.js" data-request-timeout="120000"></script>`
  */
+import { normalizeToolResponse } from '@mcp-b/webmcp-polyfill/schema';
 import type {
-  ModelContextTestingPolyfillExtensions,
-  ModelContextTestingToolInfo,
-  ModelContextWithExtensions,
-  ToolListItem,
+  ChromeModelContextExtensions,
+  ModelContext,
+  RegisteredTool,
 } from '@mcp-b/webmcp-types';
-import { isJsonObject } from './shared.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
+import { createRequestId, isJsonObject } from './shared.js';
 
 /** Loose JSON object: values aren't recursively typed since we just forward them. */
 type JsonObject = Record<string, unknown>;
 
 interface RelayToolDescriptor {
   name: string;
-  description?: string;
-  inputSchema?: JsonObject;
+  title?: string;
+  description: string;
+  inputSchema?: unknown;
+  annotations?: RegisteredTool['annotations'];
 }
 
-interface ToolBridge {
-  listTools: () => RelayToolDescriptor[] | Promise<RelayToolDescriptor[]>;
-  invoke: (name: string, args: JsonObject) => unknown;
+interface DescriptorToolContext extends ModelContext {
+  executeTool: NonNullable<ChromeModelContextExtensions['executeTool']>;
 }
 
 interface WidgetRequestMessage {
@@ -55,8 +57,8 @@ interface RelayConfig {
 const RELAY_IFRAME_SELECTOR = '[data-webmcp-relay]';
 const TAB_ID_STORAGE_KEY = '__webmcp_relay_tab_id';
 const TOOL_SYNC_POLL_INTERVAL_MS = 2000;
-const FALLBACK_WIDGET_URL =
-  'https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay/dist/browser/widget.html';
+const INPUT_REQUIRED_UNSUPPORTED_MESSAGE =
+  'The WebMCP local relay cannot forward MCP input_required results. Multi-round tool flows require direct McpServer registration.';
 
 let widgetWindow: Window | null = null;
 let config: RelayConfig;
@@ -72,13 +74,6 @@ function debugWarn(...args: unknown[]): void {
   if (DEBUG) console.warn('[webmcp-relay-embed]', ...args);
 }
 
-function createTabId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `${String(Date.now())}_${String(Math.random()).slice(2, 10)}`;
-}
-
 function readOrCreateTabId(): string {
   try {
     const storedTabId = sessionStorage.getItem(TAB_ID_STORAGE_KEY);
@@ -89,7 +84,7 @@ function readOrCreateTabId(): string {
     debugWarn('sessionStorage read failed, tab ID will not persist:', err);
   }
 
-  const tabId = createTabId();
+  const tabId = createRequestId();
   try {
     sessionStorage.setItem(TAB_ID_STORAGE_KEY, tabId);
   } catch (err) {
@@ -100,16 +95,10 @@ function readOrCreateTabId(): string {
 }
 
 function resolveWidgetUrl(script: HTMLScriptElement | null): string {
-  if (script?.src) {
-    try {
-      return new URL('widget.html', script.src).href;
-    } catch (err) {
-      debugWarn('Failed to resolve widget URL from script src, falling back to CDN:', err);
-    }
-  } else {
-    debugWarn('Script element has no src attribute, falling back to CDN widget URL.');
+  if (!script?.src) {
+    throw new Error('The relay embed script must be loaded from a URL');
   }
-  return FALLBACK_WIDGET_URL;
+  return new URL('widget.html', script.src).href;
 }
 
 function buildRelayConfig(script: HTMLScriptElement | null): RelayConfig {
@@ -130,23 +119,6 @@ function buildRelayConfig(script: HTMLScriptElement | null): RelayConfig {
   };
 }
 
-function parseTestingSchema(rawSchema: unknown): JsonObject {
-  if (typeof rawSchema !== 'string' || rawSchema.length === 0) {
-    return { type: 'object', properties: {} };
-  }
-  try {
-    const parsed: unknown = JSON.parse(rawSchema);
-    return isJsonObject(parsed) ? parsed : { type: 'object', properties: {} };
-  } catch (err) {
-    debugWarn(
-      'Tool inputSchema is not valid JSON:',
-      typeof rawSchema === 'string' ? rawSchema.slice(0, 200) : rawSchema,
-      err
-    );
-    return { type: 'object', properties: {} };
-  }
-}
-
 function toInvokeArgs(value: unknown): JsonObject {
   if (isJsonObject(value)) return value;
   if (value !== undefined && value !== null) {
@@ -155,101 +127,85 @@ function toInvokeArgs(value: unknown): JsonObject {
   return {};
 }
 
-function mapToolListItem(tool: ToolListItem): RelayToolDescriptor {
+function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor {
   return {
     name: tool.name,
+    ...(tool.title === undefined ? {} : { title: tool.title }),
     description: tool.description,
-    inputSchema: tool.inputSchema,
+    ...(tool.inputSchema === undefined
+      ? {}
+      : { inputSchema: JSON.parse(tool.inputSchema) as unknown }),
+    ...(tool.annotations === undefined ? {} : { annotations: tool.annotations }),
   };
 }
 
-function mapTestingToolInfo(tool: ModelContextTestingToolInfo): RelayToolDescriptor {
-  return {
-    name: tool.name,
-    description: tool.description,
-    inputSchema: parseTestingSchema(tool.inputSchema),
-  };
-}
-
-/**
- * At runtime, navigator.modelContext may be the extended BrowserMcpServer
- * (with listTools/callTool/addEventListener) installed by @mcp-b/global,
- * or the bare ModelContextCore from the native browser / polyfill.
- * We duck-type to detect the extended version.
- */
-function getExtendedModelContext(): ModelContextWithExtensions | undefined {
-  const mc = navigator.modelContext;
-  if (
-    mc &&
-    typeof (mc as Partial<ModelContextWithExtensions>).listTools === 'function' &&
-    typeof (mc as Partial<ModelContextWithExtensions>).callTool === 'function'
-  ) {
-    return mc as ModelContextWithExtensions;
-  }
-  return undefined;
-}
-
-function getToolBridge(): ToolBridge | null {
-  const modelContext = getExtendedModelContext();
-  if (modelContext) {
+function normalizeSerializedToolResult(serialized: string | null): CallToolResult {
+  if (serialized === null) {
     return {
-      listTools() {
-        return modelContext.listTools().map(mapToolListItem);
-      },
-      invoke(name: string, args: JsonObject) {
-        return modelContext.callTool({ name, arguments: args });
-      },
+      isError: true,
+      content: [{ type: 'text', text: 'Tool execution interrupted by navigation' }],
     };
   }
 
-  const testing = navigator.modelContextTesting;
-  if (
-    testing &&
-    typeof testing.listTools === 'function' &&
-    typeof testing.executeTool === 'function'
-  ) {
+  let rawResult: unknown;
+  try {
+    rawResult = JSON.parse(serialized);
+  } catch {
+    // Chrome returns callback strings directly rather than JSON-quoting them.
+    rawResult = serialized;
+  }
+
+  if (isJsonObject(rawResult) && rawResult.resultType === 'input_required') {
     return {
-      listTools() {
-        return testing.listTools().map(mapTestingToolInfo);
-      },
-      async invoke(name: string, args: JsonObject) {
-        const serialized: string | null = await testing.executeTool(name, JSON.stringify(args));
-        if (serialized === null) {
-          return {
-            isError: true,
-            content: [{ type: 'text', text: 'Tool execution interrupted by navigation' }],
-          };
-        }
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(serialized);
-        } catch {
-          throw new Error(
-            `Testing tool returned invalid JSON: ${String(serialized).slice(0, 200)}`
-          );
-        }
-        if (!isJsonObject(parsed)) {
-          throw new Error('Testing tool response was not an object');
-        }
-        return parsed;
-      },
+      isError: true,
+      content: [{ type: 'text', text: INPUT_REQUIRED_UNSUPPORTED_MESSAGE }],
     };
   }
 
-  debugWarn('No WebMCP runtime found (navigator.modelContext or navigator.modelContextTesting).');
-  return null;
+  return normalizeToolResponse(rawResult);
 }
 
-function listRelayTools(): Promise<RelayToolDescriptor[]> {
-  const bridge = getToolBridge();
-  if (!bridge) {
-    return Promise.resolve([]);
+function hasDescriptorToolApi(
+  modelContext: ModelContext | undefined
+): modelContext is DescriptorToolContext {
+  return Boolean(
+    modelContext && 'executeTool' in modelContext && typeof modelContext.executeTool === 'function'
+  );
+}
+
+function getDocumentDescriptorContext(): DescriptorToolContext | undefined {
+  const modelContext: ModelContext | undefined = document.modelContext;
+  return hasDescriptorToolApi(modelContext) ? modelContext : undefined;
+}
+
+async function listRelayTools(): Promise<RelayToolDescriptor[]> {
+  const descriptorContext = getDocumentDescriptorContext();
+  if (!descriptorContext) {
+    return [];
   }
 
-  return Promise.resolve(bridge.listTools()).then((tools) => (Array.isArray(tools) ? tools : []));
+  return (await descriptorContext.getTools()).map(mapRegisteredTool);
+}
+
+async function invokeRelayTool(name: string, args: JsonObject): Promise<CallToolResult> {
+  const descriptorContext = getDocumentDescriptorContext();
+  if (!descriptorContext) {
+    throw new Error('No executable WebMCP runtime found on this page');
+  }
+
+  // Current Chrome requires a RegisteredTool returned by getTools(), not a
+  // name or a stale copy.
+  const tool = (await descriptorContext.getTools()).find((candidate) => candidate.name === name);
+  if (!tool) {
+    throw new Error(`Tool not found: ${name}`);
+  }
+
+  const serialized = await descriptorContext.executeTool(tool, JSON.stringify(args));
+  return normalizeSerializedToolResult(serialized);
 }
 
 let toolSyncScheduled = false;
+let toolSyncRevision = 0;
 let toolSyncPollTimer: ReturnType<typeof setInterval> | null = null;
 let lastToolsSnapshot = '';
 
@@ -273,9 +229,11 @@ function toolsSnapshot(tools: RelayToolDescriptor[]): string {
 
 function pushToolsIfChanged(): void {
   toolSyncScheduled = false;
+  const revision = toolSyncRevision;
 
   listRelayTools()
     .then((tools) => {
+      if (revision !== toolSyncRevision) return;
       const nextSnapshot = toolsSnapshot(tools);
       if (nextSnapshot === lastToolsSnapshot || !widgetWindow) return;
       lastToolsSnapshot = nextSnapshot;
@@ -287,6 +245,7 @@ function pushToolsIfChanged(): void {
 }
 
 function scheduleToolSync(): void {
+  toolSyncRevision++;
   if (toolSyncScheduled) return;
   toolSyncScheduled = true;
   setTimeout(pushToolsIfChanged, 0);
@@ -297,49 +256,18 @@ function startToolSyncPolling(): void {
   toolSyncPollTimer = setInterval(scheduleToolSync, TOOL_SYNC_POLL_INTERVAL_MS);
 }
 
-// Subscribe on BOTH modelContext and modelContextTesting (non-exclusive).
-// Chrome native fires toolchange on modelContextTesting; the polyfill fires on
-// modelContext. We subscribe to all available surfaces so no event is missed.
 function trySubscribe(): boolean {
-  let subscribed = false;
-
-  const mc = getExtendedModelContext();
-  if (mc) {
-    try {
-      mc.addEventListener('toolchange', scheduleToolSync);
-      subscribed = true;
-    } catch (error) {
-      debugWarn('addEventListener on modelContext threw:', error);
-    }
+  try {
+    document.modelContext.addEventListener('toolchange', scheduleToolSync);
+    return true;
+  } catch (error) {
+    debugWarn('addEventListener on modelContext threw:', error);
+    return false;
   }
-
-  const testing = navigator.modelContextTesting as
-    | (typeof navigator.modelContextTesting & Partial<ModelContextTestingPolyfillExtensions>)
-    | undefined;
-  if (testing) {
-    if (typeof testing.addEventListener === 'function') {
-      try {
-        testing.addEventListener('toolchange', scheduleToolSync);
-        subscribed = true;
-      } catch (error) {
-        debugWarn('addEventListener on modelContextTesting threw:', error);
-      }
-    } else if (typeof testing.registerToolsChangedCallback === 'function') {
-      try {
-        testing.registerToolsChangedCallback(scheduleToolSync);
-        subscribed = true;
-      } catch (error) {
-        debugWarn('Failed to subscribe via registerToolsChangedCallback:', error);
-      }
-    }
-  }
-
-  return subscribed;
 }
 
-// Polling fallback: Chrome 148+ removed unregisterTool(); tools are removed via
-// AbortSignal only, which does NOT fire a toolchange event. Polling every 2s
-// ensures we still detect those silent removals within a bounded delay.
+// Polling fallback: some Chromium previews miss toolchange events when an
+// AbortSignal removes a tool. Polling bounds how long a stale tool can remain.
 function subscribeToToolChanges(): void {
   startToolSyncPolling();
   scheduleToolSync();
@@ -424,107 +352,17 @@ function handleListRequest(request: WidgetRequestMessage, event: MessageEvent): 
     });
 }
 
-/**
- * Monkey-patches `navigator.modelContext.elicitInput` to bridge elicitation
- * requests through the relay widget iframe to the local relay server, which
- * forwards them to the MCP client (e.g. Claude Code).
- *
- * This is the same pattern used by Chrome DevTools MCP for CDP-based
- * elicitation forwarding. The relay widget and server handle the new
- * `elicitation-request` / `elicitation-response` message types.
- */
-let elicitBridgeInstalled = false;
-
-function installElicitBridge(widgetSource: MessageEventSource, widgetOrigin: string): void {
-  if (elicitBridgeInstalled) return;
-
-  const mc = getExtendedModelContext() as
-    | (ModelContextWithExtensions & {
-        elicitInput?: (
-          params: Record<string, unknown>,
-          options?: unknown
-        ) => Promise<Record<string, unknown>>;
-      })
-    | undefined;
-  if (!mc || typeof mc.elicitInput !== 'function') {
-    debugWarn('Elicitation bridge not installed: elicitInput not available on modelContext');
-    return;
-  }
-
-  mc.elicitInput = (
-    params: Record<string, unknown>,
-    _options?: unknown
-  ): Promise<Record<string, unknown>> => {
-    const callId = createElicitCallId();
-    return new Promise<Record<string, unknown>>((resolve) => {
-      const ELICIT_TIMEOUT_MS = 60_000;
-
-      const cleanup = (): void => {
-        window.removeEventListener('message', handler);
-        clearTimeout(timeout);
-      };
-
-      const timeout = setTimeout(() => {
-        cleanup();
-        debugWarn('Elicitation request timed out after 60s');
-        resolve({ action: 'decline', content: null });
-      }, ELICIT_TIMEOUT_MS);
-
-      const handler = (event: MessageEvent): void => {
-        if (event.origin !== widgetOrigin) return;
-        const data = event.data as Record<string, unknown>;
-        if (
-          !isJsonObject(data) ||
-          data.type !== 'webmcp.elicitation.response' ||
-          data.callId !== callId
-        ) {
-          return;
-        }
-        cleanup();
-        resolve(
-          isJsonObject(data.result)
-            ? (data.result as Record<string, unknown>)
-            : { action: 'decline', content: null }
-        );
-      };
-      window.addEventListener('message', handler);
-
-      respondToSource(widgetSource, widgetOrigin, {
-        type: 'webmcp.elicitation.request',
-        callId,
-        params,
-      });
-    });
-  };
-
-  elicitBridgeInstalled = true;
-  debugWarn('Elicitation bridge installed');
-}
-
-let elicitCallCounter = 0;
-function createElicitCallId(): string {
-  elicitCallCounter += 1;
-  return `elicit_${String(Date.now())}_${String(elicitCallCounter)}`;
-}
-
 function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent): void {
-  const bridge = getToolBridge();
-  if (!bridge) {
+  if (!getDocumentDescriptorContext()) {
     respondToSource(event.source, event.origin, {
       type: 'webmcp.tools.invoke.error',
       requestId: request.requestId,
-      error: 'No WebMCP runtime found on this page',
+      error: 'No executable WebMCP runtime found on this page',
     });
     return;
   }
 
-  // Install elicitation bridge before invoking the tool, so that tool
-  // handlers can call elicitInput() and have it forwarded to the MCP client.
-  if (event.source) {
-    installElicitBridge(event.source, event.origin);
-  }
-
-  Promise.resolve(bridge.invoke(String(request.toolName ?? ''), toInvokeArgs(request.args)))
+  invokeRelayTool(String(request.toolName ?? ''), toInvokeArgs(request.args))
     .then((result) => {
       respondToSource(event.source, event.origin, {
         type: 'webmcp.tools.invoke.response',
@@ -567,30 +405,21 @@ async function injectRelayWidget(cfg: RelayConfig): Promise<void> {
     searchParams.set('requestTimeout', cfg.requestTimeout);
   }
 
-  // Try fetch + blob URL to work around CDNs serving .html as text/plain.
-  let blobUrl: string | null = null;
-  try {
-    const response = await fetch(cfg.widgetUrl);
-    if (!response.ok) {
-      console.warn(
-        `[webmcp-relay-embed] Widget HTML fetch returned ${String(response.status)}; falling back to direct iframe src.`
-      );
-    } else {
-      const html = await response.text();
-      const configScript = `<script>window.__WEBMCP_RELAY_CONFIG=${JSON.stringify(Object.fromEntries(searchParams))};</script>`;
-      const blob = new Blob([html.replace('</head>', `${configScript}</head>`)], {
-        type: 'text/html',
-      });
-      blobUrl = URL.createObjectURL(blob);
-      cfg.widgetOrigin = window.location.origin;
-    }
-  } catch (err) {
-    debugWarn('Failed to fetch widget HTML for blob URL:', err);
+  // The blob inherits the host origin, allowing the relay to verify the
+  // WebSocket Origin header instead of trusting a client-reported value.
+  const response = await fetch(cfg.widgetUrl);
+  if (!response.ok) {
+    throw new Error(`Widget HTML request failed with status ${String(response.status)}`);
   }
+  const html = await response.text();
+  const configScript = `<script>window.__WEBMCP_RELAY_CONFIG=${JSON.stringify(Object.fromEntries(searchParams))};</script>`;
+  const blobUrl = URL.createObjectURL(
+    new Blob([html.replace('</head>', `${configScript}</head>`)], { type: 'text/html' })
+  );
+  cfg.widgetOrigin = window.location.origin;
 
   const iframe = document.createElement('iframe');
-  // Fallback: direct iframe src (works when widget.html is served as text/html).
-  iframe.src = blobUrl ?? `${cfg.widgetUrl}?${searchParams.toString()}`;
+  iframe.src = blobUrl;
   iframe.style.display = 'none';
   iframe.setAttribute('aria-hidden', 'true');
   iframe.setAttribute('data-webmcp-relay', '1');
@@ -599,9 +428,7 @@ async function injectRelayWidget(cfg: RelayConfig): Promise<void> {
   widgetWindow = iframe.contentWindow;
   iframe.addEventListener('load', () => {
     widgetWindow = iframe.contentWindow;
-    if (blobUrl) {
-      URL.revokeObjectURL(blobUrl);
-    }
+    URL.revokeObjectURL(blobUrl);
   });
   iframe.addEventListener('error', () => {
     console.error(
@@ -609,9 +436,7 @@ async function injectRelayWidget(cfg: RelayConfig): Promise<void> {
       iframe.src,
       '-- WebMCP tools will NOT be relayed. Check network connectivity and widget URL.'
     );
-    if (blobUrl) {
-      URL.revokeObjectURL(blobUrl);
-    }
+    URL.revokeObjectURL(blobUrl);
   });
 }
 

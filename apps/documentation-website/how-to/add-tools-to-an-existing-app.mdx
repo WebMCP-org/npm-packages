@@ -51,7 +51,7 @@ Call `registerTool` for each tool you want to expose. You can register them all 
 ```ts title="tools.ts"
 import '@mcp-b/global';
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'search-products',
   description: 'Search products by keyword, category, or price range',
   inputSchema: {
@@ -71,7 +71,7 @@ document.modelContext.registerTool({
   },
 });
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'add-to-cart',
   description: 'Add a product to the shopping cart',
   inputSchema: {
@@ -98,7 +98,7 @@ document.modelContext.registerTool({
 import '@mcp-b/global';
 
 if (currentUser.isAdmin) {
-  document.modelContext.registerTool({
+  await document.modelContext.registerTool({
     name: 'delete-user',
     description: 'Delete a user account (admin only)',
     inputSchema: {
@@ -114,7 +114,9 @@ if (currentUser.isAdmin) {
 }
 ```
 
-`registerTool` throws if a tool with the same name already exists. To update a tool, abort the previous registration signal, then register the new version.
+`registerTool` returns a rejected promise if a tool with the same name already
+exists. To update a tool, abort the previous registration signal, then await the
+new registration.
 
 ## Update tools when app state changes
 
@@ -125,18 +127,18 @@ import type { ToolDescriptor } from '@mcp-b/webmcp-types';
 
 const registeredToolControllers = new Map<string, AbortController>();
 
-function registerRoleTool(tool: ToolDescriptor) {
+function registerRoleTool(tool: ToolDescriptor): Promise<void> {
   registeredToolControllers.get(tool.name)?.abort();
 
   const controller = new AbortController();
   registeredToolControllers.set(tool.name, controller);
-  document.modelContext.registerTool(tool, { signal: controller.signal });
+  return document.modelContext.registerTool(tool, { signal: controller.signal });
 }
 
-function onLogin(user: User) {
+async function onLogin(user: User) {
   // Register tools appropriate for the user's role
   for (const tool of getToolsForRole(user.role)) {
-    registerRoleTool(tool);
+    await registerRoleTool(tool);
   }
 }
 
@@ -151,9 +153,9 @@ function onLogout() {
 
 Use `registerTool` and an `AbortController` to add or remove individual tools:
 
-```ts
+```ts title="registration-lifetime.ts"
 const controller = new AbortController();
-document.modelContext.registerTool(adminTool, { signal: controller.signal });
+await document.modelContext.registerTool(adminTool, { signal: controller.signal });
 
 // later:
 controller.abort();
@@ -164,7 +166,16 @@ controller.abort();
 Tools can read from and write to the DOM. This is useful for form-filling, page navigation, or surfacing visible content.
 
 ```ts title="form-tools.ts"
-document.modelContext.registerTool({
+const nameInput = document.querySelector<HTMLInputElement>('#name');
+const emailInput = document.querySelector<HTMLInputElement>('#email');
+const messageInput = document.querySelector<HTMLInputElement>('#message');
+const contactForm = document.querySelector<HTMLFormElement>('#contact-form');
+
+if (!nameInput || !emailInput || !messageInput || !contactForm) {
+  throw new Error('Contact form is incomplete');
+}
+
+await document.modelContext.registerTool({
   name: 'fill-contact-form',
   description: 'Fill the contact form with provided details',
   inputSchema: {
@@ -177,19 +188,19 @@ document.modelContext.registerTool({
     required: ['name', 'email', 'message'],
   },
   async execute(args) {
-    document.querySelector('#name').value = args.name;
-    document.querySelector('#email').value = args.email;
-    document.querySelector('#message').value = args.message;
+    nameInput.value = args.name;
+    emailInput.value = args.email;
+    messageInput.value = args.message;
     return { content: [{ type: 'text', text: 'Form filled' }] };
   },
 });
 
-document.modelContext.registerTool({
+await document.modelContext.registerTool({
   name: 'submit-form',
   description: 'Submit the contact form',
   inputSchema: { type: 'object', properties: {} },
   async execute() {
-    document.querySelector('#contact-form').submit();
+    contactForm.requestSubmit();
     return { content: [{ type: 'text', text: 'Form submitted' }] };
   },
 });
@@ -199,14 +210,15 @@ document.modelContext.registerTool({
 
 If a tool execution fails, return an error response instead of throwing. This gives the AI agent a structured signal to retry or adjust its approach.
 
-```ts
+```ts title="tool-errors.ts"
 async execute(args) {
   try {
     const result = await riskyOperation(args);
     return { content: [{ type: 'text', text: JSON.stringify(result) }] };
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
-      content: [{ type: 'text', text: `Operation failed: ${error.message}` }],
+      content: [{ type: 'text', text: `Operation failed: ${message}` }],
       isError: true,
     };
   }
@@ -217,14 +229,15 @@ async execute(args) {
 
 Tool annotations give the AI agent hints about side effects. They do not change execution behavior, but help the agent decide when and how to call the tool.
 
-```ts
-document.modelContext.registerTool({
+```ts title="Read-only tool annotations"
+await document.modelContext.registerTool({
   name: 'get-cart',
+  title: 'Get shopping cart',
   description: 'Get the current shopping cart contents',
   inputSchema: { type: 'object', properties: {} },
   annotations: {
     readOnlyHint: true,
-    idempotentHint: true,
+    untrustedContentHint: true,
   },
   async execute() {
     return { content: [{ type: 'text', text: JSON.stringify(getCart()) }] };
@@ -232,34 +245,28 @@ document.modelContext.registerTool({
 });
 ```
 
-Available annotation fields: `title`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`. See the [`@mcp-b/webmcp-types` reference](/packages/webmcp-types/reference) for the full `ToolAnnotations` interface.
+The WebMCP draft standardizes `readOnlyHint` and `untrustedContentHint`.
+`title` is a top-level tool field. MCP-B runtimes also accept the MCP-specific
+`destructiveHint`, `idempotentHint`, and `openWorldHint` annotations for MCP
+clients. Annotations are planning hints, not authorization checks.
 
 ## Verify tools are registered
 
-Use `navigator.modelContextTesting` to list registered tools and execute them programmatically. This API is available when the testing shim is installed (the default for both `@mcp-b/global` and `@mcp-b/webmcp-polyfill`).
+Use standard discovery, then feature-detect Chrome's optional execution extension:
 
 ```ts
-const tools = navigator.modelContextTesting?.listTools();
-console.log(
-  'Registered tools:',
-  tools?.map((t) => t.name)
-);
+import type { ChromeModelContext } from '@mcp-b/webmcp-types';
 
-const result = await navigator.modelContextTesting?.executeTool(
-  'search-products',
-  '{"query": "laptop"}'
-);
-console.log('Result:', result);
-```
-
-If you installed `@mcp-b/global`, use the standard in-page consumer methods directly:
-
-```ts
-const tools = await document.modelContext.getTools();
+const modelContext = document.modelContext as ChromeModelContext;
+const tools = await modelContext.getTools();
 const searchTool = tools.find((tool) => tool.name === 'search-products');
 if (!searchTool) throw new Error('search-products is not available');
 
-const resultJson = await document.modelContext.executeTool(
+const executeTool = modelContext.executeTool;
+if (!executeTool) throw new Error('This runtime does not expose Chrome executeTool');
+
+const resultJson = await executeTool.call(
+  modelContext,
   searchTool,
   JSON.stringify({ query: 'laptop' })
 );

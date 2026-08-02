@@ -46,7 +46,6 @@
   },
   "devDependencies": {
     "@types/three": "^0.183.1",
-    "shadcn": "^4.0.8",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   },

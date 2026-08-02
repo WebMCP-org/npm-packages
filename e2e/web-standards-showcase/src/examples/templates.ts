@@ -190,8 +190,7 @@ const timerTool = {
 // Use registerTool for persistent registration
 document.modelContext.registerTool(timerTool);`,
 
-  'output-schema': `// Tool with Output Schema (structuredContent demo)
-// This demonstrates how outputSchema enables structuredContent in MCP responses
+  'structured-result': `// Tool with a structured JSON result
 
 let counter = 0;
 
@@ -207,31 +206,12 @@ const counterTool = {
       }
     }
   },
-  // Output schema enables structuredContent in the MCP response
-  outputSchema: {
-    type: 'object',
-    properties: {
-      counter: {
-        type: 'number',
-        description: 'The current counter value'
-      },
-      timestamp: {
-        type: 'string',
-        description: 'ISO timestamp when the value was retrieved'
-      },
-      previousValue: {
-        type: 'number',
-        description: 'The previous counter value before increment'
-      }
-    },
-    required: ['counter', 'timestamp']
-  },
   async execute(input) {
     const previousValue = counter;
     if (input.increment) {
       counter += input.increment;
     }
-    // Return structured data matching the outputSchema
+    // WebMCP tool handlers may return structured-cloneable values.
     return {
       counter,
       timestamp: new Date().toISOString(),

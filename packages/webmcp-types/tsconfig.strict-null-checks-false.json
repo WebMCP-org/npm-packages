@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strictNullChecks": false,
+    "exactOptionalPropertyTypes": false,
+    "noEmit": true
+  },
+  "include": ["src/**/*.test-d.ts"],
+  "exclude": ["node_modules", "dist"]
+}

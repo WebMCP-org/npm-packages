@@ -66,7 +66,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "vp pack",
+    "build": "vp pack && pnpm run typecheck:consumer",
     "check": "vp check --fix",
     "clean": "rm -rf dist",
     "format": "vp fmt --write",
@@ -75,15 +75,14 @@
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
-    "test:browser": "vp test run --browser.headless",
-    "test:browser:ui": "vp test --browser",
-    "test:conformance:global": "vp test run --config vitest.conformance.global.config.ts --browser.headless",
+    "test:conformance:global": "vp test run conformance/global-runtime.e2e.test.ts --browser.headless",
     "test:conformance:matrix": "pnpm run test:conformance:polyfill && pnpm run test:conformance:global && pnpm run test:conformance:native",
     "test:conformance:native": "vp test run --config vitest.conformance.native.config.ts --browser.headless",
     "test:conformance:polyfill": "pnpm --filter @mcp-b/webmcp-polyfill run test:conformance",
     "test:node": "vp test run --config vitest.node.config.ts",
     "test:watch": "vp test",
     "typecheck": "tsc --noEmit && vp test run --typecheck --silent",
+    "typecheck:consumer": "tsc --noEmit --strict --skipLibCheck --module preserve --moduleResolution bundler --lib ES2022,DOM type-tests/consumer.ts",
     "version:major": "pnpm version major --no-git-tag-version",
     "version:minor": "pnpm version minor --no-git-tag-version",
     "version:patch": "pnpm version patch --no-git-tag-version"
@@ -92,18 +91,19 @@
     "@mcp-b/transports": "workspace:*",
     "@mcp-b/webmcp-polyfill": "workspace:*",
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
-    "@mcp-b/webmcp-types": "workspace:*"
+    "@mcp-b/webmcp-types": "workspace:*",
+    "@modelcontextprotocol/server": "catalog:"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "fast-check": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   }
 }

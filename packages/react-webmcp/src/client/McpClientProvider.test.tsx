@@ -1,608 +1,665 @@
-import { TabClientTransport, TabServerTransport } from '@mcp-b/transports';
-import { BrowserMcpServer, Client } from '@mcp-b/webmcp-ts-sdk';
-import type { ReactNode } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, renderHook } from 'vitest-browser-react';
+import { Client, type ConnectOptions, InMemoryTransport } from '@modelcontextprotocol/client';
+import { fromJsonSchema, McpServer } from '@modelcontextprotocol/server';
+import { StrictMode, type ReactNode } from 'react';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
+import { renderHook } from 'vitest-browser-react';
 import {
   McpClientProvider,
   type McpClientProviderProps,
   useMcpClient,
 } from './McpClientProvider.js';
 
-// Create mock client and transport
-const mockConnect = vi.fn();
-const mockListTools = vi.fn();
-const mockListResources = vi.fn();
-const mockGetServerCapabilities = vi.fn();
-const mockSetNotificationHandler = vi.fn();
-const mockRemoveNotificationHandler = vi.fn();
-
-const createMockClient = () => ({
-  connect: mockConnect,
-  listTools: mockListTools,
-  listResources: mockListResources,
-  getServerCapabilities: mockGetServerCapabilities,
-  setNotificationHandler: mockSetNotificationHandler,
-  removeNotificationHandler: mockRemoveNotificationHandler,
-});
-
-const createMockTransport = () => ({
-  start: vi.fn(),
-  close: vi.fn(),
-  send: vi.fn(),
-});
-
-type LiveConnection = {
+interface TestConnection {
   client: Client;
-  clientTransport: TabClientTransport;
-  server: BrowserMcpServer;
-  serverTransport: TabServerTransport;
-};
+  server: McpServer;
+  transport: InMemoryTransport;
+}
 
-const liveConnections: LiveConnection[] = [];
+async function createConnection(configure: (server: McpServer) => void): Promise<TestConnection> {
+  const server = new McpServer({
+    name: 'react-webmcp-test-server',
+    version: '1.0.0',
+  });
+  configure(server);
 
-function toProviderProps(
-  client: ReturnType<typeof createMockClient>,
-  transport: ReturnType<typeof createMockTransport>
-): Pick<McpClientProviderProps, 'client' | 'transport'> {
-  return {
-    client: client as unknown as McpClientProviderProps['client'],
-    transport: transport as unknown as McpClientProviderProps['transport'],
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverTransport);
+
+  const client = new Client(
+    { name: 'react-webmcp-test-client', version: '1.0.0' },
+    { versionNegotiation: { mode: 'auto' } }
+  );
+
+  return { client, server, transport: clientTransport };
+}
+
+function providerFor(connection: TestConnection) {
+  return function Provider({ children }: { children: ReactNode }) {
+    return (
+      <McpClientProvider client={connection.client} transport={connection.transport}>
+        {children}
+      </McpClientProvider>
+    );
   };
 }
 
-describe('McpClientProvider', () => {
-  let mockClient: ReturnType<typeof createMockClient>;
-  let mockTransport: ReturnType<typeof createMockTransport>;
-  let providerProps: Pick<McpClientProviderProps, 'client' | 'transport'>;
+async function closeConnection(connection: TestConnection): Promise<void> {
+  await Promise.allSettled([connection.client.close(), connection.server.close()]);
+}
 
-  beforeEach(() => {
-    mockClient = createMockClient();
-    mockTransport = createMockTransport();
-    providerProps = toProviderProps(mockClient, mockTransport);
-
-    // Default mocks
-    mockConnect.mockResolvedValue(undefined);
-    mockGetServerCapabilities.mockReturnValue({
-      tools: { listChanged: true },
-      resources: { listChanged: true },
-    });
-    mockListTools.mockResolvedValue({ tools: [] });
-    mockListResources.mockResolvedValue({ resources: [] });
+describe('McpClientProvider with an MCP v2 in-memory connection', () => {
+  it('accepts every SDK connection option', () => {
+    expectTypeOf<McpClientProviderProps['opts']>().toEqualTypeOf<ConnectOptions | undefined>();
   });
 
-  afterEach(async () => {
-    while (liveConnections.length > 0) {
-      const connection = liveConnections.pop();
-      if (!connection) {
-        break;
+  it('connects under StrictMode when the transport cannot be restarted', async () => {
+    const connection = await createConnection((server) => {
+      server.registerTool('strict_mode_tool', {}, async () => ({
+        content: [{ type: 'text', text: 'ready' }],
+      }));
+    });
+    const start = connection.transport.start.bind(connection.transport);
+    const close = connection.transport.close.bind(connection.transport);
+    let startCount = 0;
+    connection.transport.start = async () => {
+      startCount += 1;
+      if (startCount > 1) {
+        throw new Error('transport cannot be restarted');
       }
-      await connection.client
-        .close()
-        .catch((e) => console.warn('[test cleanup] client.close():', e));
-      await connection.clientTransport
-        .close()
-        .catch((e) => console.warn('[test cleanup] clientTransport.close():', e));
-      await connection.server
-        .close()
-        .catch((e) => console.warn('[test cleanup] server.close():', e));
-      await connection.serverTransport
-        .close()
-        .catch((e) => console.warn('[test cleanup] serverTransport.close():', e));
+      await start();
+    };
+    connection.transport.close = async () => {
+      await Promise.resolve();
+      await close();
+    };
+
+    const Provider = providerFor(connection);
+    const hook = await renderHook(() => useMcpClient(), {
+      wrapper: ({ children }) => (
+        <StrictMode>
+          <Provider>{children}</Provider>
+        </StrictMode>
+      ),
+    });
+
+    try {
+      await vi.waitFor(() => {
+        expect(hook.result.current.error).toBeNull();
+        expect(hook.result.current.isConnected).toBe(true);
+        expect(hook.result.current.tools.map(({ name }) => name)).toContain('strict_mode_tool');
+        expect(startCount).toBe(1);
+      });
+    } finally {
+      await hook.unmount();
+      await closeConnection(connection);
     }
-    vi.clearAllMocks();
   });
 
-  describe('connection', () => {
-    it('should connect client on mount', async () => {
-      await render(
-        <McpClientProvider {...providerProps}>
-          <div>Test</div>
+  it('does not reconnect when request options are recreated', async () => {
+    const connection = await createConnection((server) => {
+      server.registerTool('stable_connection', {}, async () => ({
+        content: [{ type: 'text', text: 'ready' }],
+      }));
+    });
+    const close = vi.spyOn(connection.client, 'close');
+    let requestOptions = { timeout: 1_000 };
+    function Provider({ children }: { children: ReactNode }) {
+      return (
+        <McpClientProvider
+          client={connection.client}
+          transport={connection.transport}
+          opts={requestOptions}
+        >
+          {children}
         </McpClientProvider>
       );
+    }
 
-      // Wait for connection
+    const hook = await renderHook(() => useMcpClient(), { wrapper: Provider });
+
+    try {
       await vi.waitFor(() => {
-        expect(mockConnect).toHaveBeenCalledWith(mockTransport, {});
+        expect(hook.result.current.isConnected).toBe(true);
+        expect(hook.result.current.tools.map(({ name }) => name)).toContain('stable_connection');
       });
+
+      requestOptions = { timeout: 1_000 };
+      await hook.rerender();
+
+      expect(close).not.toHaveBeenCalled();
+      expect(hook.result.current.isConnected).toBe(true);
+      expect(hook.result.current.error).toBeNull();
+    } finally {
+      await hook.unmount();
+      await closeConnection(connection);
+    }
+  });
+
+  it('connects, discovers, and invokes real server capabilities', async () => {
+    const connection = await createConnection((server) => {
+      server.registerTool(
+        'echo',
+        {
+          description: 'Echoes a message',
+          inputSchema: fromJsonSchema<{ message: string }>({
+            type: 'object',
+            properties: { message: { type: 'string' } },
+            required: ['message'],
+          }),
+        },
+        async ({ message }) => ({
+          content: [{ type: 'text', text: `echo:${message}` }],
+        })
+      );
+      server.registerResource(
+        'settings',
+        'config://settings',
+        {
+          description: 'Application settings',
+          mimeType: 'application/json',
+        },
+        async (uri) => ({
+          contents: [{ uri: uri.href, text: '{"theme":"dark"}' }],
+        })
+      );
     });
 
-    it('should fetch tools and resources after connection', async () => {
-      mockListTools.mockResolvedValue({
-        tools: [{ name: 'tool1', description: 'Test tool' }],
-      });
-      mockListResources.mockResolvedValue({
-        resources: [{ uri: 'test://resource', name: 'Test Resource' }],
+    const hook = await renderHook(() => useMcpClient(), {
+      wrapper: providerFor(connection),
+    });
+
+    try {
+      await vi.waitFor(() => {
+        expect(hook.result.current.isConnected).toBe(true);
+        expect(hook.result.current.isLoading).toBe(false);
+        expect(hook.result.current.error).toBeNull();
+        expect(hook.result.current.tools.map(({ name }) => name)).toContain('echo');
+        expect(hook.result.current.resources.map(({ uri }) => uri)).toContain('config://settings');
       });
 
-      await render(
-        <McpClientProvider {...providerProps}>
-          <div>Test</div>
+      const toolResult = await hook.result.current.client.callTool({
+        name: 'echo',
+        arguments: { message: 'hello' },
+      });
+      const resourceResult = await hook.result.current.client.readResource({
+        uri: 'config://settings',
+      });
+
+      expect(toolResult.content[0]).toMatchObject({ type: 'text', text: 'echo:hello' });
+      expect(resourceResult.contents[0]).toMatchObject({
+        uri: 'config://settings',
+        text: '{"theme":"dark"}',
+      });
+    } finally {
+      await hook.unmount();
+      await closeConnection(connection);
+    }
+  });
+
+  it('reconnects after remote closure when given a fresh one-shot transport', async () => {
+    const connection = await createConnection((server) => {
+      server.registerTool('remote_close_tool', {}, async () => ({
+        content: [{ type: 'text', text: 'ready' }],
+      }));
+    });
+    const replacementServer = new McpServer({
+      name: 'react-webmcp-replacement-server',
+      version: '1.0.0',
+    });
+    replacementServer.registerTool('replacement_tool', {}, async () => ({
+      content: [{ type: 'text', text: 'reconnected' }],
+    }));
+    const [replacementTransport, replacementServerTransport] = InMemoryTransport.createLinkedPair();
+    await replacementServer.connect(replacementServerTransport);
+    const previousOnclose = vi.fn();
+    connection.client.onclose = previousOnclose;
+    const connect = vi.spyOn(connection.client, 'connect');
+    let requestOptions = { timeout: 1_000 };
+    function Provider({ children }: { children: ReactNode }) {
+      return (
+        <McpClientProvider
+          client={connection.client}
+          transport={connection.transport}
+          opts={requestOptions}
+        >
+          {children}
         </McpClientProvider>
       );
-
-      await vi.waitFor(() => {
-        expect(mockListTools).toHaveBeenCalled();
-        expect(mockListResources).toHaveBeenCalled();
-      });
+    }
+    const hook = await renderHook(() => useMcpClient(), {
+      wrapper: Provider,
     });
 
-    it('should not fetch tools if capability is not supported', async () => {
-      mockGetServerCapabilities.mockReturnValue({
-        resources: { listChanged: true },
-        // No tools capability
+    try {
+      await vi.waitFor(() => {
+        expect(hook.result.current.isConnected).toBe(true);
+        expect(hook.result.current.tools).toHaveLength(1);
       });
 
-      await render(
-        <McpClientProvider {...providerProps}>
-          <div>Test</div>
-        </McpClientProvider>
+      requestOptions = { timeout: 2_000 };
+      await hook.rerender();
+      await connection.server.close();
+
+      await vi.waitFor(() => {
+        expect(previousOnclose).toHaveBeenCalledOnce();
+        expect(connection.client.transport).toBeUndefined();
+        expect(hook.result.current.isConnected).toBe(false);
+        expect(hook.result.current.tools).toEqual([]);
+        expect(hook.result.current.capabilities).toBeNull();
+      });
+
+      connection.transport.start = vi.fn(async () => {
+        throw new Error('fresh transport required');
+      });
+
+      await hook.act(async () => {
+        await hook.result.current.reconnect(replacementTransport);
+      });
+      await vi.waitFor(() => {
+        expect(hook.result.current.error).toBeNull();
+        expect(hook.result.current.isConnected).toBe(true);
+        expect(hook.result.current.tools.map(({ name }) => name)).toEqual(['replacement_tool']);
+      });
+      expect(connect.mock.calls[1]?.[0]).toBe(replacementTransport);
+      expect(connect.mock.calls[1]?.[1]).toBe(requestOptions);
+      expect(connect).toHaveBeenCalledTimes(2);
+    } finally {
+      await hook.unmount();
+      expect(connection.client.onclose).toBe(previousOnclose);
+      await Promise.allSettled([
+        connection.client.close(),
+        connection.server.close(),
+        replacementServer.close(),
+      ]);
+    }
+  });
+
+  it('keeps the handshake alive and recovers an initial inventory failure', async () => {
+    const connection = await createConnection((server) => {
+      server.registerTool('still_callable', {}, async () => ({
+        content: [{ type: 'text', text: 'usable' }],
+      }));
+    });
+    vi.spyOn(connection.client, 'getServerCapabilities').mockReturnValue({ tools: {} });
+    const listTools = vi
+      .spyOn(connection.client, 'listTools')
+      .mockRejectedValueOnce(new Error('inventory unavailable'))
+      .mockResolvedValue({
+        tools: [{ name: 'recovered_tool', inputSchema: { type: 'object' } }],
+      });
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const hook = await renderHook(() => useMcpClient(), {
+      wrapper: providerFor(connection),
+    });
+
+    try {
+      await vi.waitFor(() => {
+        expect(hook.result.current.error?.message).toBe('inventory unavailable');
+        expect(hook.result.current.isConnected).toBe(true);
+        expect(hook.result.current.isLoading).toBe(false);
+      });
+      expect(connection.client.transport).toBeDefined();
+      await expect(
+        connection.client.callTool({ name: 'still_callable', arguments: {} })
+      ).resolves.toMatchObject({
+        content: [{ type: 'text', text: 'usable' }],
+      });
+
+      await hook.act(async () => {
+        await hook.result.current.reconnect();
+      });
+      await vi.waitFor(() => {
+        expect(hook.result.current.error).toBeNull();
+        expect(hook.result.current.isConnected).toBe(true);
+        expect(hook.result.current.isLoading).toBe(false);
+        expect(hook.result.current.tools.map(({ name }) => name)).toEqual(['recovered_tool']);
+      });
+      expect(listTools).toHaveBeenCalledTimes(2);
+    } finally {
+      consoleError.mockRestore();
+      await hook.unmount();
+      await closeConnection(connection);
+    }
+  });
+
+  it('keeps the last complete inventory when one list refresh fails', async () => {
+    const connection = await createConnection((server) => {
+      server.registerTool('stable_tool', {}, async () => ({
+        content: [{ type: 'text', text: 'stable' }],
+      }));
+      server.registerResource('stable_resource', 'stable://resource', {}, async (uri) => ({
+        contents: [{ uri: uri.href, text: 'stable' }],
+      }));
+    });
+    vi.spyOn(connection.client, 'getServerCapabilities').mockReturnValue({
+      resources: {},
+      tools: {},
+    });
+    const listResources = vi.spyOn(connection.client, 'listResources');
+    const listTools = vi.spyOn(connection.client, 'listTools');
+    const hook = await renderHook(() => useMcpClient(), {
+      wrapper: providerFor(connection),
+    });
+
+    try {
+      await vi.waitFor(() => {
+        expect(hook.result.current.resources.map(({ uri }) => uri)).toEqual(['stable://resource']);
+        expect(hook.result.current.tools.map(({ name }) => name)).toEqual(['stable_tool']);
+      });
+
+      listResources.mockResolvedValueOnce({
+        resources: [{ uri: 'new://resource', name: 'New resource' }],
+      });
+      listTools.mockRejectedValueOnce(new Error('tool inventory unavailable'));
+      await hook.act(async () => hook.result.current.reconnect());
+
+      expect(hook.result.current.error?.message).toBe('tool inventory unavailable');
+      expect(hook.result.current.resources.map(({ uri }) => uri)).toEqual(['stable://resource']);
+      expect(hook.result.current.tools.map(({ name }) => name)).toEqual(['stable_tool']);
+    } finally {
+      await hook.unmount();
+      await closeConnection(connection);
+    }
+  });
+
+  it('clears an inventory error after a subscribed full refresh succeeds', async () => {
+    const connection = await createConnection((server) => {
+      server.registerTool('subscribed_recovery', {}, async () => ({
+        content: [{ type: 'text', text: 'ready' }],
+      }));
+    });
+    vi.spyOn(connection.client, 'getServerCapabilities').mockReturnValue({
+      tools: { listChanged: true },
+    });
+    vi.spyOn(connection.client, 'getProtocolEra').mockReturnValue('modern');
+    const subscription = {
+      honoredFilter: { toolsListChanged: true },
+      close: vi.fn(async () => {}),
+      closed: new Promise<'local' | 'graceful' | 'remote'>(() => {}),
+    };
+    let acknowledgeSubscription!: (value: typeof subscription) => void;
+    const subscriptionAcknowledged = new Promise<typeof subscription>((resolve) => {
+      acknowledgeSubscription = resolve;
+    });
+    const listen = vi
+      .spyOn(connection.client, 'listen')
+      .mockImplementation(async () => subscriptionAcknowledged);
+    const listTools = vi
+      .spyOn(connection.client, 'listTools')
+      .mockRejectedValueOnce(new Error('inventory unavailable'))
+      .mockResolvedValue({
+        tools: [{ name: 'subscribed_recovery', inputSchema: { type: 'object' } }],
+      });
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const hook = await renderHook(() => useMcpClient(), {
+      wrapper: providerFor(connection),
+    });
+
+    try {
+      await vi.waitFor(() => {
+        expect(hook.result.current.error?.message).toBe('inventory unavailable');
+        expect(hook.result.current.isConnected).toBe(true);
+        expect(listen).toHaveBeenCalledTimes(1);
+        expect(listTools).toHaveBeenCalledTimes(1);
+      });
+
+      acknowledgeSubscription(subscription);
+      await vi.waitFor(() => {
+        expect(hook.result.current.error).toBeNull();
+        expect(hook.result.current.tools.map(({ name }) => name)).toEqual(['subscribed_recovery']);
+        expect(listTools).toHaveBeenCalledTimes(2);
+      });
+    } finally {
+      consoleError.mockRestore();
+      await hook.unmount();
+      await closeConnection(connection);
+    }
+  });
+
+  it('refreshes every provider-owned tool and resource list read', async () => {
+    const connection = await createConnection((server) => {
+      server.registerTool('cached_tool', {}, async () => ({
+        content: [{ type: 'text', text: 'tool' }],
+      }));
+      server.registerResource('cached_resource', 'cache://resource', {}, async (uri) => ({
+        contents: [{ uri: uri.href, text: 'resource' }],
+      }));
+    });
+    const listTools = vi.spyOn(connection.client, 'listTools');
+    const listResources = vi.spyOn(connection.client, 'listResources');
+
+    const hook = await renderHook(() => useMcpClient(), {
+      wrapper: providerFor(connection),
+    });
+
+    try {
+      await vi.waitFor(() => {
+        expect(hook.result.current.tools.map(({ name }) => name)).toContain('cached_tool');
+        expect(hook.result.current.resources.map(({ uri }) => uri)).toContain('cache://resource');
+      });
+
+      expect(listTools.mock.calls.length).toBeGreaterThan(0);
+      expect(listResources.mock.calls.length).toBeGreaterThan(0);
+      expect(listTools.mock.calls.every(([, options]) => options?.cacheMode === 'refresh')).toBe(
+        true
       );
+      expect(
+        listResources.mock.calls.every(([, options]) => options?.cacheMode === 'refresh')
+      ).toBe(true);
+    } finally {
+      await hook.unmount();
+      await closeConnection(connection);
+    }
+  });
 
-      await vi.waitFor(() => {
-        expect(mockConnect).toHaveBeenCalled();
-      });
+  it('opens and aborts a modern list-changed subscription', async () => {
+    const connection = await createConnection((server) => {
+      server.registerTool('modern_tool', {}, async () => ({
+        content: [{ type: 'text', text: 'tool' }],
+      }));
+      server.registerResource('modern_resource', 'modern://resource', {}, async (uri) => ({
+        contents: [{ uri: uri.href, text: 'resource' }],
+      }));
+    });
+    vi.spyOn(connection.client, 'getProtocolEra').mockReturnValue('modern');
+    const subscription = {
+      honoredFilter: {
+        toolsListChanged: true,
+        resourcesListChanged: true,
+      },
+      close: vi.fn(async () => {}),
+      closed: new Promise<'local' | 'graceful' | 'remote'>(() => {}),
+    };
+    let acknowledgeSubscription!: (value: typeof subscription) => void;
+    const subscriptionAcknowledged = new Promise<typeof subscription>((resolve) => {
+      acknowledgeSubscription = resolve;
+    });
+    const listen = vi
+      .spyOn(connection.client, 'listen')
+      .mockImplementation(async () => subscriptionAcknowledged);
+    const listTools = vi.spyOn(connection.client, 'listTools');
+    const listResources = vi.spyOn(connection.client, 'listResources');
 
-      // Give time for potential calls
-      await new Promise((r) => setTimeout(r, 50));
-
-      expect(mockListTools).not.toHaveBeenCalled();
+    const hook = await renderHook(() => useMcpClient(), {
+      wrapper: providerFor(connection),
     });
 
-    it('should not fetch resources if capability is not supported', async () => {
-      mockGetServerCapabilities.mockReturnValue({
-        tools: { listChanged: true },
-        // No resources capability
-      });
-
-      await render(
-        <McpClientProvider {...providerProps}>
-          <div>Test</div>
-        </McpClientProvider>
-      );
-
+    let unmounted = false;
+    try {
       await vi.waitFor(() => {
-        expect(mockConnect).toHaveBeenCalled();
+        expect(listen).toHaveBeenCalledTimes(1);
+      });
+      const [filter, options] = listen.mock.calls[0] ?? [];
+      expect(filter).toEqual({
+        toolsListChanged: true,
+        resourcesListChanged: true,
+      });
+      expect(options?.signal?.aborted).toBe(false);
+      expect(listTools).toHaveBeenCalledTimes(1);
+      expect(listResources).toHaveBeenCalledTimes(1);
+
+      acknowledgeSubscription(subscription);
+      await vi.waitFor(() => {
+        expect(listTools).toHaveBeenCalledTimes(2);
+        expect(listResources).toHaveBeenCalledTimes(2);
       });
 
-      // Give time for potential calls
-      await new Promise((r) => setTimeout(r, 50));
+      await hook.unmount();
+      unmounted = true;
 
-      expect(mockListResources).not.toHaveBeenCalled();
+      expect(options?.signal?.aborted).toBe(true);
+    } finally {
+      if (!unmounted) {
+        await hook.unmount();
+      }
+      await closeConnection(connection);
+    }
+  });
+
+  it('refreshes the tool list after a real list_changed notification', async () => {
+    let addTool: (() => void) | undefined;
+    const connection = await createConnection((server) => {
+      server.registerTool('initial', {}, async () => ({
+        content: [{ type: 'text', text: 'initial' }],
+      }));
+      addTool = () => {
+        server.registerTool('added_later', {}, async () => ({
+          content: [{ type: 'text', text: 'added' }],
+        }));
+      };
     });
 
-    it('emits tool-flow trace logs when WEBMCP_TRACE_TOOL_FLOW=1', async () => {
-      const originalDebug = console.debug;
-      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
-      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      window.localStorage.setItem('WEBMCP_TRACE_TOOL_FLOW', '1');
-      // Force capability-missing path that emits a tool-flow event.
-      mockGetServerCapabilities.mockReturnValue({
-        resources: { listChanged: true },
+    const hook = await renderHook(() => useMcpClient(), {
+      wrapper: providerFor(connection),
+    });
+
+    try {
+      await vi.waitFor(() => {
+        expect(hook.result.current.tools.map(({ name }) => name)).toEqual(['initial']);
       });
 
-      try {
-        // Ensure fallback path is also safe if debug is unavailable.
-        Object.defineProperty(console, 'debug', {
-          configurable: true,
-          writable: true,
-          value: undefined,
-        });
+      addTool?.();
 
-        await render(
-          <McpClientProvider {...providerProps}>
-            <div>Test</div>
-          </McpClientProvider>
-        );
+      await vi.waitFor(() => {
+        expect(hook.result.current.tools.map(({ name }) => name)).toEqual([
+          'initial',
+          'added_later',
+        ]);
+      });
+    } finally {
+      await hook.unmount();
+      await closeConnection(connection);
+    }
+  });
 
-        await vi.waitFor(() => {
-          expect(mockConnect).toHaveBeenCalled();
-        });
-
-        await vi.waitFor(() => {
-          expect(logSpy).toHaveBeenCalledWith(
-            '[ReactWebMCP:McpClientProvider:ToolFlow]',
-            expect.stringContaining('listTools:capability_missing'),
-            expect.any(Object)
-          );
-        });
-      } finally {
-        Object.defineProperty(console, 'debug', {
-          configurable: true,
-          writable: true,
-          value: originalDebug,
-        });
-        window.localStorage.removeItem('WEBMCP_TRACE_TOOL_FLOW');
-        debugSpy.mockRestore();
-        logSpy.mockRestore();
+  it('refreshes after installing handlers to close the initial snapshot race', async () => {
+    const connection = await createConnection((server) => {
+      server.registerTool('initial', {}, async () => ({
+        content: [{ type: 'text', text: 'initial' }],
+      }));
+    });
+    let availableTools = [{ name: 'initial', inputSchema: { type: 'object' as const } }];
+    const listTools = vi.spyOn(connection.client, 'listTools').mockImplementation(async () => ({
+      tools: [...availableTools],
+    }));
+    let subscribedAfterInitialSnapshot = false;
+    vi.spyOn(connection.client, 'setNotificationHandler').mockImplementation((method) => {
+      if (method === 'notifications/tools/list_changed') {
+        subscribedAfterInitialSnapshot = listTools.mock.calls.length === 1;
+        availableTools = [
+          ...availableTools,
+          { name: 'added_during_subscription', inputSchema: { type: 'object' as const } },
+        ];
       }
     });
+
+    const hook = await renderHook(() => useMcpClient(), {
+      wrapper: providerFor(connection),
+    });
+
+    try {
+      await vi.waitFor(() => {
+        expect(hook.result.current.tools.map(({ name }) => name)).toEqual([
+          'initial',
+          'added_during_subscription',
+        ]);
+      });
+      expect(subscribedAfterInitialSnapshot).toBe(true);
+      expect(listTools).toHaveBeenCalledTimes(2);
+    } finally {
+      await hook.unmount();
+      await closeConnection(connection);
+    }
   });
 
-  describe('useMcpClient hook', () => {
-    const wrapper = ({ children }: { children: ReactNode }) => (
-      <McpClientProvider {...providerProps}>{children}</McpClientProvider>
-    );
+  it('does not refetch a list when the server cannot notify changes', async () => {
+    const connection = await createConnection((server) => {
+      server.registerTool('stable', {}, async () => ({
+        content: [{ type: 'text', text: 'stable' }],
+      }));
+    });
+    vi.spyOn(connection.client, 'getServerCapabilities').mockReturnValue({ tools: {} });
+    const listTools = vi.spyOn(connection.client, 'listTools');
 
-    it('should provide client instance', async () => {
-      const { result } = await renderHook(() => useMcpClient(), { wrapper });
-
-      await vi.waitFor(() => {
-        expect(result.current.client).toBe(mockClient);
-      });
+    const hook = await renderHook(() => useMcpClient(), {
+      wrapper: providerFor(connection),
     });
 
-    it('should provide connection state', async () => {
-      const { result } = await renderHook(() => useMcpClient(), { wrapper });
-
+    try {
       await vi.waitFor(() => {
-        expect(result.current.isConnected).toBe(true);
-        expect(result.current.isLoading).toBe(false);
+        expect(hook.result.current.isConnected).toBe(true);
+        expect(hook.result.current.tools.map(({ name }) => name)).toEqual(['stable']);
       });
-    });
+      expect(listTools).toHaveBeenCalledTimes(1);
+    } finally {
+      await hook.unmount();
+      await closeConnection(connection);
+    }
+  });
 
-    it('should provide tools list', async () => {
-      mockListTools.mockResolvedValue({
+  it('keeps the newest tool snapshot when overlapping refreshes finish out of order', async () => {
+    const connection = await createConnection((server) => {
+      server.registerTool('initial', {}, async () => ({
+        content: [{ type: 'text', text: 'initial' }],
+      }));
+    });
+    type ToolList = Awaited<ReturnType<Client['listTools']>>;
+    let resolveInitialSnapshot!: (value: ToolList) => void;
+    const initialSnapshot = new Promise<ToolList>((resolve) => {
+      resolveInitialSnapshot = resolve;
+    });
+    const listTools = vi
+      .spyOn(connection.client, 'listTools')
+      .mockImplementationOnce(async () => initialSnapshot)
+      .mockResolvedValueOnce({
         tools: [
-          { name: 'add', description: 'Add numbers' },
-          { name: 'subtract', description: 'Subtract numbers' },
+          { name: 'initial', inputSchema: { type: 'object' } },
+          { name: 'newest', inputSchema: { type: 'object' } },
         ],
       });
 
-      const { result } = await renderHook(() => useMcpClient(), { wrapper });
+    const hook = await renderHook(() => useMcpClient(), {
+      wrapper: providerFor(connection),
+    });
 
+    try {
       await vi.waitFor(() => {
-        expect(result.current.tools).toHaveLength(2);
-        expect(result.current.tools[0].name).toBe('add');
-      });
-    });
-
-    it('should provide resources list', async () => {
-      mockListResources.mockResolvedValue({
-        resources: [{ uri: 'config://app', name: 'App Config' }],
+        expect(listTools).toHaveBeenCalledTimes(2);
+        expect(hook.result.current.isLoading).toBe(true);
+        expect(hook.result.current.tools.map(({ name }) => name)).toEqual(['initial', 'newest']);
       });
 
-      const { result } = await renderHook(() => useMcpClient(), { wrapper });
-
-      await vi.waitFor(() => {
-        expect(result.current.resources).toHaveLength(1);
-        expect(result.current.resources[0].uri).toBe('config://app');
-      });
-    });
-
-    it('should provide server capabilities', async () => {
-      const capabilities = {
-        tools: { listChanged: true },
-        resources: { listChanged: true },
-        prompts: {},
-      };
-      mockGetServerCapabilities.mockReturnValue(capabilities);
-
-      const { result } = await renderHook(() => useMcpClient(), { wrapper });
-
-      await vi.waitFor(() => {
-        expect(result.current.capabilities).toEqual(capabilities);
-      });
-    });
-
-    it('should provide reconnect function', async () => {
-      const { result } = await renderHook(() => useMcpClient(), { wrapper });
-
-      await vi.waitFor(() => {
-        expect(typeof result.current.reconnect).toBe('function');
-      });
-    });
-
-    it('should throw error when used outside provider', async () => {
-      // Suppress console.error for this test
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      let thrownError: Error | null = null;
-      try {
-        await renderHook(() => useMcpClient());
-      } catch (e) {
-        thrownError = e as Error;
-      }
-
-      expect(thrownError).not.toBeNull();
-      expect(thrownError?.message).toBe('useMcpClient must be used within an McpClientProvider');
-
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe('error handling', () => {
-    it('should set error state on connection failure', async () => {
-      const connectionError = new Error('Connection failed');
-      mockConnect.mockRejectedValueOnce(connectionError);
-
-      // Suppress console.error for expected error
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      const wrapper = ({ children }: { children: ReactNode }) => (
-        <McpClientProvider {...providerProps}>{children}</McpClientProvider>
-      );
-
-      const { result } = await renderHook(() => useMcpClient(), { wrapper });
-
-      await vi.waitFor(() => {
-        expect(result.current.error).toEqual(connectionError);
-        expect(result.current.isConnected).toBe(false);
-      });
-
-      consoleSpy.mockRestore();
-    });
-
-    it('surfaces listResources fetch failures with provider logging', async () => {
-      const resourcesError = new Error('Resources unavailable');
-      mockListResources.mockRejectedValue(resourcesError);
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      const wrapper = ({ children }: { children: ReactNode }) => (
-        <McpClientProvider {...providerProps}>{children}</McpClientProvider>
-      );
-
-      try {
-        const { result } = await renderHook(() => useMcpClient(), { wrapper });
-
-        await vi.waitFor(() => {
-          expect(result.current.error?.message).toBe('Resources unavailable');
+      await hook.act(async () => {
+        resolveInitialSnapshot({
+          tools: [{ name: 'initial', inputSchema: { type: 'object' } }],
         });
-
-        expect(result.current.isConnected).toBe(true);
-        expect(consoleSpy).toHaveBeenCalledWith(
-          '[ReactWebMCP:McpClientProvider]',
-          'Error fetching resources:',
-          resourcesError
-        );
-      } finally {
-        consoleSpy.mockRestore();
-      }
-    });
-
-    it('surfaces listTools fetch failures with provider logging', async () => {
-      const toolsError = new Error('Tools unavailable');
-      mockListTools.mockRejectedValue(toolsError);
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      const wrapper = ({ children }: { children: ReactNode }) => (
-        <McpClientProvider {...providerProps}>{children}</McpClientProvider>
-      );
-
-      try {
-        const { result } = await renderHook(() => useMcpClient(), { wrapper });
-
-        await vi.waitFor(() => {
-          expect(result.current.error?.message).toBe('Tools unavailable');
-        });
-
-        expect(result.current.isConnected).toBe(true);
-        expect(consoleSpy).toHaveBeenCalledWith(
-          '[ReactWebMCP:McpClientProvider]',
-          'Error fetching tools:',
-          toolsError
-        );
-      } finally {
-        consoleSpy.mockRestore();
-      }
-    });
-  });
-
-  describe('notification handlers', () => {
-    it('should set up notification handlers for tool changes', async () => {
-      await render(
-        <McpClientProvider {...providerProps}>
-          <div>Test</div>
-        </McpClientProvider>
-      );
-
-      await vi.waitFor(() => {
-        expect(mockSetNotificationHandler).toHaveBeenCalled();
-      });
-    });
-
-    it('should set up notification handlers for resource changes', async () => {
-      await render(
-        <McpClientProvider {...providerProps}>
-          <div>Test</div>
-        </McpClientProvider>
-      );
-
-      await vi.waitFor(() => {
-        expect(mockSetNotificationHandler).toHaveBeenCalled();
-      });
-    });
-
-    it('logs refresh errors when list_changed notifications trigger failing fetches', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      try {
-        await render(
-          <McpClientProvider {...providerProps}>
-            <div>Test</div>
-          </McpClientProvider>
-        );
-
-        await vi.waitFor(() => {
-          expect(mockSetNotificationHandler).toHaveBeenCalledTimes(2);
-        });
-
-        const resourceHandler = mockSetNotificationHandler.mock.calls[0]?.[1] as () => void;
-        const toolsHandler = mockSetNotificationHandler.mock.calls[1]?.[1] as () => void;
-        mockListResources.mockRejectedValueOnce(new Error('resource refresh failed'));
-        mockListTools.mockRejectedValueOnce(new Error('tool refresh failed'));
-
-        resourceHandler();
-        toolsHandler();
-
-        await vi.waitFor(() => {
-          expect(consoleSpy).toHaveBeenCalledWith(
-            '[ReactWebMCP:McpClientProvider]',
-            'Failed to refresh resources after list_changed:',
-            expect.any(Error)
-          );
-        });
-        await vi.waitFor(() => {
-          expect(consoleSpy).toHaveBeenCalledWith(
-            '[ReactWebMCP:McpClientProvider]',
-            'Failed to refresh tools after list_changed:',
-            expect.any(Error)
-          );
-        });
-      } finally {
-        consoleSpy.mockRestore();
-      }
-    });
-
-    it('logs post-handler refresh failures after notification handlers are registered', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockListTools
-        .mockResolvedValueOnce({ tools: [] })
-        .mockRejectedValueOnce(new Error('post-handler refresh failed'));
-
-      try {
-        await render(
-          <McpClientProvider {...providerProps}>
-            <div>Test</div>
-          </McpClientProvider>
-        );
-
-        await vi.waitFor(() => {
-          expect(consoleSpy).toHaveBeenCalledWith(
-            '[ReactWebMCP:McpClientProvider]',
-            'Failed to refresh tools/resources after handler registration:',
-            expect.any(Error)
-          );
-        });
-      } finally {
-        consoleSpy.mockRestore();
-      }
-    });
-  });
-
-  describe('cleanup', () => {
-    it('should clean up on unmount', async () => {
-      const { unmount } = await render(
-        <McpClientProvider {...providerProps}>
-          <div>Test</div>
-        </McpClientProvider>
-      );
-
-      await vi.waitFor(() => {
-        expect(mockConnect).toHaveBeenCalled();
+        await initialSnapshot;
       });
 
-      unmount();
-
-      // Notification handlers should be removed
-      // Note: The exact cleanup behavior depends on the implementation
-    });
-  });
-
-  describe('real transport integration', () => {
-    function uniqueChannelId(prefix: string): string {
-      return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      expect(hook.result.current.tools.map(({ name }) => name)).toEqual(['initial', 'newest']);
+    } finally {
+      await hook.unmount();
+      await closeConnection(connection);
     }
-
-    async function createLiveProvider(): Promise<{
-      server: BrowserMcpServer;
-      providerProps: Pick<McpClientProviderProps, 'client' | 'transport'>;
-    }> {
-      const channelId = uniqueChannelId('mcp-client-provider-live');
-      const server = new BrowserMcpServer({
-        name: 'react-webmcp-test-server',
-        version: '1.0.0',
-      });
-      const serverTransport = new TabServerTransport({
-        channelId,
-        allowedOrigins: [window.location.origin],
-      });
-      await server.connect(serverTransport);
-
-      const client = new Client({ name: 'react-webmcp-test-client', version: '1.0.0' });
-      const clientTransport = new TabClientTransport({
-        targetOrigin: window.location.origin,
-        channelId,
-      });
-      liveConnections.push({ client, clientTransport, server, serverTransport });
-
-      return {
-        server,
-        providerProps: {
-          client: client as unknown as McpClientProviderProps['client'],
-          transport: clientTransport as unknown as McpClientProviderProps['transport'],
-        },
-      };
-    }
-
-    it('connects through real transport and loads tools from server', async () => {
-      const { server, providerProps: liveProviderProps } = await createLiveProvider();
-
-      server.registerTool({
-        name: 'live_echo',
-        description: 'Echoes message',
-        inputSchema: {
-          type: 'object',
-          properties: { message: { type: 'string' } },
-          required: ['message'],
-        },
-        async execute(args) {
-          return {
-            content: [{ type: 'text', text: `echo:${String(args.message ?? '')}` }],
-          };
-        },
-      });
-
-      const wrapper = ({ children }: { children: ReactNode }) => (
-        <McpClientProvider {...liveProviderProps}>{children}</McpClientProvider>
-      );
-
-      const { result } = await renderHook(() => useMcpClient(), { wrapper });
-
-      await vi.waitFor(() => {
-        expect(result.current.isConnected).toBe(true);
-      });
-
-      await vi.waitFor(() => {
-        expect(result.current.tools.some((tool) => tool.name === 'live_echo')).toBe(true);
-      });
-
-      const callResult = await result.current.client.callTool({
-        name: 'live_echo',
-        arguments: { message: 'hello' },
-      });
-
-      expect(callResult.content[0]).toMatchObject({ type: 'text', text: 'echo:hello' });
-    });
-
-    it('refreshes tool list after real list_changed notifications', async () => {
-      const { server, providerProps: liveProviderProps } = await createLiveProvider();
-      const wrapper = ({ children }: { children: ReactNode }) => (
-        <McpClientProvider {...liveProviderProps}>{children}</McpClientProvider>
-      );
-
-      const { result } = await renderHook(() => useMcpClient(), { wrapper });
-
-      await vi.waitFor(() => {
-        expect(result.current.isConnected).toBe(true);
-      });
-
-      await vi.waitFor(() => {
-        expect(result.current.tools).toEqual([]);
-      });
-
-      server.registerTool({
-        name: 'list_changed_tool',
-        description: 'Added after provider connection',
-        inputSchema: {},
-        async execute() {
-          return { content: [{ type: 'text', text: 'ok' }] };
-        },
-      });
-
-      await vi.waitFor(() => {
-        expect(result.current.tools.some((tool) => tool.name === 'list_changed_tool')).toBe(true);
-      });
-    });
   });
 });

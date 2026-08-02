@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Copies the built Smart DOM Reader library into the MCP server location.
-// Source: ../../dist/index.js (ESM, single file, no chunks)
+// Source: ../../dist/index.mjs (ESM, single file, no chunks)
 // Dest:   ../lib/smart-dom-reader.bundle.js
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const src = resolve(__dirname, '../../dist/index.js');
+const src = resolve(__dirname, '../../dist/index.mjs');
 const destDir = resolve(__dirname, '../lib');
 const dest = join(destDir, 'smart-dom-reader.bundle.js');
 

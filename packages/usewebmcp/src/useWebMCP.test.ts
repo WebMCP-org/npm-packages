@@ -1,36 +1,46 @@
 import { initializeWebModelContext } from '@mcp-b/global';
-import type {
-  JsonValue,
-  ModelContextTestingPolyfillExtensions,
-  ModelContextWithExtensions,
-} from '@mcp-b/webmcp-types';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CallToolResult, ChromeModelContext, ModelContext } from '@mcp-b/webmcp-types';
+import { StrictMode, Suspense, createElement, useLayoutEffect } from 'react';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
-
+import { z } from 'zod';
 import { useWebMCP } from './useWebMCP.js';
 
-function listRegisteredToolNames(): string[] {
-  return (navigator.modelContext as ModelContextWithExtensions).listTools().map((t) => t.name);
+const TEST_CHANNEL_ID = `usewebmcp-browser-${Date.now()}`;
+
+function hasDescriptorExecution(context: ModelContext): context is ChromeModelContext {
+  return 'executeTool' in context && typeof context.executeTool === 'function';
 }
 
-const TEST_CHANNEL_ID = `useWebMCP-test-${Date.now()}`;
-
-function parseSerializedToolResponse(result: string | null | undefined): {
-  content: Array<{ type: string; text?: string }>;
-  structuredContent?: JsonValue;
-} {
-  if (!result) {
-    throw new Error('Expected serialized tool response, received null/undefined');
+async function executeRegisteredTool(
+  name: string,
+  args: Record<string, unknown> = {}
+): Promise<CallToolResult> {
+  const modelContext = document.modelContext;
+  if (!hasDescriptorExecution(modelContext)) {
+    throw new Error('Chrome descriptor execution is unavailable');
   }
-  return JSON.parse(result) as {
-    content: Array<{ type: string; text?: string }>;
-    structuredContent?: JsonValue;
-  };
+
+  const tool = (await modelContext.getTools()).find((candidate) => candidate.name === name);
+  if (!tool) {
+    throw new Error(`Tool not found: ${name}`);
+  }
+
+  const serialized = await modelContext.executeTool(tool, JSON.stringify(args));
+  if (serialized === null) {
+    throw new Error(`Tool execution was interrupted: ${name}`);
+  }
+
+  return JSON.parse(serialized) as CallToolResult;
 }
 
-describe('useWebMCP', () => {
+async function findTool(name: string) {
+  return (await document.modelContext.getTools()).find((tool) => tool.name === name);
+}
+
+describe('useWebMCP in a browser runtime', () => {
   beforeAll(() => {
-    if (!navigator.modelContext) {
+    if (!document.modelContext) {
       initializeWebModelContext({
         transport: {
           tabServer: {
@@ -42,1730 +52,330 @@ describe('useWebMCP', () => {
     }
   });
 
-  beforeEach(() => {
-    (
-      navigator.modelContextTesting as
-        | (Navigator['modelContextTesting'] & Partial<ModelContextTestingPolyfillExtensions>)
-        | undefined
-    )?.reset?.();
-  });
-
-  describe('initial state', () => {
-    it('should have correct initial state', async () => {
-      const { result } = await renderHook(() =>
+  it('registers, executes, and unregisters a real WebMCP tool', async () => {
+    const { act, result, unmount } = await renderHook(
+      () =>
         useWebMCP({
-          name: 'test_tool',
-          description: 'Test tool',
-          handler: async () => 'result',
-        })
-      );
-
-      expect(result.current.state).toEqual({
-        isExecuting: false,
-        lastResult: null,
-        error: null,
-        executionCount: 0,
-      });
-    });
-
-    it('should provide execute and reset functions', async () => {
-      const { result } = await renderHook(() =>
-        useWebMCP({
-          name: 'test_tool',
-          description: 'Test tool',
-          handler: async () => 'result',
-        })
-      );
-
-      expect(typeof result.current.execute).toBe('function');
-      expect(typeof result.current.reset).toBe('function');
-    });
-
-    it('throws when neither execute nor handler is provided', async () => {
-      let thrownError: Error | null = null;
-
-      try {
-        await renderHook(() =>
-          useWebMCP({
-            name: 'missing_impl_tool',
-            description: 'Missing implementation',
-          } as never)
-        );
-      } catch (error) {
-        thrownError = error as Error;
-      }
-
-      expect(thrownError).toBeInstanceOf(Error);
-      expect(thrownError?.message).toContain(
-        'must provide an implementation via config.execute or config.handler'
-      );
-    });
-  });
-
-  describe('tool registration', () => {
-    it('should register tool with document.modelContext', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'my_tool',
-          description: 'My test tool',
-          handler: async () => 'result',
-        })
-      );
-
-      const tools = navigator.modelContextTesting?.listTools();
-      expect(tools).toHaveLength(1);
-      expect(tools[0].name).toBe('my_tool');
-      expect(tools[0].description).toBe('My test tool');
-    });
-
-    it('should register tool when config uses execute', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'my_execute_tool',
-          description: 'Tool using execute config',
-          execute: async () => 'result',
-        })
-      );
-
-      const tools = navigator.modelContextTesting?.listTools();
-      expect(tools).toHaveLength(1);
-      expect(tools[0].name).toBe('my_execute_tool');
-      expect(tools[0].description).toBe('Tool using execute config');
-    });
-
-    it('should register tool with input schema', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'greet',
-          description: 'Greet someone',
+          name: 'browser_greet',
+          description: 'Greets a person',
           inputSchema: {
             type: 'object',
             properties: { name: { type: 'string' } },
             required: ['name'],
           } as const,
-          handler: async ({ name }) => `Hello, ${name}!`,
-        })
-      );
+          execute: async ({ name }) => `Hello, ${name}`,
+        }),
+      { wrapper: ({ children }) => createElement(StrictMode, null, children) }
+    );
 
-      const tools = navigator.modelContextTesting?.listTools();
-      expect(tools).toHaveLength(1);
-      expect(tools[0].name).toBe('greet');
-      // The testing API returns inputSchema as a JSON string
-      const inputSchema = JSON.parse(tools[0].inputSchema);
-      expect(inputSchema.properties).toHaveProperty('name');
+    const tool = await findTool('browser_greet');
+    expect(tool?.description).toBe('Greets a person');
+    expect(JSON.parse(tool?.inputSchema ?? '{}')).toMatchObject({
+      type: 'object',
+      required: ['name'],
     });
 
-    it('should unregister tool on unmount', async () => {
-      const { unmount } = await renderHook(() =>
-        useWebMCP({
-          name: 'temp_tool',
-          description: 'Temporary tool',
-          handler: async () => 'result',
-        })
-      );
+    let response: CallToolResult | undefined;
+    await act(async () => {
+      response = await executeRegisteredTool('browser_greet', { name: 'Ada' });
+    });
+    expect(response?.content[0]).toMatchObject({ type: 'text', text: 'Hello, Ada' });
+    expect(result.current.state.lastResult).toBe('Hello, Ada');
+    expect(result.current.state.executionCount).toBe(1);
 
-      expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
+    unmount();
+    expect(await findTool('browser_greet')).toBeUndefined();
+  });
 
-      unmount();
+  it('publishes JSON structured content when an output schema is present', async () => {
+    const { act } = await renderHook(() =>
+      useWebMCP({
+        name: 'browser_total',
+        description: 'Adds two numbers',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            left: { type: 'number' },
+            right: { type: 'number' },
+          },
+          required: ['left', 'right'],
+        } as const,
+        outputSchema: {
+          type: 'object',
+          properties: { total: { type: 'number' } },
+          required: ['total'],
+        } as const,
+        execute: async ({ left, right }) => ({ total: left + right }),
+      })
+    );
 
-      expect(navigator.modelContextTesting?.listTools()).toHaveLength(0);
+    let response: CallToolResult | undefined;
+    await act(async () => {
+      response = await executeRegisteredTool('browser_total', { left: 3, right: 4 });
+    });
+    expect(response?.structuredContent).toEqual({ total: 7 });
+  });
+
+  it('records non-serializable schema output as an execution error', async () => {
+    const cyclic: { self?: unknown } = {};
+    cyclic.self = cyclic;
+    const { act, result } = await renderHook(() =>
+      useWebMCP({
+        name: 'browser_invalid_output',
+        description: 'Returns invalid structured output',
+        outputSchema: { type: 'object', properties: { ok: { type: 'boolean' } } } as const,
+        execute: async () => cyclic as { ok?: boolean },
+      })
+    );
+
+    let response: CallToolResult | undefined;
+    await act(async () => {
+      response = await executeRegisteredTool('browser_invalid_output');
+    });
+    expect(response?.isError).toBe(true);
+    expect(result.current.state.executionCount).toBe(0);
+    expect(result.current.state.error?.message).toContain('JSON-serializable');
+  });
+
+  it('tracks manual execution, errors, and reset state', async () => {
+    const { act, result } = await renderHook(() =>
+      useWebMCP({
+        name: 'browser_state',
+        description: 'Exercises hook state',
+        inputSchema: {
+          type: 'object',
+          properties: { value: { type: 'number' } },
+          required: ['value'],
+        } as const,
+        execute: async ({ value }) => {
+          if (value < 0) throw new Error('value must be positive');
+          return value * 2;
+        },
+      })
+    );
+
+    await act(async () => {
+      await result.current.execute({ value: 5 });
+    });
+    expect(result.current.state.lastResult).toBe(10);
+
+    await act(async () => {
+      await expect(result.current.execute({ value: -1 })).rejects.toThrow('value must be positive');
+    });
+    expect(result.current.state.error?.message).toBe('value must be positive');
+
+    await act(async () => result.current.reset());
+    expect(result.current.state).toEqual({
+      isExecuting: false,
+      lastResult: null,
+      error: null,
+      executionCount: 0,
     });
   });
 
-  describe('execute', () => {
-    it('should execute config execute function and update state', async () => {
-      const toolExecute = vi.fn().mockResolvedValue('success');
+  it('keeps isExecuting true until every overlapping execution settles', async () => {
+    const resolvers = new Map<string, (value: string) => void>();
+    const { act, result } = await renderHook(() =>
+      useWebMCP({
+        name: 'browser_concurrent_state',
+        description: 'Tracks concurrent executions',
+        inputSchema: {
+          type: 'object',
+          properties: { id: { type: 'string' } },
+          required: ['id'],
+        } as const,
+        execute: ({ id }) => new Promise<string>((resolve) => resolvers.set(id, resolve)),
+      })
+    );
 
-      const { result, act } = await renderHook(() =>
-        useWebMCP({
-          name: 'test_execute_tool',
-          description: 'Test',
-          execute: toolExecute,
-        })
-      );
-
-      await act(async () => {
-        await result.current.execute({ foo: 'bar' });
-      });
-
-      expect(toolExecute).toHaveBeenCalledWith({ foo: 'bar' });
-      expect(result.current.state.lastResult).toBe('success');
-      expect(result.current.state.executionCount).toBe(1);
+    let first!: Promise<unknown>;
+    let second!: Promise<unknown>;
+    await act(async () => {
+      first = result.current.execute({ id: 'first' });
+      second = result.current.execute({ id: 'second' });
     });
+    expect(result.current.state.isExecuting).toBe(true);
 
-    it('should execute handler and update state', async () => {
-      const handler = vi.fn().mockResolvedValue('success');
-
-      const { result, act } = await renderHook(() =>
-        useWebMCP({
-          name: 'test_tool',
-          description: 'Test',
-          handler,
-        })
-      );
-
-      await act(async () => {
-        await result.current.execute({ foo: 'bar' });
-      });
-
-      expect(handler).toHaveBeenCalledWith({ foo: 'bar' });
-      expect(result.current.state.lastResult).toBe('success');
-      expect(result.current.state.executionCount).toBe(1);
+    await act(async () => {
+      resolvers.get('first')?.('first');
+      await first;
     });
+    expect(result.current.state.isExecuting).toBe(true);
 
-    it('should prefer execute over handler when both are provided', async () => {
-      const toolExecute = vi.fn().mockResolvedValue('from_execute');
-      const handler = vi.fn().mockResolvedValue('from_handler');
-
-      const { result, act } = await renderHook(() =>
-        useWebMCP({
-          name: 'both_execute_and_handler_tool',
-          description: 'Test',
-          execute: toolExecute,
-          handler,
-        })
-      );
-
-      await act(async () => {
-        await result.current.execute({ value: 1 });
-      });
-
-      expect(toolExecute).toHaveBeenCalledWith({ value: 1 });
-      expect(handler).not.toHaveBeenCalled();
-      expect(result.current.state.lastResult).toBe('from_execute');
+    await act(async () => {
+      resolvers.get('second')?.('second');
+      await second;
     });
-
-    it('should pass input to handler', async () => {
-      const handler = vi.fn().mockResolvedValue('valid');
-
-      const { result, act } = await renderHook(() =>
-        useWebMCP({
-          name: 'typed_tool',
-          description: 'Test',
-          inputSchema: {
-            type: 'object',
-            properties: { count: { type: 'number' } },
-            required: ['count'],
-          } as const,
-          handler,
-        })
-      );
-
-      // Valid input
-      await act(async () => {
-        await result.current.execute({ count: 42 });
-      });
-
-      expect(handler).toHaveBeenCalledWith({ count: 42 });
-    });
-
-    it('should handle errors and update state', async () => {
-      const handler = vi.fn().mockRejectedValue(new Error('Handler failed'));
-
-      const { result, act } = await renderHook(() =>
-        useWebMCP({
-          name: 'failing_tool',
-          description: 'Test',
-          handler,
-        })
-      );
-
-      await act(async () => {
-        try {
-          await result.current.execute({});
-        } catch {
-          // Expected
-        }
-      });
-
-      expect(result.current.state.error).toBeInstanceOf(Error);
-      expect(result.current.state.error?.message).toBe('Handler failed');
-      expect(result.current.state.isExecuting).toBe(false);
-    });
+    expect(result.current.state.isExecuting).toBe(false);
   });
 
-  describe('MCP tool execution via testing API', () => {
-    it('should execute tool via modelContextTesting', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'echo_tool',
-          description: 'Echo input',
-          inputSchema: {
-            type: 'object',
-            properties: { message: { type: 'string' } },
-            required: ['message'],
-          } as const,
-          handler: async ({ message }) => `Echo: ${message}`,
-        })
-      );
-
-      const result = await navigator.modelContextTesting?.executeTool(
-        'echo_tool',
-        JSON.stringify({ message: 'hello' })
-      );
-
-      const parsed = parseSerializedToolResponse(result);
-      expect(parsed.content[0]?.type).toBe('text');
-      expect(parsed.content[0]?.text).toBe('Echo: hello');
+  it('normalizes raw JSON and passes through existing MCP responses', async () => {
+    const { act } = await renderHook(() => {
+      useWebMCP({
+        name: 'browser_response',
+        description: 'Returns an MCP response',
+        execute: async () => ({
+          content: [{ type: 'text' as const, text: 'ready' }],
+          isError: false,
+        }),
+      });
+      useWebMCP({
+        name: 'browser_raw_json',
+        description: 'Returns raw JSON',
+        execute: async () => ({ ready: true }),
+      });
     });
 
-    it('should return structured content when outputSchema is provided', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'calc_tool',
-          description: 'Calculate',
-          inputSchema: {
-            type: 'object',
-            properties: { a: { type: 'number' }, b: { type: 'number' } },
-            required: ['a', 'b'],
-          } as const,
-          outputSchema: { type: 'object', properties: { result: { type: 'number' } } } as const,
-          handler: async ({ a, b }) => ({ result: a + b }),
-        })
-      );
-
-      const result = await navigator.modelContextTesting?.executeTool(
-        'calc_tool',
-        JSON.stringify({ a: 5, b: 3 })
-      );
-
-      const parsed = parseSerializedToolResponse(result);
-      expect(parsed.structuredContent).toEqual({ result: 8 });
+    let response: CallToolResult | undefined;
+    let rawResponse: CallToolResult | undefined;
+    await act(async () => {
+      [response, rawResponse] = await Promise.all([
+        executeRegisteredTool('browser_response'),
+        executeRegisteredTool('browser_raw_json'),
+      ]);
     });
+    expect(response).toEqual({
+      content: [{ type: 'text', text: 'ready' }],
+      isError: false,
+    });
+    expect(rawResponse?.structuredContent).toEqual({ ready: true });
   });
 
-  describe('callbacks', () => {
-    it('should call onSuccess after successful execution', async () => {
-      const onSuccess = vi.fn();
-      const handler = vi.fn().mockResolvedValue('result');
-
-      const { result, act } = await renderHook(() =>
+  it('uses the latest implementation without re-registering the descriptor', async () => {
+    const registerTool = vi.spyOn(document.modelContext, 'registerTool');
+    const { act, rerender, unmount } = await renderHook(
+      ({ version }) =>
         useWebMCP({
-          name: 'test_tool',
-          description: 'Test',
-          handler,
-          onSuccess,
-        })
-      );
+          name: 'browser_latest_execute',
+          description: 'Uses the latest closure',
+          execute: async () => version,
+        }),
+      { initialProps: { version: 'first' } }
+    );
 
-      await act(async () => {
-        await result.current.execute({ input: 'value' });
-      });
+    const registrationsAfterMount = registerTool.mock.calls.filter(
+      ([tool]) => tool.name === 'browser_latest_execute'
+    ).length;
+    await rerender({ version: 'second' });
 
-      expect(onSuccess).toHaveBeenCalledWith('result', { input: 'value' });
+    let response: CallToolResult | undefined;
+    await act(async () => {
+      response = await executeRegisteredTool('browser_latest_execute');
     });
-
-    it('should call onError after failed execution', async () => {
-      const onError = vi.fn();
-      const error = new Error('Failure');
-      const handler = vi.fn().mockRejectedValue(error);
-
-      const { result, act } = await renderHook(() =>
-        useWebMCP({
-          name: 'test_tool',
-          description: 'Test',
-          handler,
-          onError,
-        })
-      );
-
-      await act(async () => {
-        try {
-          await result.current.execute({ input: 'value' });
-        } catch {
-          // Expected
-        }
-      });
-
-      expect(onError).toHaveBeenCalledWith(error, { input: 'value' });
-    });
+    expect(response?.content[0]).toMatchObject({ type: 'text', text: 'second' });
+    expect(
+      registerTool.mock.calls.filter(([tool]) => tool.name === 'browser_latest_execute')
+    ).toHaveLength(registrationsAfterMount);
+    registerTool.mockRestore();
+    unmount();
   });
 
-  describe('reset', () => {
-    it('should reset state to initial values', async () => {
-      const handler = vi.fn().mockResolvedValue('result');
-
-      const { result, act } = await renderHook(() =>
-        useWebMCP({
-          name: 'test_tool',
-          description: 'Test',
-          handler,
-        })
-      );
-
-      await act(async () => {
-        await result.current.execute({});
-      });
-
-      expect(result.current.state.lastResult).toBe('result');
-      expect(result.current.state.executionCount).toBe(1);
-
-      await act(async () => {
-        result.current.reset();
-      });
-
-      expect(result.current.state).toEqual({
-        isExecuting: false,
-        lastResult: null,
-        error: null,
-        executionCount: 0,
-      });
-    });
-  });
-
-  describe('re-registration behavior', () => {
-    it('should not re-register when rerendered with unchanged config', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
-      const stableHandler = async () => 'result';
-
-      try {
-        const { rerender } = await renderHook(() =>
-          useWebMCP({
-            name: 'stable_tool',
-            description: 'Stable tool',
-            handler: stableHandler,
-          })
-        );
-
-        expect(registerToolSpy).toHaveBeenCalledTimes(1);
-        expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
-
-        await rerender();
-
-        expect(registerToolSpy).toHaveBeenCalledTimes(1);
-        expect(navigator.modelContextTesting?.listTools()).toHaveLength(1);
-      } finally {
-        registerToolSpy.mockRestore();
-      }
-    });
-
-    it('should not re-register when schema or annotations references change without deps', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
-
-      try {
-        const { rerender } = await renderHook(
-          ({ inputSchema, outputSchema, annotations }) =>
-            useWebMCP({
-              name: 'stable_descriptor_tool',
-              description: 'Stable descriptor tool',
-              inputSchema,
-              outputSchema,
-              annotations,
-              handler: async () => ({ value: 'test' }),
-            }),
-          {
-            initialProps: {
-              inputSchema: {
-                type: 'object',
-                properties: { name: { type: 'string' } },
-                required: ['name'],
-              } as const,
-              outputSchema: {
-                type: 'object',
-                properties: { value: { type: 'string' } },
-              } as const,
-              annotations: { readOnlyHint: true } as const,
-            },
-          }
-        );
-
-        const initialCallCount = registerToolSpy.mock.calls.length;
-
-        await rerender({
-          inputSchema: {
-            type: 'object',
-            properties: { name: { type: 'string' } },
-            required: ['name'],
-          } as const,
-          outputSchema: {
-            type: 'object',
-            properties: { value: { type: 'string' } },
-          } as const,
-          annotations: { readOnlyHint: true },
+  it('publishes the latest implementation before later layout effects', async () => {
+    let observed: string | undefined;
+    const pending = new Promise<never>(() => {});
+    const hook = await renderHook(
+      ({ value }) => {
+        const tool = useWebMCP({
+          name: 'browser_layout_execute',
+          description: 'Publishes at commit',
+          execute: () => {
+            observed = value;
+            return pending;
+          },
         });
+        useLayoutEffect(() => {
+          void tool.execute({});
+        }, [tool.execute, value]);
+      },
+      { initialProps: { value: 'first' } }
+    );
 
-        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
-      } finally {
-        registerToolSpy.mockRestore();
+    expect(observed).toBe('first');
+    await hook.rerender({ value: 'second' });
+    expect(observed).toBe('second');
+  });
+
+  it('does not publish an implementation from a suspended render', async () => {
+    const pending = new Promise<never>(() => {});
+    const hook = await renderHook(
+      ({ value, suspend }: { value: string; suspend?: boolean }) => {
+        const tool = useWebMCP({
+          name: 'browser_committed_execute',
+          description: 'Uses only committed closures',
+          execute: async () => value,
+        });
+        if (suspend) throw pending;
+        return tool;
+      },
+      {
+        initialProps: { value: 'committed' },
+        wrapper: ({ children }) => createElement(Suspense, { fallback: null }, children),
       }
+    );
+
+    await hook.rerender({ value: 'uncommitted', suspend: true });
+
+    let response: CallToolResult | undefined;
+    await hook.act(async () => {
+      response = await executeRegisteredTool('browser_committed_execute');
     });
-
-    it('should re-register when name changes', async () => {
-      const { rerender } = await renderHook(
-        ({ name }) =>
-          useWebMCP({
-            name,
-            description: 'Test',
-            handler: async () => 'result',
-          }),
-        { initialProps: { name: 'tool_v1' } }
-      );
-
-      expect(navigator.modelContextTesting?.listTools()[0].name).toBe('tool_v1');
-
-      await rerender({ name: 'tool_v2' });
-
-      expect(navigator.modelContextTesting?.listTools()[0].name).toBe('tool_v2');
-    });
-
-    it('should re-register when description changes', async () => {
-      const { rerender } = await renderHook(
-        ({ description }) =>
-          useWebMCP({
-            name: 'test_tool',
-            description,
-            handler: async () => 'result',
-          }),
-        { initialProps: { description: 'Version 1' } }
-      );
-
-      expect(navigator.modelContextTesting?.listTools()[0].description).toBe('Version 1');
-
-      await rerender({ description: 'Version 2' });
-
-      expect(navigator.modelContextTesting?.listTools()[0].description).toBe('Version 2');
-    });
+    expect(response?.content[0]).toMatchObject({ type: 'text', text: 'committed' });
+    await hook.unmount();
   });
 
-  describe('defaultFormatOutput', () => {
-    it('should format non-string output as JSON via MCP response', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'json_tool',
-          description: 'Returns an object',
-          handler: async () => ({ key: 'value', count: 42 }),
-        })
-      );
-
-      const result = await navigator.modelContextTesting?.executeTool(
-        'json_tool',
-        JSON.stringify({})
-      );
-
-      const parsed = parseSerializedToolResponse(result);
-      expect(parsed.content[0]?.type).toBe('text');
-      // Non-string output should be JSON.stringified with indentation
-      expect(parsed.content[0]?.text).toBe(JSON.stringify({ key: 'value', count: 42 }, null, 2));
-    });
-
-    it('should return string output as-is via MCP response', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'string_tool',
-          description: 'Returns a string',
-          handler: async () => 'plain string result',
-        })
-      );
-
-      const result = await navigator.modelContextTesting?.executeTool(
-        'string_tool',
-        JSON.stringify({})
-      );
-
-      const parsed = parseSerializedToolResponse(result);
-      expect(parsed.content[0]?.text).toBe('plain string result');
-    });
-  });
-
-  describe('custom formatOutput', () => {
-    it('should use custom formatOutput for MCP text response', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'custom_fmt_tool',
-          description: 'Custom format',
-          handler: async () => ({ x: 1, y: 2 }),
-          formatOutput: (output) =>
-            `x=${(output as { x: number }).x},y=${(output as { y: number }).y}`,
-        })
-      );
-
-      const result = await navigator.modelContextTesting?.executeTool(
-        'custom_fmt_tool',
-        JSON.stringify({})
-      );
-
-      const parsed = parseSerializedToolResponse(result);
-      expect(parsed.content[0]?.text).toBe('x=1,y=2');
-    });
-  });
-
-  describe('MCP handler error path', () => {
-    it('should handle handler errors via MCP (testing API throws on isError)', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'error_mcp_tool',
-          description: 'Throws an error',
-          handler: async () => {
-            throw new Error('MCP handler error');
-          },
-        })
-      );
-
-      // The testing API converts isError responses to thrown DOMException
-      await expect(
-        navigator.modelContextTesting?.executeTool('error_mcp_tool', JSON.stringify({}))
-      ).rejects.toThrow();
-    });
-
-    it('should handle validation errors via MCP (testing API throws on isError)', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'validation_error_tool',
-          description: 'Has input validation',
-          inputSchema: {
-            type: 'object',
-            properties: { count: { type: 'number' } },
-            required: ['count'],
-          } as const,
-          handler: async ({ count }) => `Count: ${count}`,
-        })
-      );
-
-      // The bridge validates input before calling the hook's mcpHandler.
-      // Validation errors result in isError response, which testing API throws.
-      await expect(
-        navigator.modelContextTesting?.executeTool(
-          'validation_error_tool',
-          JSON.stringify({ count: 'not-a-number' })
-        )
-      ).rejects.toThrow();
-    });
-
-    it('should handle non-Error thrown values via MCP', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'string_throw_tool',
-          description: 'Throws a string',
-          handler: async () => {
-            throw 'raw string error';
-          },
-        })
-      );
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('string_throw_tool', JSON.stringify({}))
-      ).rejects.toThrow();
-    });
-  });
-
-  describe('execute with non-Error thrown values', () => {
-    it('should wrap non-Error thrown values in Error', async () => {
-      const handler = vi.fn().mockRejectedValue('string error');
-
-      const { result, act } = await renderHook(() =>
-        useWebMCP({
-          name: 'non_error_tool',
-          description: 'Test',
-          handler,
-        })
-      );
-
-      await act(async () => {
-        try {
-          await result.current.execute({});
-        } catch {
-          // Expected
-        }
-      });
-
-      expect(result.current.state.error).toBeInstanceOf(Error);
-      expect(result.current.state.error?.message).toBe('string error');
-    });
-  });
-
-  describe('outputSchema with non-object result', () => {
-    it('should throw error when outputSchema is defined but handler returns non-object', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'bad_output_tool',
-          description: 'Returns string with outputSchema',
-          outputSchema: { type: 'object', properties: { value: { type: 'string' } } } as const,
-          // @ts-expect-error - intentionally returning wrong type for test
-          handler: async () => 'not an object',
-        })
-      );
-
-      // The mcpHandler catches the error and returns isError response.
-      // The testing API converts isError responses to thrown DOMExceptions.
-      await expect(
-        navigator.modelContextTesting?.executeTool('bad_output_tool', JSON.stringify({}))
-      ).rejects.toThrow();
-    });
-
-    it('should throw error when outputSchema is defined but handler returns an array', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'array_output_tool',
-          description: 'Returns array with outputSchema',
-          outputSchema: {
-            type: 'object',
-            properties: { items: { type: 'array', items: { type: 'string' } } },
-          } as const,
-          // @ts-expect-error - intentionally returning wrong type for test
-          handler: async () => ['item1', 'item2'],
-        })
-      );
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('array_output_tool', JSON.stringify({}))
-      ).rejects.toThrow();
-    });
-
-    it('should allow primitive structured outputs when outputSchema is primitive', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'primitive_schema_tool',
-          description: 'Returns primitive with primitive output schema',
-          outputSchema: { type: 'string' } as const,
-          handler: async () => 'ready',
-        })
-      );
-
-      const result = await navigator.modelContextTesting?.executeTool(
-        'primitive_schema_tool',
-        JSON.stringify({})
-      );
-      const parsed = parseSerializedToolResponse(result);
-      expect(parsed.isError).not.toBe(true);
-      expect(parsed.structuredContent).toBe('ready');
-    });
-
-    it('should allow array structured outputs when outputSchema is array', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'array_schema_tool',
-          description: 'Returns array with array output schema',
-          outputSchema: { type: 'array', items: { type: 'number' } } as const,
-          handler: async () => [1, 2, 3],
-        })
-      );
-
-      const result = await navigator.modelContextTesting?.executeTool(
-        'array_schema_tool',
-        JSON.stringify({})
-      );
-      const parsed = parseSerializedToolResponse(result);
-      expect(parsed.isError).not.toBe(true);
-      expect(parsed.structuredContent).toEqual([1, 2, 3]);
-    });
-    it('should throw error when outputSchema is defined but handler returns null', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'null_output_tool',
-          description: 'Returns null with outputSchema',
-          outputSchema: { type: 'object', properties: { value: { type: 'string' } } } as const,
-          // @ts-expect-error - intentionally returning wrong type for test
-          handler: async () => null,
-        })
-      );
-
-      await expect(
-        navigator.modelContextTesting?.executeTool('null_output_tool', JSON.stringify({}))
-      ).rejects.toThrow();
-    });
-  });
-
-  describe('annotations', () => {
-    it('should register tool with annotations', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'annotated_tool',
-          description: 'Tool with annotations',
-          annotations: {
-            destructiveHint: true,
-            idempotentHint: false,
-          },
-          handler: async () => 'result',
-        })
-      );
-
-      const tools = navigator.modelContextTesting?.listTools();
-      expect(tools).toHaveLength(1);
-      expect(tools[0].name).toBe('annotated_tool');
-    });
-  });
-
-  describe('output schema registration', () => {
-    it('should register tool with output schema in the tool definition', async () => {
-      await renderHook(() =>
-        useWebMCP({
-          name: 'output_schema_tool',
-          description: 'Tool with output schema',
-          outputSchema: { type: 'object', properties: { message: { type: 'string' } } } as const,
-          handler: async () => ({ message: 'hello' }),
-        })
-      );
-
-      const tools = navigator.modelContextTesting?.listTools();
-      expect(tools).toHaveLength(1);
-      expect(tools[0].name).toBe('output_schema_tool');
-    });
-  });
-
-  describe('deps parameter', () => {
-    it('should re-register when deps change', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
-
-      try {
-        const { rerender } = await renderHook(
-          ({ count }) =>
-            useWebMCP(
-              {
-                name: 'deps_tool',
-                description: `Count: ${count}`,
-                handler: async () => `count is ${count}`,
+  it('re-registers metadata only when declared dependencies change', async () => {
+    const { rerender } = await renderHook(
+      ({ revision }) =>
+        useWebMCP(
+          {
+            name: 'browser_dependency',
+            description: 'Uses explicit descriptor dependencies',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                value: { type: 'string', description: `Revision ${revision}` },
               },
-              [count]
-            ),
-          { initialProps: { count: 1 } }
-        );
+            } as const,
+            execute: async () => revision,
+          },
+          [revision]
+        ),
+      { initialProps: { revision: 1 } }
+    );
 
-        expect(registerToolSpy).toHaveBeenCalledTimes(1);
-
-        await rerender({ count: 2 });
-
-        // Should have re-registered due to deps change (and description change)
-        expect(registerToolSpy).toHaveBeenCalledTimes(2);
-      } finally {
-        registerToolSpy.mockRestore();
-      }
-    });
+    const getValueDescription = async () => {
+      const schema = JSON.parse((await findTool('browser_dependency'))?.inputSchema ?? '{}');
+      return schema.properties.value.description;
+    };
+    expect(await getValueDescription()).toBe('Revision 1');
+    await rerender({ revision: 2 });
+    expect(await getValueDescription()).toBe('Revision 2');
   });
 
-  describe('dev mode warnings', () => {
-    let originalProcess: unknown;
-
-    beforeEach(() => {
-      // Save original process
-      originalProcess = (globalThis as Record<string, unknown>).process;
-      // Set NODE_ENV to development to enable isDev
-      (globalThis as Record<string, unknown>).process = {
-        env: { NODE_ENV: 'development' },
-      };
+  it('converts a real Zod Standard JSON Schema through the registration path', async () => {
+    const inputSchema = z.object({
+      query: z.string(),
+      limit: z.number().int().min(1).max(50).optional(),
     });
 
-    afterEach(() => {
-      // Restore original process
-      (globalThis as Record<string, unknown>).process = originalProcess;
-    });
-
-    it('should not warn when schema or annotations references change in dev mode', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const { rerender } = await renderHook(
-          ({ inputSchema, outputSchema, annotations }) =>
-            useWebMCP({
-              name: 'dev_descriptor_ref_tool',
-              description: 'Test',
-              inputSchema,
-              outputSchema,
-              annotations,
-              handler: async () => ({ value: 'test' }),
-            }),
-          {
-            initialProps: {
-              inputSchema: {
-                type: 'object',
-                properties: { name: { type: 'string' } },
-                required: ['name'],
-              } as const,
-              outputSchema: {
-                type: 'object',
-                properties: { value: { type: 'string' } },
-              } as const,
-              annotations: { destructiveHint: true } as const,
-            },
-          }
-        );
-
-        await rerender({
-          inputSchema: {
-            type: 'object',
-            properties: { name: { type: 'string' } },
-            required: ['name'],
-          } as const,
-          outputSchema: {
-            type: 'object',
-            properties: { value: { type: 'string' } },
-          } as const,
-          annotations: { destructiveHint: true },
-        });
-
-        expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('reference changed'));
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should warn when description changes in dev mode', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const { rerender } = await renderHook(
-          ({ desc }) =>
-            useWebMCP({
-              name: 'dev_desc_warn_tool',
-              description: desc,
-              handler: async () => 'result',
-            }),
-          { initialProps: { desc: 'Version 1' } }
-        );
-
-        await rerender({ desc: 'Version 2' });
-
-        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('description changed'));
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should warn when deps contain non-primitive values in dev mode', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const objDep = { key: 'value' };
-        await renderHook(() =>
-          useWebMCP(
-            {
-              name: 'dev_deps_warn_tool',
-              description: 'Test',
-              handler: async () => 'result',
-            },
-            [objDep]
-          )
-        );
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('deps contains non-primitive values')
-        );
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should only warn once per category (warnOnce)', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const { rerender } = await renderHook(
-          ({ desc }) =>
-            useWebMCP({
-              name: 'dev_warn_once_tool',
-              description: desc,
-              handler: async () => 'result',
-            }),
-          { initialProps: { desc: 'V1' } }
-        );
-
-        await rerender({ desc: 'V2' });
-        await rerender({ desc: 'V3' });
-
-        // Description warning should only appear once
-        const descWarnings = warnSpy.mock.calls.filter(
-          (call) => typeof call[0] === 'string' && call[0].includes('description changed')
-        );
-        expect(descWarnings).toHaveLength(1);
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('should warn when deps contain function values in dev mode', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const fnDep = () => {};
-        await renderHook(() =>
-          useWebMCP(
-            {
-              name: 'dev_fn_deps_warn_tool',
-              description: 'Test',
-              handler: async () => 'result',
-            },
-            [fnDep]
-          )
-        );
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('deps contains non-primitive values')
-        );
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-  });
-
-  describe('isDev when NODE_ENV is production', () => {
-    let originalProcess: unknown;
-
-    beforeEach(() => {
-      originalProcess = (globalThis as Record<string, unknown>).process;
-      (globalThis as Record<string, unknown>).process = {
-        env: { NODE_ENV: 'production' },
-      };
-    });
-
-    afterEach(() => {
-      (globalThis as Record<string, unknown>).process = originalProcess;
-    });
-
-    it('should not warn in production mode', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      try {
-        const { rerender } = await renderHook(
-          ({ desc }) =>
-            useWebMCP({
-              name: 'prod_tool',
-              description: desc,
-              handler: async () => 'result',
-            }),
-          { initialProps: { desc: 'V1' } }
-        );
-
-        await rerender({ desc: 'V2' });
-
-        // Should not have description change warning in production
-        const descWarnings = warnSpy.mock.calls.filter(
-          (call) => typeof call[0] === 'string' && call[0].includes('description changed')
-        );
-        expect(descWarnings).toHaveLength(0);
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-  });
-
-  describe('cleanup edge cases', () => {
-    it('prefers document.modelContext over navigator.modelContext', async () => {
-      const originalDocumentDescriptor = Object.getOwnPropertyDescriptor(document, 'modelContext');
-      const originalNavigatorDescriptor = Object.getOwnPropertyDescriptor(
-        navigator,
-        'modelContext'
-      );
-      const documentRegisterTool = vi.fn();
-      const navigatorRegisterTool = vi.fn();
-
-      Object.defineProperty(document, 'modelContext', {
-        configurable: true,
-        enumerable: true,
-        writable: true,
-        value: { registerTool: documentRegisterTool },
-      });
-      Object.defineProperty(navigator, 'modelContext', {
-        configurable: true,
-        enumerable: true,
-        writable: true,
-        value: { registerTool: navigatorRegisterTool },
-      });
-
-      try {
-        const { unmount } = await renderHook(() =>
-          useWebMCP({
-            name: 'document_preferred_tool',
-            description: 'Uses document surface',
-            handler: async () => 'result',
-          })
-        );
-
-        expect(documentRegisterTool).toHaveBeenCalledTimes(1);
-        expect(navigatorRegisterTool).not.toHaveBeenCalled();
-        unmount();
-      } finally {
-        if (originalDocumentDescriptor) {
-          Object.defineProperty(document, 'modelContext', originalDocumentDescriptor);
-        } else {
-          delete (document as unknown as Record<string, unknown>).modelContext;
-        }
-        if (originalNavigatorDescriptor) {
-          Object.defineProperty(navigator, 'modelContext', originalNavigatorDescriptor);
-        } else {
-          delete (navigator as unknown as Record<string, unknown>).modelContext;
-        }
-      }
-    });
-
-    it('should call registerTool with an AbortSignal and abort on unmount', async () => {
-      const originalDocumentDescriptor = Object.getOwnPropertyDescriptor(document, 'modelContext');
-      const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
-      const registerTool = vi.fn();
-      const unregisterTool = vi.fn();
-      const modelContext = { registerTool, unregisterTool };
-
-      Object.defineProperty(document, 'modelContext', {
-        configurable: true,
-        enumerable: true,
-        writable: true,
-        value: modelContext,
-      });
-
-      Object.defineProperty(navigator, 'modelContext', {
-        configurable: true,
-        enumerable: true,
-        writable: true,
-        value: modelContext,
-      });
-
-      try {
-        const { unmount } = await renderHook(() =>
-          useWebMCP({
-            name: 'signal_cleanup_tool',
-            description: 'Uses AbortSignal-driven cleanup',
-            handler: async () => 'result',
-          })
-        );
-
-        expect(registerTool).toHaveBeenCalledTimes(1);
-        const callArgs = registerTool.mock.calls[0];
-        expect(callArgs?.[0]).toMatchObject({ name: 'signal_cleanup_tool' });
-        const passedSignal = callArgs?.[1]?.signal;
-        expect(passedSignal).toBeInstanceOf(AbortSignal);
-        expect(passedSignal?.aborted).toBe(false);
-
-        unmount();
-
-        expect(passedSignal?.aborted).toBe(true);
-        expect(unregisterTool).not.toHaveBeenCalled();
-      } finally {
-        if (originalDocumentDescriptor) {
-          Object.defineProperty(document, 'modelContext', originalDocumentDescriptor);
-        } else {
-          delete (document as unknown as Record<string, unknown>).modelContext;
-        }
-        if (originalDescriptor) {
-          Object.defineProperty(navigator, 'modelContext', originalDescriptor);
-        } else {
-          delete (navigator as unknown as Record<string, unknown>).modelContext;
-        }
-      }
-    });
-
-    it('should remove the tool from the registry on unmount', async () => {
-      const { unmount } = await renderHook(() =>
-        useWebMCP({
-          name: 'cleanup_registry_tool',
-          description: 'Cleanup registry tool',
-          handler: async () => 'result',
-        })
-      );
-
-      expect(listRegisteredToolNames()).toContain('cleanup_registry_tool');
-
-      unmount();
-
-      expect(listRegisteredToolNames()).not.toContain('cleanup_registry_tool');
-    });
-
-    it('does not remove a newer same-name registration when the older hook unmounts', async () => {
-      const originalDocumentDescriptor = Object.getOwnPropertyDescriptor(document, 'modelContext');
-      const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
-      const registry = new Map<
-        string,
-        { description: string; execute: (args: Record<string, unknown>) => Promise<unknown> }
-      >();
-      const capturedSignals: AbortSignal[] = [];
-      const registerTool = vi.fn(
-        (
-          tool: { name: string; description: string; execute: never },
-          options?: { signal?: AbortSignal }
-        ) => {
-          registry.set(tool.name, tool);
-          if (options?.signal) {
-            capturedSignals.push(options.signal);
-            options.signal.addEventListener(
-              'abort',
-              () => {
-                registry.delete(tool.name);
-              },
-              { once: true }
-            );
-          }
-        }
-      );
-      const modelContext = { registerTool, unregisterTool: vi.fn() };
-
-      Object.defineProperty(document, 'modelContext', {
-        configurable: true,
-        enumerable: true,
-        writable: true,
-        value: modelContext,
-      });
-
-      Object.defineProperty(navigator, 'modelContext', {
-        configurable: true,
-        enumerable: true,
-        writable: true,
-        value: modelContext,
-      });
-
-      try {
-        const { unmount: unmount1 } = await renderHook(() =>
-          useWebMCP({
-            name: 'owner_clash_tool',
-            description: 'First instance',
-            handler: async () => 'first',
-          })
-        );
-
-        const { unmount: unmount2 } = await renderHook(() =>
-          useWebMCP({
-            name: 'owner_clash_tool',
-            description: 'Second instance',
-            handler: async () => 'second',
-          })
-        );
-        await Promise.resolve();
-
-        expect(capturedSignals).toHaveLength(2);
-        const [firstSignal, secondSignal] = capturedSignals;
-        expect(registry.get('owner_clash_tool')?.description).toBe('Second instance');
-
-        unmount1();
-        expect(registry.get('owner_clash_tool')?.description).toBe('Second instance');
-        expect(firstSignal?.aborted).toBe(false);
-        expect(secondSignal?.aborted).toBe(false);
-
-        unmount2();
-        expect(registry.has('owner_clash_tool')).toBe(false);
-        expect(secondSignal?.aborted).toBe(true);
-      } finally {
-        if (originalDocumentDescriptor) {
-          Object.defineProperty(document, 'modelContext', originalDocumentDescriptor);
-        } else {
-          delete (document as unknown as Record<string, unknown>).modelContext;
-        }
-        if (originalDescriptor) {
-          Object.defineProperty(navigator, 'modelContext', originalDescriptor);
-        } else {
-          delete (navigator as unknown as Record<string, unknown>).modelContext;
-        }
-      }
-    });
-
-    it('rolls back observable registration when async registerTool rejects', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const originalRegisterTool = navigator.modelContext.registerTool.bind(navigator.modelContext);
-      const registerError = new Error('async registration failed');
-      const registerSpy = vi.spyOn(navigator.modelContext, 'registerTool').mockImplementation(((
-        tool: Parameters<Navigator['modelContext']['registerTool']>[0],
-        options?: Parameters<Navigator['modelContext']['registerTool']>[1]
-      ) => {
-        originalRegisterTool(tool, options);
-        return Promise.reject(registerError);
-      }) as Navigator['modelContext']['registerTool']);
-
-      try {
-        await renderHook(() =>
-          useWebMCP({
-            name: 'async_reject_tool',
-            description: 'Async rejection tool',
-            handler: async () => 'result',
-          })
-        );
-
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          '[useWebMCP] registerTool("async_reject_tool") rejected:',
-          registerError
-        );
-        expect(listRegisteredToolNames()).not.toContain('async_reject_tool');
-      } finally {
-        registerSpy.mockRestore();
-        warnSpy.mockRestore();
-      }
-    });
-  });
-
-  describe('structured content edge cases', () => {
-    it('should handle circular references in handler result with outputSchema', async () => {
-      // Create an object with a circular reference - JSON.stringify will throw
-      const circular: Record<string, unknown> = { key: 'value' };
-      circular.self = circular;
-
-      await renderHook(() =>
-        useWebMCP({
-          name: 'circular_tool',
-          description: 'Returns circular object',
-          outputSchema: { type: 'object', properties: { key: { type: 'string' } } } as const,
-          // @ts-expect-error - intentionally returning circular for test
-          handler: async () => circular,
-          // Provide custom formatOutput that handles circular objects
-          // so the structured-content guard sees the handler result.
-          formatOutput: () => 'circular object result',
-        })
-      );
-
-      // Circular output is not JSON structured content, so the object outputSchema errors.
-      await expect(
-        navigator.modelContextTesting?.executeTool('circular_tool', JSON.stringify({}))
-      ).rejects.toThrow();
-    });
-  });
-
-  describe('modelContext not available', () => {
-    it('should warn when document.modelContext is not available', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const originalDocumentModelContext = document.modelContext;
-      const originalNavigatorModelContext = navigator.modelContext;
-
-      try {
-        // Temporarily remove modelContext
-        Object.defineProperty(document, 'modelContext', {
-          value: undefined,
-          writable: true,
-          configurable: true,
-        });
-        Object.defineProperty(navigator, 'modelContext', {
-          value: undefined,
-          writable: true,
-          configurable: true,
-        });
-
-        await renderHook(() =>
-          useWebMCP({
-            name: 'no_context_tool',
-            description: 'Test',
-            handler: async () => 'result',
-          })
-        );
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('window.document.modelContext is not available')
-        );
-      } finally {
-        // Restore modelContext
-        Object.defineProperty(document, 'modelContext', {
-          value: originalDocumentModelContext,
-          writable: true,
-          configurable: true,
-        });
-        Object.defineProperty(navigator, 'modelContext', {
-          value: originalNavigatorModelContext,
-          writable: true,
-          configurable: true,
-        });
-        warnSpy.mockRestore();
-      }
-    });
-  });
-
-  describe('re-render optimization', () => {
-    // --- Reference Stability ---
-
-    it('should return stable execute reference across same-prop rerenders', async () => {
-      const { result, rerender } = await renderHook(() =>
-        useWebMCP({
-          name: 'stable_exec_tool',
-          description: 'Test',
-          handler: async () => 'result',
-        })
-      );
-
-      const firstExecute = result.current.execute;
-
-      await rerender();
-
-      expect(result.current.execute).toBe(firstExecute);
-    });
-
-    it('should maintain stable execute reference when description changes', async () => {
-      const { result, rerender } = await renderHook(
-        ({ description }) =>
-          useWebMCP({
-            name: 'stable_exec_desc_tool',
-            description,
-            handler: async () => 'result',
-          }),
-        { initialProps: { description: 'v1' } }
-      );
-
-      const firstExecute = result.current.execute;
-
-      await rerender({ description: 'v2' });
-
-      expect(result.current.execute).toBe(firstExecute);
-    });
-
-    it('should return stable reset reference across rerenders', async () => {
-      const { result, rerender } = await renderHook(
-        ({ description }) =>
-          useWebMCP({
-            name: 'stable_reset_tool',
-            description,
-            handler: async () => 'result',
-          }),
-        { initialProps: { description: 'v1' } }
-      );
-
-      const firstReset = result.current.reset;
-
-      await rerender({ description: 'v2' });
-
-      expect(result.current.reset).toBe(firstReset);
-    });
-
-    // --- Callbacks Don't Trigger Re-registration ---
-
-    it('should not re-register when handler reference changes', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
-
-      try {
-        const { rerender } = await renderHook(
-          ({ handler }) =>
-            useWebMCP({
-              name: 'handler_ref_tool',
-              description: 'Test',
-              handler,
-            }),
-          { initialProps: { handler: async () => 'v1' } }
-        );
-
-        const initialCallCount = registerToolSpy.mock.calls.length;
-
-        await rerender({ handler: async () => 'v2' });
-
-        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
-      } finally {
-        registerToolSpy.mockRestore();
-      }
-    });
-
-    it('should not re-register when execute reference changes', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
-
-      try {
-        const { rerender } = await renderHook(
-          ({ execute }) =>
-            useWebMCP({
-              name: 'execute_ref_tool',
-              description: 'Test',
-              execute,
-            }),
-          { initialProps: { execute: async () => 'v1' } }
-        );
-
-        const initialCallCount = registerToolSpy.mock.calls.length;
-
-        await rerender({ execute: async () => 'v2' });
-
-        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
-      } finally {
-        registerToolSpy.mockRestore();
-      }
-    });
-
-    it('should not re-register when onSuccess reference changes', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
-
-      try {
-        const { rerender } = await renderHook(
-          ({ onSuccess }) =>
-            useWebMCP({
-              name: 'onsuccess_ref_tool',
-              description: 'Test',
-              handler: async () => 'result',
-              onSuccess,
-            }),
-          { initialProps: { onSuccess: () => {} } }
-        );
-
-        const initialCallCount = registerToolSpy.mock.calls.length;
-
-        await rerender({ onSuccess: () => {} });
-
-        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
-      } finally {
-        registerToolSpy.mockRestore();
-      }
-    });
-
-    it('should not re-register when onError reference changes', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
-
-      try {
-        const { rerender } = await renderHook(
-          ({ onError }) =>
-            useWebMCP({
-              name: 'onerror_ref_tool',
-              description: 'Test',
-              handler: async () => 'result',
-              onError,
-            }),
-          { initialProps: { onError: () => {} } }
-        );
-
-        const initialCallCount = registerToolSpy.mock.calls.length;
-
-        await rerender({ onError: () => {} });
-
-        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
-      } finally {
-        registerToolSpy.mockRestore();
-      }
-    });
-
-    it('should not re-register when formatOutput reference changes', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
-
-      try {
-        const { rerender } = await renderHook(
-          ({ formatOutput }) =>
-            useWebMCP({
-              name: 'format_ref_tool',
-              description: 'Test',
-              handler: async () => 42,
-              formatOutput,
-            }),
-          { initialProps: { formatOutput: (output: unknown) => `Old: ${output}` } }
-        );
-
-        const initialCallCount = registerToolSpy.mock.calls.length;
-
-        await rerender({ formatOutput: (output: unknown) => `New: ${output}` });
-
-        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
-      } finally {
-        registerToolSpy.mockRestore();
-      }
-    });
-
-    it('should not accumulate registrations when multiple callbacks change', async () => {
-      const registerToolSpy = vi.spyOn(navigator.modelContext, 'registerTool');
-
-      try {
-        const { rerender } = await renderHook(
-          ({ handler, onSuccess, onError, formatOutput }) =>
-            useWebMCP({
-              name: 'multi_callback_tool',
-              description: 'Test',
-              handler,
-              onSuccess,
-              onError,
-              formatOutput,
-            }),
-          {
-            initialProps: {
-              handler: async () => 'v1',
-              onSuccess: () => {},
-              onError: () => {},
-              formatOutput: (output: unknown) => String(output),
-            },
-          }
-        );
-
-        const initialCallCount = registerToolSpy.mock.calls.length;
-
-        await rerender({
-          handler: async () => 'v2',
-          onSuccess: () => {},
-          onError: () => {},
-          formatOutput: (output: unknown) => `new: ${output}`,
-        });
-
-        await rerender({
-          handler: async () => 'v3',
-          onSuccess: () => {},
-          onError: () => {},
-          formatOutput: (output: unknown) => `newest: ${output}`,
-        });
-
-        expect(registerToolSpy.mock.calls.length).toBe(initialCallCount);
-      } finally {
-        registerToolSpy.mockRestore();
-      }
-    });
-
-    // --- Latest Ref Values Used at Execution Time ---
-
-    it('should use latest config execute function after reference change', async () => {
-      const executeV1 = vi.fn().mockResolvedValue('v1');
-      const executeV2 = vi.fn().mockResolvedValue('v2');
-
-      const { result, rerender, act } = await renderHook(
-        ({ execute }) =>
-          useWebMCP({
-            name: 'latest_execute_prop_tool',
-            description: 'Test',
-            execute,
-          }),
-        { initialProps: { execute: executeV1 } }
-      );
-
-      await rerender({ execute: executeV2 });
-
-      await act(async () => {
-        await result.current.execute({ key: 'test' });
-      });
-
-      expect(executeV1).not.toHaveBeenCalled();
-      expect(executeV2).toHaveBeenCalledWith({ key: 'test' });
-      expect(result.current.state.lastResult).toBe('v2');
-    });
-
-    it('should use latest handler after reference change', async () => {
-      const handlerV1 = vi.fn().mockResolvedValue('v1');
-      const handlerV2 = vi.fn().mockResolvedValue('v2');
-
-      const { result, rerender, act } = await renderHook(
-        ({ handler }) =>
-          useWebMCP({
-            name: 'latest_handler_tool',
-            description: 'Test',
-            handler,
-          }),
-        { initialProps: { handler: handlerV1 } }
-      );
-
-      await rerender({ handler: handlerV2 });
-
-      await act(async () => {
-        await result.current.execute({ key: 'test' });
-      });
-
-      expect(handlerV1).not.toHaveBeenCalled();
-      expect(handlerV2).toHaveBeenCalledWith({ key: 'test' });
-      expect(result.current.state.lastResult).toBe('v2');
-    });
-
-    it('should use latest onSuccess callback after reference change', async () => {
-      const onSuccessV1 = vi.fn();
-      const onSuccessV2 = vi.fn();
-
-      const { result, rerender, act } = await renderHook(
-        ({ onSuccess }) =>
-          useWebMCP({
-            name: 'latest_onsuccess_tool',
-            description: 'Test',
-            handler: async () => 'result',
-            onSuccess,
-          }),
-        { initialProps: { onSuccess: onSuccessV1 } }
-      );
-
-      await rerender({ onSuccess: onSuccessV2 });
-
-      await act(async () => {
-        await result.current.execute({});
-      });
-
-      expect(onSuccessV1).not.toHaveBeenCalled();
-      expect(onSuccessV2).toHaveBeenCalledWith('result', {});
-    });
-
-    it('should use latest onError callback after reference change', async () => {
-      const onErrorV1 = vi.fn();
-      const onErrorV2 = vi.fn();
-      const error = new Error('fail');
-
-      const { result, rerender, act } = await renderHook(
-        ({ onError }) =>
-          useWebMCP({
-            name: 'latest_onerror_tool',
-            description: 'Test',
-            handler: async () => {
-              throw error;
-            },
-            onError,
-          }),
-        { initialProps: { onError: onErrorV1 } }
-      );
-
-      await rerender({ onError: onErrorV2 });
-
-      await act(async () => {
-        try {
-          await result.current.execute({});
-        } catch {
-          // Expected
-        }
-      });
-
-      expect(onErrorV1).not.toHaveBeenCalled();
-      expect(onErrorV2).toHaveBeenCalledWith(error, {});
-    });
-
-    it('should use latest formatOutput after reference change', async () => {
-      const { rerender } = await renderHook(
-        ({ formatOutput }) =>
-          useWebMCP({
-            name: 'latest_format_tool',
-            description: 'Test',
-            handler: async () => 42,
-            formatOutput,
-          }),
-        { initialProps: { formatOutput: (output: unknown) => `Old: ${output}` } }
-      );
-
-      await rerender({ formatOutput: (output: unknown) => `New: ${output}` });
-
-      const result = await navigator.modelContextTesting?.executeTool(
-        'latest_format_tool',
-        JSON.stringify({})
-      );
-
-      const parsed = parseSerializedToolResponse(result);
-      expect(parsed.content[0]?.text).toBe('New: 42');
-    });
-
-    // --- State Reference Behavior ---
-
-    it('should not change state reference on rerender without state change', async () => {
-      const { result, rerender } = await renderHook(() =>
-        useWebMCP({
-          name: 'state_ref_tool',
-          description: 'Test',
-          handler: async () => 'result',
-        })
-      );
-
-      const firstState = result.current.state;
-
-      await rerender();
-
-      expect(result.current.state).toBe(firstState);
-    });
-
-    it('should change state reference after execution', async () => {
-      const { result, act } = await renderHook(() =>
-        useWebMCP({
-          name: 'state_change_tool',
-          description: 'Test',
-          handler: async () => 'result',
-        })
-      );
-
-      const firstState = result.current.state;
-
-      await act(async () => {
-        await result.current.execute({});
-      });
-
-      expect(result.current.state).not.toBe(firstState);
-      expect(result.current.state.executionCount).toBe(1);
-    });
-
-    // --- Effect Cleanup Ordering ---
-
-    it('should clean up old tool before registering new one when name changes', async () => {
-      const { rerender } = await renderHook(
-        ({ name }) =>
-          useWebMCP({
-            name,
-            description: 'Test',
-            handler: async () => 'result',
-          }),
-        { initialProps: { name: 'order_tool_old' } }
-      );
-
-      expect(listRegisteredToolNames()).toContain('order_tool_old');
-
-      await rerender({ name: 'order_tool_new' });
-
-      const registeredNames = listRegisteredToolNames();
-      expect(registeredNames).toContain('order_tool_new');
-      expect(registeredNames).not.toContain('order_tool_old');
+    await renderHook(() =>
+      useWebMCP({
+        name: 'browser_standard_schema',
+        description: 'Uses Standard JSON Schema',
+        inputSchema,
+        execute: async ({ query }) => query,
+      })
+    );
+
+    const tool = await findTool('browser_standard_schema');
+    expect(JSON.parse(tool?.inputSchema ?? '{}')).toEqual({
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        limit: { type: 'integer', minimum: 1, maximum: 50 },
+      },
+      required: ['query'],
     });
   });
 });

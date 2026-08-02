@@ -1,56 +1,21 @@
 # usewebmcp
 
-Standalone React hooks for strict core WebMCP tool registration via `document.modelContext`.
+React hook for registering strict-core WebMCP tools with `document.modelContext`.
 
-`usewebmcp` is intentionally separate from `@mcp-b/react-webmcp`:
-
-- Use `usewebmcp` for strict core WebMCP workflows.
-- Use `@mcp-b/react-webmcp` for full MCP-B runtime features (resources, prompts, client/provider flows, etc.).
-
-## Type Safety First
-
-`usewebmcp` is built for schema-driven types:
-
-- `config.execute`/`config.handler` input is inferred from `inputSchema`
-- Tool result type is inferred from `outputSchema`
-- `state.lastResult` and returned `execute(input)` are typed from that same inferred output
-
-## Package Selection
-
-| Package                  | Use When                                                  |
-| ------------------------ | --------------------------------------------------------- |
-| `usewebmcp`              | React hooks for strict core `document.modelContext` tools |
-| `@mcp-b/react-webmcp`    | React hooks for full MCP-B runtime surface                |
-| `@mcp-b/webmcp-polyfill` | You need a strict core runtime polyfill                   |
-| `@mcp-b/global`          | You need full MCP-B runtime (core + extensions)           |
+Use `usewebmcp` when an app only needs standard tool registration. Use
+`@mcp-b/react-webmcp` for prompts, resources, or MCP client/provider flows.
 
 ## Install
 
 ```bash
 pnpm add usewebmcp react
-# or
-npm install usewebmcp react
 ```
 
-Optional (only if you want Standard Schema authoring like Zod v4 input schemas):
+The hook expects `document.modelContext` to exist before the component mounts. Provide it through
+native browser support, `@mcp-b/webmcp-polyfill`, or `@mcp-b/global`. Older
+`navigator.modelContext` runtimes remain a fallback.
 
-```bash
-pnpm add zod
-```
-
-## Runtime Prerequisite
-
-`usewebmcp` expects `window.document.modelContext` to exist.
-
-You can provide it via:
-
-- Browser-native WebMCP implementation, or
-- `@mcp-b/webmcp-polyfill`, or
-- `@mcp-b/global`
-
-If `document.modelContext` is missing, the hook falls back to older preview `navigator.modelContext` runtimes. If both are missing, the hook logs a warning and skips registration.
-
-## Quick Start
+## Quick start
 
 ```tsx
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
@@ -58,221 +23,85 @@ import { useWebMCP } from 'usewebmcp';
 
 initializeWebMCPPolyfill();
 
-const COUNTER_INPUT_SCHEMA = {
-  type: 'object',
-  properties: {},
-} as const;
-
-const COUNTER_OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    count: { type: 'integer' },
-  },
-  required: ['count'],
-  additionalProperties: false,
-} as const;
-
-export function CounterTool() {
-  const counterTool = useWebMCP({
-    name: 'counter_get',
-    description: 'Get current count',
-    inputSchema: COUNTER_INPUT_SCHEMA,
-    outputSchema: COUNTER_OUTPUT_SCHEMA,
-    execute: async () => ({ count: 42 }),
-  });
-
-  return (
-    <div>
-      <p>Executions: {counterTool.state.executionCount}</p>
-      <p>Last count: {counterTool.state.lastResult?.count ?? 'none'}</p>
-      {counterTool.state.error && <p>Error: {counterTool.state.error.message}</p>}
-      <button
-        onClick={async () => {
-          await counterTool.execute({});
-        }}
-      >
-        Run Tool Locally
-      </button>
-    </div>
-  );
-}
-```
-
-## How `useWebMCP` Works
-
-- Registers a tool on mount with `document.modelContext.registerTool(tool, { signal })` and aborts the controller on unmount.
-- Older Chrome preview builds may not remove tools when the controller aborts. Install `@mcp-b/global` or `@mcp-b/webmcp-polyfill` when you need consistent cleanup across preview versions.
-- Exposes local execution state:
-  - `state.isExecuting`
-  - `state.lastResult`
-  - `state.error`
-  - `state.executionCount`
-- Returns `execute(input)` for manual in-app invocation and `reset()` for state reset.
-
-Your tool implementation (`config.execute` or `config.handler`) can be synchronous or asynchronous.
-
-## `config.execute` vs returned `execute(...)`
-
-- `config.execute`: preferred config field for tool logic.
-- `config.handler`: backward-compatible alias for `config.execute`.
-- returned `execute(input)`: hook return function for local manual invocation from your UI/tests.
-
-If both `config.execute` and `config.handler` are provided, `config.execute` is used.
-
-Both paths run the same underlying tool logic and update the hook state.
-
-## Type Inference
-
-### Input inference
-
-`inputSchema` supports:
-
-- JSON Schema literals (`as const`) via `InferArgsFromInputSchema`
-- Standard Schema v1 input typing (for example Zod v4 / Valibot / ArkType) via `~standard.types.input`
-
-```tsx
 const INPUT_SCHEMA = {
   type: 'object',
-  properties: {
-    query: { type: 'string' },
-    limit: { type: 'integer' },
-  },
+  properties: { query: { type: 'string' } },
   required: ['query'],
-  additionalProperties: false,
 } as const;
 
-useWebMCP({
-  name: 'search',
-  description: 'Search docs',
-  inputSchema: INPUT_SCHEMA,
-  execute(input) {
-    // input is inferred as { query: string; limit?: number }
-    return { total: 1 };
-  },
-});
-```
-
-### Output inference
-
-When `outputSchema` is provided as a literal JSON Schema:
-
-- implementation return type is inferred from `outputSchema`
-- `state.lastResult` is inferred to the same type
-- MCP response includes `structuredContent`
-
-```tsx
 const OUTPUT_SCHEMA = {
   type: 'object',
-  properties: {
-    total: { type: 'integer' },
-  },
+  properties: { total: { type: 'integer' } },
   required: ['total'],
-  additionalProperties: false,
 } as const;
 
-const tool = useWebMCP({
-  name: 'count_items',
-  description: 'Count items',
-  outputSchema: OUTPUT_SCHEMA,
-  execute: () => ({ total: 3 }),
-});
-
-// tool.state.lastResult is inferred as { total: number } | null
-```
-
-## Manual `execute(...)` Calls
-
-You can call the returned `execute(...)` function directly from your component.
-
-```tsx
-function SearchToolPanel() {
-  const searchTool = useWebMCP({
-    name: 'search_local',
-    description: 'Run local search',
-    inputSchema: {
-      type: 'object',
-      properties: { query: { type: 'string' } },
-      required: ['query'],
-      additionalProperties: false,
-    } as const,
-    execute: async ({ query }) => ({ query, total: query.length }),
+export function SearchTool() {
+  const search = useWebMCP({
+    name: 'search',
+    description: 'Search indexed documents',
+    inputSchema: INPUT_SCHEMA,
+    outputSchema: OUTPUT_SCHEMA,
+    execute: async ({ query }) => ({ total: await countMatches(query) }),
   });
 
   return (
-    <button
-      onClick={async () => {
-        await searchTool.execute({ query: 'webmcp' });
-      }}
-    >
-      Run Search
+    <button disabled={search.state.isExecuting} onClick={() => search.execute({ query: 'webmcp' })}>
+      Run search ({search.state.executionCount})
     </button>
   );
 }
 ```
 
-## Output Schema Contract
-
-If `outputSchema` is defined, your tool implementation must return a JSON-serializable value that matches that schema for MCP-B helpers that consume it. Object, array, string, number, boolean, and null schemas are supported for type inference and hook result shaping.
-
-Native Chrome WebMCP does not currently define or enforce `outputSchema`; the browser standard tool dictionary defines `inputSchema`.
-
-## Re-Registration and Performance
-
-The tool re-registers when any of these change:
-
-- `name`
-- `description`
-- `inputSchema` reference
-- `outputSchema` reference
-- `annotations` reference
-- values in `deps`
-
-The hook avoids re-registration when only callback references change:
-
-- `execute`
-- `handler`
-- `onSuccess`
-- `onError`
-- `formatOutput`
-
-Latest callback versions are still used at execution time.
-
-Recommendation:
-
-- Define schemas/annotations outside render or memoize them.
-- Keep `deps` primitive when possible.
+JSON Schema literals infer the `execute` input, output, returned `execute(input)`, and
+`state.lastResult` types. Standard JSON Schema v1 inputs such as Zod 4.2+ are also supported.
 
 ## API
 
-### `useWebMCP(config, deps?)`
+```ts
+const { state, execute, reset } = useWebMCP(config, deps?);
+```
 
-`config` fields:
+`config` contains:
 
-- `name: string`
-- `description: string`
-- `inputSchema?`
-- `outputSchema?`
-- `annotations?`
-- `execute(input)` (preferred)
-- `handler(input)` (backward-compatible alias)
-- `formatOutput?(output)` (deprecated)
-- `onSuccess?(result, input)`
-- `onError?(error, input)`
+- `name` and `description`
+- optional `inputSchema`, `outputSchema`, and `annotations`
+- `execute(input)`, which may return synchronously or asynchronously
 
-Return value:
+`state` contains `isExecuting`, `lastResult`, `error`, and `executionCount`. The returned
+`execute(input)` invokes the same implementation locally. `reset()` clears observed state; it does
+not cancel work already running.
 
-- `state`
-- `execute(input)`
-- `reset()`
+## Tool responses
 
-`execute(input)` is a local direct call to your configured tool implementation for in-app control/testing.
-Tool calls coming from MCP clients still go through the page `document.modelContext` surface.
+Raw return values use the same normalization as the MCP-B runtime:
 
-## Important Notes
+- Existing MCP responses with a `content` array pass through unchanged.
+- Strings become text content.
+- JSON values become text content plus `structuredContent`.
+- Other values receive a safe text representation.
 
-- This is a client-side hook package (`'use client'`).
-- `formatOutput` is deprecated; prefer `outputSchema` + structured output.
-- When tool output is not a string, default text content is pretty-printed JSON.
+When `outputSchema` is present, a non-JSON-serializable result rejects local execution and becomes
+an MCP error response. Native Chrome WebMCP does not advertise `outputSchema`; it is MCP-B metadata
+for output inference and compatible runtimes.
+
+## Re-registration
+
+The tool re-registers when `name`, `description`, or a value in `deps` changes. Implementations,
+schemas, and annotations use their latest committed values without reference-driven churn. Include
+a primitive schema or annotation revision in `deps` when registered metadata must change.
+
+Registration is aborted on unmount. If the runtime is missing at mount, the hook warns and skips
+registration; initialize the runtime first rather than polling once per hook.
+
+## Exports
+
+- `useWebMCP`
+- `WebMCPConfig`
+- `WebMCPReturn`
+- `ToolExecutionState`
+- `ToolExecuteFunction`
+- `InferToolInput`
+- `InferOutput`
 
 ## License
 

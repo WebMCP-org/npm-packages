@@ -9,7 +9,7 @@
     <h1>Clean Build Test</h1>
     <div id="status" style="font-family: monospace; padding: 20px; background: #f0f0f0"></div>
 
-    <script>
+    <script type="module">
       const statusEl = document.getElementById('status');
 
       function log(message, color = 'green') {
@@ -30,13 +30,13 @@
         log('✗ WebMCP global NOT available', 'red');
       }
 
-      // Check navigator.modelContext
-      if (window.navigator.modelContext) {
-        log('✓ navigator.modelContext available');
+      // Check document.modelContext
+      if (document.modelContext) {
+        log('✓ document.modelContext available');
 
         try {
           // Register a test tool
-          window.navigator.modelContext.registerTool({
+          await document.modelContext.registerTool({
             name: 'get-page-title',
             description: 'Get the current page title',
             inputSchema: {
@@ -58,8 +58,8 @@
           log('✓ Tool registered successfully');
 
           // List tools
-          const tools = window.navigator.modelContextTesting?.listTools();
-          if (tools && tools.length > 0) {
+          const tools = await document.modelContext.getTools();
+          if (tools.length > 0) {
             log(`✓ ${tools.length} tool(s) registered`);
             log('Tool names: ' + tools.map((t) => t.name).join(', '), 'blue');
           }
@@ -71,7 +71,7 @@
           console.error(error);
         }
       } else {
-        log('✗ navigator.modelContext NOT available', 'red');
+        log('✗ document.modelContext NOT available', 'red');
       }
     </script>
   </body>

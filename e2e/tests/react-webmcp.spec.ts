@@ -656,8 +656,7 @@ test.describe('React WebMCP structuredContent Tests', () => {
     expect(result.timestampType).toBe('string');
   });
 
-  test('should return parsed text for tools without outputSchema', async ({ page }) => {
-    // Call the counter_increment tool via MCP client (it does NOT have outputSchema)
+  test('should normalize JSON results without outputSchema', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const w = window as unknown as {
         mcpClient?: {
@@ -691,7 +690,7 @@ test.describe('React WebMCP structuredContent Tests', () => {
 
     // Verify the tool call was successful
     expect(result.success).toBe(true);
-    expect(result.hasStructuredContent).toBe(false);
+    expect(result.hasStructuredContent).toBe(true);
     expect(result.hasContent).toBe(true);
   });
 

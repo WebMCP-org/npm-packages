@@ -163,8 +163,8 @@ function renderRegionInfo(region: RegionInfo): string {
 
 function wrapXml(body: string, meta?: PageMeta, type = 'section'): string {
   const attrs = [
-    meta?.title ? `title="${escapeXml(meta?.title!)}"` : null,
-    meta?.url ? `url="${escapeXml(meta?.url!)}"` : null,
+    meta?.title ? `title="${escapeXml(meta.title)}"` : null,
+    meta?.url ? `url="${escapeXml(meta.url)}"` : null,
   ]
     .filter(Boolean)
     .join(' ');

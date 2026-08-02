@@ -66,7 +66,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "prebuild": "pnpm build:bundle && node generate-bundle-module.mjs",
+    "prebuild": "pnpm build:bundle && node generate-bundle-module.mjs && vp fmt dist-bundle/smart-dom-reader-bundle.js src/bundle-string.ts --write",
     "build": "vp pack",
     "build:bundle": "vp build --config vite.config.bundle.ts",
     "bundle:mcp": "pnpm --filter @mcp-b/smart-dom-reader build && pnpm --filter @mcp-b/smart-dom-reader-server bundle",
@@ -87,15 +87,6 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-monkey": "catalog:",
     "vite-plus": "catalog:"
-  },
-  "peerDependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0"
-  },
-  "peerDependenciesMeta": {
-    "@modelcontextprotocol/sdk": {
-      "optional": true
-    }
   }
 }

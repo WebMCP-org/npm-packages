@@ -1,12 +1,16 @@
 #!/usr/bin/env tsx
 
 import { constants as fsConstants } from 'node:fs';
-import { access, readFile, stat } from 'node:fs/promises';
+import { access, open } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { type CallToolResult, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import {
+  type CallToolResult,
+  McpServer,
+  ProtocolError,
+  ProtocolErrorCode,
+} from '@modelcontextprotocol/server';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { type Browser, chromium, type LaunchOptions, type Page } from 'playwright';
 import { z } from 'zod';
 
@@ -19,7 +23,7 @@ const EMBEDDED_LIBRARY_RELATIVE_PATH = join('..', 'lib', 'smart-dom-reader.bundl
 const DEFAULT_LAUNCH_ARGS = ['--no-sandbox', '--disable-setuid-sandbox'] as const;
 
 type ConnectBrowserArgs = {
-  executablePath?: string;
+  executablePath?: string | undefined;
   headless: boolean;
 };
 
@@ -28,29 +32,29 @@ type NavigateArgs = {
 };
 
 type OptionalSelectorArgs = {
-  selector?: string;
-  detail?: 'summary' | 'region' | 'deep';
-  maxTextLength?: number;
-  maxElements?: number;
+  selector?: string | undefined;
+  detail?: 'summary' | 'region' | 'deep' | undefined;
+  maxTextLength?: number | undefined;
+  maxElements?: number | undefined;
 };
 
 type RegionArgs = {
   selector: string;
-  options?: ProgressiveExtractorRegionConfig & FormatOptions;
+  options?: (ProgressiveExtractorRegionConfig & FormatOptions) | undefined;
 };
 
 type ContentArgs = {
   selector: string;
-  options?: ProgressiveExtractorContentConfig & FormatOptions;
+  options?: (ProgressiveExtractorContentConfig & FormatOptions) | undefined;
 };
 
 type InteractiveArgs = {
-  selector?: string;
-  options?: SmartDomReaderOptions & FormatOptions;
+  selector?: string | undefined;
+  options?: (SmartDomReaderOptions & FormatOptions) | undefined;
 };
 
 type ScreenshotArgs = {
-  path?: string;
+  path?: string | undefined;
   fullPage: boolean;
 };
 
@@ -105,28 +109,54 @@ const DEFAULT_CHROME_LOCATIONS: Partial<Record<NodeJS.Platform, readonly string[
 };
 
 interface ProgressiveExtractorRegionConfig {
-  mode?: 'interactive' | 'full';
-  includeHidden?: boolean;
-  maxDepth?: number;
+  mode?: 'interactive' | 'full' | undefined;
+  includeHidden?: boolean | undefined;
+  maxDepth?: number | undefined;
 }
 
 interface ProgressiveExtractorContentConfig {
-  includeHeadings?: boolean;
-  includeLists?: boolean;
-  includeMedia?: boolean;
-  maxTextLength?: number;
+  includeHeadings?: boolean | undefined;
+  includeLists?: boolean | undefined;
+  includeMedia?: boolean | undefined;
+  maxTextLength?: number | undefined;
 }
 
 interface SmartDomReaderOptions {
-  viewportOnly?: boolean;
-  maxDepth?: number;
+  viewportOnly?: boolean | undefined;
+  maxDepth?: number | undefined;
 }
 
 interface FormatOptions {
-  detail?: 'summary' | 'region' | 'deep';
-  maxTextLength?: number;
-  maxElements?: number;
+  detail?: 'summary' | 'region' | 'deep' | undefined;
+  maxTextLength?: number | undefined;
+  maxElements?: number | undefined;
 }
+
+const COMMON_TRAVERSAL_OPTIONS_SHAPE = {
+  maxDepth: z
+    .number()
+    .int()
+    .min(0)
+    .describe('Traversal depth for nested elements. Larger values inspect deeper trees.')
+    .optional(),
+  detail: z
+    .enum(['summary', 'region', 'deep'])
+    .default('region')
+    .describe("Output depth. 'region' is actionable; 'deep' expands more details.")
+    .optional(),
+  maxTextLength: z
+    .number()
+    .int()
+    .min(0)
+    .describe('Truncate text snippets to this many characters to save tokens.')
+    .optional(),
+  maxElements: z
+    .number()
+    .int()
+    .min(0)
+    .describe('Limit number of listed items per group (buttons, links, inputs).')
+    .optional(),
+};
 
 type LibraryCache = {
   path: string;
@@ -186,8 +216,7 @@ class SmartDomReaderServer {
         title: 'Connect with Playwright',
         description:
           'Launch Chromium for subsequent tools. Use this first. Returns a brief status message. Run headless=false for visual debugging.',
-        // Cast to any for Zod v4 compatibility with SDK's v3 type expectations
-        inputSchema: {
+        inputSchema: z.object({
           executablePath: z
             .string()
             .trim()
@@ -202,9 +231,9 @@ class SmartDomReaderServer {
             .describe(
               'Run without a visible window. Set false to watch interactions. Default: false.'
             ),
-        } as unknown as z.ZodRawShape,
+        }),
       },
-      async (args: unknown) => this.connectBrowser(args as ConnectBrowserArgs)
+      async (args) => this.connectBrowser(args)
     );
 
     this.server.registerTool(
@@ -213,14 +242,14 @@ class SmartDomReaderServer {
         title: 'Navigate to URL',
         description:
           'Load an absolute URL in the active tab and wait for network idle. Use after browser_connect.',
-        inputSchema: {
+        inputSchema: z.object({
           url: z
             .string()
             .url('url must be a valid absolute URL')
             .describe('Absolute URL to navigate to (e.g., https://example.com).'),
-        } as unknown as z.ZodRawShape,
+        }),
       },
-      async (args: unknown) => this.navigate(args as NavigateArgs)
+      async (args) => this.navigate(args)
     );
 
     this.server.registerTool(
@@ -229,7 +258,7 @@ class SmartDomReaderServer {
         title: 'Extract DOM Structure',
         description:
           'Start here. Returns an XML-wrapped Markdown outline (<outline>) describing page regions. Next: pick a selector/section and call dom_extract_region.',
-        inputSchema: {
+        inputSchema: z.object({
           selector: z
             .union([z.string().trim().min(1), z.literal('')])
             .describe(
@@ -253,9 +282,9 @@ class SmartDomReaderServer {
             .min(0)
             .describe('Limit number of listed items per group (buttons, links, etc.).')
             .optional(),
-        } as unknown as z.ZodRawShape,
+        }),
       },
-      async (args: unknown) => this.extractStructure(args as OptionalSelectorArgs)
+      async (args) => this.extractStructure(args)
     );
 
     this.server.registerTool(
@@ -264,7 +293,7 @@ class SmartDomReaderServer {
         title: 'Extract DOM Region',
         description:
           'Use after the outline. Returns XML-wrapped Markdown (<section>) with actionable selectors for a specific region. Next: write a script or rerun with higher detail.',
-        inputSchema: {
+        inputSchema: z.object({
           selector: z
             .string()
             .trim()
@@ -282,36 +311,12 @@ class SmartDomReaderServer {
                 .boolean()
                 .describe('Include elements that are hidden/offscreen. Default: false.')
                 .optional(),
-              maxDepth: z
-                .number()
-                .int()
-                .min(0)
-                .describe(
-                  'Traversal depth for nested elements. Larger values inspect deeper trees.'
-                )
-                .optional(),
-              detail: z
-                .enum(['summary', 'region', 'deep'])
-                .default('region')
-                .describe("Output depth. 'region' is actionable; 'deep' expands more details.")
-                .optional(),
-              maxTextLength: z
-                .number()
-                .int()
-                .min(0)
-                .describe('Truncate text snippets to this many characters to save tokens.')
-                .optional(),
-              maxElements: z
-                .number()
-                .int()
-                .min(0)
-                .describe('Limit number of listed items per group (buttons, links, inputs).')
-                .optional(),
+              ...COMMON_TRAVERSAL_OPTIONS_SHAPE,
             })
             .optional(),
-        } as unknown as z.ZodRawShape,
+        }),
       },
-      async (args: unknown) => this.extractRegion(args as RegionArgs)
+      async (args) => this.extractRegion(args)
     );
 
     this.server.registerTool(
@@ -320,7 +325,7 @@ class SmartDomReaderServer {
         title: 'Extract DOM Content',
         description:
           'Readable text for a region as XML-wrapped Markdown (<content>). Use for comprehension; for selectors use dom_extract_region.',
-        inputSchema: {
+        inputSchema: z.object({
           selector: z
             .string()
             .trim()
@@ -359,9 +364,9 @@ class SmartDomReaderServer {
                 .optional(),
             })
             .optional(),
-        } as unknown as z.ZodRawShape,
+        }),
       },
-      async (args: unknown) => this.extractContent(args as ContentArgs)
+      async (args) => this.extractContent(args)
     );
 
     this.server.registerTool(
@@ -370,7 +375,7 @@ class SmartDomReaderServer {
         title: 'Extract Interactive Elements',
         description:
           'Quick list of controls within a scope as XML-wrapped Markdown (<section>). Alternative to region when you only need controls.',
-        inputSchema: {
+        inputSchema: z.object({
           selector: z
             .union([z.string().trim().min(1), z.literal('')])
             .describe(
@@ -383,36 +388,12 @@ class SmartDomReaderServer {
                 .boolean()
                 .default(false)
                 .describe('Only include elements currently within the viewport. Default: false.'),
-              maxDepth: z
-                .number()
-                .int()
-                .min(0)
-                .describe(
-                  'Traversal depth for nested elements. Larger values inspect deeper trees.'
-                )
-                .optional(),
-              detail: z
-                .enum(['summary', 'region', 'deep'])
-                .default('region')
-                .describe("Output depth. 'region' is actionable; 'deep' expands more details.")
-                .optional(),
-              maxTextLength: z
-                .number()
-                .int()
-                .min(0)
-                .describe('Truncate text snippets to this many characters to save tokens.')
-                .optional(),
-              maxElements: z
-                .number()
-                .int()
-                .min(0)
-                .describe('Limit number of listed items per group (buttons, links, inputs).')
-                .optional(),
+              ...COMMON_TRAVERSAL_OPTIONS_SHAPE,
             })
             .optional(),
-        } as unknown as z.ZodRawShape,
+        }),
       },
-      async (args: unknown) => this.extractInteractive(args as InteractiveArgs)
+      async (args) => this.extractInteractive(args)
     );
 
     this.server.registerTool(
@@ -421,7 +402,7 @@ class SmartDomReaderServer {
         title: 'Capture Screenshot',
         description:
           'Capture a PNG screenshot of the current page. Returns a short Markdown summary (path and fullPage flag).',
-        inputSchema: {
+        inputSchema: z.object({
           path: z
             .string()
             .trim()
@@ -434,9 +415,9 @@ class SmartDomReaderServer {
             .boolean()
             .default(false)
             .describe('Capture the full scrollable page. Default: false.'),
-        } as unknown as z.ZodRawShape,
+        }),
       },
-      async (args: unknown) => this.captureScreenshot(args as ScreenshotArgs)
+      async (args) => this.captureScreenshot(args)
     );
 
     this.server.registerTool(
@@ -445,7 +426,7 @@ class SmartDomReaderServer {
         title: 'Close Browser',
         description:
           'Shut down the launched browser instance and release resources. Safe to call multiple times.',
-        inputSchema: {},
+        inputSchema: z.object({}),
       },
       async () => this.closeBrowser()
     );
@@ -697,12 +678,7 @@ class SmartDomReaderServer {
               }
 
               const { selector, options } = args as RegionOperationArgs;
-              const result = ProgressiveExtractor.extractRegion(
-                selector,
-                document,
-                options ?? {},
-                SmartDOMReader
-              );
+              const result = ProgressiveExtractor.extractRegion(selector, document, options ?? {});
               if (!result)
                 return `No matching region for selector ${selector}` as unknown as TResult;
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
@@ -779,8 +755,8 @@ class SmartDomReaderServer {
 
   private getActivePage(): Page {
     if (!this.browser || !this.browser.isConnected() || !this.page) {
-      throw new McpError(
-        ErrorCode.InvalidRequest,
+      throw new ProtocolError(
+        ProtocolErrorCode.InvalidRequest,
         'Browser not connected. Call browser_connect first.'
       );
     }
@@ -796,35 +772,50 @@ class SmartDomReaderServer {
   }
 
   private async readLibraryFile(resolvedPath: string): Promise<string> {
-    if (!(await pathExists(resolvedPath))) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        `Embedded library file not found at ${resolvedPath}. Ensure the bundled file exists.`
-      );
+    let file;
+    try {
+      file = await open(resolvedPath, 'r');
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
+        throw new ProtocolError(
+          ProtocolErrorCode.InvalidParams,
+          `Embedded library file not found at ${resolvedPath}. Ensure the bundled file exists.`
+        );
+      }
+      throw error;
     }
 
-    // If cached, validate mtime to support hot updates without restart
-    const { mtimeMs } = await stat(resolvedPath);
-    if (this.cachedLibrary?.path === resolvedPath && this.cachedLibrary.mtimeMs === mtimeMs) {
-      return this.cachedLibrary.code;
-    }
+    try {
+      // If cached, validate mtime to support hot updates without restart
+      const { mtimeMs } = await file.stat();
+      if (this.cachedLibrary?.path === resolvedPath && this.cachedLibrary.mtimeMs === mtimeMs) {
+        return this.cachedLibrary.code;
+      }
 
-    const code = await readFile(resolvedPath, 'utf8');
-    this.cachedLibrary = { path: resolvedPath, code, mtimeMs };
-    return code;
+      const code = await file.readFile('utf8');
+      this.cachedLibrary = { path: resolvedPath, code, mtimeMs };
+      return code;
+    } finally {
+      await file.close();
+    }
   }
 
   private handleToolError(error: unknown, fallbackMessage: string): never {
-    if (error instanceof McpError) {
+    if (error instanceof ProtocolError) {
       throw error;
     }
 
     if (error instanceof Error) {
       console.error(fallbackMessage, error);
-      throw new McpError(ErrorCode.InternalError, error.message);
+      throw new ProtocolError(ProtocolErrorCode.InternalError, error.message);
     }
 
-    throw new McpError(ErrorCode.InternalError, fallbackMessage);
+    throw new ProtocolError(ProtocolErrorCode.InternalError, fallbackMessage);
   }
 }
 

@@ -31,9 +31,7 @@ test.describe('Runtime Contract - Iframe Transport', () => {
     await resetFrameInvocations(frame);
 
     const result = await callClientTool(page, 'sum', { a: 7, b: 5 });
-    expect(firstTextContent(result as { content?: Array<{ type?: string; text?: string }> })).toBe(
-      'sum:12'
-    );
+    expect(firstTextContent(result)).toBe('sum:12');
 
     await expect
       .poll(async () => await readFrameInvocations(frame))
@@ -54,9 +52,7 @@ test.describe('Runtime Contract - Iframe Transport', () => {
     await expect.poll(async () => await listClientToolNames(page)).toContain(DYNAMIC_TOOL_NAME);
 
     const result = await callClientTool(page, DYNAMIC_TOOL_NAME, { value: 'iframe' });
-    expect(firstTextContent(result as { content?: Array<{ type?: string; text?: string }> })).toBe(
-      'dynamic:iframe'
-    );
+    expect(firstTextContent(result)).toBe('dynamic:iframe');
   });
 
   test('removes an unregistered iframe tool from discovery and later calls fail', async ({

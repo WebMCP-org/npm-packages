@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { IframeChildTransport } from './IframeChildTransport.js';
+import { IframeParentTransport } from './IframeParentTransport.js';
 import { TabClientTransport } from './TabClientTransport.js';
 import { TabServerTransport } from './TabServerTransport.js';
-
-const isBrowserEnv = typeof window !== 'undefined' && typeof window.postMessage === 'function';
-const browserDescribe = isBrowserEnv ? describe : describe.skip;
 
 const delay = (ms = 25) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -11,14 +10,10 @@ async function safeClose(transport: {
   close: () => Promise<void>;
   serverReadyPromise?: Promise<void>;
 }): Promise<void> {
-  try {
-    await transport.close();
-  } catch {
-    // Close should be best-effort for tests
-  }
   if ('serverReadyPromise' in transport && transport.serverReadyPromise) {
-    transport.serverReadyPromise.catch(() => {});
+    void transport.serverReadyPromise.catch(() => {});
   }
+  await transport.close();
 }
 
 const uniqueChannel = (prefix: string) =>
@@ -31,6 +26,8 @@ function captureServerPayloads(channelId: string): {
   const payloads: unknown[] = [];
 
   const handler = (event: MessageEvent) => {
+    if (event.origin !== window.location.origin || event.source !== window) return;
+
     if (
       event.data?.channel === channelId &&
       event.data?.type === 'mcp' &&
@@ -48,7 +45,7 @@ function captureServerPayloads(channelId: string): {
   };
 }
 
-async function startPair(options?: { channelId?: string; requestTimeout?: number }) {
+async function startPair(options?: { channelId?: string }) {
   const channelId = options?.channelId ?? uniqueChannel('pair');
 
   const serverTransport = new TabServerTransport({
@@ -59,7 +56,6 @@ async function startPair(options?: { channelId?: string; requestTimeout?: number
   const clientTransport = new TabClientTransport({
     targetOrigin: window.location.origin,
     channelId,
-    requestTimeout: options?.requestTimeout ?? 250,
   });
 
   await serverTransport.start();
@@ -69,7 +65,159 @@ async function startPair(options?: { channelId?: string; requestTimeout?: number
   return { channelId, clientTransport, serverTransport };
 }
 
-browserDescribe('Tab transports (browser)', () => {
+describe('Tab transports (browser)', () => {
+  describe('IframeParentTransport', () => {
+    it('requires an explicit target origin', () => {
+      expect(() => {
+        // @ts-expect-error testing the JavaScript caller boundary
+        new IframeParentTransport({ iframe: document.createElement('iframe') });
+      }).toThrow('targetOrigin must be explicitly set');
+    });
+
+    it('accepts an explicit wildcard origin only from its iframe window', async () => {
+      const iframe = document.createElement('iframe');
+      document.body.append(iframe);
+      const channelId = uniqueChannel('iframe-parent');
+      const transport = new IframeParentTransport({ iframe, targetOrigin: '*', channelId });
+      const onClose = vi.fn();
+      transport.onclose = onClose;
+
+      try {
+        await transport.start();
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: 'https://child.example',
+            source: window,
+            data: {
+              channel: channelId,
+              type: 'mcp',
+              direction: 'server-to-client',
+              payload: 'mcp-server-ready',
+            },
+          })
+        );
+        await delay();
+
+        let ready = false;
+        void transport.serverReadyPromise.then(() => {
+          ready = true;
+        });
+        await delay();
+        expect(ready).toBe(false);
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: 'https://child.example',
+            source: iframe.contentWindow,
+            data: {
+              channel: channelId,
+              type: 'mcp',
+              direction: 'server-to-client',
+              payload: 'mcp-server-ready',
+            },
+          })
+        );
+
+        await expect(transport.serverReadyPromise).resolves.toBeUndefined();
+        await transport.close();
+        await transport.close();
+        expect(onClose).toHaveBeenCalledOnce();
+        await expect(transport.start()).rejects.toThrow('cannot be restarted');
+      } finally {
+        await safeClose(transport);
+        iframe.remove();
+      }
+    });
+  });
+
+  describe('IframeChildTransport', () => {
+    it('accepts messages only from its parent and snapshotted origins', async () => {
+      const iframe = document.createElement('iframe');
+      document.body.append(iframe);
+      const channelId = uniqueChannel('iframe-child');
+      const allowedOrigins = [window.location.origin];
+      const transport = new IframeChildTransport({ allowedOrigins, channelId });
+      const onMessage = vi.fn();
+      const onClose = vi.fn();
+      transport.onmessage = onMessage;
+      transport.onclose = onClose;
+
+      try {
+        await transport.start();
+        const data = {
+          channel: channelId,
+          type: 'mcp',
+          direction: 'client-to-server',
+          payload: { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+        };
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: window.location.origin,
+            source: iframe.contentWindow,
+            data,
+          })
+        );
+        expect(onMessage).not.toHaveBeenCalled();
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: window.location.origin,
+            source: window.parent,
+            data,
+          })
+        );
+        expect(onMessage).toHaveBeenCalledTimes(1);
+
+        allowedOrigins.push('https://attacker.example');
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: 'https://attacker.example',
+            source: window.parent,
+            data,
+          })
+        );
+        expect(onMessage).toHaveBeenCalledTimes(1);
+
+        await transport.close();
+        await transport.close();
+        expect(onClose).toHaveBeenCalledOnce();
+        await expect(transport.start()).rejects.toThrow('cannot be restarted');
+      } finally {
+        await safeClose(transport);
+        iframe.remove();
+      }
+    });
+
+    it('accepts an explicit wildcard origin from its parent', async () => {
+      const channelId = uniqueChannel('iframe-child-wildcard');
+      const transport = new IframeChildTransport({ allowedOrigins: ['*'], channelId });
+      const onMessage = vi.fn();
+      transport.onmessage = onMessage;
+
+      try {
+        await transport.start();
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: 'https://unlisted.example',
+            source: window.parent,
+            data: {
+              channel: channelId,
+              type: 'mcp',
+              direction: 'client-to-server',
+              payload: { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+            },
+          })
+        );
+
+        expect(onMessage).toHaveBeenCalledOnce();
+      } finally {
+        await safeClose(transport);
+      }
+    });
+  });
+
   describe('TabClientTransport', () => {
     let clientTransport: TabClientTransport;
     let channelId: string;
@@ -79,7 +227,6 @@ browserDescribe('Tab transports (browser)', () => {
       clientTransport = new TabClientTransport({
         targetOrigin: window.location.origin,
         channelId,
-        requestTimeout: 150,
       });
     });
 
@@ -87,9 +234,11 @@ browserDescribe('Tab transports (browser)', () => {
       await safeClose(clientTransport);
     });
 
-    it('defaults targetOrigin to * when not provided', () => {
-      const transport = new TabClientTransport({});
-      expect((transport as any)._targetOrigin).toBe('*');
+    it('requires an explicit target origin', () => {
+      expect(() => {
+        // @ts-expect-error testing the JavaScript caller boundary
+        new TabClientTransport({});
+      }).toThrow('targetOrigin must be explicitly set');
     });
 
     it('rejects sends before start', async () => {
@@ -115,6 +264,7 @@ browserDescribe('Tab transports (browser)', () => {
       window.dispatchEvent(
         new MessageEvent('message', {
           origin: 'https://malicious.example',
+          source: window,
           data: {
             channel: channelId,
             type: 'mcp',
@@ -124,7 +274,6 @@ browserDescribe('Tab transports (browser)', () => {
         })
       );
 
-      await delay();
       expect(onMessage).not.toHaveBeenCalled();
     });
 
@@ -133,26 +282,41 @@ browserDescribe('Tab transports (browser)', () => {
         targetOrigin: '*',
         channelId,
       });
+      const iframe = document.createElement('iframe');
+      document.body.append(iframe);
       const onMessage = vi.fn();
       wildcardTransport.onmessage = onMessage;
 
-      await wildcardTransport.start();
+      try {
+        await wildcardTransport.start();
+        const data = {
+          channel: channelId,
+          type: 'mcp',
+          direction: 'server-to-client',
+          payload: { jsonrpc: '2.0', result: { ok: true }, id: 99 },
+        };
 
-      window.dispatchEvent(
-        new MessageEvent('message', {
-          origin: 'https://malicious.example',
-          data: {
-            channel: channelId,
-            type: 'mcp',
-            direction: 'server-to-client',
-            payload: { jsonrpc: '2.0', result: { ok: true }, id: 99 },
-          },
-        })
-      );
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: 'https://malicious.example',
+            source: iframe.contentWindow,
+            data,
+          })
+        );
+        expect(onMessage).not.toHaveBeenCalled();
 
-      await delay();
-      expect(onMessage).toHaveBeenCalled();
-      await safeClose(wildcardTransport);
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: 'https://malicious.example',
+            source: window,
+            data,
+          })
+        );
+        expect(onMessage).toHaveBeenCalledTimes(1);
+      } finally {
+        await safeClose(wildcardTransport);
+        iframe.remove();
+      }
     });
 
     it('ignores messages with wrong direction', async () => {
@@ -217,20 +381,25 @@ browserDescribe('Tab transports (browser)', () => {
 
       await delay();
       expect(onClose).toHaveBeenCalledTimes(1);
+      await clientTransport.close();
+      expect(onClose).toHaveBeenCalledTimes(1);
+      await expect(clientTransport.start()).rejects.toThrow('cannot be restarted');
       await expect(
         clientTransport.send({ jsonrpc: '2.0', method: 'after-close', id: 5 })
-      ).rejects.toThrow('Transport not started');
+      ).rejects.toThrow('Transport is closed');
     });
   });
 
   describe('TabServerTransport', () => {
     let serverTransport: TabServerTransport;
     let channelId: string;
+    let allowedOrigins: string[];
 
     beforeEach(() => {
       channelId = uniqueChannel('server');
+      allowedOrigins = [window.location.origin];
       serverTransport = new TabServerTransport({
-        allowedOrigins: [window.location.origin],
+        allowedOrigins,
         channelId,
       });
     });
@@ -251,15 +420,17 @@ browserDescribe('Tab transports (browser)', () => {
       await expect(serverTransport.start()).rejects.toThrow('Transport already started');
     });
 
-    it('ignores messages from disallowed origins', async () => {
+    it('snapshots allowed origins and ignores later mutations', async () => {
       const onMessage = vi.fn();
       serverTransport.onmessage = onMessage;
 
       await serverTransport.start();
+      allowedOrigins.push('https://attacker.example');
 
       window.dispatchEvent(
         new MessageEvent('message', {
           origin: 'https://attacker.example',
+          source: window,
           data: {
             channel: channelId,
             type: 'mcp',
@@ -269,8 +440,44 @@ browserDescribe('Tab transports (browser)', () => {
         })
       );
 
-      await delay();
       expect(onMessage).not.toHaveBeenCalled();
+    });
+
+    it('accepts allowed-origin messages only from the same window', async () => {
+      const iframe = document.createElement('iframe');
+      document.body.append(iframe);
+      const onMessage = vi.fn();
+      serverTransport.onmessage = onMessage;
+
+      try {
+        await serverTransport.start();
+        const data = {
+          channel: channelId,
+          type: 'mcp',
+          direction: 'client-to-server',
+          payload: { jsonrpc: '2.0', method: 'tools/list', id: 1 },
+        };
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: window.location.origin,
+            source: iframe.contentWindow,
+            data,
+          })
+        );
+        expect(onMessage).not.toHaveBeenCalled();
+
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            origin: window.location.origin,
+            source: window,
+            data,
+          })
+        );
+        expect(onMessage).toHaveBeenCalledTimes(1);
+      } finally {
+        iframe.remove();
+      }
     });
 
     it('emits onerror for invalid client payloads', async () => {
@@ -279,38 +486,21 @@ browserDescribe('Tab transports (browser)', () => {
 
       await serverTransport.start();
 
-      window.postMessage(
-        {
-          channel: channelId,
-          type: 'mcp',
-          direction: 'client-to-server',
-          payload: { foo: 'bar' },
-        },
-        window.location.origin
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          source: window,
+          data: {
+            channel: channelId,
+            type: 'mcp',
+            direction: 'client-to-server',
+            payload: { foo: 'bar' },
+          },
+        })
       );
 
-      await delay();
       expect(onError).toHaveBeenCalled();
       expect(onError.mock.calls[0]?.[0]?.message).toContain('Invalid message');
-    });
-
-    it('broadcasts server ready when started', async () => {
-      const readyReceived = new Promise<void>((resolve) => {
-        const handler = (event: MessageEvent) => {
-          if (
-            event.data?.channel === channelId &&
-            event.data?.payload === 'mcp-server-ready' &&
-            event.data?.direction === 'server-to-client'
-          ) {
-            window.removeEventListener('message', handler);
-            resolve();
-          }
-        };
-        window.addEventListener('message', handler);
-      });
-
-      await serverTransport.start();
-      await readyReceived;
     });
 
     it('responds to allowed cross-origin ready checks', async () => {
@@ -330,6 +520,7 @@ browserDescribe('Tab transports (browser)', () => {
         window.dispatchEvent(
           new MessageEvent('message', {
             origin: crossOrigin,
+            source: window,
             data: {
               channel: crossOriginChannel,
               type: 'mcp',
@@ -381,6 +572,7 @@ browserDescribe('Tab transports (browser)', () => {
         window.dispatchEvent(
           new MessageEvent('message', {
             origin: crossOrigin,
+            source: window,
             data: {
               channel: raceChannel,
               type: 'mcp',
@@ -412,72 +604,16 @@ browserDescribe('Tab transports (browser)', () => {
       }
     });
 
-    it('delivers interrupted responses for cross-origin pending requests on beforeunload', async () => {
-      const crossOrigin = 'https://app.usechar.ai';
-      const unloadChannel = uniqueChannel('cross-origin-beforeunload');
-      const transport = new TabServerTransport({
-        allowedOrigins: [crossOrigin],
-        channelId: unloadChannel,
-      });
-      const captured = captureServerPayloads(unloadChannel);
-
-      try {
-        await transport.start();
-        await delay();
-        captured.payloads.length = 0;
-
-        window.dispatchEvent(
-          new MessageEvent('message', {
-            origin: crossOrigin,
-            data: {
-              channel: unloadChannel,
-              type: 'mcp',
-              direction: 'client-to-server',
-              payload: {
-                jsonrpc: '2.0',
-                method: 'tools/call',
-                id: 99,
-              },
-            },
-          })
-        );
-
-        await delay();
-        captured.payloads.length = 0;
-
-        window.dispatchEvent(new Event('beforeunload'));
-        await delay();
-
-        expect(captured.payloads).toContainEqual({
-          jsonrpc: '2.0',
-          id: 99,
-          result: {
-            content: [
-              {
-                type: 'text',
-                text: 'Tool execution interrupted by page navigation',
-              },
-            ],
-            metadata: expect.objectContaining({
-              navigationInterrupted: true,
-              originalMethod: 'tools/call',
-            }),
-          },
-        });
-      } finally {
-        captured.stop();
-        await safeClose(transport);
-      }
-    });
-
     it('invokes onclose when closed manually', async () => {
       const onClose = vi.fn();
       serverTransport.onclose = onClose;
 
       await serverTransport.start();
       await serverTransport.close();
+      await serverTransport.close();
 
       expect(onClose).toHaveBeenCalledTimes(1);
+      await expect(serverTransport.start()).rejects.toThrow('cannot be restarted');
     });
   });
 
@@ -486,7 +622,7 @@ browserDescribe('Tab transports (browser)', () => {
     let serverTransport: TabServerTransport;
 
     beforeEach(async () => {
-      const pair = await startPair({ requestTimeout: 120 });
+      const pair = await startPair();
       ({ clientTransport, serverTransport } = pair);
     });
 
@@ -516,33 +652,13 @@ browserDescribe('Tab transports (browser)', () => {
       await safeClose(server);
     });
 
-    it('delivers client requests to the server', async () => {
-      const messageReceived = new Promise<unknown>((resolve) => {
-        serverTransport.onmessage = (msg) => resolve(msg);
-      });
-
-      await clientTransport.send({
-        jsonrpc: '2.0',
-        method: 'test/method',
-        id: 1,
-        params: { foo: 'bar' },
-      });
-
-      expect(await messageReceived).toEqual({
-        jsonrpc: '2.0',
-        method: 'test/method',
-        id: 1,
-        params: { foo: 'bar' },
-      });
-    });
-
     it('roundtrips responses from server to client', async () => {
       const responseReceived = new Promise<unknown>((resolve) => {
         clientTransport.onmessage = (msg) => resolve(msg);
       });
 
       serverTransport.onmessage = async (msg) => {
-        if ('method' in msg && msg.id !== undefined) {
+        if ('method' in msg && 'id' in msg) {
           await serverTransport.send({
             jsonrpc: '2.0',
             id: msg.id,
@@ -562,57 +678,6 @@ browserDescribe('Tab transports (browser)', () => {
         id: 42,
         result: { success: true },
       });
-    });
-
-    it('clears request timeouts after responses arrive', async () => {
-      const responses: unknown[] = [];
-      clientTransport.onmessage = (msg) => responses.push(msg);
-
-      await clientTransport.send({ jsonrpc: '2.0', method: 'work', id: 7 });
-      await serverTransport.send({ jsonrpc: '2.0', id: 7, result: { ok: true } });
-
-      await delay(200);
-      expect(responses).toHaveLength(1);
-
-      const activeRequests = (clientTransport as any)._activeRequests as Map<unknown, unknown>;
-      expect(activeRequests?.size ?? 0).toBe(0);
-    });
-
-    it('surfaces synthesized timeout errors when server hangs', async () => {
-      clientTransport.onerror = vi.fn();
-
-      const timeoutMessage = new Promise<any>((resolve) => {
-        clientTransport.onmessage = (msg) => resolve(msg);
-      });
-
-      await clientTransport.send({
-        jsonrpc: '2.0',
-        method: 'slow/method',
-        id: 99,
-      });
-
-      const received = await timeoutMessage;
-      expect(received.id).toBe(99);
-      expect(received.error?.code).toBe(-32000);
-      expect(received.error?.message).toContain('timeout');
-    });
-
-    it('emits interrupted responses on beforeunload', async () => {
-      const seenByServer = new Promise<void>((resolve) => {
-        serverTransport.onmessage = () => resolve();
-      });
-
-      const interruptedResponse = new Promise<any>((resolve) => {
-        clientTransport.onmessage = (msg) => resolve(msg);
-      });
-
-      await clientTransport.send({ jsonrpc: '2.0', method: 'long/task', id: 123 });
-      await seenByServer;
-      window.dispatchEvent(new Event('beforeunload'));
-
-      const received = await interruptedResponse;
-      expect(received.id).toBe(123);
-      expect(received.result?.content?.[0]?.text).toContain('interrupted');
     });
   });
 

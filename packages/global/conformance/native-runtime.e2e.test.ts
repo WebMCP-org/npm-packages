@@ -1,48 +1,55 @@
+import type {
+  ChromeModelContextExtensions,
+  ModelContext,
+  ModelContextTool,
+  RegisteredTool,
+} from '@mcp-b/webmcp-types';
+import { runDeclarativeFormConformanceSuite } from '../../../conformance/declarative-forms-conformance.shared.js';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { ModelContext, ModelContextTesting, ToolDescriptor } from '@mcp-b/webmcp-types';
 
 type NativeRegisterTool = (
-  tool: ToolDescriptor,
+  tool: ModelContextTool,
   options?: { signal?: AbortSignal }
 ) => Promise<void>;
+
+type ChromeExecuteTool = NonNullable<ChromeModelContextExtensions['executeTool']>;
 
 const registeredControllers: AbortController[] = [];
 
 function requireNativeModelContext(): ModelContext {
-  const modelContext = document.modelContext as unknown as ModelContext | undefined;
+  const modelContext = document.modelContext as ModelContext | undefined;
   if (!modelContext) {
-    throw new Error('Expected native document.modelContext to be available in Chrome 152+');
+    throw new Error('Expected native document.modelContext with WebMCP enabled');
   }
   return modelContext;
 }
 
-function requireNativeTestingContext(): ModelContextTesting {
-  const testing = navigator.modelContextTesting as ModelContextTesting | undefined;
-  if (!testing) {
-    throw new Error(
-      'Expected native navigator.modelContextTesting to be available with WebMCPTesting enabled'
-    );
-  }
-  return testing;
+function getChromeExecuteTool(modelContext: ModelContext): ChromeExecuteTool | undefined {
+  const chromeContext = modelContext as ModelContext & ChromeModelContextExtensions;
+  return typeof chromeContext.executeTool === 'function'
+    ? chromeContext.executeTool.bind(modelContext)
+    : undefined;
 }
 
 function uniqueToolName(prefix: string): string {
   return `${prefix}_${String(Date.now())}_${String(Math.random()).slice(2)}`;
 }
 
-function listNativeToolNames(): string[] {
-  return requireNativeTestingContext()
-    .listTools()
-    .map((tool) => tool.name);
+async function listNativeTools(): Promise<RegisteredTool[]> {
+  return requireNativeModelContext().getTools();
 }
 
-function registerNativeTool(tool: ToolDescriptor, signal?: AbortSignal): Promise<void> {
+async function listNativeToolNames(): Promise<string[]> {
+  return (await listNativeTools()).map((tool) => tool.name);
+}
+
+function registerNativeTool(tool: ModelContextTool, signal?: AbortSignal): Promise<void> {
   const modelContext = requireNativeModelContext();
   const registerTool = modelContext.registerTool as NativeRegisterTool;
   return registerTool.call(modelContext, tool, signal ? { signal } : undefined);
 }
 
-async function registerAbortableTool(tool: ToolDescriptor): Promise<AbortController> {
+async function registerAbortableTool(tool: ModelContextTool): Promise<AbortController> {
   const controller = new AbortController();
   registeredControllers.push(controller);
   await expect(registerNativeTool(tool, controller.signal)).resolves.toBeUndefined();
@@ -54,7 +61,7 @@ async function flush(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-describe('Native WebMCP conformance (Chrome 152+)', () => {
+describe('Native WebMCP conformance', () => {
   afterEach(async () => {
     for (const controller of registeredControllers.splice(0)) {
       controller.abort();
@@ -62,23 +69,23 @@ describe('Native WebMCP conformance (Chrome 152+)', () => {
     await flush();
   });
 
-  it('exposes the Chrome 152 native producer and testing surfaces', () => {
+  it('exposes the standard document.modelContext surface', () => {
     const modelContext = requireNativeModelContext();
-    const testing = requireNativeTestingContext();
 
     expect(typeof modelContext.registerTool).toBe('function');
-    expect(typeof testing.listTools).toBe('function');
-    expect(typeof testing.executeTool).toBe('function');
-    expect(typeof testing.addEventListener).toBe('function');
-
-    expect(typeof modelContext.unregisterTool).toBe('undefined');
-    expect(typeof modelContext.provideContext).toBe('undefined');
-    expect(typeof modelContext.clearContext).toBe('undefined');
     expect(typeof modelContext.getTools).toBe('function');
-    expect(typeof modelContext.executeTool).toBe('function');
+    expect(typeof modelContext.addEventListener).toBe('function');
+    expect('unregisterTool' in modelContext).toBe(false);
+    expect('provideContext' in modelContext).toBe(false);
+    expect('clearContext' in modelContext).toBe(false);
   });
 
-  it('registerTool resolves undefined and mirrors tools into modelContextTesting.listTools()', async () => {
+  it('treats Chromium executeTool as a feature-detected extension', () => {
+    const executeTool = getChromeExecuteTool(requireNativeModelContext());
+    expect(executeTool === undefined || typeof executeTool === 'function').toBe(true);
+  });
+
+  it('registerTool resolves undefined and exposes tools through getTools()', async () => {
     const toolName = uniqueToolName('native_register');
     const controller = new AbortController();
     registeredControllers.push(controller);
@@ -97,7 +104,13 @@ describe('Native WebMCP conformance (Chrome 152+)', () => {
       )
     ).resolves.toBeUndefined();
 
-    expect(listNativeToolNames()).toContain(toolName);
+    await expect(listNativeToolNames()).resolves.toContain(toolName);
+  });
+
+  it('getTools accepts the standard fromOrigins option', async () => {
+    await expect(requireNativeModelContext().getTools({ fromOrigins: [] })).resolves.toEqual(
+      expect.any(Array)
+    );
   });
 
   it('registerTool(tool, { signal }) unregisters when the signal aborts', async () => {
@@ -111,12 +124,12 @@ describe('Native WebMCP conformance (Chrome 152+)', () => {
       },
     });
 
-    expect(listNativeToolNames()).toContain(toolName);
+    await expect(listNativeToolNames()).resolves.toContain(toolName);
 
     controller.abort();
     await flush();
 
-    expect(listNativeToolNames()).not.toContain(toolName);
+    await expect(listNativeToolNames()).resolves.not.toContain(toolName);
   });
 
   it('registerTool with a pre-aborted signal rejects and does not register the tool', async () => {
@@ -136,13 +149,19 @@ describe('Native WebMCP conformance (Chrome 152+)', () => {
         },
         controller.signal
       )
-    ).rejects.toThrow(/aborted/i);
+    ).rejects.toThrow(/abort/i);
     await flush();
 
-    expect(listNativeToolNames()).not.toContain(toolName);
+    await expect(listNativeToolNames()).resolves.not.toContain(toolName);
   });
 
-  it('modelContextTesting.executeTool invokes a registered native tool', async () => {
+  it('executes a registered tool when Chromium executeTool is available', async () => {
+    const modelContext = requireNativeModelContext();
+    const executeTool = getChromeExecuteTool(modelContext);
+    if (!executeTool) {
+      return;
+    }
+
     const toolName = uniqueToolName('native_execute');
     await registerAbortableTool({
       name: toolName,
@@ -157,12 +176,18 @@ describe('Native WebMCP conformance (Chrome 152+)', () => {
       },
     });
 
-    const serialized = await requireNativeTestingContext().executeTool(
-      toolName,
-      JSON.stringify({ value: 7 })
-    );
+    const registeredTool = (await listNativeTools()).find((tool) => tool.name === toolName);
+    if (!registeredTool) {
+      throw new Error(`Expected getTools() to return ${toolName}`);
+    }
+
+    const serialized = await executeTool(registeredTool, JSON.stringify({ value: 7 }));
 
     expect(serialized).toEqual(expect.any(String));
     expect(serialized).toContain('value:7');
   });
+});
+
+runDeclarativeFormConformanceSuite({
+  suiteName: 'Native declarative form conformance (Chrome)',
 });

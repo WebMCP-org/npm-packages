@@ -1,6 +1,6 @@
 ---
 title: '@mcp-b/react-webmcp reference'
-description: 'Reference for the full React integration: useWebMCP, prompt and resource hooks, client providers, and Zod support.'
+description: 'Reference for the full React integration: useWebMCP, prompt and resource hooks, client providers, and schema support.'
 keywords:
   [
     '@mcp-b/react-webmcp',
@@ -13,55 +13,74 @@ keywords:
 icon: 'react'
 ---
 
-`@mcp-b/react-webmcp` is the full React surface for MCP-B. It supports tool registration, prompt and resource hooks, sampling and elicitation helpers, and client/provider hooks for consuming MCP servers from a React tree.
+`@mcp-b/react-webmcp` is the full React surface for MCP-B. It supports tool registration, prompt and resource hooks, and client/provider hooks for consuming MCP servers.
 
-Provider hooks register against `document.modelContext` while retaining a `navigator.modelContext` fallback for older preview runtimes.
+Producer hooks register against `document.modelContext`. An internal fallback to the deprecated `navigator.modelContext` alias remains only for older preview runtimes; application code should not use it.
 
 ## Installation
 
-```bash
-pnpm add @mcp-b/react-webmcp zod
+```bash title="Install provider hooks"
+pnpm add @mcp-b/global @mcp-b/react-webmcp
 ```
+
+Omit `@mcp-b/global` only when the application exclusively uses the client hooks, or when a native
+WebMCP implementation supplies `document.modelContext` and the application only uses the core
+`useWebMCP` tool hook. Prompt and resource hooks require the MCP-B
+extensions installed by `@mcp-b/global`.
 
 For client functionality:
 
-```bash
-pnpm add @mcp-b/transports @modelcontextprotocol/sdk
+```bash title="Install client dependencies"
+pnpm add @mcp-b/transports @modelcontextprotocol/client
 ```
-
-<Note>
-  `zod` and `zod-to-json-schema` are optional peer dependencies. They are required only when you
-  pass Zod v3 object maps or Zod v4 (via Standard Schema v1) as `inputSchema` or `outputSchema`.
-</Note>
 
 ## Minimal example
 
 <Snippet file="snippets/packages/react-webmcp-quickstart.ts" />
 
+## Declarative form attributes
+
+Importing this package adds React JSX declarations for `toolname`, `tooltitle`,
+`tooldescription`, `toolautosubmit`, and `toolparamdescription`.
+
+```tsx title="Declare a form tool in React"
+import '@mcp-b/global';
+import type {} from '@mcp-b/react-webmcp';
+
+export function SearchForm() {
+  return (
+    <form toolname="search_catalog" tooldescription="Search the product catalog" toolautosubmit="">
+      <input name="query" toolparamdescription="Words to match" required />
+      <button type="submit">Search</button>
+    </form>
+  );
+}
+```
+
+Use `toolautosubmit=""`. React drops an unknown attribute whose value is the
+boolean `true`, so JSX shorthand (`toolautosubmit`) does not reach the DOM.
+See the [declarative API reference](/reference/webmcp/declarative-api) for the
+runtime behavior.
+
 ## Provider hooks
 
 ### `useWebMCP(config, deps?)`
 
-```ts
+```ts title="Import useWebMCP"
 import { useWebMCP } from '@mcp-b/react-webmcp';
 ```
 
-The signature matches the strict-core hook from [`usewebmcp`](/packages/usewebmcp/reference) with two package-specific differences:
+This package re-exports the same hook implementation and function signature as
+[`usewebmcp`](/packages/usewebmcp/reference).
 
-1. The implementation field is named `handler`.
-2. `inputSchema` and `outputSchema` also accept Zod v3 object maps and any Standard Schema v1-compliant schema (e.g., Zod v4 via `~standard`).
-
-| Field                      | Type                                                  | Required | Description                        |
-| -------------------------- | ----------------------------------------------------- | -------- | ---------------------------------- |
-| `name`                     | `string`                                              | Yes      | Unique tool identifier             |
-| `description`              | `string`                                              | Yes      | Human-readable description         |
-| `inputSchema`              | JSON Schema, Standard Schema v1, or Zod v3 object map | No       | Input parameters                   |
-| `outputSchema`             | JSON Schema, Standard Schema v1, or Zod v3 object map | No       | MCP-B output helper metadata       |
-| `annotations`              | `ToolAnnotations`                                     | No       | Metadata hints                     |
-| `handler(input)`           | `(input) => T \| Promise<T>`                          | Yes      | Tool implementation function       |
-| `formatOutput(output)`     | `(output) => string`                                  | No       | Deprecated. Prefer `outputSchema`. |
-| `onSuccess(result, input)` | `(result, input) => void`                             | No       | Success callback                   |
-| `onError(error, input)`    | `(error, input) => void`                              | No       | Error callback                     |
+| Field            | Type                                   | Required | Description                  |
+| ---------------- | -------------------------------------- | -------- | ---------------------------- |
+| `name`           | `string`                               | Yes      | Unique tool identifier       |
+| `description`    | `string`                               | Yes      | Human-readable description   |
+| `inputSchema`    | JSON Schema or Standard JSON Schema v1 | No       | Input parameters             |
+| `outputSchema`   | JSON Schema                            | No       | MCP-B output helper metadata |
+| `annotations`    | `ToolAnnotations`                      | No       | Metadata hints               |
+| `execute(input)` | `(input) => T \| Promise<T>`           | Yes      | Tool implementation          |
 
 **Returns:** `WebMCPReturn`
 
@@ -70,7 +89,7 @@ React hooks use it for output typing and structured MCP responses.
 
 ### `useWebMCPContext(name, description, getValue)`
 
-```ts
+```ts title="Import useWebMCPContext"
 import { useWebMCPContext } from '@mcp-b/react-webmcp';
 ```
 
@@ -84,26 +103,29 @@ Convenience wrapper around `useWebMCP` for read-only context tools. It automatic
 
 ### `useWebMCPPrompt(config)`
 
-```ts
+```ts title="Import useWebMCPPrompt"
 import { useWebMCPPrompt } from '@mcp-b/react-webmcp';
 ```
 
-Registers an MCP prompt on `document.modelContext`.
+Registers an MCP prompt through the `BrowserMcpServer` installed by `@mcp-b/global`. It does not register against a native strict-only context.
 
-| Config field  | Type                                                  | Required | Description                |
-| ------------- | ----------------------------------------------------- | -------- | -------------------------- |
-| `name`        | `string`                                              | Yes      | Prompt identifier          |
-| `description` | `string`                                              | No       | Human-readable description |
-| `argsSchema`  | JSON Schema, Standard Schema v1, or Zod v3 object map | No       | Argument schema            |
-| `get(args)`   | `(args) => { messages: PromptMessage[] }`             | Yes      | Message generator          |
+| Config field  | Type                                      | Required | Description                |
+| ------------- | ----------------------------------------- | -------- | -------------------------- |
+| `name`        | `string`                                  | Yes      | Prompt identifier          |
+| `description` | `string`                                  | No       | Human-readable description |
+| `argsSchema`  | JSON Schema or Standard Schema v1         | No       | Argument schema            |
+| `get(args)`   | `(args) => { messages: PromptMessage[] }` | Yes      | Message generator          |
+
+**Returns:** `WebMCPPromptReturn`, with `isRegistered: boolean` indicating whether the prompt's
+registration is active.
 
 ### `useWebMCPResource(config)`
 
-```ts
+```ts title="Import useWebMCPResource"
 import { useWebMCPResource } from '@mcp-b/react-webmcp';
 ```
 
-Registers an MCP resource on `document.modelContext`.
+Registers an MCP resource through the `BrowserMcpServer` installed by `@mcp-b/global`. It does not register against a native strict-only context.
 
 | Config field         | Type                                                               | Required | Description                       |
 | -------------------- | ------------------------------------------------------------------ | -------- | --------------------------------- |
@@ -113,58 +135,85 @@ Registers an MCP resource on `document.modelContext`.
 | `mimeType`           | `string`                                                           | No       | MIME type of the resource content |
 | `read(uri, params?)` | `(uri: URL, params?) => Promise<{ contents: ResourceContents[] }>` | Yes      | Read handler                      |
 
-### `useElicitation(config)` / `useElicitationHandler(config)`
+**Returns:** `WebMCPResourceReturn`, with `isRegistered: boolean` indicating whether the resource's
+registration is active.
 
-Request user input from the connected MCP client.
-
-### `useSampling(config)` / `useSamplingHandler(config)`
-
-Request LLM completions from the connected MCP client.
+The prompt `get` and resource `read` handlers follow the same
+[committed-ref lifecycle as `useWebMCP`](/packages/usewebmcp/reference#re-registration-triggers):
+the latest committed handler is available without replacing its registration.
 
 ## Client hooks
 
 ### `McpClientProvider`
 
-```tsx
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+```tsx title="Create an MCP client and transport"
 import { McpClientProvider } from '@mcp-b/react-webmcp';
 import { TabClientTransport } from '@mcp-b/transports';
+import { Client } from '@modelcontextprotocol/client';
+
+const client = new Client(
+  { name: 'MyApp', version: '1.0.0' },
+  { versionNegotiation: { mode: 'auto' } }
+);
+const transport = new TabClientTransport({
+  channelId: 'mcp',
+  targetOrigin: window.location.origin,
+});
 ```
 
 Provider component that manages an MCP client connection and shares tools, resources, capabilities, and connection state with descendant components.
 
-| Prop        | Type             | Required | Description                |
-| ----------- | ---------------- | -------- | -------------------------- |
-| `children`  | `ReactNode`      | Yes      | Child components           |
-| `client`    | `Client`         | Yes      | MCP client instance        |
-| `transport` | `Transport`      | Yes      | Transport instance         |
-| `opts`      | `RequestOptions` | No       | Connection request options |
+| Prop        | Type             | Required | Description                                        |
+| ----------- | ---------------- | -------- | -------------------------------------------------- |
+| `children`  | `ReactNode`      | Yes      | Child components                                   |
+| `client`    | `Client`         | Yes      | MCP client instance                                |
+| `transport` | `Transport`      | Yes      | Transport instance                                 |
+| `opts`      | `ConnectOptions` | No       | Connection options, including a cached era verdict |
 
 ### `useMcpClient()`
 
-```ts
+```ts title="Import useMcpClient"
 import { useMcpClient } from '@mcp-b/react-webmcp';
 ```
 
 Accesses the client context. It must be used inside `McpClientProvider`.
 
-| Field          | Type                         | Description                                 |
-| -------------- | ---------------------------- | ------------------------------------------- |
-| `client`       | `Client`                     | MCP client instance                         |
-| `tools`        | `Tool[]`                     | Available tools from the server             |
-| `resources`    | `Resource[]`                 | Available resources from the server         |
-| `isConnected`  | `boolean`                    | Whether the client is connected             |
-| `isLoading`    | `boolean`                    | Whether a connection attempt is in progress |
-| `error`        | `Error \| null`              | Connection error, if any                    |
-| `capabilities` | `ServerCapabilities \| null` | Server-reported capabilities                |
-| `reconnect()`  | `() => Promise<void>`        | Manually reconnect to the server            |
+| Field                   | Type                                       | Description                                                                |
+| ----------------------- | ------------------------------------------ | -------------------------------------------------------------------------- |
+| `client`                | `Client`                                   | MCP client instance                                                        |
+| `tools`                 | `Tool[]`                                   | Available tools from the server                                            |
+| `resources`             | `Resource[]`                               | Available resources from the server                                        |
+| `isConnected`           | `boolean`                                  | Whether the MCP handshake is active                                        |
+| `isLoading`             | `boolean`                                  | Whether connection or inventory discovery is in progress                   |
+| `error`                 | `Error \| null`                            | Connection or inventory error, if any                                      |
+| `capabilities`          | `ServerCapabilities \| null`               | Server-reported capabilities                                               |
+| `reconnect(transport?)` | `(transport?: Transport) => Promise<void>` | Retry inventory discovery or reconnect a disconnected client to the server |
 
-## Zod compatibility
+Calling `reconnect()` while connected retries the complete tool and resource inventory. After a
+one-shot transport closes, create a new transport instance and pass it to `reconnect(newTransport)`;
+reusing a closed transport is not supported by every transport implementation.
 
-`@mcp-b/react-webmcp` supports Zod `^3.25 || ^4.0` as an optional peer dependency.
+## Schema compatibility
 
-- Zod v3 object maps are converted to JSON Schema at registration time via `zod-to-json-schema`.
-- Zod v4 schemas work through the Standard Schema v1 `~standard` interface.
+`@mcp-b/react-webmcp` no longer accepts raw Zod object maps. Use JSON Schema directly, or pass a
+Standard JSON Schema object such as `z.object(...)` from Zod 4.2 or newer. `outputSchema` remains
+JSON Schema-only because native WebMCP does not define output schema enforcement.
+
+## Exported types
+
+| Type                     | Description                                              |
+| ------------------------ | -------------------------------------------------------- |
+| `InferOutput`            | Infers a tool result from an output schema               |
+| `InferToolInput`         | Infers tool input from a supported input schema          |
+| `ToolExecutionState`     | State exposed by `useWebMCP`                             |
+| `WebMCPConfig`           | Configuration accepted by `useWebMCP`                    |
+| `WebMCPReturn`           | Return value from `useWebMCP` and `useWebMCPContext`     |
+| `ToolInputSchema`        | Supported JSON Schema or Standard JSON Schema input type |
+| `McpClientProviderProps` | Props accepted by `McpClientProvider`                    |
+| `WebMCPPromptConfig`     | Configuration accepted by `useWebMCPPrompt`              |
+| `WebMCPPromptReturn`     | Registration state returned by `useWebMCPPrompt`         |
+| `WebMCPResourceConfig`   | Configuration accepted by `useWebMCPResource`            |
+| `WebMCPResourceReturn`   | Registration state returned by `useWebMCPResource`       |
 
 ## Related pages
 

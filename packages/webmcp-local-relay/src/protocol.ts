@@ -1,12 +1,10 @@
+import type { CallToolResult, Tool, ToolAnnotations } from '@modelcontextprotocol/server';
 import {
   CallToolRequestParamsSchema,
-  type CallToolResult,
   CallToolResultSchema,
-  type Tool,
-  type ToolAnnotations,
   ToolAnnotationsSchema,
   ToolSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/core';
 import { z } from 'zod/v4';
 
 /**
@@ -15,14 +13,6 @@ import { z } from 'zod/v4';
 export const NormalizedToolSchema = ToolSchema.extend({
   name: ToolSchema.shape.name.min(1),
 });
-
-/**
- * Permissive inbound tool shape from browser/widget payloads.
- *
- * Only enforces a non-empty name at ingest. All other fields are normalized
- * against SDK schemas by {@link normalizeInboundTool}.
- */
-export const InboundToolSchema = z.object({ name: z.string().min(1) }).passthrough();
 
 /**
  * SDK-derived argument schema for tool invocation payloads.
@@ -37,6 +27,11 @@ export const DEFAULT_TOOL_INPUT_SCHEMA: Tool['inputSchema'] = {
   type: 'object',
   properties: {},
 };
+
+/** SDK tool schema with a browser-compatible default input schema. */
+export const InboundToolSchema = NormalizedToolSchema.extend({
+  inputSchema: NormalizedToolSchema.shape.inputSchema.optional(),
+});
 
 /**
  * Canonical normalized relay tool shape.
@@ -59,43 +54,13 @@ export type RelayCallToolResult = CallToolResult;
 export type RelayInvokeArgs = Exclude<z.infer<typeof RelayInvokeArgsSchema>, undefined>;
 
 /**
- * Normalizes permissive inbound tool payloads into SDK-compliant Tool objects.
- *
- * Invalid optional metadata (description, output schema, annotations, etc.)
- * is dropped. Invalid/missing inputSchema falls back to an empty object schema.
+ * Applies the browser default input schema and validates the complete SDK tool.
  */
 export function normalizeInboundTool(inbound: z.infer<typeof InboundToolSchema>): RelayTool {
-  const inputSchemaParsed = ToolSchema.shape.inputSchema.safeParse(inbound.inputSchema);
-  const outputSchemaParsed = ToolSchema.shape.outputSchema.safeParse(inbound.outputSchema);
-  const annotationsParsed = ToolAnnotationsSchema.safeParse(inbound.annotations);
-
-  const normalizedCandidate: Record<string, unknown> = {
-    name: inbound.name,
-    inputSchema: inputSchemaParsed.success ? inputSchemaParsed.data : DEFAULT_TOOL_INPUT_SCHEMA,
-  };
-
-  if (typeof inbound.description === 'string') {
-    normalizedCandidate.description = inbound.description;
-  }
-  if (typeof inbound.title === 'string') {
-    normalizedCandidate.title = inbound.title;
-  }
-  if (outputSchemaParsed.success && outputSchemaParsed.data !== undefined) {
-    normalizedCandidate.outputSchema = outputSchemaParsed.data;
-  }
-  if (annotationsParsed.success && annotationsParsed.data !== undefined) {
-    normalizedCandidate.annotations = annotationsParsed.data;
-  }
-
-  const normalizedParsed = NormalizedToolSchema.safeParse(normalizedCandidate);
-  if (normalizedParsed.success) {
-    return normalizedParsed.data;
-  }
-
-  return {
-    name: inbound.name,
-    inputSchema: DEFAULT_TOOL_INPUT_SCHEMA,
-  };
+  return NormalizedToolSchema.parse({
+    ...inbound,
+    inputSchema: inbound.inputSchema ?? DEFAULT_TOOL_INPUT_SCHEMA,
+  });
 }
 
 export { CallToolRequestParamsSchema, CallToolResultSchema, ToolAnnotationsSchema, ToolSchema };

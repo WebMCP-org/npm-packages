@@ -2,7 +2,6 @@
  * Public package exports for WebMCP Local Relay.
  */
 
-export type { CallToolResult, Tool, ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 export { RelayBridgeServer, type RelayBridgeServerOptions } from './bridgeServer.js';
 export { type CliOptions, parseCliOptions, printHelp } from './cli-utils.js';
 export { LocalRelayMcpServer, type LocalRelayMcpServerOptions } from './mcpRelayServer.js';

@@ -1,33 +1,18 @@
-import type { InputSchema } from '@mcp-b/webmcp-types';
 import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
-import { useEffect, useRef, useState } from 'react';
-import type {
-  PromptMessage,
-  ReactWebMCPInputSchema,
-  WebMCPPromptConfig,
-  WebMCPPromptReturn,
-} from './types.js';
-import { getModelContext, type ModelContextSurface } from './model-context.js';
-import { isZodSchema, zodToJsonSchema } from './zod-utils.js';
-
-type PromptModelContext = ModelContextSurface & {
-  registerPrompt: (descriptor: {
-    name: string;
-    description?: string;
-    argsSchema?: InputSchema;
-    get: (args: Record<string, unknown>) => Promise<{ messages: PromptMessage[] }>;
-  }) => { unregister: () => void } | undefined;
-};
+import { useCallback } from 'react';
+import type { WebMCPPromptConfig, WebMCPPromptReturn } from './types.js';
+import { getBrowserMcpServer } from './model-context.js';
+import { useCommittedRef } from './useCommittedRef.js';
+import { useMcpRegistration } from './useMcpRegistration.js';
 
 /**
  * React hook for registering Model Context Protocol (MCP) prompts.
  *
  * This hook handles the complete lifecycle of an MCP prompt:
- * - Registers the prompt with `window.document.modelContext`
- * - Converts Zod schemas to JSON Schema for argument validation
+ * - Registers the prompt with the installed MCP-B `BrowserMcpServer`
  * - Automatically unregisters on component unmount
  *
- * @template TArgsSchema - Zod schema object defining argument types
+ * @template TArgsSchema - Schema defining argument types
  *
  * @param config - Configuration object for the prompt
  * @returns Object indicating registration status
@@ -83,68 +68,31 @@ type PromptModelContext = ModelContextSurface & {
  * }
  * ```
  */
-export function useWebMCPPrompt<TArgsSchema extends ReactWebMCPInputSchema = InputSchema>(
-  config: WebMCPPromptConfig<TArgsSchema>
-): WebMCPPromptReturn {
+export function useWebMCPPrompt(config: WebMCPPromptConfig): WebMCPPromptReturn {
   const { name, description, argsSchema, get } = config;
 
-  const [isRegistered, setIsRegistered] = useState(false);
+  const getRef = useCommittedRef(get);
 
-  const getRef = useRef(get);
-
-  useEffect(() => {
-    getRef.current = get;
-  }, [get]);
-
-  useEffect(() => {
-    const modelContext = getModelContext() as PromptModelContext | undefined;
+  const register = useCallback(() => {
+    const modelContext = getBrowserMcpServer();
     if (!modelContext) {
       console.warn(
-        `[ReactWebMCP] window.document.modelContext is not available. Prompt "${name}" will not be registered.`
+        `[ReactWebMCP] BrowserMcpServer is not available. Prompt "${name}" will not be registered.`
       );
       return;
     }
 
-    const promptHandler = async (
-      args: Record<string, unknown>
-    ): Promise<{ messages: PromptMessage[] }> => {
-      return getRef.current(args as never);
-    };
-
     const resolvedArgsSchema = argsSchema
-      ? isZodSchema(argsSchema)
-        ? zodToJsonSchema(argsSchema)
-        : normalizeInputSchema(argsSchema).inputSchema
+      ? normalizeInputSchema(argsSchema).inputSchema
       : undefined;
 
-    let registration: { unregister: () => void } | undefined;
-    try {
-      registration = modelContext.registerPrompt({
-        name,
-        ...(description !== undefined && { description }),
-        ...(resolvedArgsSchema && { argsSchema: resolvedArgsSchema }),
-        get: promptHandler,
-      });
-    } catch (error) {
-      setIsRegistered(false);
-      throw error;
-    }
+    return modelContext.registerPrompt({
+      name,
+      ...(description !== undefined && { description }),
+      ...(resolvedArgsSchema && { argsSchema: resolvedArgsSchema }),
+      get: async (args) => getRef.current(args),
+    });
+  }, [name, description, argsSchema, getRef]);
 
-    if (!registration) {
-      console.warn(`[ReactWebMCP] Prompt "${name}" did not return a registration handle.`);
-      setIsRegistered(false);
-      return;
-    }
-
-    setIsRegistered(true);
-
-    return () => {
-      registration.unregister();
-      setIsRegistered(false);
-    };
-  }, [name, description, argsSchema]);
-
-  return {
-    isRegistered,
-  };
+  return { isRegistered: useMcpRegistration(register) };
 }

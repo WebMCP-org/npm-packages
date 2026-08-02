@@ -22,7 +22,11 @@ pnpm install
 pnpm dev
 ```
 
-Then verify the registered tool is on the page by checking for `navigator.modelContext.tools` in the browser console.
+Then verify the registered tool in the browser console:
+
+```js
+await document.modelContext.getTools();
+```
 
 ## Cloning a Single Example (Sparse Checkout)
 

@@ -47,7 +47,7 @@ npm install @mcp-b/webmcp-polyfill usewebmcp
 
 Open `src/main.tsx` and add the polyfill initialization before `createRoot`:
 
-```tsx src/main.tsx
+```tsx title="src/main.tsx"
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -108,7 +108,7 @@ export function App() {
 }
 ```
 
-The `useWebMCP` hook registers the tool when the component mounts and unregisters it when the component unmounts. The input schema is defined outside the component to prevent unnecessary re-registration on every render.
+The `useWebMCP` hook registers the tool when the component mounts and unregisters it when the component unmounts. The named schema also keeps the component easy to scan; inline schema objects do not cause re-registration by reference.
 
 </Step>
 
@@ -120,7 +120,7 @@ npm run dev
 
 Open `http://localhost:5173` in your browser. You should see:
 
-```
+```text title="Expected page"
 My First React WebMCP Tool
 Tool "say_hello" registered.
 Executions: 0
@@ -133,7 +133,7 @@ Last result: none
 
 Click the **Run Tool Locally** button. Notice the page updates:
 
-```
+```text title="Expected result"
 Executions: 1
 Last result: {"content":[{"type":"text","text":"Hello React!"}]}
 ```
@@ -147,18 +147,24 @@ Click the button a few more times. The execution count increases with each click
 Open the browser console (F12) and verify the tool is registered:
 
 ```javascript
-const tools = navigator.modelContextTesting.listTools();
+const modelContext = document.modelContext;
+const tools = await modelContext.getTools();
 console.log(tools);
 ```
 
-You should see an array containing your `say_hello` tool. Now call it through the testing API:
+You should see an array containing your `say_hello` tool. Now feature-detect the Chrome-compatible execution extension and call it:
 
 ```javascript
-const result = await navigator.modelContextTesting.executeTool(
-  'say_hello',
-  JSON.stringify({ name: 'Console' })
-);
-console.log(JSON.parse(result));
+const tool = tools.find((candidate) => candidate.name === 'say_hello');
+if (!tool) throw new Error('say_hello is not registered');
+
+const executeTool = modelContext.executeTool;
+if (typeof executeTool !== 'function') {
+  throw new Error('This runtime does not expose the optional Chrome executeTool extension');
+}
+
+const result = await executeTool.call(modelContext, tool, JSON.stringify({ name: 'Console' }));
+console.log(result === null ? null : JSON.parse(result));
 ```
 
 The output should be an object containing the tool response:
@@ -175,71 +181,13 @@ Notice that the execution count in the UI also incremented, because the same und
 
 </Steps>
 
-## The complete files
-
-<CodeGroup>
-```tsx src/main.tsx
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import { App } from './App';
-
-initializeWebMCPPolyfill();
-
-createRoot(document.getElementById('root')!).render(
-
-<StrictMode>
-  <App />
-</StrictMode>
-); ```
-
-```tsx src/App.tsx
-import { useWebMCP } from 'usewebmcp';
-
-const INPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    name: { type: 'string' },
-  },
-} as const;
-
-export function App() {
-  const helloTool = useWebMCP({
-    name: 'say_hello',
-    description: 'Returns a hello message',
-    inputSchema: INPUT_SCHEMA,
-    execute: async (args) => ({
-      content: [{ type: 'text', text: `Hello ${args?.name ?? 'world'}!` }],
-    }),
-  });
-
-  return (
-    <div>
-      <h1>My First React WebMCP Tool</h1>
-      <p>Tool "say_hello" registered.</p>
-      <p>Executions: {helloTool.state.executionCount}</p>
-      <p>
-        Last result:{' '}
-        {helloTool.state.lastResult ? JSON.stringify(helloTool.state.lastResult) : 'none'}
-      </p>
-      {helloTool.state.error && (
-        <p style={{ color: 'red' }}>Error: {helloTool.state.error.message}</p>
-      )}
-      <button onClick={() => helloTool.execute({ name: 'React' })}>Run Tool Locally</button>
-    </div>
-  );
-}
-```
-
-</CodeGroup>
-
 ## What you learned
 
 - `initializeWebMCPPolyfill()` should be called once at app startup, before components mount
 - `useWebMCP` registers a tool on mount and unregisters on unmount
-- Define input schemas outside the component (or memoize them) to avoid re-registration on each render
+- Schema object identity does not trigger re-registration; use `deps` when registered metadata changes
 - The hook returns `state` (with `executionCount`, `lastResult`, `error`, `isExecuting`) and an `execute` function for local invocation
-- Tools registered via the hook are also callable through `navigator.modelContextTesting` in the console
+- Tools registered via the hook are discoverable with `document.modelContext.getTools()` and callable when the runtime exposes Chrome's optional `executeTool()` extension
 
 ## Next steps
 

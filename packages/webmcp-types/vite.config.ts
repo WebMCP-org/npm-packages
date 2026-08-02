@@ -4,12 +4,10 @@ export default defineConfig({
   test: {
     typecheck: {
       enabled: true,
+      only: true,
       tsconfig: './tsconfig.json',
       include: ['src/**/*.test-d.ts'],
-      exclude: ['src/**/*.conformance-d.ts'],
     },
     include: ['src/**/*.test-d.ts'],
-    exclude: ['src/**/*.conformance-d.ts'],
-    globals: true,
   },
 });
