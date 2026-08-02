@@ -609,10 +609,13 @@ async function setupE2EHarness(options: {
     });
 
     const expectedToolName = sanitizeName(TEST_TOOL_NAME);
+    const requiredToolNames = [expectedToolName, sanitizeName('always_fail')];
 
     await waitForValue(async () => {
       const toolList = await client?.listTools();
-      return toolList?.tools.some((tool) => tool.name === expectedToolName) ? true : undefined;
+      return requiredToolNames.every((name) => toolList?.tools.some((tool) => tool.name === name))
+        ? true
+        : undefined;
     }, 20_000);
 
     return {
