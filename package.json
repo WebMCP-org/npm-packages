@@ -44,6 +44,7 @@
     "test:unit:coverage": "pnpm test:unit:packages:coverage && pnpm test:hooks:coverage",
     "test:unit:packages": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/landing-page' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' --filter '!usewebmcp' --filter '!@mcp-b/react-webmcp' run test",
     "test:unit:packages:coverage": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/landing-page' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' --filter '!usewebmcp' --filter '!@mcp-b/react-webmcp' run test -- --coverage",
+    "test:wpt": "pnpm --filter @mcp-b/webmcp-polyfill build && node ./scripts/run-webmcp-wpt.mjs",
     "typecheck": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/landing-page' run typecheck",
     "validate:docs": "pnpm --filter @mcp-b/documentation-website validate",
     "validate:publish": "node ./scripts/validate-publish.js"

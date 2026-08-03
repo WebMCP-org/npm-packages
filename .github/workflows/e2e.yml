@@ -176,19 +176,10 @@ jobs:
       - name: Print Chromium Snapshot version
         run: '"${{ steps.chromium_snapshot.outputs.chrome-path }}" --version'
 
-      - name: Run declarative WPT against the polyfill
-        working-directory: .reference/wpt
+      - name: Run WebMCP WPT against the polyfill
         env:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
-          POLYFILL_SCRIPT: ${{ github.workspace }}/packages/webmcp-polyfill/dist/index.iife.js
-        run: >-
-          ./wpt run --channel canary --binary "$CHROME_BIN" --yes --install-webdriver
-          --headless --no-enable-experimental --test-types testharness
-          --binary-arg=--no-sandbox
-          --binary-arg=--disable-features=WebMCP,WebMCPTesting
-          --inject-script "$POLYFILL_SCRIPT"
-          --no-pause-after-test --processes 1 --no-manifest-download
-          --include /webmcp/declarative/ chrome
+        run: pnpm test:wpt
 
       - name: Run Native Runtime Contract (Chrome Canary)
         env:

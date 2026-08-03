@@ -40,6 +40,9 @@ pnpm --filter mcp-e2e-tests test:native-showcase
 pnpm --filter @mcp-b/webmcp-polyfill test:conformance
 pnpm --filter @mcp-b/global test:conformance:global
 
+# Pinned upstream WebMCP WPT (requires .reference/wpt and Chrome Canary)
+CHROME_BIN=/path/to/chrome-canary pnpm test:wpt
+
 # Runtime-specific canonical E2E packages
 pnpm --filter @mcp-b/webmcp-local-relay test:e2e
 pnpm --filter @mcp-b/transports test:e2e
@@ -124,18 +127,20 @@ The workflow runs:
 
 1. Tab, iframe, local-relay, framework, and `@mcp-b/global` tarball E2E coverage
 2. Extension transport and extension-template E2E coverage
-3. The pinned upstream declarative Web Platform Tests against the standalone polyfill
+3. The pinned upstream WebMCP Web Platform Tests against the standalone polyfill
 4. Native contract and showcase integration coverage on Chrome Canary
 
 `pnpm test` runs unit tests plus the local zero-mock `pnpm test:e2e` umbrella. CI adds the
 framework, tarball, upstream WPT, and Chrome Canary lanes listed above.
 
-The upstream declarative suite lives in
-[`webmcp/declarative`](https://github.com/web-platform-tests/wpt/tree/master/webmcp/declarative).
-The workflow pins its WPT revision and injects
-`packages/webmcp-polyfill/dist/index.iife.js` with native WebMCP disabled. The
-shared repository suite adds MCP-B-specific polyfill, global, and native
-integration coverage.
+The upstream suite lives in
+[`webmcp`](https://github.com/web-platform-tests/wpt/tree/master/webmcp). The
+workflow pins its WPT revision and injects
+`packages/webmcp-polyfill/dist/index.iife.js` with native WebMCP disabled. It
+runs every declarative test plus an explicit allowlist of imperative tests for
+the page-local surface. Frame-tree, origin-policy, and navigation WPT are
+excluded because they require native browser behavior. The shared repository
+suite adds MCP-B-specific polyfill, global, and native integration coverage.
 
 ## Extension Transport Testing
 

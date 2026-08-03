@@ -11,6 +11,7 @@ Goal: keep one place to track standards decisions, implementation details, and e
 - Spec source (`index.bs`): https://github.com/webmachinelearning/webmcp/blob/main/index.bs
 - Repository explainer: https://github.com/webmachinelearning/webmcp/blob/main/README.md
 - Declarative API explainer: https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md
+- WebMCP Web Platform Tests: https://github.com/web-platform-tests/wpt/tree/master/webmcp
 - Declarative Web Platform Tests: https://github.com/web-platform-tests/wpt/tree/master/webmcp/declarative
 
 ## Community Group Discussions / Issues
@@ -81,7 +82,9 @@ Goal: keep one place to track standards decisions, implementation details, and e
 - Polyfill runtime entry: `packages/webmcp-polyfill/conformance/polyfill-runtime.e2e.test.ts`
 - Native Chromium runtime entry: `conformance/native-runtime.e2e.test.ts`
 - Shared declarative suite: `conformance/declarative-forms-conformance.shared.ts`
-- Pinned upstream declarative WPT lane: `.github/workflows/e2e.yml`
+- Pinned upstream declarative and page-local imperative WPT:
+  - Selection and runner: `scripts/run-webmcp-wpt.mjs`
+  - CI revision and job: `.github/workflows/e2e.yml`
 
 Current MCP-B alignment note:
 
@@ -95,6 +98,8 @@ Current MCP-B alignment note:
 
 Run commands:
 
+- Pinned upstream WebMCP WPT against the standalone polyfill:
+  - `CHROME_BIN="/path/to/chrome-canary" pnpm test:wpt`
 - WebMCP polyfill runtime (non-native Chromium):
   - `pnpm --filter @mcp-b/webmcp-polyfill run test:conformance`
 - Global runtime (non-native Chromium):
