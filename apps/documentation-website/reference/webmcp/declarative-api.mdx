@@ -39,6 +39,11 @@ for proposal status. The upstream
 record the current executable compatibility cases. Do not treat this example as
 a stable compatibility contract.
 
+Native `getTools()` includes declarative forms from same-origin active documents
+in the current frame tree. Declarative HTML currently has no equivalent to the
+imperative API's `exposedTo` option, so a form cannot opt into cross-origin
+discovery. The MCP-B polyfill observes only its owning document.
+
 [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference#declarative-forms)
 implements the tested local-document subset and documents its native-only gaps.
 React users can write these attributes directly after importing

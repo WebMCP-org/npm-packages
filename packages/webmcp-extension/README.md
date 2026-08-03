@@ -79,6 +79,11 @@ extension adds no separate DOM scanner or declarative client API. See the
 [declarative API reference](https://docs.mcp-b.ai/reference/webmcp/declarative-api)
 for the evolving browser behavior and polyfill compatibility boundary.
 
+Native Chrome also includes imperative and declarative tools owned by
+same-origin child documents in the top-level client's tool list. This uses the
+browser's frame-tree discovery; the extension does not inject into those child
+frames. The polyfilled path remains scoped to the top document.
+
 Connect from the isolated content script and use the standard client API:
 
 ```ts
@@ -123,7 +128,16 @@ Load `dist/` as an unpacked extension from `chrome://extensions`.
 - The template needs no extension API permissions, background worker, or `web_accessible_resources` declaration. Its match patterns declare the page access it needs.
 - Narrow the manifest match patterns to the sites your extension actually supports before publishing it.
 - Add icons and the remaining Chrome Web Store listing metadata before publishing; the included manifest is a runnable development baseline.
-- The template intentionally targets top-level pages. It does not inject into child frames.
+- The template injects into top-level pages only. Native Chrome still discovers
+  same-origin child-document tools through `getTools()`.
+- Cross-origin imperative tools require `allow="tools"`, `exposedTo`, and an
+  explicit `fromOrigins` request. The extension client does not make that
+  request. Declarative tools currently have no cross-origin exposure attribute.
+- Native Chrome resolves `executeTool()` with `null` when a tool navigates. The
+  extension client reports that as an interrupted MCP call and does not carry
+  calls across navigation or read JSON-LD from the destination document. Use
+  `SubmitEvent.respondWith()` when a declarative tool must return a result
+  without navigation.
 
 ## Test
 
@@ -136,5 +150,6 @@ manifest and runtime as a real unpacked MV3 extension in Playwright's bundled
 Chromium. It covers document-start injection, strict page CSP, imperative and
 declarative discovery and calls, `toolautosubmit`, `respondWith()`, list-change
 handling, tool errors, dynamic registration and removal, top-frame scoping,
-navigation, and BFCache restoration. See Playwright's
+navigation, and BFCache restoration. A native Chromium lane also covers
+same-origin child-document imperative and declarative tools. See Playwright's
 [Chrome extension testing guide](https://playwright.dev/docs/chrome-extensions).

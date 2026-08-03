@@ -36,8 +36,11 @@ polyfilled declarative runtime. Both tool types use the same `listTools()` and
 The extension does not scan forms itself. `@mcp-b/global` owns the page runtime,
 including its [declarative support and compatibility boundary](/reference/webmcp/declarative-api).
 
-The shipped template targets top-level pages only. It does not inject into
-child frames.
+The shipped content scripts target top-level pages only. Native Chrome still
+exposes imperative and declarative tools from same-origin child documents
+through frame-tree discovery. The polyfilled path remains scoped to the top
+document. The [reference page](/packages/webmcp-extension/reference#document-tree-scope)
+lists the cross-origin and navigation boundaries.
 
 ## Security boundary
 

@@ -49,15 +49,17 @@ its rejection.
 Registration options are `signal`, which unregisters the tool when aborted,
 and `exposedTo`, an array of origins in the current document tree to which the
 tool may be exposed. `getTools()` accepts `fromOrigins` to include tools from
-specified origins; without it, discovery is same-origin.
+specified origins. Without it, discovery includes same-origin active documents
+throughout the current top-level frame tree.
 
 `getTools()` returns `RegisteredTool` values. They contain `name`, optional
 `title`, `description`, serialized `inputSchema`, `window`, `origin`, and
 optional annotations. They do not expose the original `execute` callback.
 
 The API is available only in secure contexts. The `tools` Permissions Policy
-defaults to `self`; cross-origin discovery still requires explicit exposure and
-policy delegation.
+defaults to `self`. Cross-origin discovery requires policy delegation with
+`allow="tools"`, owner exposure through `exposedTo`, and caller opt-in through
+`fromOrigins`.
 
 ## Chrome execution extension
 

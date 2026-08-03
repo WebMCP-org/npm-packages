@@ -9,6 +9,8 @@ import { chromium, type BrowserContext, type Page } from 'playwright';
 
 const packageDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const extensionDirectory = resolve(packageDirectory, 'e2e/dist/extension');
+const chromiumExecutablePath = process.env.PLAYWRIGHT_EXTENSION_CHROMIUM_EXECUTABLE_PATH;
+const enableNativeWebMCP = process.env.PLAYWRIGHT_EXTENSION_ENABLE_WEBMCP_FLAGS === '1';
 
 const pageHtml = `<!doctype html>
 <html>
@@ -16,6 +18,7 @@ const pageHtml = `<!doctype html>
     <meta charset="utf-8">
     <title>WebMCP extension fixture</title>
     <script nonce="webmcp-e2e">
+      window.__webmcpPageWorld = true;
       Promise.resolve().then(async () => {
         if (!document.modelContext) throw new Error('document.modelContext was not injected');
         let dynamicController;
@@ -100,7 +103,7 @@ const pageHtml = `<!doctype html>
       <input name="value" toolparamdescription="Value to submit" required>
       <button type="submit">Submit</button>
     </form>
-    <iframe src="/child" title="Uninjected child frame"></iframe>
+    <iframe src="/child" title="Same-origin child frame"></iframe>
   </body>
 </html>`;
 
@@ -109,10 +112,57 @@ const childHtml = `<!doctype html>
   <head>
     <meta charset="utf-8">
     <script nonce="webmcp-e2e">
-      document.documentElement.dataset.webmcpChildReady = 'true';
+      Promise.resolve().then(async () => {
+        if (!document.modelContext) {
+          document.documentElement.dataset.webmcpChildMode = 'unavailable';
+          document.documentElement.dataset.webmcpChildReady = 'true';
+          return;
+        }
+
+        await document.modelContext.registerTool({
+          name: 'extension_child_script',
+          description: 'Echo a value from a same-origin child document.',
+          inputSchema: {
+            type: 'object',
+            properties: { value: { type: 'string' } },
+            required: ['value']
+          },
+          execute({ value }) {
+            document.documentElement.dataset.webmcpChildScriptInvoked = value;
+            return { content: [{ type: 'text', text: 'child-script:' + value }] };
+          }
+        });
+        document.addEventListener('submit', (event) => {
+          const form = event.target;
+          if (
+            !(form instanceof HTMLFormElement) ||
+            form.getAttribute('toolname') !== 'extension_child_declarative'
+          ) {
+            return;
+          }
+          event.preventDefault();
+          const value = String(new FormData(form).get('value'));
+          document.documentElement.dataset.webmcpChildDeclarativeInvoked = value;
+          event.respondWith(Promise.resolve('child-form:' + value));
+        });
+        document.documentElement.dataset.webmcpChildMode = 'native';
+        document.documentElement.dataset.webmcpChildReady = 'true';
+      }).catch((error) => {
+        document.documentElement.dataset.webmcpChildError = String(error?.message ?? error);
+      });
     </script>
   </head>
-  <body>Child frame</body>
+  <body>
+    Child frame
+    <form
+      toolname="extension_child_declarative"
+      tooldescription="Submit a value from a same-origin child document."
+      toolautosubmit
+    >
+      <input name="value" toolparamdescription="Value to submit" required>
+      <button type="submit">Submit</button>
+    </form>
+  </body>
 </html>`;
 
 let server: Server;
@@ -149,13 +199,21 @@ async function launchExtension(): Promise<{
   const userDataDirectory = mkdtempSync(resolve(tmpdir(), 'webmcp-extension-e2e-'));
   try {
     const context = await chromium.launchPersistentContext(userDataDirectory, {
-      channel: process.env.PLAYWRIGHT_EXTENSION_CHROMIUM_CHANNEL ?? 'chromium',
+      ...(chromiumExecutablePath
+        ? { executablePath: chromiumExecutablePath }
+        : { channel: process.env.PLAYWRIGHT_EXTENSION_CHROMIUM_CHANNEL ?? 'chromium' }),
       headless: process.env.PLAYWRIGHT_EXTENSION_HEADLESS !== 'false',
       // Playwright disables BFCache by default; this suite exercises extension restore behavior.
       ignoreDefaultArgs: ['--disable-back-forward-cache'],
       args: [
         `--disable-extensions-except=${extensionDirectory}`,
         `--load-extension=${extensionDirectory}`,
+        ...(enableNativeWebMCP
+          ? [
+              '--enable-experimental-web-platform-features',
+              '--enable-features=WebMCPTesting,DevToolsWebMCPSupport',
+            ]
+          : []),
       ],
     });
     return { context, userDataDirectory };
@@ -187,6 +245,8 @@ describe('WebMCP extension template', () => {
           assert.deepStrictEqual(
             {
               contentError: outcome.webmcpExtensionError,
+              childDeclarativeResult: outcome.webmcpExtensionChildDeclarativeResult,
+              childScriptResult: outcome.webmcpExtensionChildScriptResult,
               declarativeInvocation: outcome.webmcpDeclarativeInvoked,
               declarativeResult: outcome.webmcpExtensionDeclarativeResult,
               dynamicResult: outcome.webmcpExtensionDynamicResult,
@@ -203,6 +263,8 @@ describe('WebMCP extension template', () => {
             },
             {
               contentError: undefined,
+              childDeclarativeResult: enableNativeWebMCP ? `child-form:${pathname}` : undefined,
+              childScriptResult: enableNativeWebMCP ? `child-script:${pathname}` : undefined,
               declarativeInvocation: pathname,
               declarativeResult: `submitted:${pathname}`,
               dynamicResult: `dynamic:${pathname}`,
@@ -215,16 +277,32 @@ describe('WebMCP extension template', () => {
               result: `echo:${pathname}`,
               sawDynamic: 'true',
               sawDynamicRemoval: 'true',
-              tools: 'extension_declarative,extension_echo,extension_fail,extension_set_dynamic',
+              tools: enableNativeWebMCP
+                ? 'extension_child_declarative,extension_child_script,extension_declarative,extension_echo,extension_fail,extension_set_dynamic'
+                : 'extension_declarative,extension_echo,extension_fail,extension_set_dynamic',
             }
           );
 
           const child = page.frames().find((frame) => frame.url() === `${origin}/child`);
           assert.ok(child, 'child frame did not load');
-          await child.waitForFunction(() => document.documentElement.dataset.webmcpChildReady);
           assert.deepStrictEqual(
-            await child.evaluate(() => ({ ...document.documentElement.dataset })),
-            { webmcpChildReady: 'true' }
+            await child.evaluate(() => {
+              const { dataset } = document.documentElement;
+              return {
+                declarativeInvocation: dataset.webmcpChildDeclarativeInvoked,
+                error: dataset.webmcpChildError,
+                mode: dataset.webmcpChildMode,
+                ready: dataset.webmcpChildReady,
+                scriptInvocation: dataset.webmcpChildScriptInvoked,
+              };
+            }),
+            {
+              declarativeInvocation: enableNativeWebMCP ? pathname : undefined,
+              error: undefined,
+              mode: enableNativeWebMCP ? 'native' : 'unavailable',
+              ready: 'true',
+              scriptInvocation: enableNativeWebMCP ? pathname : undefined,
+            }
           );
         }
 

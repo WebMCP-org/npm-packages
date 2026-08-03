@@ -116,6 +116,34 @@ The extension package adds no separate DOM scanner or declarative client API.
 See the [declarative API reference](/reference/webmcp/declarative-api) for the
 upstream behavior and the polyfill's documented compatibility boundary.
 
+## Document-tree scope
+
+The template injects its MAIN-world runtime and isolated client into top-level
+pages only. Native Chrome's `getTools()` still includes tools owned by
+same-origin active documents in the same frame tree. The extension client can
+therefore list and call both JavaScript and declarative form tools from
+same-origin child documents without child-frame injection.
+
+The polyfilled path discovers only the top document. Cross-origin imperative
+tools require `allow="tools"`, child registration with `exposedTo`, and a
+caller-supplied `fromOrigins` list. The extension client does not supply that
+list. Declarative forms currently have no equivalent cross-origin exposure
+attribute. See the [WebMCP standard API](/reference/webmcp/standard-api) and
+Chrome's [cross-origin iframe guidance](https://developer.chrome.com/docs/ai/webmcp/imperative-api#cross-origin-iframes).
+
+MCP tool names are global within one client connection. Use unique names across
+the frame tree.
+
+## Navigation results
+
+Chrome resolves `executeTool()` with `null` when a tool triggers navigation.
+The extension client reports that call as interrupted. It does not preserve the
+call across document navigation or read JSON-LD from the destination document.
+For a declarative tool that must return a result without navigation, cancel the
+submission and use `SubmitEvent.respondWith()`. The upstream
+[declarative explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md#getting-the-form-response-to-the-agent)
+tracks the unresolved cross-document response design.
+
 ## Isolated content-script entry
 
 ```typescript title="src/content-script.ts"
@@ -192,7 +220,8 @@ imports at runtime.
 </Warning>
 
 - Narrow the manifest match patterns before publishing.
-- The template targets top-level pages and does not inject into child frames.
+- The template injects into top-level pages only. Native Chrome can still
+  discover same-origin child-document tools.
 - Add icons and Chrome Web Store listing metadata before publishing.
 
 For the broader threat model, see [Security and human control](/explanation/design/security-and-human-in-the-loop).

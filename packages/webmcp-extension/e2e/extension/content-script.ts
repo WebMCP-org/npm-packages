@@ -1,5 +1,5 @@
 import { connectWebMCPClient } from '@mcp-b/webmcp-extension/content-script';
-import type { CallToolResult } from '@modelcontextprotocol/client';
+import type { CallToolResult, Client } from '@modelcontextprotocol/client';
 
 async function waitForDocument(): Promise<void> {
   if (document.readyState !== 'loading') return;
@@ -30,12 +30,60 @@ function readText(result: CallToolResult, toolName: string): string {
   return text.text;
 }
 
-async function run(): Promise<void> {
-  document.documentElement.dataset.webmcpIsolatedWorld = String(
-    !Reflect.has(document, 'modelContext')
+async function callChildToolsWhenNative(client: Client): Promise<void> {
+  const frame = document.querySelector('iframe');
+  if (!frame) throw new Error('Child frame was not found');
+
+  const deadline = performance.now() + 5_000;
+  let childDataset: DOMStringMap | undefined;
+  while (performance.now() < deadline) {
+    childDataset = frame.contentDocument?.documentElement?.dataset;
+    if (childDataset?.webmcpChildError) throw new Error(childDataset.webmcpChildError);
+    if (childDataset?.webmcpChildReady) break;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  if (!childDataset?.webmcpChildReady) throw new Error('Child frame did not become ready');
+
+  const mode = childDataset.webmcpChildMode;
+  if (!mode) throw new Error('Child frame did not report its WebMCP mode');
+  if (mode !== 'native') return;
+
+  const childToolNames = ['extension_child_declarative', 'extension_child_script'];
+  let toolNames: string[] = [];
+  const toolDeadline = performance.now() + 5_000;
+  while (performance.now() < toolDeadline) {
+    toolNames = (await client.listTools()).tools.map(({ name }) => name);
+    if (childToolNames.every((name) => toolNames.includes(name))) break;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  if (!childToolNames.every((name) => toolNames.includes(name))) {
+    throw new Error('Native child-frame tools were not exposed to the extension client');
+  }
+
+  const scriptResult = await client.callTool({
+    name: 'extension_child_script',
+    arguments: { value: window.location.pathname },
+  });
+  document.documentElement.dataset.webmcpExtensionChildScriptResult = readText(
+    scriptResult,
+    'extension_child_script'
   );
 
+  const declarativeResult = await client.callTool({
+    name: 'extension_child_declarative',
+    arguments: { value: window.location.pathname },
+  });
+  document.documentElement.dataset.webmcpExtensionChildDeclarativeResult = readText(
+    declarativeResult,
+    'extension_child_declarative'
+  );
+}
+
+async function run(): Promise<void> {
   await waitForPageTools();
+  document.documentElement.dataset.webmcpIsolatedWorld = String(
+    !Reflect.has(window, '__webmcpPageWorld')
+  );
   let sawDynamicTool = false;
   let resolveDynamicRemoval!: () => void;
   let rejectDynamicRemoval!: (reason: unknown) => void;
@@ -64,6 +112,8 @@ async function run(): Promise<void> {
       },
     },
   });
+
+  await callChildToolsWhenNative(client);
 
   window.addEventListener('pageshow', (event) => {
     if (!event.persisted) return;
