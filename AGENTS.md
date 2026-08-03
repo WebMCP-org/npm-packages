@@ -13,6 +13,7 @@ vp check              # Check without fixing (CI)
 pnpm check-all        # All checks (typecheck + lint)
 pnpm test:unit        # Unit tests only
 pnpm test:e2e         # E2E tests only
+pnpm test:wpt         # Pinned upstream WebMCP WPT (requires Chrome Canary)
 vp test run           # Run tests in current package
 vp pack               # Build current library package
 pnpm changeset        # Create a changeset for versioning
@@ -56,13 +57,14 @@ the Diataxis framework.
 
 ## Key Files
 
-| File                                                               | Purpose                                              |
-| ------------------------------------------------------------------ | ---------------------------------------------------- |
-| [CONTRIBUTING.md](./CONTRIBUTING.md)                               | Code quality requirements, commit format, PR process |
-| [.agents/skills/release/SKILL.md](.agents/skills/release/SKILL.md) | Publishing workflow and troubleshooting              |
-| [docs/TESTING.md](./docs/TESTING.md)                               | Testing documentation                                |
-| [pnpm-workspace.yaml](./pnpm-workspace.yaml)                       | Workspace packages and dependency catalog            |
-| [vite.config.ts](./vite.config.ts)                                 | Lint, format, staged, and task config (Vite+)        |
+| File                                                                                                   | Purpose                                              |
+| ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| [CONTRIBUTING.md](./CONTRIBUTING.md)                                                                   | Code quality requirements, commit format, PR process |
+| [.agents/skills/release/SKILL.md](.agents/skills/release/SKILL.md)                                     | Publishing workflow and troubleshooting              |
+| [docs/TESTING.md](./docs/TESTING.md)                                                                   | Testing documentation                                |
+| [packages/global/WEBMCP-CONFORMANCE-REFERENCES.md](./packages/global/WEBMCP-CONFORMANCE-REFERENCES.md) | WebMCP spec, WPT, and Chromium source index          |
+| [pnpm-workspace.yaml](./pnpm-workspace.yaml)                                                           | Workspace packages and dependency catalog            |
+| [vite.config.ts](./vite.config.ts)                                                                     | Lint, format, staged, and task config (Vite+)        |
 
 ## Quick Reference
 
@@ -151,12 +153,39 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 ## Reference Repos (`.reference/`)
 
-The `.reference/` directory (gitignored) holds shallow clones of upstream repos we track for sync. These are NOT dependencies — they are for human/AI reference when syncing with upstream changes.
+The `.reference/` directory (gitignored) holds shallow clones of upstream repos
+we track for sync. They are not runtime dependencies. Most are human/AI
+references; `wpt/` is also the pinned upstream conformance suite used by CI.
 
-| Directory          | Upstream                                                                                      | Tracked By            |
-| ------------------ | --------------------------------------------------------------------------------------------- | --------------------- |
-| `standard-schema/` | [standard-schema/standard-schema](https://github.com/standard-schema/standard-schema)         | `@mcp-b/webmcp-types` |
-| `typescript-sdk/`  | [anthropics/anthropic-sdk-typescript](https://github.com/anthropics/anthropic-sdk-typescript) | General reference     |
+| Directory          | Upstream                                                                                      | Purpose                                     |
+| ------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `standard-schema/` | [standard-schema/standard-schema](https://github.com/standard-schema/standard-schema)         | `@mcp-b/webmcp-types` reference             |
+| `typescript-sdk/`  | [anthropics/anthropic-sdk-typescript](https://github.com/anthropics/anthropic-sdk-typescript) | General SDK reference                       |
+| `webmcp/`          | [webmachinelearning/webmcp](https://github.com/webmachinelearning/webmcp)                     | WebMCP draft and explainer source           |
+| `wpt/`             | [web-platform-tests/wpt](https://github.com/web-platform-tests/wpt)                           | Executable WebMCP conformance, pinned in CI |
+
+### WebMCP Standards and Conformance
+
+For changes to browser-facing WebMCP behavior:
+
+1. Read the relevant draft or explainer in `.reference/webmcp/`.
+2. Inspect `.reference/wpt/webmcp/` for executable upstream behavior. WPT is a
+   cross-browser standards suite, not a Chromium-only test repository.
+3. Consult Blink's `third_party/blink/renderer/core/script_tools/` only for
+   Chromium-specific implementation details or extensions.
+
+The pinned WPT revision and CI job live in
+[`.github/workflows/e2e.yml`](./.github/workflows/e2e.yml). Test selection and
+the shared local/CI runner live in
+[`scripts/run-webmcp-wpt.mjs`](./scripts/run-webmcp-wpt.mjs). The WPT lane builds
+the standalone polyfill, disables native WebMCP, injects the bundle, and runs
+the declarative suite plus an explicit page-local imperative allowlist.
+Frame-tree, origin-policy, and navigation WPT are excluded because they require
+native coverage. When changing covered behavior, run the shared conformance
+suite and replay the WPT lane with
+`CHROME_BIN=/path/to/chrome-canary pnpm test:wpt`. Update the WPT pin
+deliberately and review the upstream diff first. See
+[`docs/TESTING.md`](./docs/TESTING.md) for the test matrix.
 
 ## Before Committing
 

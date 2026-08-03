@@ -65,7 +65,7 @@
           "href": "https://github.com/WebMCP-org/examples"
         },
         {
-          "anchor": "W3C Spec",
+          "anchor": "Community Group Draft",
           "icon": "book",
           "href": "https://webmachinelearning.github.io/webmcp/"
         }
@@ -139,6 +139,13 @@
           {
             "group": "Tooling",
             "pages": [
+              {
+                "group": "@mcp-b/webmcp-extension",
+                "pages": [
+                  "packages/webmcp-extension/overview",
+                  "packages/webmcp-extension/reference"
+                ]
+              },
               {
                 "group": "@mcp-b/webmcp-local-relay",
                 "pages": [

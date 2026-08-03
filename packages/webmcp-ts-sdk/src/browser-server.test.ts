@@ -116,7 +116,11 @@ describe('BrowserMcpServer', () => {
       ontoolchange: null,
       registerTool() {
         registrationCount += 1;
-        return registrationCount === 1 ? accepted : Promise.reject(nativeFailure);
+        return registrationCount === 1
+          ? accepted.then(() => {
+              native.dispatchEvent(new Event('toolchange'));
+            })
+          : Promise.reject(nativeFailure);
       },
       async getTools() {
         return nativeTools;
@@ -142,9 +146,10 @@ describe('BrowserMcpServer', () => {
     expect(server.listTools().map(({ name }) => name)).toEqual(['accepted']);
     expect(order).toEqual(['toolchange', 'resolved']);
 
+    // Native events remain authoritative when getTools() reuses descriptor objects.
     native.dispatchEvent(new Event('toolchange'));
     await server.syncNativeTools();
-    expect(order).toEqual(['toolchange', 'resolved']);
+    await expect.poll(() => order).toEqual(['toolchange', 'resolved', 'toolchange']);
 
     await expect(
       server.registerTool({

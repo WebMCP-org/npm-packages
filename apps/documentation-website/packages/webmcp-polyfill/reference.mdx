@@ -172,14 +172,16 @@ validation and calls `requestSubmit()`. Agent-triggered submit events expose
 `SubmitEvent.agentInvoked` and `SubmitEvent.respondWith()`; `toolactivated`
 fires on `window` after the controls are filled.
 
-Removing a declarative form unregisters its tool. Changes that alter its
-generated tool replace the registration. Resetting, removing, or replacing a
-registration cancels a pending invocation. Tool names must be unique; duplicate
-names expose one form.
+Removing a declarative form unregisters its tool. Changes to its registration
+attributes or generated schema replace the registration. Resetting, removing,
+or replacing a registration cancels a pending invocation. Tool names must be
+unique; duplicate names expose one form.
 
 Chrome's [declarative API documentation](https://developer.chrome.com/docs/ai/webmcp/declarative-api)
 defines the current compatibility target. This package covers the tested subset
-described above. The Community Group draft's
+described above. CI runs the upstream
+[declarative Web Platform Tests](https://github.com/web-platform-tests/wpt/tree/master/webmcp/declarative)
+against the standalone polyfill. The Community Group draft's
 [declarative section](https://webmachinelearning.github.io/webmcp/#declarative-webmcp)
 is still incomplete.
 

@@ -308,6 +308,36 @@ export function runDeclarativeFormConformanceSuite(
       );
     });
 
+    it('dispatches autosubmit before announcing tool activation', async () => {
+      const name = `declarative_autosubmit_order_${String(Date.now())}`;
+      toolNames.add(name);
+      document.body.insertAdjacentHTML(
+        'beforeend',
+        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Autosubmit order" toolautosubmit></form>`
+      );
+      const form = document.querySelector<HTMLFormElement>(
+        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
+      );
+      if (!form) throw new Error('Expected autosubmit-order declarative form fixture');
+      const events: string[] = [];
+      form.addEventListener('submit', (event) => {
+        events.push('submit');
+        event.preventDefault();
+        event.respondWith(Promise.resolve());
+      });
+      window.addEventListener(
+        'toolactivated',
+        (event) => {
+          if (Reflect.get(event, 'toolName') === name) events.push('activated');
+        },
+        { once: true }
+      );
+
+      await executeTool(await waitForTool(name), {});
+
+      expect(events).toEqual(['submit', 'activated']);
+    });
+
     it('honors native validation, novalidate, and formnovalidate during autosubmit', async () => {
       for (const validationBypass of ['novalidate', 'formnovalidate'] as const) {
         const name = `declarative_${validationBypass}_${String(Date.now())}`;
@@ -649,6 +679,27 @@ export function runDeclarativeFormConformanceSuite(
       await waitForToolRemoval(name);
       second.setAttribute('tooldescription', 'Restored form');
       expect(await waitForTool(name)).toMatchObject({ description: 'Restored form' });
+    });
+
+    it('emits a tool change when toolautosubmit is added', async () => {
+      const name = `declarative_autosubmit_change_${String(Date.now())}`;
+      toolNames.add(name);
+      document.body.insertAdjacentHTML(
+        'beforeend',
+        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Autosubmit change"></form>`
+      );
+      const form = document.querySelector<HTMLFormElement>(
+        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
+      );
+      if (!form) throw new Error('Expected autosubmit-change declarative form fixture');
+      await waitForTool(name);
+      const changed = new Promise((resolve) => {
+        document.modelContext.addEventListener('toolchange', resolve, { once: true });
+      });
+
+      form.setAttribute('toolautosubmit', '');
+
+      await changed;
     });
 
     it('rejects invalid input transactionally before changing any control', async () => {

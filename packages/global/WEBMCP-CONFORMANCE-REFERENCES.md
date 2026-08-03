@@ -2,17 +2,19 @@
 
 This file is the canonical link index for WebMCP discussions and Chromium implementation/source references used by `@mcp-b/global`.
 
-Goal: keep one place to track standards decisions and implementation details before adding full conformance tests.
+Goal: keep one place to track standards decisions, implementation details, and executable conformance coverage.
 
-## W3C WebMCP Spec and Docs
+## WebMCP Community Group Draft and Docs
 
 - WebMCP repository: https://github.com/webmachinelearning/webmcp
 - Rendered spec: https://webmachinelearning.github.io/webmcp/
 - Spec source (`index.bs`): https://github.com/webmachinelearning/webmcp/blob/main/index.bs
-- Proposal doc: https://github.com/webmachinelearning/webmcp/blob/main/docs/proposal.md
-- Explainer: https://github.com/webmachinelearning/webmcp/blob/main/docs/explainer.md
+- Repository explainer: https://github.com/webmachinelearning/webmcp/blob/main/README.md
+- Declarative API explainer: https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md
+- WebMCP Web Platform Tests: https://github.com/web-platform-tests/wpt/tree/master/webmcp
+- Declarative Web Platform Tests: https://github.com/web-platform-tests/wpt/tree/master/webmcp/declarative
 
-## W3C Discussions / Issues
+## Community Group Discussions / Issues
 
 - Elicitation discussion (WebMCP vs MCP behavior): https://github.com/webmachinelearning/webmcp/issues/21
 - Consumer API for in-page agents: https://github.com/webmachinelearning/webmcp/issues/51
@@ -71,7 +73,6 @@ Goal: keep one place to track standards decisions and implementation details bef
 
 - [ ] Cross-document `getTools({ fromOrigins })` exposure and Permissions Policy behavior
 - [ ] Event conformance for standard `toolchange` dispatch timing
-- [ ] Native-vs-polyfill parity matrix (Chromium native + shimmed consumer API)
 - [ ] Optional Chromium `executeTool` behavior without treating it as standard API
 
 ## Runtime Conformance Matrix (Implemented)
@@ -80,6 +81,10 @@ Goal: keep one place to track standards decisions and implementation details bef
 - Global runtime entry: `packages/global/conformance/global-runtime.e2e.test.ts`
 - Polyfill runtime entry: `packages/webmcp-polyfill/conformance/polyfill-runtime.e2e.test.ts`
 - Native Chromium runtime entry: `conformance/native-runtime.e2e.test.ts`
+- Shared declarative suite: `conformance/declarative-forms-conformance.shared.ts`
+- Pinned upstream declarative and page-local imperative WPT:
+  - Selection and runner: `scripts/run-webmcp-wpt.mjs`
+  - CI revision and job: `.github/workflows/e2e.yml`
 
 Current MCP-B alignment note:
 
@@ -93,6 +98,8 @@ Current MCP-B alignment note:
 
 Run commands:
 
+- Pinned upstream WebMCP WPT against the standalone polyfill:
+  - `CHROME_BIN="/path/to/chrome-canary" pnpm test:wpt`
 - WebMCP polyfill runtime (non-native Chromium):
   - `pnpm --filter @mcp-b/webmcp-polyfill run test:conformance`
 - Global runtime (non-native Chromium):

@@ -36,9 +36,17 @@ pnpm --filter mcp-e2e-tests test:integration:frameworks
 pnpm --filter mcp-e2e-tests test:native-contract:default
 pnpm --filter mcp-e2e-tests test:native-showcase
 
+# Shared WebMCP conformance lanes
+pnpm --filter @mcp-b/webmcp-polyfill test:conformance
+pnpm --filter @mcp-b/global test:conformance:global
+
+# Pinned upstream WebMCP WPT (requires .reference/wpt and Chrome Canary)
+CHROME_BIN=/path/to/chrome-canary pnpm test:wpt
+
 # Runtime-specific canonical E2E packages
 pnpm --filter @mcp-b/webmcp-local-relay test:e2e
 pnpm --filter @mcp-b/transports test:e2e
+pnpm --filter @mcp-b/webmcp-extension test:e2e
 
 # Tarball validation
 pnpm test:e2e:tarball:global
@@ -51,13 +59,14 @@ Notes:
 
 ## Runtime Coverage Matrix
 
-| Runtime             | Canonical caller                          | Real runtime boundary under test                    | Command                                                    |
-| ------------------- | ----------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------- |
-| Tab / global        | SDK `Client` + `TabClientTransport`       | Browser page running `@mcp-b/global`                | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
-| Iframe              | SDK `Client` + `IframeParentTransport`    | Parent/iframe runtime boundary                      | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
-| Native Chromium     | `document.modelContext`                   | Chrome 152+ with WebMCP flags in CI                 | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
-| Local relay         | SDK `Client` over stdio                   | Real relay server + real browser runtime            | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
-| Extension transport | SDK `Client` + `ExtensionClientTransport` | Real MV3 extension using `ExtensionServerTransport` | `pnpm --filter @mcp-b/transports test:e2e`                 |
+| Runtime             | Canonical caller                           | Real runtime boundary under test                         | Command                                                    |
+| ------------------- | ------------------------------------------ | -------------------------------------------------------- | ---------------------------------------------------------- |
+| Tab / global        | SDK `Client` + `TabClientTransport`        | Browser page running `@mcp-b/global`                     | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
+| Iframe              | SDK `Client` + `IframeParentTransport`     | Parent/iframe runtime boundary                           | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
+| Native Chromium     | `document.modelContext`                    | Chrome 152+ with WebMCP flags in CI                      | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
+| Local relay         | SDK `Client` over stdio                    | Real relay server + real browser runtime                 | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
+| Extension transport | SDK `Client` + `ExtensionClientTransport`  | Real MV3 extension using `ExtensionServerTransport`      | `pnpm --filter @mcp-b/transports test:e2e`                 |
+| Extension template  | SDK `Client` in an isolated content script | Imperative and declarative tools in a real MV3 extension | `pnpm --filter @mcp-b/webmcp-extension test:e2e`           |
 
 ## Canonical E2E Assertions
 
@@ -116,12 +125,22 @@ The canonical runtime gate lives in `.github/workflows/e2e.yml`.
 
 The workflow runs:
 
-1. `pnpm test:e2e`
-2. Native contract on Chrome Canary with WebMCP flags
-3. Native showcase integration coverage on Chrome Canary
-4. Tarball validation for `@mcp-b/global`
+1. Tab, iframe, local-relay, framework, and `@mcp-b/global` tarball E2E coverage
+2. Extension transport and extension-template E2E coverage
+3. The pinned upstream WebMCP Web Platform Tests against the standalone polyfill
+4. Native contract and showcase integration coverage on Chrome Canary
 
-`pnpm test` at the repo root includes this gate by default.
+`pnpm test` runs unit tests plus the local zero-mock `pnpm test:e2e` umbrella. CI adds the
+framework, tarball, upstream WPT, and Chrome Canary lanes listed above.
+
+The upstream suite lives in
+[`webmcp`](https://github.com/web-platform-tests/wpt/tree/master/webmcp). The
+workflow pins its WPT revision and injects
+`packages/webmcp-polyfill/dist/index.iife.js` with native WebMCP disabled. It
+runs every declarative test plus an explicit allowlist of imperative tests for
+the page-local surface. Frame-tree, origin-policy, and navigation WPT are
+excluded because they require native browser behavior. The shared repository
+suite adds MCP-B-specific polyfill, global, and native integration coverage.
 
 ## Extension Transport Testing
 

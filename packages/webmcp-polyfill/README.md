@@ -68,8 +68,10 @@ submit it. With `toolautosubmit`, the polyfill validates the form and calls
 `requestSubmit()`. Agent submissions expose `SubmitEvent.agentInvoked` and
 `SubmitEvent.respondWith()`.
 
-The implementation tracks the subset of current Chromium behavior covered by
-the package's browser conformance suite. See Chrome's
+CI checks the standalone polyfill against the upstream
+[declarative Web Platform Tests](https://github.com/web-platform-tests/wpt/tree/master/webmcp/declarative).
+Repository-specific browser tests cover the polyfill and composed MCP-B runtime.
+See Chrome's
 [declarative API documentation](https://developer.chrome.com/docs/ai/webmcp/declarative-api)
 for the evolving API. The Community Group draft's
 [declarative section](https://webmachinelearning.github.io/webmcp/#declarative-webmcp)

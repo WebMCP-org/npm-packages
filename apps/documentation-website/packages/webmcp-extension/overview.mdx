@@ -1,0 +1,79 @@
+---
+title: '@mcp-b/webmcp-extension overview'
+description: 'When to use the Chromium extension template and how it separates page runtime installation from isolated client code.'
+keywords:
+  ['@mcp-b/webmcp-extension', 'overview', 'chrome extension', 'manifest v3', 'content script']
+icon: 'chrome'
+---
+
+`@mcp-b/webmcp-extension` provides a Chromium MV3 template and a client helper
+for extension-owned WebMCP integration. A MAIN-world content script installs
+the runtime, page code uses `document.modelContext` or declarative HTML forms,
+and an isolated content script receives the official MCP `Client`.
+
+## When to use this package
+
+- You want an extension to install WebMCP on matching pages.
+- You want page runtime installation separated from isolated client code.
+- You want to discover and call imperative and declarative page tools through
+  the official MCP client API.
+
+## When not to use this package
+
+- Your page can install its own runtime. Use [`@mcp-b/global`](/packages/global/overview).
+- You need a background worker or Chrome runtime-port server. This package's
+  template connects an isolated content script to the current page.
+
+## Where it sits in the package graph
+
+The MAIN-world entry imports `@mcp-b/global`. The isolated entry calls
+`connectWebMCPClient()`, which connects an MCP client to that page. The package
+does not replace or wrap the website API: site code still registers tools with
+`document.modelContext`, and annotated forms become tools through the native or
+polyfilled declarative runtime. Both tool types use the same `listTools()` and
+`callTool()` methods from the isolated content script.
+
+The extension does not scan forms itself. `@mcp-b/global` owns the page runtime,
+including its [declarative support and compatibility boundary](/reference/webmcp/declarative-api).
+
+The shipped content scripts target top-level pages only. Native Chrome still
+exposes imperative and declarative tools from same-origin child documents
+through frame-tree discovery. The polyfilled path remains scoped to the top
+document. The [reference page](/packages/webmcp-extension/reference#document-tree-scope)
+lists the cross-origin and navigation boundaries.
+
+## Security boundary
+
+MAIN-world code shares the website's JavaScript environment. Keep extension
+secrets, credentials, and privileged Chrome APIs out of that bundle. Treat page
+tool metadata, arguments, and results as untrusted. Authorize privileged
+actions from trusted extension state, never from page-provided values alone.
+
+For the broader threat model, see [Security and human control](/explanation/design/security-and-human-in-the-loop).
+
+## First step
+
+Start with the included template, then narrow its manifest match patterns to
+the sites your extension supports. The [reference page](/packages/webmcp-extension/reference)
+documents the manifest, build shape, exported helper, and security constraints.
+
+## Related pages
+
+<CardGroup cols={2}>
+  <Card title="Reference" icon="book-open" href="/packages/webmcp-extension/reference">
+    Manifest structure, world boundaries, client helper, and template build.
+  </Card>
+  <Card title="@mcp-b/global overview" icon="globe" href="/packages/global/overview">
+    Runtime installed by the MAIN-world entry.
+  </Card>
+  <Card title="Declarative API" icon="file-code" href="/reference/webmcp/declarative-api">
+    Annotated forms, browser behavior, and polyfill compatibility.
+  </Card>
+  <Card
+    title="Security and human control"
+    icon="shield-halved"
+    href="/explanation/design/security-and-human-in-the-loop"
+  >
+    Security principles for page tools and agent access.
+  </Card>
+</CardGroup>

@@ -1,0 +1,235 @@
+---
+title: '@mcp-b/webmcp-extension'
+description: 'Reference for the Chromium MV3 extension template, imperative and declarative page tools, isolated client helper, and security boundary.'
+keywords:
+  [
+    '@mcp-b/webmcp-extension',
+    'connectWebMCPClient',
+    'chrome extension',
+    'manifest v3',
+    'content script',
+    'MAIN world',
+    'declarative WebMCP',
+    'toolname',
+  ]
+icon: 'chrome'
+---
+
+`@mcp-b/webmcp-extension` installs WebMCP from a Chromium extension and
+connects an isolated content script to the page's imperative and declarative
+tools. It returns the official MCP `Client`; websites continue to use
+`document.modelContext` and annotated HTML forms.
+
+```text title="Package metadata"
+npm: @mcp-b/webmcp-extension
+export: @mcp-b/webmcp-extension/content-script
+license: MIT
+node: >= 20
+```
+
+## Installation
+
+```bash title="Install packages"
+pnpm add @mcp-b/global @mcp-b/webmcp-extension
+```
+
+## Extension layout
+
+The template declares two static `document_start` content scripts. Chrome 111
+or newer is required for `world: "MAIN"`.
+
+| Entry                    | World    | Responsibility                                  |
+| ------------------------ | -------- | ----------------------------------------------- |
+| `main-world.iife.js`     | `MAIN`   | Install `@mcp-b/global` in the page environment |
+| `content-script.iife.js` | Isolated | Connect the MCP client and consume page tools   |
+
+```json title="manifest.json"
+{
+  "manifest_version": 3,
+  "name": "My WebMCP Extension",
+  "version": "1.0.0",
+  "minimum_chrome_version": "111",
+  "content_scripts": [
+    {
+      "matches": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["main-world.iife.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["content-script.iife.js"],
+      "run_at": "document_start"
+    }
+  ]
+}
+```
+
+The template omits `all_frames`, extension API permissions, a background
+worker, and `web_accessible_resources`. It targets matching top-level pages.
+
+## MAIN-world entry
+
+The MAIN-world bundle only installs the runtime:
+
+```typescript title="src/main-world.ts"
+import '@mcp-b/global';
+```
+
+Website code uses the native-shaped page API directly:
+
+```typescript title="Page code"
+await document.modelContext.registerTool({
+  name: 'get_cart',
+  description: 'Read the current shopping cart.',
+  execute: () => ({
+    content: [{ type: 'text', text: JSON.stringify(readCart()) }],
+  }),
+});
+```
+
+See the [WebMCP standard API](/reference/webmcp/standard-api) for a page-facing
+quick reference and a link to the authoritative Community Group draft.
+
+## Declarative form tools
+
+The MAIN-world runtime also discovers annotated forms:
+
+```html title="Page form"
+<form
+  toolname="extension_declarative"
+  tooldescription="Submit a value through an annotated form."
+  toolautosubmit
+>
+  <input name="value" toolparamdescription="Value to submit" required />
+  <button type="submit">Submit</button>
+</form>
+```
+
+`@mcp-b/global` adopts native declarative behavior when available and installs
+the polyfilled form runtime otherwise. Form tools and JavaScript registrations
+both appear in the isolated client's `listTools()` result and run through
+`callTool()`. `listChanged.tools` reports form additions, definition changes,
+and removals.
+
+The extension package adds no separate DOM scanner or declarative client API.
+See the [declarative API reference](/reference/webmcp/declarative-api) for the
+upstream behavior and the polyfill's documented compatibility boundary.
+
+## Document-tree scope
+
+The template injects its MAIN-world runtime and isolated client into top-level
+pages only. Native Chrome's `getTools()` still includes tools owned by
+same-origin active documents in the same frame tree. The extension client can
+therefore list and call both JavaScript and declarative form tools from
+same-origin child documents without child-frame injection.
+
+The polyfilled path discovers only the top document. Cross-origin imperative
+tools require `allow="tools"`, child registration with `exposedTo`, and a
+caller-supplied `fromOrigins` list. The extension client does not supply that
+list. Declarative forms currently have no equivalent cross-origin exposure
+attribute. See the [WebMCP standard API](/reference/webmcp/standard-api) and
+Chrome's [cross-origin iframe guidance](https://developer.chrome.com/docs/ai/webmcp/imperative-api#cross-origin-iframes).
+
+MCP tool names are global within one client connection. Use unique names across
+the frame tree.
+
+## Navigation results
+
+Chrome resolves `executeTool()` with `null` when a tool triggers navigation.
+The extension client reports that call as interrupted. It does not preserve the
+call across document navigation or read JSON-LD from the destination document.
+For a declarative tool that must return a result without navigation, cancel the
+submission and use `SubmitEvent.respondWith()`. The upstream
+[declarative explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md#getting-the-form-response-to-the-agent)
+tracks the unresolved cross-document response design.
+
+## Isolated content-script entry
+
+```typescript title="src/content-script.ts"
+import { connectWebMCPClient } from '@mcp-b/webmcp-extension/content-script';
+
+const client = await connectWebMCPClient({
+  name: 'my-extension',
+  version: '1.0.0',
+});
+
+const { tools } = await client.listTools();
+const result = await client.callTool({
+  name: 'get_cart',
+  arguments: {},
+});
+
+await client.close();
+```
+
+`client` is the official `Client` from `@modelcontextprotocol/client`, not a
+package-specific wrapper.
+
+## `connectWebMCPClient()`
+
+```typescript title="Signature"
+connectWebMCPClient(
+  clientInfo?: Implementation,
+  clientOptions?: ClientOptions
+): Promise<Client>
+```
+
+| Parameter       | Default                                                 | Description                                       |
+| --------------- | ------------------------------------------------------- | ------------------------------------------------- |
+| `clientInfo`    | `{ name: '@mcp-b/webmcp-extension', version: '1.0.0' }` | MCP client identity                               |
+| `clientOptions` | `{}`                                                    | Official MCP `ClientOptions` passed to the client |
+
+The helper:
+
+1. Creates the official MCP `Client` with automatic protocol version negotiation.
+2. Applies the supplied `ClientOptions`.
+3. Connects a `TabClientTransport` with `targetOrigin` set to `window.location.origin`.
+4. Resolves with the connected client.
+
+Use the returned client's `listTools()`, `callTool()`, and `close()` methods.
+The second argument also accepts official client features such as
+`listChanged.tools`; the template uses it to follow tools registered after page
+hydration.
+
+## Template build
+
+The published package includes a copyable `template` directory. Its build
+requires Node 22.12 or newer.
+
+```bash title="Build the template"
+cp -R node_modules/@mcp-b/webmcp-extension/template my-webmcp-extension
+cd my-webmcp-extension
+pnpm install
+pnpm build
+```
+
+Load the generated `dist/` directory as an unpacked extension. The Vite+ config
+bundles both entries as self-contained, minified IIFEs targeting Chrome 111 and
+copies `manifest.json` into `dist/`. Content scripts cannot load bare npm
+imports at runtime.
+
+## Security and scope
+
+<Warning>
+  MAIN-world code shares the website's JavaScript environment. Keep secrets, credentials, and
+  privileged Chrome API calls out of the MAIN-world bundle. The client pins messages to
+  `window.location.origin`, but this routing check is not authentication. Same-page code can observe
+  or forge the channel. Treat page tool metadata, arguments, and results as untrusted. Authorize
+  privileged actions from trusted extension state, never from page-provided values alone.
+</Warning>
+
+- Narrow the manifest match patterns before publishing.
+- The template injects into top-level pages only. Native Chrome can still
+  discover same-origin child-document tools.
+- Add icons and Chrome Web Store listing metadata before publishing.
+
+For the broader threat model, see [Security and human control](/explanation/design/security-and-human-in-the-loop).
+
+## Related pages
+
+- [@mcp-b/webmcp-extension overview](/packages/webmcp-extension/overview)
+- [@mcp-b/global reference](/packages/global/reference)
+- [@mcp-b/transports reference](/packages/transports/reference)
+- [WebMCP standard API](/reference/webmcp/standard-api)
+- [WebMCP declarative API](/reference/webmcp/declarative-api)

@@ -52,6 +52,12 @@ const installedProperties: InstalledProperty[] = [];
 let installedContext: StrictWebMCPContext | null = null;
 let cleanupDeclarativeForms: (() => void) | null = null;
 
+function currentOrigin(): string {
+  return typeof globalThis.origin === 'string'
+    ? globalThis.origin
+    : (globalThis.location?.origin ?? '');
+}
+
 function installProperty(target: object, key: PropertyKey, descriptor: PropertyDescriptor): void {
   const previous = Object.getOwnPropertyDescriptor(target, key);
   try {
@@ -174,7 +180,7 @@ class StrictWebMCPContext extends EventTarget implements ModelContext {
       }
     }
     validateExecutableOrigin(tool.origin);
-    if (tool.window !== globalThis.window || tool.origin !== (globalThis.location?.origin ?? '')) {
+    if (tool.window !== globalThis.window || tool.origin !== currentOrigin()) {
       throw createUnknownError(`Tool not found: ${tool.name}`);
     }
     return this.invokeToolByName(tool.name, inputArgsJson, options);
@@ -208,7 +214,7 @@ class StrictWebMCPContext extends EventTarget implements ModelContext {
         ...(tool[REGISTERED_INPUT_SCHEMA_SYMBOL] !== undefined
           ? { inputSchema: tool[REGISTERED_INPUT_SCHEMA_SYMBOL] }
           : {}),
-        origin: globalThis.location?.origin ?? '',
+        origin: currentOrigin(),
         window: globalThis.window,
         ...(tool.annotations ? { annotations: toWebMcpAnnotations(tool.annotations) } : {}),
       }))

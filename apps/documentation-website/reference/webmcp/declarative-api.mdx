@@ -34,13 +34,23 @@ behavior, and iframe model are still evolving. Use Chrome's
 for current browser behavior. Track the Community Group
 [declarative draft section](https://webmachinelearning.github.io/webmcp/#declarative-webmcp)
 and [declarative explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md)
-for proposal status. Do not treat this example as a stable compatibility
-contract.
+for proposal status. The upstream
+[declarative Web Platform Tests](https://github.com/web-platform-tests/wpt/tree/master/webmcp/declarative)
+record the current executable compatibility cases. Do not treat this example as
+a stable compatibility contract.
+
+Native `getTools()` includes declarative forms from same-origin active documents
+in the current frame tree. Declarative HTML currently has no equivalent to the
+imperative API's `exposedTo` option, so a form cannot opt into cross-origin
+discovery. The MCP-B polyfill observes only its owning document.
 
 [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference#declarative-forms)
 implements the tested local-document subset and documents its native-only gaps.
 React users can write these attributes directly after importing
 [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference#declarative-form-attributes).
+Extensions can install the same runtime in the MAIN world with
+[`@mcp-b/webmcp-extension`](/packages/webmcp-extension/overview), then discover
+and call form tools from an isolated MCP client.
 
 For imperative JavaScript registration, use
 [`document.modelContext.registerTool()`](/reference/webmcp/standard-api).
