@@ -127,6 +127,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Checkout Web Platform Tests
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: web-platform-tests/wpt
+          ref: c7fdee80f3f17b4e9813964916afdfd57ace863f
+          path: .reference/wpt
+          sparse-checkout: |
+            common
+            docs
+            resources
+            tools
+            webmcp
+
       - name: Setup pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
 
@@ -151,6 +164,19 @@ jobs:
 
       - name: Print Chrome Canary version
         run: '"${{ steps.chrome_canary.outputs.chrome-path }}" --version'
+
+      - name: Run declarative WPT against the polyfill
+        working-directory: .reference/wpt
+        env:
+          CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
+          POLYFILL_SCRIPT: ${{ github.workspace }}/packages/webmcp-polyfill/dist/index.iife.js
+        run: >-
+          ./wpt run --channel canary --binary "$CHROME_BIN" --yes --install-webdriver
+          --headless --no-enable-experimental
+          --binary-arg=--disable-features=WebMCP,WebMCPTesting
+          --inject-script "$POLYFILL_SCRIPT"
+          --no-pause-after-test --processes 1 --no-manifest-download
+          --include /webmcp/declarative/ chrome
 
       - name: Run Native Runtime Contract (Chrome Canary)
         env:

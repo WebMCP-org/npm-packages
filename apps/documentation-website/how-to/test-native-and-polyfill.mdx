@@ -23,12 +23,14 @@ The monorepo provides several testing lanes organized by runtime:
 
 | Runtime                | Canonical caller                                | Command                                                       |
 | ---------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
+| Strict polyfill        | `document.modelContext`                         | `pnpm --filter @mcp-b/webmcp-polyfill test:conformance`       |
+| Composed global        | `document.modelContext`                         | `pnpm --filter @mcp-b/global test:conformance:global`         |
 | Tab and iframe         | SDK `Client` over MCP-B transports              | `pnpm --filter mcp-e2e-tests test:runtime-contract:transport` |
 | `<mcp-iframe>` element | SDK `Client` + `IframeParentTransport`          | `pnpm --filter mcp-e2e-tests test:mcp-iframe`                 |
 | Native Chrome          | `getTools()` + feature-detected `executeTool()` | `pnpm --filter mcp-e2e-tests test:native-contract:default`    |
 | Local relay            | SDK `Client` over stdio                         | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`            |
 
-Every canonical E2E suite proves the same six assertions against the real runtime:
+Each runtime-contract E2E suite proves the same six assertions against the real runtime:
 
 1. Initial discovery returns the expected tools
 2. A successful call returns the expected payload
@@ -37,9 +39,18 @@ Every canonical E2E suite proves the same six assertions against the real runtim
 5. Unregistration removes the tool and later calls fail
 6. Runtime-thrown tool errors propagate to the caller
 
-## Run the canonical polyfill tests
+## Run the polyfill tests
 
-The polyfill tests use Playwright with a real browser. They exercise `@mcp-b/global` running in a page, discovered and called through the SDK `Client` and `TabClientTransport`.
+Run the shared browser conformance suite against the strict polyfill and the
+composed global runtime:
+
+```bash title="Run browser conformance"
+pnpm --filter @mcp-b/webmcp-polyfill test:conformance
+pnpm --filter @mcp-b/global test:conformance:global
+```
+
+Then run the transport contract to exercise `@mcp-b/global` through an SDK
+`Client` and `TabClientTransport`:
 
 ```bash title="Run transport contracts"
 # Tab and iframe transport contracts only
@@ -50,6 +61,10 @@ pnpm test:e2e
 ```
 
 These tests use the shared fixture in `e2e/runtime-contract/` which registers a deterministic tool set: `echo`, `sum`, `dynamic_tool`, and `always_fail`.
+
+CI also injects the built standalone polyfill into the upstream
+[declarative Web Platform Tests](https://github.com/web-platform-tests/wpt/tree/master/webmcp/declarative).
+The workflow pins a WPT revision so upstream behavior changes require review.
 
 ## Run the native Chromium tests
 
@@ -143,6 +158,7 @@ cd e2e && pnpm test:chrome-beta:webmcp:headed
 | If you are...                             | Use this lane                                      |
 | ----------------------------------------- | -------------------------------------------------- |
 | Building tools with `@mcp-b/global`       | `test:runtime-contract:transport`                  |
+| Validating declarative polyfill behavior  | `@mcp-b/webmcp-polyfill test:conformance`          |
 | Validating against the native browser API | `test:native-contract:default`                     |
 | Testing the local relay end-to-end        | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e` |
 | Running the full canonical gate           | `pnpm test:e2e`                                    |

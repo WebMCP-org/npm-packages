@@ -684,11 +684,14 @@ function waitForSubmission(
     registration.cancelPending = cancel;
     Reflect.apply(EventTarget.prototype.addEventListener, form, ['invalid', onInvalid, true]);
 
-    if (!autosubmit) submitter?.focus();
-    window.dispatchEvent(agentEvent('toolactivated', toolName));
-    if (!autosubmit) return;
+    if (!autosubmit) {
+      submitter?.focus();
+      window.dispatchEvent(agentEvent('toolactivated', toolName));
+      return;
+    }
     try {
       requestFormSubmit(form, submitter);
+      window.dispatchEvent(agentEvent('toolactivated', toolName));
     } catch (error) {
       cancel(error);
     }

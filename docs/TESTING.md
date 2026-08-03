@@ -36,6 +36,10 @@ pnpm --filter mcp-e2e-tests test:integration:frameworks
 pnpm --filter mcp-e2e-tests test:native-contract:default
 pnpm --filter mcp-e2e-tests test:native-showcase
 
+# Shared WebMCP conformance lanes
+pnpm --filter @mcp-b/webmcp-polyfill test:conformance
+pnpm --filter @mcp-b/global test:conformance:global
+
 # Runtime-specific canonical E2E packages
 pnpm --filter @mcp-b/webmcp-local-relay test:e2e
 pnpm --filter @mcp-b/transports test:e2e
@@ -117,11 +121,19 @@ The canonical runtime gate lives in `.github/workflows/e2e.yml`.
 The workflow runs:
 
 1. `pnpm test:e2e`
-2. Native contract on Chrome Canary with WebMCP flags
-3. Native showcase integration coverage on Chrome Canary
-4. Tarball validation for `@mcp-b/global`
+2. The pinned upstream declarative Web Platform Tests against the standalone polyfill
+3. Native contract on Chrome Canary with WebMCP flags
+4. Native showcase integration coverage on Chrome Canary
+5. Tarball validation for `@mcp-b/global`
 
 `pnpm test` at the repo root includes this gate by default.
+
+The upstream declarative suite lives in
+[`webmcp/declarative`](https://github.com/web-platform-tests/wpt/tree/master/webmcp/declarative).
+The workflow pins its WPT revision and injects
+`packages/webmcp-polyfill/dist/index.iife.js` with native WebMCP disabled. The
+shared repository suite adds MCP-B-specific polyfill, global, and native
+integration coverage.
 
 ## Extension Transport Testing
 

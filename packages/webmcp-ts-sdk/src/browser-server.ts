@@ -165,6 +165,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   private readonly pendingTools = new Map<string, AbortController>();
   private readonly removingNativeTools = new Set<string>();
   private nativeSyncQueue: Promise<void> = Promise.resolve();
+  private nativeToolChangeQueue: Promise<void> = Promise.resolve();
   private nativeToolChangeListener: EventListener | undefined;
   private closed = false;
   private closePromise: Promise<void> | undefined;
@@ -189,13 +190,14 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     if (native) {
       this.nativeToolChangeListener = () => {
         if (this.closed) return;
-        void this.queueNativeToolSync()
-          .then(async (changed) => {
-            if (changed) await this.notifyProducerToolsChanged();
-          })
-          .catch((error: unknown) => {
+        this.nativeToolChangeQueue = this.nativeToolChangeQueue.then(async () => {
+          try {
+            await this.queueNativeToolSync();
+          } catch (error) {
             console.warn('[BrowserMcpServer] Native WebMCP tool reconciliation failed:', error);
-          });
+          }
+          await this.notifyProducerToolsChanged();
+        });
       };
       native.addEventListener('toolchange', this.nativeToolChangeListener);
     }
@@ -221,11 +223,9 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
 
   private async notifyProducerToolsChanged(): Promise<void> {
     if (this.closed) return;
-    // ponytail: the platform does not expose its WebMCP task source; a timer
-    // preserves task (rather than microtask) ordering for local registrations.
+    // Preserve task ordering because WebMCP does not expose its platform task source.
     await new Promise((resolve) => setTimeout(resolve, 0));
-    if (this.closed) return;
-    this.dispatchEvent(new Event('toolchange'));
+    if (!this.closed) this.dispatchEvent(new Event('toolchange'));
   }
 
   private getNativeStandardToolsApi(): NativeStandardToolsApi | undefined {
@@ -417,7 +417,8 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       registered.abortListener = abort;
     }
     if (this.tools.get(tool.name) === registered) {
-      await this.notifyProducerToolsChanged();
+      if (this.native) await this.nativeToolChangeQueue;
+      else await this.notifyProducerToolsChanged();
     }
     if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
     options.signal?.throwIfAborted();
@@ -432,7 +433,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       this.tools.delete(name);
       this.nativeBackfilledTools.delete(name);
       registered.mcpHandle?.remove();
-      if (options?.notify ?? true) {
+      if ((options?.notify ?? true) && !this.native) {
         void this.notifyProducerToolsChanged();
       }
     }
@@ -440,14 +441,14 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   }
 
   syncNativeTools(): Promise<void> {
-    return this.queueNativeToolSync().then(() => undefined);
+    return this.queueNativeToolSync();
   }
 
-  private queueNativeToolSync(): Promise<boolean> {
+  private queueNativeToolSync(): Promise<void> {
     const sync = this.nativeSyncQueue.then(async () => {
-      if (this.closed) return false;
+      if (this.closed) return;
       const native = this.getNativeStandardToolsApi();
-      return native ? this.backfillNativeStandardTools(native) : false;
+      if (native) await this.backfillNativeStandardTools(native);
     });
     this.nativeSyncQueue = sync.then(
       () => undefined,
@@ -456,10 +457,9 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     return sync;
   }
 
-  private async backfillNativeStandardTools(native: NativeStandardToolsApi): Promise<boolean> {
+  private async backfillNativeStandardTools(native: NativeStandardToolsApi): Promise<void> {
     const tools = await native.getTools();
-    if (this.closed) return false;
-    let changed = false;
+    if (this.closed) return;
     const nextTools = new Map<string, NativeBackfilledTool>();
     const nativeNames = new Set(tools.map(({ name }) => name));
     for (const name of this.removingNativeTools) {
@@ -508,7 +508,6 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       const next = nextTools.get(name);
       if (!next || next.fingerprint !== current.fingerprint) {
         this.removeTool(name, { skipNative: true, notify: false });
-        changed = true;
         continue;
       }
       this.nativeBackfilledTools.set(name, next);
@@ -538,7 +537,6 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
         const normalized = this.validateToolDescriptor(tool);
         this.tools.set(tool.name, this.registerToolInMcp(tool, normalized, execute));
         this.nativeBackfilledTools.set(name, next);
-        changed = true;
       } catch (error) {
         console.warn(
           `[BrowserMcpServer] Native tool "${name}" was not exposed over MCP because its schema could not be compiled:`,
@@ -546,7 +544,6 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
         );
       }
     }
-    return changed;
   }
 
   registerResource(descriptor: ResourceDescriptor): RegistrationHandle {
