@@ -13,6 +13,7 @@ import type { RuntimeContractController } from '../../../e2e/runtime-contract/co
 import { sanitizeName } from './naming.js';
 
 const TEST_TOOL_NAME = 'sum';
+const DECLARATIVE_TOOL_NAME = 'webmcp_zero_config_declarative_e2e';
 const PACKAGE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = resolve(PACKAGE_DIR, '../..');
 const CLI_ENTRY_PATH = resolve(PACKAGE_DIR, 'dist/cli.mjs');
@@ -74,12 +75,14 @@ declare global {
   }
 }
 
+const GLOBAL_RUNTIME_CASE: RuntimeCase = {
+  mode: 'global',
+  scriptRoute: '/runtime/global.iife.js',
+  scriptPath: GLOBAL_RUNTIME_PATH,
+};
+
 const RUNTIME_CASES: RuntimeCase[] = [
-  {
-    mode: 'global',
-    scriptRoute: '/runtime/global.iife.js',
-    scriptPath: GLOBAL_RUNTIME_PATH,
-  },
+  GLOBAL_RUNTIME_CASE,
   {
     mode: 'polyfill-testing',
     scriptRoute: '/runtime/webmcp-polyfill.iife.js',
@@ -344,6 +347,20 @@ function buildHostPageHtml(options: {
 }): string {
   const { widgetOrigin, relayPort, runtimeScriptRoute, runtimeContractRoute, runtimeMode } =
     options;
+  const declarativeFixture = `<script>
+      document.addEventListener('submit', (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement) || form.getAttribute('toolname') !== '${DECLARATIVE_TOOL_NAME}') return;
+        event.preventDefault();
+        const value = String(new FormData(form).get('value'));
+        document.documentElement.dataset.webmcpDeclarativeInvoked = value;
+        event.respondWith(Promise.resolve({ content: [{ type: 'text', text: 'submitted:' + value }] }));
+      });
+    </script>
+    <form toolname="${DECLARATIVE_TOOL_NAME}" tooldescription="Submit through the zero-configuration relay." toolautosubmit>
+      <input name="value" toolparamdescription="Value to submit" required />
+      <button type="submit">Submit</button>
+    </form>`;
 
   return `<!doctype html>
 <html lang="en">
@@ -353,6 +370,7 @@ function buildHostPageHtml(options: {
   </head>
   <body>
     <h1>WebMCP Relay E2E Host</h1>
+    ${declarativeFixture}
     <div id="status" data-state="booting">booting</div>
     <script src="${runtimeScriptRoute}"></script>
     <script type="module">
@@ -378,7 +396,6 @@ function buildHostPageHtml(options: {
     </script>
     <script
       src="${widgetOrigin}/embed.js"
-      data-relay-host="127.0.0.1"
       data-relay-port="${String(relayPort)}"
     ></script>
   </body>
@@ -564,15 +581,7 @@ async function setupE2EHarness(options: {
 
     const stdioTransport = new StdioClientTransport({
       command: process.execPath,
-      args: [
-        CLI_ENTRY_PATH,
-        '--host',
-        '127.0.0.1',
-        '--port',
-        String(relayPort),
-        '--widget-origin',
-        host.origin,
-      ],
+      args: [CLI_ENTRY_PATH, '--port', String(relayPort)],
       cwd: PACKAGE_DIR,
       stderr: 'pipe',
     });
@@ -637,6 +646,45 @@ async function setupE2EHarness(options: {
 }
 
 describe('relay e2e (real browser assets)', () => {
+  it('invokes a declarative form with the default origin policy', async () => {
+    let widgetServer: StartedHttpServer | null = null;
+    let harness: E2EHarness | null = null;
+
+    try {
+      const relayPort = await getOpenPort();
+      widgetServer = await startWidgetAssetServer();
+      harness = await setupE2EHarness({
+        runtimeCase: GLOBAL_RUNTIME_CASE,
+        relayPort,
+        widgetOrigin: widgetServer.origin,
+        clientName: 'webmcp-local-relay-e2e-client-default-origin-declarative',
+      });
+
+      const toolName = sanitizeName(DECLARATIVE_TOOL_NAME);
+      await waitForValue(async () => {
+        const toolList = await harness?.client.listTools();
+        return toolList?.tools.some((tool) => tool.name === toolName) ? true : undefined;
+      }, 20_000);
+
+      const result = await harness.client.callTool({
+        name: toolName,
+        arguments: { value: 'zero-config' },
+      });
+
+      expect(firstContentText(result)).toBe('submitted:zero-config');
+      await expect
+        .poll(() =>
+          harness?.page.evaluate(() => document.documentElement.dataset.webmcpDeclarativeInvoked)
+        )
+        .toBe('zero-config');
+    } catch (error) {
+      throw formatE2EError('default-origin declarative', error, harness);
+    } finally {
+      await harness?.cleanup();
+      await stopHttpServer(widgetServer?.server ?? null);
+    }
+  });
+
   it('uses async document discovery, current descriptor identity, and document toolchange', async () => {
     let widgetServer: StartedHttpServer | null = null;
     let harness: E2EHarness | null = null;
