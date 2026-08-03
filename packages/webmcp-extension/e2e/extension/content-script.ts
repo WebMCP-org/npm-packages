@@ -8,6 +8,22 @@ async function waitForDocument(): Promise<void> {
   });
 }
 
+async function waitForPageTools(): Promise<void> {
+  await waitForDocument();
+  await new Promise<void>((resolve, reject) => {
+    const check = () => {
+      const { dataset } = document.documentElement;
+      if (!dataset.webmcpPageReady && !dataset.webmcpPageError) return;
+      observer.disconnect();
+      if (dataset.webmcpPageError) reject(new Error(dataset.webmcpPageError));
+      else resolve();
+    };
+    const observer = new MutationObserver(check);
+    observer.observe(document.documentElement, { attributes: true });
+    check();
+  });
+}
+
 function readText(result: CallToolResult, toolName: string): string {
   const text = result.content.find((item) => item.type === 'text');
   if (!text || text.type !== 'text') throw new Error(`${toolName} returned no text`);
@@ -19,7 +35,7 @@ async function run(): Promise<void> {
     !Reflect.has(document, 'modelContext')
   );
 
-  await waitForDocument();
+  await waitForPageTools();
   let sawDynamicTool = false;
   let resolveDynamicRemoval!: () => void;
   let rejectDynamicRemoval!: (reason: unknown) => void;
