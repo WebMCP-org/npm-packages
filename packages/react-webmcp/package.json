@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/react-webmcp",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "description": "React hooks for Model Context Protocol (MCP) - expose React components as AI tools for Claude, ChatGPT, Cursor, and Copilot",
   "keywords": [
     "ai",
