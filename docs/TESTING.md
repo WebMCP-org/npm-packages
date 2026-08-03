@@ -43,6 +43,7 @@ pnpm --filter @mcp-b/global test:conformance:global
 # Runtime-specific canonical E2E packages
 pnpm --filter @mcp-b/webmcp-local-relay test:e2e
 pnpm --filter @mcp-b/transports test:e2e
+pnpm --filter @mcp-b/webmcp-extension test:e2e
 
 # Tarball validation
 pnpm test:e2e:tarball:global
@@ -55,13 +56,14 @@ Notes:
 
 ## Runtime Coverage Matrix
 
-| Runtime             | Canonical caller                          | Real runtime boundary under test                    | Command                                                    |
-| ------------------- | ----------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------- |
-| Tab / global        | SDK `Client` + `TabClientTransport`       | Browser page running `@mcp-b/global`                | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
-| Iframe              | SDK `Client` + `IframeParentTransport`    | Parent/iframe runtime boundary                      | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
-| Native Chromium     | `document.modelContext`                   | Chrome 152+ with WebMCP flags in CI                 | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
-| Local relay         | SDK `Client` over stdio                   | Real relay server + real browser runtime            | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
-| Extension transport | SDK `Client` + `ExtensionClientTransport` | Real MV3 extension using `ExtensionServerTransport` | `pnpm --filter @mcp-b/transports test:e2e`                 |
+| Runtime             | Canonical caller                           | Real runtime boundary under test                    | Command                                                    |
+| ------------------- | ------------------------------------------ | --------------------------------------------------- | ---------------------------------------------------------- |
+| Tab / global        | SDK `Client` + `TabClientTransport`        | Browser page running `@mcp-b/global`                | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
+| Iframe              | SDK `Client` + `IframeParentTransport`     | Parent/iframe runtime boundary                      | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
+| Native Chromium     | `document.modelContext`                    | Chrome 152+ with WebMCP flags in CI                 | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
+| Local relay         | SDK `Client` over stdio                    | Real relay server + real browser runtime            | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
+| Extension transport | SDK `Client` + `ExtensionClientTransport`  | Real MV3 extension using `ExtensionServerTransport` | `pnpm --filter @mcp-b/transports test:e2e`                 |
+| Extension template  | SDK `Client` in an isolated content script | MAIN-world runtime injected by a real MV3 extension | `pnpm --filter @mcp-b/webmcp-extension test:e2e`           |
 
 ## Canonical E2E Assertions
 
@@ -120,13 +122,13 @@ The canonical runtime gate lives in `.github/workflows/e2e.yml`.
 
 The workflow runs:
 
-1. `pnpm test:e2e`
-2. The pinned upstream declarative Web Platform Tests against the standalone polyfill
-3. Native contract on Chrome Canary with WebMCP flags
-4. Native showcase integration coverage on Chrome Canary
-5. Tarball validation for `@mcp-b/global`
+1. Tab, iframe, local-relay, framework, and `@mcp-b/global` tarball E2E coverage
+2. Extension transport and extension-template E2E coverage
+3. The pinned upstream declarative Web Platform Tests against the standalone polyfill
+4. Native contract and showcase integration coverage on Chrome Canary
 
-`pnpm test` at the repo root includes this gate by default.
+`pnpm test` runs unit tests plus the local zero-mock `pnpm test:e2e` umbrella. CI adds the
+framework, tarball, upstream WPT, and Chrome Canary lanes listed above.
 
 The upstream declarative suite lives in
 [`webmcp/declarative`](https://github.com/web-platform-tests/wpt/tree/master/webmcp/declarative).

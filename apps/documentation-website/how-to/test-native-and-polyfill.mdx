@@ -29,6 +29,7 @@ The monorepo provides several testing lanes organized by runtime:
 | `<mcp-iframe>` element | SDK `Client` + `IframeParentTransport`          | `pnpm --filter mcp-e2e-tests test:mcp-iframe`                 |
 | Native Chrome          | `getTools()` + feature-detected `executeTool()` | `pnpm --filter mcp-e2e-tests test:native-contract:default`    |
 | Local relay            | SDK `Client` over stdio                         | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`            |
+| Extension template     | SDK `Client` from an isolated content script    | `pnpm --filter @mcp-b/webmcp-extension test:e2e`              |
 
 Each runtime-contract E2E suite proves the same six assertions against the real runtime:
 
@@ -56,7 +57,7 @@ Then run the transport contract to exercise `@mcp-b/global` through an SDK
 # Tab and iframe transport contracts only
 pnpm --filter mcp-e2e-tests test:runtime-contract:transport
 
-# Full E2E gate, including native Chrome and the relay
+# Local E2E umbrella, including native Chrome, relay, and extension packages
 pnpm test:e2e
 ```
 
@@ -126,7 +127,8 @@ pnpm --filter mcp-e2e-tests test:integration:runtime-api
 pnpm --filter mcp-e2e-tests test:integration:frameworks
 ```
 
-These lanes are useful for broader compatibility checks but are not the canonical E2E gate.
+These lanes provide broader compatibility checks outside the local `pnpm test:e2e` umbrella. CI
+also runs the framework lane.
 
 ## Debug failing tests
 
@@ -161,7 +163,7 @@ cd e2e && pnpm test:chrome-beta:webmcp:headed
 | Validating declarative polyfill behavior  | `@mcp-b/webmcp-polyfill test:conformance`          |
 | Validating against the native browser API | `test:native-contract:default`                     |
 | Testing the local relay end-to-end        | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e` |
-| Running the full canonical gate           | `pnpm test:e2e`                                    |
+| Running the local zero-mock E2E umbrella  | `pnpm test:e2e`                                    |
 
 ## Related pages
 
