@@ -173,6 +173,7 @@ jobs:
         run: >-
           ./wpt run --channel canary --binary "$CHROME_BIN" --yes --install-webdriver
           --headless --no-enable-experimental --test-types testharness
+          --binary-arg=--no-sandbox
           --binary-arg=--disable-features=WebMCP,WebMCPTesting
           --inject-script "$POLYFILL_SCRIPT"
           --no-pause-after-test --processes 1 --no-manifest-download
