@@ -1,6 +1,6 @@
 ---
 title: '@mcp-b/webmcp-extension'
-description: 'Reference for the Chromium MV3 extension template, isolated-world client helper, build entries, and security boundary.'
+description: 'Reference for the Chromium MV3 extension template, imperative and declarative page tools, isolated client helper, and security boundary.'
 keywords:
   [
     '@mcp-b/webmcp-extension',
@@ -9,13 +9,16 @@ keywords:
     'manifest v3',
     'content script',
     'MAIN world',
+    'declarative WebMCP',
+    'toolname',
   ]
 icon: 'chrome'
 ---
 
 `@mcp-b/webmcp-extension` installs WebMCP from a Chromium extension and
-connects an isolated content script to the page's tools. It returns the
-official MCP `Client`; websites continue to use `document.modelContext`.
+connects an isolated content script to the page's imperative and declarative
+tools. It returns the official MCP `Client`; websites continue to use
+`document.modelContext` and annotated HTML forms.
 
 ```text title="Package metadata"
 npm: @mcp-b/webmcp-extension
@@ -87,6 +90,31 @@ await document.modelContext.registerTool({
 
 See the [WebMCP standard API](/reference/webmcp/standard-api) for a page-facing
 quick reference and a link to the authoritative Community Group draft.
+
+## Declarative form tools
+
+The MAIN-world runtime also discovers annotated forms:
+
+```html title="Page form"
+<form
+  toolname="extension_declarative"
+  tooldescription="Submit a value through an annotated form."
+  toolautosubmit
+>
+  <input name="value" toolparamdescription="Value to submit" required />
+  <button type="submit">Submit</button>
+</form>
+```
+
+`@mcp-b/global` adopts native declarative behavior when available and installs
+the polyfilled form runtime otherwise. Form tools and JavaScript registrations
+both appear in the isolated client's `listTools()` result and run through
+`callTool()`. `listChanged.tools` reports form additions, definition changes,
+and removals.
+
+The extension package adds no separate DOM scanner or declarative client API.
+See the [declarative API reference](/reference/webmcp/declarative-api) for the
+upstream behavior and the polyfill's documented compatibility boundary.
 
 ## Isolated content-script entry
 
@@ -175,3 +203,4 @@ For the broader threat model, see [Security and human control](/explanation/desi
 - [@mcp-b/global reference](/packages/global/reference)
 - [@mcp-b/transports reference](/packages/transports/reference)
 - [WebMCP standard API](/reference/webmcp/standard-api)
+- [WebMCP declarative API](/reference/webmcp/declarative-api)

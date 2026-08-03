@@ -8,14 +8,15 @@ icon: 'chrome'
 
 `@mcp-b/webmcp-extension` provides a Chromium MV3 template and a client helper
 for extension-owned WebMCP integration. A MAIN-world content script installs
-the runtime, page code uses `document.modelContext` normally, and an isolated
-content script receives the official MCP `Client`.
+the runtime, page code uses `document.modelContext` or declarative HTML forms,
+and an isolated content script receives the official MCP `Client`.
 
 ## When to use this package
 
 - You want an extension to install WebMCP on matching pages.
 - You want page runtime installation separated from isolated client code.
-- You want to discover and call page tools through the official MCP client API.
+- You want to discover and call imperative and declarative page tools through
+  the official MCP client API.
 
 ## When not to use this package
 
@@ -28,7 +29,12 @@ content script receives the official MCP `Client`.
 The MAIN-world entry imports `@mcp-b/global`. The isolated entry calls
 `connectWebMCPClient()`, which connects an MCP client to that page. The package
 does not replace or wrap the website API: site code still registers tools with
-`document.modelContext`.
+`document.modelContext`, and annotated forms become tools through the native or
+polyfilled declarative runtime. Both tool types use the same `listTools()` and
+`callTool()` methods from the isolated content script.
+
+The extension does not scan forms itself. `@mcp-b/global` owns the page runtime,
+including its [declarative support and compatibility boundary](/reference/webmcp/declarative-api).
 
 The shipped template targets top-level pages only. It does not inject into
 child frames.
@@ -56,6 +62,9 @@ documents the manifest, build shape, exported helper, and security constraints.
   </Card>
   <Card title="@mcp-b/global overview" icon="globe" href="/packages/global/overview">
     Runtime installed by the MAIN-world entry.
+  </Card>
+  <Card title="Declarative API" icon="file-code" href="/reference/webmcp/declarative-api">
+    Annotated forms, browser behavior, and polyfill compatibility.
   </Card>
   <Card
     title="Security and human control"

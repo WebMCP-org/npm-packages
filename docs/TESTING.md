@@ -56,14 +56,14 @@ Notes:
 
 ## Runtime Coverage Matrix
 
-| Runtime             | Canonical caller                           | Real runtime boundary under test                    | Command                                                    |
-| ------------------- | ------------------------------------------ | --------------------------------------------------- | ---------------------------------------------------------- |
-| Tab / global        | SDK `Client` + `TabClientTransport`        | Browser page running `@mcp-b/global`                | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
-| Iframe              | SDK `Client` + `IframeParentTransport`     | Parent/iframe runtime boundary                      | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
-| Native Chromium     | `document.modelContext`                    | Chrome 152+ with WebMCP flags in CI                 | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
-| Local relay         | SDK `Client` over stdio                    | Real relay server + real browser runtime            | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
-| Extension transport | SDK `Client` + `ExtensionClientTransport`  | Real MV3 extension using `ExtensionServerTransport` | `pnpm --filter @mcp-b/transports test:e2e`                 |
-| Extension template  | SDK `Client` in an isolated content script | MAIN-world runtime injected by a real MV3 extension | `pnpm --filter @mcp-b/webmcp-extension test:e2e`           |
+| Runtime             | Canonical caller                           | Real runtime boundary under test                         | Command                                                    |
+| ------------------- | ------------------------------------------ | -------------------------------------------------------- | ---------------------------------------------------------- |
+| Tab / global        | SDK `Client` + `TabClientTransport`        | Browser page running `@mcp-b/global`                     | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
+| Iframe              | SDK `Client` + `IframeParentTransport`     | Parent/iframe runtime boundary                           | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
+| Native Chromium     | `document.modelContext`                    | Chrome 152+ with WebMCP flags in CI                      | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
+| Local relay         | SDK `Client` over stdio                    | Real relay server + real browser runtime                 | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
+| Extension transport | SDK `Client` + `ExtensionClientTransport`  | Real MV3 extension using `ExtensionServerTransport`      | `pnpm --filter @mcp-b/transports test:e2e`                 |
+| Extension template  | SDK `Client` in an isolated content script | Imperative and declarative tools in a real MV3 extension | `pnpm --filter @mcp-b/webmcp-extension test:e2e`           |
 
 ## Canonical E2E Assertions
 
