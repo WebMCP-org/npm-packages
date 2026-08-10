@@ -85,6 +85,10 @@ const PAGES = {
     <section>
       <button id="primary-btn" class="btn btn-primary">Primary Action</button>
       <button data-testid="secondary-action">Secondary Action</button>
+      <button data-testid="save-action">Delete Draft</button>
+      <button data-cy="save-action">Save Changes</button>
+      <button data-test="cancel-action">Cancel Changes</button>
+      <button data-test-id="legacy-action">Legacy Action</button>
       <div role="button" aria-label="Delete Item" class="icon-btn">Delete</div>
       <input type="button" value="Input Button">
       <input type="submit" value="Submit Form">
@@ -97,6 +101,8 @@ const PAGES = {
       <form id="test-form" action="/submit" method="post">
         <input type="text" id="username" name="username" required placeholder="Enter username">
         <input type="email" id="email" name="email">
+        <input type="radio" name="plan" value="free">
+        <input type="radio" name="plan" value="pro">
         <button type="submit">Submit Form</button>
       </form>
     </section>
@@ -149,13 +155,13 @@ const PAGES = {
         <style>button{background:blue;color:#fff;padding:6px;border:0}</style>
         <div>
           <h3>Shadow DOM Content 1</h3>
-          <button id="shadow-btn">Shadow Button</button>
+          <button data-testid="shadow-action">Shadow Button</button>
           <input type="text" placeholder="Shadow Input">
         </div>
       \`;
       const host2 = document.getElementById('shadow-host-2');
       const shadow2 = host2.attachShadow({ mode: 'open' });
-      shadow2.innerHTML = '<form><input type="text" name="shadow-field"><button type="submit">Shadow Submit</button></form>';
+      shadow2.innerHTML = '<form><input type="text" name="shadow-field"><button type="submit" data-testid="shadow-action">Shadow Submit</button></form>';
     </script>
   </body></html>`,
 };
@@ -176,6 +182,12 @@ async function runBasicInteractiveTest(page) {
     const roleAriaSel = res.interactive.buttons.find(
       (button) => button.attributes?.['aria-label'] === 'Delete Item'
     )?.selector?.css;
+    const dataCySel = findButton('Save Changes')?.selector?.css;
+    const dataTestSel = findButton('Cancel Changes')?.selector?.css;
+    const dataTestIdVariantSel = findButton('Legacy Action')?.selector?.css;
+    const proPlanSel = res.interactive.inputs.find(
+      (input) => input.attributes?.name === 'plan' && input.attributes?.value === 'pro'
+    )?.selector?.css;
     return {
       idSel: findButton('Primary Action')?.selector?.css,
       testIdSel: findButton('Secondary Action')?.selector?.css,
@@ -185,6 +197,26 @@ async function runBasicInteractiveTest(page) {
         document.querySelector(roleAriaSel)?.getAttribute('aria-label') === 'Delete Item',
       usernameSel: res.interactive.inputs.find((i) => i.attributes?.name === 'username')?.selector
         ?.css,
+      dataCySel,
+      dataCyMatches:
+        dataCySel !== undefined &&
+        document.querySelectorAll(dataCySel).length === 1 &&
+        document.querySelector(dataCySel)?.textContent === 'Save Changes',
+      dataTestSel,
+      dataTestMatches:
+        dataTestSel !== undefined &&
+        document.querySelectorAll(dataTestSel).length === 1 &&
+        document.querySelector(dataTestSel)?.textContent === 'Cancel Changes',
+      dataTestIdVariantSel,
+      dataTestIdVariantMatches:
+        dataTestIdVariantSel !== undefined &&
+        document.querySelectorAll(dataTestIdVariantSel).length === 1 &&
+        document.querySelector(dataTestIdVariantSel)?.textContent === 'Legacy Action',
+      proPlanSel,
+      proPlanMatches:
+        proPlanSel !== undefined &&
+        document.querySelectorAll(proPlanSel).length === 1 &&
+        document.querySelector(proPlanSel)?.getAttribute('value') === 'pro',
     };
   });
 
@@ -208,6 +240,26 @@ async function runBasicInteractiveTest(page) {
     name: 'name or id selector',
     ok: results.usernameSel === '#username' || results.usernameSel === '[name="username"]',
     got: results.usernameSel,
+  });
+  assertions.push({
+    name: 'data-cy selector',
+    ok: results.dataCyMatches,
+    got: results.dataCySel,
+  });
+  assertions.push({
+    name: 'data-test selector',
+    ok: results.dataTestMatches,
+    got: results.dataTestSel,
+  });
+  assertions.push({
+    name: 'data-test-id selector',
+    ok: results.dataTestIdVariantMatches,
+    got: results.dataTestIdVariantSel,
+  });
+  assertions.push({
+    name: 'shared name selector',
+    ok: results.proPlanMatches,
+    got: results.proPlanSel,
   });
 
   return assertions;
@@ -235,16 +287,37 @@ async function runShadowTest(page) {
   const results = await page.evaluate(() => {
     const res = window.SmartDOMReader.extractInteractive(document, {});
     const shadowBtn = res.interactive.buttons.find((b) => (b.text || '').includes('Shadow Button'));
+    const shadowSubmit = res.interactive.buttons.find((b) =>
+      (b.text || '').includes('Shadow Submit')
+    );
     const regBtn = res.interactive.buttons.find((b) => (b.text || '').includes('Regular Button'));
+    const shadow1 = document.querySelector('#shadow-host-1')?.shadowRoot;
+    const shadow2 = document.querySelector('#shadow-host-2')?.shadowRoot;
+    const shadowBtnSelector = shadowBtn?.selector?.css;
+    const shadowSubmitSelector = shadowSubmit?.selector?.css;
     return {
       shadowBtn: !!shadowBtn,
       regBtn: !!regBtn,
+      shadowBtnSelector,
+      shadowSubmitSelector,
+      shadowSelectorsMatch:
+        shadowBtnSelector === '[data-testid="shadow-action"]' &&
+        shadowSubmitSelector === '[data-testid="shadow-action"]' &&
+        shadow1?.querySelectorAll(shadowBtnSelector).length === 1 &&
+        shadow1.querySelector(shadowBtnSelector)?.textContent === 'Shadow Button' &&
+        shadow2?.querySelectorAll(shadowSubmitSelector).length === 1 &&
+        shadow2.querySelector(shadowSubmitSelector)?.textContent === 'Shadow Submit',
       buttons: res.interactive.buttons.map((button) => button.text),
     };
   });
   return [
     { name: 'Shadow button detected', ok: results.shadowBtn, got: JSON.stringify(results) },
     { name: 'Regular button detected', ok: results.regBtn, got: JSON.stringify(results) },
+    {
+      name: 'Shadow selectors scoped',
+      ok: results.shadowSelectorsMatch,
+      got: JSON.stringify(results),
+    },
   ];
 }
 
