@@ -418,7 +418,6 @@ export class DOMTraversal {
    */
   private static getElementText(element: Element, options?: ExtractionOptions): string {
     // For input elements, get value or placeholder
-    // (matches() cannot narrow, and instanceof is unsafe across iframe realms)
     if (element.matches('input, textarea')) {
       const input = element as HTMLInputElement;
       return input.value || input.placeholder || '';

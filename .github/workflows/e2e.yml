@@ -184,9 +184,8 @@ jobs:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
         run: pnpm test:wpt
 
-      # Reports API-shape conformance without gating on it. The polyfill now passes
-      # idlharness 20/20, matching native Chrome Canary; dropping continue-on-error
-      # would make this a hard gate. Left non-blocking pending that decision.
+      # Passes 20/20 today; non-blocking because hard-gating API shape is a pending
+      # decision, not because it fails. See docs/TESTING.md.
       - name: Report WebMCP IDL conformance (non-blocking)
         continue-on-error: true
         env:

@@ -91,7 +91,6 @@ export async function callClientToolForError(
   );
 }
 
-/** The runtime contract controller lives on whichever document hosts the runtime. */
 type RuntimeHost = Page | Frame;
 
 export async function resetInvocations(host: RuntimeHost): Promise<void> {

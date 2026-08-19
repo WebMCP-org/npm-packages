@@ -640,6 +640,10 @@ class SmartDomReaderServer {
     return createTextResult('Browser closed');
   }
 
+  /**
+   * All formatting happens in-page via the bundled library; the server never
+   * imports it, so there are no server-side dynamic imports.
+   */
   private async runLibraryOperation<
     TResult,
     TArgs extends Record<string, unknown> & { format: FormatOptions },
@@ -744,8 +748,6 @@ class SmartDomReaderServer {
 
     return this.page;
   }
-
-  // All formatting happens in-page via the bundled library; no server-side dynamic imports.
 
   private async readLibraryFile(resolvedPath: string): Promise<string> {
     let file;

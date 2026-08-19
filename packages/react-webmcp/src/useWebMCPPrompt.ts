@@ -12,7 +12,6 @@ import { useMcpRegistration } from './useMcpRegistration.js';
  * - Registers the prompt with the installed MCP-B `BrowserMcpServer`
  * - Automatically unregisters on component unmount
  *
- *
  * @param config - Configuration object for the prompt
  * @returns Object indicating registration status
  *

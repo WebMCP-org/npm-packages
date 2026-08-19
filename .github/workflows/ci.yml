@@ -65,6 +65,10 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      # install-dependencies runs `sudo apt-get update`, which stalled CI for 13 minutes
+      # when the Azure apt mirror went dark. GitHub-hosted runners already ship Chrome's
+      # shared libraries; the flag is for bare containers. Applies to every setup-chrome
+      # call site here and in e2e.yml.
       - name: Setup Chrome Beta
         id: chrome
         uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd

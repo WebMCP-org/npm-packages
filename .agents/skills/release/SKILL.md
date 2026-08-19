@@ -49,8 +49,8 @@ Use separate changesets when packages need different release notes. A multi-pack
 changeset copies the same summary into every selected package's changelog.
 
 **Fixed versioning note:** Select only packages that actually changed. Changesets
-automatically bumps all packages in the configured fixed group to the same new version.
-`@mcp-b/smart-dom-reader-server` is versioned independently.
+automatically bumps all packages in the configured fixed group to the same new version,
+which is now every published package.
 
 ### Step 3: Apply Version Bumps
 
@@ -114,8 +114,7 @@ echo "usewebmcp: local=$(node -p "require('./packages/usewebmcp/package.json').v
 echo "@mcp-b/smart-dom-reader-server: local=$(node -p "require('./packages/smart-dom-reader/mcp-server/package.json').version") npm=$(npm view @mcp-b/smart-dom-reader-server version 2>/dev/null)"
 ```
 
-All packages in the fixed group should have the same version. The independently
-versioned package may differ.
+All packages in the fixed group should have the same version.
 
 ### Step 8: Commit and Push
 
@@ -203,7 +202,6 @@ pnpm -r --filter './packages/**' publish --access public --tag canary --no-git-c
 
 The core browser stack shares one version number through the `"fixed"` group in
 `.changeset/config.json`. When one member changes, all members bump together.
-`@mcp-b/smart-dom-reader-server` remains independently versioned.
 
 Benefits:
 
@@ -239,7 +237,7 @@ Tier 3 (← Tier 2):
 ```
 @mcp-b/webmcp-types          (no internal deps)
 @mcp-b/smart-dom-reader      (no internal deps)
-@mcp-b/smart-dom-reader-server (no internal deps; independently versioned)
+@mcp-b/smart-dom-reader-server (no internal deps)
 @mcp-b/webmcp-local-relay    (no internal deps)
 @mcp-b/transports            (no internal deps)
 @mcp-b/webmcp-polyfill       → webmcp-types

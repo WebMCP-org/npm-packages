@@ -46,9 +46,7 @@ const imperativeTests = [
   'register_tool_with_empty_annotation.https.html',
   'register_tool_with_schema.https.html',
 ];
-// The IDL lane is a separate invocation (`--idl`) because idl_test asserts API *shape*
-// rather than behavior, and it needs interfaces/*.idl that the behavioral lane does not.
-// Keeping the two reportable apart keeps a shape regression readable; see docs/TESTING.md.
+// Separate lane so an API-shape regression reports apart from the behavioral gate.
 const idlOnly = process.argv.slice(2).includes('--idl');
 
 const includes = idlOnly
@@ -56,7 +54,7 @@ const includes = idlOnly
   : ['/webmcp/declarative/'].concat(imperativeTests.map((test) => `/webmcp/imperative/${test}`));
 
 // wptrunner treats an --include that matches nothing as a silent no-op, so a test
-// renamed upstream would drop out of the gate with CI still green. Fail loudly instead.
+// renamed upstream would drop out of the gate with CI still green.
 const requiredFiles = idlOnly
   ? ['webmcp/idlharness.https.window.js']
   : imperativeTests.map((test) => `webmcp/imperative/${test}`);

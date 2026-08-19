@@ -1,3 +1,7 @@
+/**
+ * Guards release invariants that live in checked-in files rather than in package.json.
+ * `--write` resyncs those files (via `changeset:version`); every mode then verifies them.
+ */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -131,6 +135,10 @@ for (const { manifest, path } of packages.values()) {
   }
 }
 
+/**
+ * The .mcpb build overrides this version in a staging copy, so the checked-in
+ * manifest drifts silently and nothing else catches it.
+ */
 const relayManifest = readJson(relayManifestPath);
 if (relayManifest?.version !== relayVersion) {
   failures.push(
@@ -138,6 +146,7 @@ if (relayManifest?.version !== relayVersion) {
   );
 }
 
+/** Smoke-tests the published CDN build, so a stale pin silently verifies the previous release. */
 const unpkgPins = [
   ...readFileSync(unpkgTestPath, 'utf8').matchAll(
     /https:\/\/unpkg\.com\/@mcp-b\/global@([^/"'\s]+)\/dist\/index\.iife\.js/g

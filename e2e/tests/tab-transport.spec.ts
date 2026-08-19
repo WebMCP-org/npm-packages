@@ -1,7 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 
-/** Registered tool names as the page's own model context reports them. */
 const listRegisteredToolNames = (page: Page): Promise<string[]> =>
   page.evaluate(() =>
     (document.modelContext as BrowserMcpServer).listTools().map((tool) => tool.name)

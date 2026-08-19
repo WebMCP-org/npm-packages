@@ -8,14 +8,14 @@ import WebSocket from 'ws';
 
 import { RelayBridgeServer } from './bridgeServer.js';
 
-/**
- * Polls until a value is available or times out.
- */
 // The relay caches its chosen port in ~/.webmcp/relay-port.json by default;
 // tests must never touch the developer's real home directory. mkdtemp gives a
 // 0700 directory with an unpredictable name, so this is not a temp-file race.
 const persistPath = join(mkdtempSync(join(tmpdir(), 'webmcp-relay-test-')), 'relay-port.json');
 
+/**
+ * Polls until a value is available or times out.
+ */
 function waitFor<T>(fn: () => T | undefined, timeoutMs = 2000): Promise<T> {
   const started = Date.now();
   return new Promise((resolve, reject) => {

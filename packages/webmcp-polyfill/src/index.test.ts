@@ -119,7 +119,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     // WebIDL puts `[SameObject] readonly attribute ModelContext modelContext`
     // on Document's interface prototype object, never on the instance, and
-    // Chrome 153 matches that.
+    // Chrome 152 matches that.
     const documentDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'modelContext');
     const navigatorDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
 

@@ -180,7 +180,6 @@ export interface MCPIframeItemsEventDetail {
   prompts: string[];
 }
 
-/** Custom event detail for mcp-iframe-ready */
 /** Custom event detail for mcp-iframe-error */
 export interface MCPIframeErrorEventDetail {
   error: unknown;

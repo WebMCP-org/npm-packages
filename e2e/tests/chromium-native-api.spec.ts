@@ -21,7 +21,6 @@ function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
   }
 }
 
-/** Tool count as the compatibility surface reports it, cast once instead of per call site. */
 const countRegisteredTools = (page: Page): Promise<number> =>
   page.evaluate(
     () => (document.modelContext as unknown as CompatibilityModelContext).listTools().length

@@ -256,10 +256,12 @@ function startToolSyncPolling(): void {
   toolSyncPollTimer = setInterval(scheduleToolSync, TOOL_SYNC_POLL_INTERVAL_MS);
 }
 
+/**
+ * WebMCP may not be installed yet (or at all); the caller retries with
+ * backoff and falls back to polling.
+ */
 function trySubscribe(): boolean {
   try {
-    // WebMCP may not be installed yet (or at all); the caller retries with
-    // backoff and falls back to polling.
     const modelContext = document.modelContext;
     if (!modelContext) return false;
     modelContext.addEventListener('toolchange', scheduleToolSync);
@@ -359,7 +361,6 @@ function handleListRequest(request: WidgetRequestMessage, event: MessageEvent): 
 }
 
 function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent): void {
-  // A missing WebMCP runtime surfaces through the rejection path below.
   invokeRelayTool(String(request.toolName ?? ''), toInvokeArgs(request.args))
     .then((result) => {
       respondToSource(event.source, event.origin, {

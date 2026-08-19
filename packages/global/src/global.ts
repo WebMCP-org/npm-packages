@@ -48,7 +48,6 @@ function replaceNavigatorModelContext(value: unknown): void {
     value,
   });
 
-  // Verify the replacement actually worked.
   if (navigator.modelContext !== value) {
     console.error(
       '[WebModelContext] Failed to replace navigator.modelContext.',

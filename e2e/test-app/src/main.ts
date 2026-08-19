@@ -1091,7 +1091,6 @@ function testChromiumCallbackClear() {
  * are coalesced into a single notification.
  */
 
-// Notification tracking state
 let toolNotificationCount = 0;
 
 function listenForToolChanges(listener: () => void): () => void {

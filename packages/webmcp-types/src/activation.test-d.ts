@@ -9,7 +9,6 @@ test('type-only import activates global Document.modelContext typing', () => {
 test('Document.modelContext is optional so feature detection narrows it', () => {
   const useWhenPresent = (doc: Document) => {
     if (!doc.modelContext) return;
-    // Narrowed by the guard alone; no non-null assertion required.
     expectTypeOf(doc.modelContext).toEqualTypeOf<ModelContext>();
   };
   expectTypeOf(useWhenPresent).toBeFunction();

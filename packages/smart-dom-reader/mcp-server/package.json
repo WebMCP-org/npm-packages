@@ -18,6 +18,7 @@
   "scripts": {
     "bundle": "node ./scripts/update-bundle.mjs && vp fmt lib/smart-dom-reader.bundle.js --write",
     "dev": "tsx watch --clear-screen=false src/index.ts",
+    "prepublishOnly": "node ../../../scripts/validate-publish.js",
     "start": "tsx src/index.ts",
     "typecheck": "NODE_OPTIONS='--max-old-space-size=16384' tsc --noEmit"
   },
