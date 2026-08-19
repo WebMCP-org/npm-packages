@@ -1330,3 +1330,108 @@ describe('BrowserMcpServer', () => {
     }
   });
 });
+
+describe('BrowserMcpServer exposedTo', () => {
+  /** InMemoryTransport plus the peer-origin surface IframeChildTransport reports. */
+  function withPeerOrigin<T extends object>(transport: T, origin?: string) {
+    return Object.assign(transport, {
+      clientOrigin: origin,
+      onclientorigin: undefined as ((origin: string) => void) | undefined,
+    });
+  }
+
+  async function connectPair(origin?: string) {
+    const server = new BrowserMcpServer({ name: 'exposure-test', version: '1.0.0' });
+    const client = new Client(
+      { name: 'exposure-test-client', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    );
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const peered = withPeerOrigin(serverTransport, origin);
+    await server.connect(peered);
+    await client.connect(clientTransport);
+    return { server, client, peered };
+  }
+
+  const restricted = {
+    name: 'restricted_tool',
+    description: 'Only for the named embedder',
+    execute: async () => 'ok',
+  };
+
+  it('hides a restricted tool from an embedder outside its allowlist', async () => {
+    const { server, client } = await connectPair('https://other.example');
+    try {
+      await server.registerTool(restricted, { exposedTo: ['https://parent.example'] });
+      const { tools } = await client.listTools();
+      expect(tools.map((tool) => tool.name)).not.toContain('restricted_tool');
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it('exposes a restricted tool to the embedder named in exposedTo', async () => {
+    const { server, client } = await connectPair('https://parent.example');
+    try {
+      await server.registerTool(restricted, { exposedTo: ['https://parent.example'] });
+      const { tools } = await client.listTools();
+      expect(tools.map((tool) => tool.name)).toContain('restricted_tool');
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it('leaves tools registered without exposedTo visible to any embedder', async () => {
+    const { server, client } = await connectPair('https://other.example');
+    try {
+      await server.registerTool({
+        name: 'open_tool',
+        description: 'No allowlist',
+        execute: async () => 'ok',
+      });
+      const { tools } = await client.listTools();
+      expect(tools.map((tool) => tool.name)).toContain('open_tool');
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it('fails closed when the transport never names a peer', async () => {
+    const server = new BrowserMcpServer({ name: 'exposure-test', version: '1.0.0' });
+    const client = new Client(
+      { name: 'exposure-test-client', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    );
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    try {
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+      await server.registerTool(restricted, { exposedTo: ['https://parent.example'] });
+      const { tools } = await client.listTools();
+      expect(tools.map((tool) => tool.name)).not.toContain('restricted_tool');
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it('exposes a tool registered before the peer origin is known', async () => {
+    const { server, client, peered } = await connectPair();
+    try {
+      await server.registerTool(restricted, { exposedTo: ['https://parent.example'] });
+      const before = await client.listTools();
+      expect(before.tools.map((tool) => tool.name)).not.toContain('restricted_tool');
+
+      peered.onclientorigin?.('https://parent.example');
+
+      const after = await client.listTools();
+      expect(after.tools.map((tool) => tool.name)).toContain('restricted_tool');
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+});

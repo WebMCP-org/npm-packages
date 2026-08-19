@@ -59,6 +59,31 @@ registerMCPIframeElement('my-mcp-frame');
 
 Standard iframe attributes (`sandbox`, `allow`, `width`, `height`, etc.) are also mirrored.
 
+## Scoping which tools the parent sees
+
+A child decides what it advertises. Registering a tool with `exposedTo` narrows it to
+named embedder origins, and the child only puts it on the wire once the connected parent
+matches:
+
+```js
+await document.modelContext.registerTool(
+  { name: 'checkout', description: 'Place the order', execute: placeOrder },
+  { exposedTo: ['https://shop.example'] }
+);
+```
+
+Embedded anywhere else, that tool never reaches the parent's `exposedTools` and cannot be
+called through the element. Tools registered without `exposedTo` are unaffected and stay
+visible to whichever parent the child's transport already allows.
+
+Two limits are worth stating plainly:
+
+- `exposedTo` can only **narrow** exposure. The child transport's `allowedOrigins` is still
+  what decides who may connect at all, and no allowlist widens past it.
+- Enforcement here is the child's own JavaScript, not the browser. That is weaker than
+  native WebMCP, where the user agent enforces `exposedTo` and a compromised child cannot
+  opt out. Treat it as scoping, not as a security boundary against the child itself.
+
 ## Events
 
 | Event                      | Detail                                                                                    |

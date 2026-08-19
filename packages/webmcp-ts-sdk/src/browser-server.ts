@@ -69,6 +69,7 @@ interface RegisteredWebMcpTool {
   registeredInputSchema?: string;
   execute: (args: WebMcpToolInput, signal?: AbortSignal) => Promise<unknown>;
   mcpHandle: McpRegisteredTool | undefined;
+  exposedTo?: readonly string[];
   abortSignal?: AbortSignal;
   abortListener?: () => void;
 }
@@ -161,6 +162,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   private readonly native: ModelContext | undefined;
   private readonly ownerDocument: Document | null;
   private readonly tools = new Map<string, RegisteredWebMcpTool>();
+  private peerOrigin: string | undefined;
   private readonly registrations = new Set<McpRegistration>();
   private readonly nativeToolAbortControllers = new Map<string, AbortController>();
   private readonly nativeBackfilledTools = new Map<string, NativeBackfilledTool>();
@@ -297,7 +299,8 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   private registerToolInMcp(
     tool: ToolDescriptor<WebMcpToolInput>,
     normalized: NormalizedInputSchema,
-    executeTool: RegisteredWebMcpTool['execute']
+    executeTool: RegisteredWebMcpTool['execute'],
+    exposedTo: readonly string[] | undefined
   ): RegisteredWebMcpTool {
     const outputSchema =
       tool.outputSchema === undefined ? undefined : structuredClone(tool.outputSchema);
@@ -329,6 +332,11 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
           }
         )
       : undefined;
+    // A restricted tool is never observable on the wire before its audience is
+    // checked: the handle is disabled here, in the same synchronous step that created
+    // it, and only applyToolExposure re-enables it.
+    if (exposedTo?.length) mcpHandle?.disable();
+
     if (!mcpCompatibleInput) {
       console.warn(
         `[BrowserMcpServer] Tool "${tool.name}" remains available through WebMCP but cannot be exposed over MCP because MCP input schemas require an object root.`
@@ -350,6 +358,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
         : {}),
       execute: executeTool,
       mcpHandle,
+      ...(exposedTo?.length ? { exposedTo } : {}),
     };
   }
 
@@ -368,12 +377,6 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     options.signal?.throwIfAborted();
     validatePotentiallyTrustworthyOrigins(options.exposedTo);
     options.signal?.throwIfAborted();
-    if (options.exposedTo?.length && !this.native) {
-      throw new DOMException(
-        'Cross-document tool exposure requires native WebMCP',
-        'NotSupportedError'
-      );
-    }
     const execute: RegisteredWebMcpTool['execute'] = async (args, signal) => {
       signal?.throwIfAborted();
       return withAbortSignal(
@@ -399,8 +402,9 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       await this.registerNativeToolMirror(tool, normalized, options, execute, controller);
       if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
       options.signal?.throwIfAborted();
-      registered = this.registerToolInMcp(tool, normalized, execute);
+      registered = this.registerToolInMcp(tool, normalized, execute, options.exposedTo);
       this.tools.set(tool.name, registered);
+      this.applyToolExposure();
       if (options.signal?.aborted) {
         abort();
         options.signal.throwIfAborted();
@@ -534,7 +538,9 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       };
       try {
         const normalized = this.validateToolDescriptor(tool);
-        this.tools.set(tool.name, this.registerToolInMcp(tool, normalized, execute));
+        // Native getTools() does not report the allowlist a tool registered with, so a
+        // backfilled mirror carries none and stays as widely exposed as it is today.
+        this.tools.set(tool.name, this.registerToolInMcp(tool, normalized, execute, undefined));
         this.nativeBackfilledTools.set(name, next);
       } catch (error) {
         console.warn(
@@ -692,8 +698,50 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     }
   }
 
+  /**
+   * Re-evaluate which registered tools may appear on the wire.
+   *
+   * `exposedTo` narrows a tool to named embedder origins. The peer origin is only known
+   * once a transport that reports one has heard from its peer, so a restricted tool stays
+   * disabled until then — and stays disabled forever on transports that cannot name a peer
+   * at all. Failing closed keeps a tool that asked for a narrow audience from reaching a
+   * wider one; unrestricted tools are untouched and behave exactly as before.
+   */
+  private applyToolExposure(): void {
+    for (const { exposedTo, mcpHandle } of this.tools.values()) {
+      if (!exposedTo?.length || !mcpHandle) continue;
+      const visible = this.peerOrigin !== undefined && exposedTo.includes(this.peerOrigin);
+      if (visible === mcpHandle.enabled) continue;
+      if (visible) mcpHandle.enable();
+      else mcpHandle.disable();
+    }
+  }
+
+  /**
+   * Follow the peer origin of transports that report one, so `exposedTo` can be scoped to
+   * the embedder actually connected. Duck-typed rather than imported: the SDK must not take
+   * a build dependency on `@mcp-b/transports`, and transports that never name a peer simply
+   * leave every restricted tool disabled.
+   */
+  private observePeerOrigin(transport: Transport): void {
+    if (!('clientOrigin' in transport)) return;
+    const peered = transport as Transport & {
+      clientOrigin?: string;
+      onclientorigin?: (origin: string) => void;
+    };
+    this.peerOrigin = peered.clientOrigin;
+    this.applyToolExposure();
+    const previous = peered.onclientorigin;
+    peered.onclientorigin = (origin) => {
+      previous?.(origin);
+      this.peerOrigin = origin;
+      this.applyToolExposure();
+    };
+  }
+
   connect(transport: Transport): Promise<void> {
     if (this.closed) return Promise.reject(createInvalidStateError('BrowserMcpServer is closed'));
+    this.observePeerOrigin(transport);
     return this.mcpServer.connect(transport);
   }
 
