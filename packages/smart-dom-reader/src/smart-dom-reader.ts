@@ -368,7 +368,7 @@ export class SmartDOMReader {
    */
   static extractInteractive(
     doc: Document,
-    options: Partial<ExtractionOptions> = {}
+    options: Omit<ExtractionOptions, 'mode'> = {}
   ): SmartDOMResult {
     const reader = new SmartDOMReader({
       ...options,
@@ -382,7 +382,7 @@ export class SmartDOMReader {
    * @param doc The document to extract from
    * @param options Extraction options
    */
-  static extractFull(doc: Document, options: Partial<ExtractionOptions> = {}): SmartDOMResult {
+  static extractFull(doc: Document, options: Omit<ExtractionOptions, 'mode'> = {}): SmartDOMResult {
     const reader = new SmartDOMReader({
       ...options,
       mode: 'full',
@@ -399,7 +399,7 @@ export class SmartDOMReader {
   static extractFromElement(
     element: Element,
     mode: ExtractionMode = 'interactive',
-    options: Partial<ExtractionOptions> = {}
+    options: Omit<ExtractionOptions, 'mode'> = {}
   ): SmartDOMResult {
     const reader = new SmartDOMReader({
       ...options,
