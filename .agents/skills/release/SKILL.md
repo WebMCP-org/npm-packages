@@ -16,7 +16,7 @@ authentication, MCPB, and troubleshooting notes.
 which means published versions have no record of what changed. This has happened before
 and must not happen again.
 
-The ONLY exception is beta/canary releases (see below), which use throwaway versions.
+The ONLY exception is snapshot prereleases (see below), whose versions are never committed.
 
 ## Release Flow (Step by Step)
 
@@ -165,37 +165,60 @@ Instead of publishing locally, let CI handle it:
 4. Merge the PR — CI runs the filtered `pnpm ci:publish` command automatically
 5. CI also builds MCPB bundles, creates GitHub releases, and signs with sigstore
 
-## Beta / Preview Releases
+## Prereleases
 
-Beta releases use throwaway versions and do NOT go through changesets. Do NOT commit
-the version change — revert it after publishing.
+Every published package shares one version through the `"fixed"` group, so a prerelease
+covers the whole train. Do not hand-bump a single package: it desynchronises the group and
+`release:check` fails.
+
+Publishing uses `pnpm publish`, which resolves the `workspace:` and `catalog:` protocols
+that `changeset publish` cannot. `npm publish` tags `latest` no matter what the version
+says, so `ci:publish` and `publish:all` derive the dist-tag from
+`scripts/npm-dist-tag.mjs`: the active tag while `.changeset/pre.json` is in pre mode,
+`latest` otherwise.
+
+### Snapshot (default)
+
+One throwaway build off `main`. Changesets stay pending, so the eventual stable release is
+still complete. Use this to hand someone a build to test.
 
 ```bash
-# 1. Generate timestamp version
-TIMESTAMP=$(date +%Y%m%d%H%M%S)
-
-# 2. Bump to beta version (do NOT commit this)
-npm version 0.0.0-beta-$TIMESTAMP --no-git-tag-version --prefix packages/<package-name>
-
-# 3. Build
-pnpm --filter @mcp-b/<package-name> build
-
-# 4. Publish with beta tag
-export $(grep -v '^#' .env | xargs)
-pnpm publish --filter @mcp-b/<package-name> --access public --no-git-checks --tag beta
-
-# 5. REVERT the version change
-git checkout packages/<package-name>/package.json
+gh workflow run "Release" --ref main -f tag=beta
 ```
 
-Install beta versions: `pnpm add @mcp-b/<package-name>@beta`
+Publishes `<next>-beta.<datetime>` for every package, signs it, and creates prerelease
+GitHub releases. Dispatch it **before** merging the "version packages" PR — merging that PR
+consumes the changesets, leaving the snapshot nothing to compute a version from.
 
-## Canary Releases (via Changesets Snapshots)
+### Pre mode
+
+An accumulating beta train with real changelogs, for when a release needs more than one
+round of testing.
+
+```bash
+pnpm changeset pre enter beta   # commit .changeset/pre.json
+```
+
+From then on the normal flow produces betas: merging to `main` opens a version PR bumping
+to `X.Y.Z-beta.0`, and merging that publishes under the `beta` tag. Further changesets give
+`beta.1`, `beta.2`, and so on.
+
+To graduate:
+
+```bash
+pnpm changeset pre exit         # commit the change
+```
+
+The next version PR drops the suffix and publishes to `latest`.
+
+Install a prerelease with `pnpm add @mcp-b/<package>@beta`.
+
+### Local one-off
 
 ```bash
 pnpm changeset version --snapshot canary
 pnpm -r --filter './packages/**' publish --access public --tag canary --no-git-checks
-# Revert: git checkout .
+git checkout .   # snapshot versions are never committed
 ```
 
 ## Versioning Strategy
