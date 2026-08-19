@@ -114,10 +114,14 @@ if (!Array.isArray(changesetConfig?.fixed)) {
 }
 
 let changelogsChecked = 0;
+const changelogsMissing = [];
 for (const { manifest, path } of packages.values()) {
   if (manifest.private) continue;
   const changelogPath = join(dirname(path), 'CHANGELOG.md');
-  if (!existsSync(changelogPath)) continue;
+  if (!existsSync(changelogPath)) {
+    changelogsMissing.push(manifest.name);
+    continue;
+  }
   changelogsChecked += 1;
   const heading = readFileSync(changelogPath, 'utf8').match(/^##\s+(\S+)\s*$/m)?.[1];
   if (heading !== manifest.version) {
@@ -148,4 +152,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Release metadata is consistent (${changelogsChecked} changelogs checked).`);
+const skipNote = changelogsMissing.length
+  ? `, skipped ${changelogsMissing.length} with no CHANGELOG.md: ${changelogsMissing.join(', ')}`
+  : '';
+console.log(`Release metadata is consistent (${changelogsChecked} changelogs checked${skipNote}).`);
