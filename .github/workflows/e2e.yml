@@ -49,7 +49,7 @@ jobs:
         uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
         with:
           chrome-version: stable
-          install-dependencies: true
+          install-dependencies: false
 
       - name: Print Chrome version
         run: '"${{ steps.chrome.outputs.chrome-path }}" --version'
@@ -163,7 +163,7 @@ jobs:
         uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
         with:
           chrome-version: canary
-          install-dependencies: true
+          install-dependencies: false
 
       # Branded Chrome blocks --load-extension; native extension E2E needs unbranded Chromium.
       - name: Setup Chromium Snapshot
@@ -171,7 +171,7 @@ jobs:
         uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
         with:
           chrome-version: latest
-          install-dependencies: true
+          install-dependencies: false
 
       - name: Print Chrome Canary version
         run: '"${{ steps.chrome_canary.outputs.chrome-path }}" --version'
