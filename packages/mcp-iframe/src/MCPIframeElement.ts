@@ -32,7 +32,7 @@
  * ```
  */
 
-import { IframeParentTransport } from '@mcp-b/transports';
+import { DEFAULT_IFRAME_CHANNEL_ID, IframeParentTransport } from '@mcp-b/transports';
 import {
   type BrowserMcpServer,
   type PromptDescriptor,
@@ -63,7 +63,6 @@ import {
 
 const DEFAULT_CALL_TIMEOUT = 30000;
 const DEFAULT_PREFIX_SEPARATOR = '_';
-const DEFAULT_CHANNEL_ID = 'mcp-iframe';
 
 type McpBRegistrationExtensions = Pick<BrowserMcpServer, 'registerPrompt' | 'registerResource'>;
 type NativeToolSyncExtension = Pick<BrowserMcpServer, 'syncNativeTools'>;
@@ -410,7 +409,7 @@ export class MCPIframeElement extends HTMLElement {
       const transport = new IframeParentTransport({
         iframe,
         targetOrigin: this.#getTargetOrigin(),
-        channelId: this.getAttribute('channel') ?? DEFAULT_CHANNEL_ID,
+        channelId: this.getAttribute('channel') ?? DEFAULT_IFRAME_CHANNEL_ID,
       });
       const onListChanged = () => {
         if (connection) this.#requestRefresh(connection, 'Failed to refresh iframe items');
