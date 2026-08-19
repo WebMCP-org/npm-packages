@@ -289,20 +289,19 @@ function parameterSchema(
 
   if (controls.length > 1) {
     if (!controls.every((control) => control instanceof HTMLInputElement)) return undefined;
-    const inputs = controls;
-    if (inputs.every((input) => input.type === 'checkbox')) {
+    if (controls.every((control) => control.type === 'checkbox')) {
       return withDescription(
         {
           type: 'array',
-          items: { type: 'string', ...groupChoiceSchemas(inputs) },
+          items: { type: 'string', ...groupChoiceSchemas(controls) },
           uniqueItems: true,
         },
         form,
         controls
       );
     }
-    if (inputs.every((input) => input.type === 'radio')) {
-      return withDescription({ type: 'string', ...groupChoiceSchemas(inputs) }, form, controls);
+    if (controls.every((control) => control.type === 'radio')) {
+      return withDescription({ type: 'string', ...groupChoiceSchemas(controls) }, form, controls);
     }
     return undefined;
   }
@@ -618,8 +617,8 @@ function validationError(form: HTMLFormElement): DOMException {
   return new DOMException(`Form validation failed: ${failures}`, 'UnknownError');
 }
 
-function agentEvent(type: string, toolName: string): Event {
-  const event = new Event(type);
+function toolActivatedEvent(toolName: string): Event {
+  const event = new Event('toolactivated');
   Object.defineProperty(event, 'toolName', { enumerable: true, value: toolName });
   return event;
 }
@@ -686,12 +685,12 @@ function waitForSubmission(
 
     if (!autosubmit) {
       submitter?.focus();
-      window.dispatchEvent(agentEvent('toolactivated', toolName));
+      window.dispatchEvent(toolActivatedEvent(toolName));
       return;
     }
     try {
       requestFormSubmit(form, submitter);
-      window.dispatchEvent(agentEvent('toolactivated', toolName));
+      window.dispatchEvent(toolActivatedEvent(toolName));
     } catch (error) {
       cancel(error);
     }
@@ -708,16 +707,18 @@ export function installDeclarativeForms(document: Document, context: ModelContex
     if (
       !(event instanceof SubmitEvent) ||
       !event.isTrusted ||
-      !(event.target instanceof HTMLFormElement) ||
-      agentInvokedEvents.has(event)
+      !(event.target instanceof HTMLFormElement)
     ) {
       return;
     }
+    // Only a form with a running tool call submits on the agent's behalf; marking
+    // every trusted submit would report agentInvoked for ordinary user submissions.
+    const submission = activeSubmissions.get(event.target);
+    if (!submission) return;
     agentInvokedEvents.add(event);
-    activeSubmissions.get(event.target)?.complete(event);
+    submission.complete(event);
   };
 
-  document.defaultView?.addEventListener('submit', onSubmit, true);
   const onReset = (event: Event) => {
     if (!event.isTrusted || !(event.target instanceof HTMLFormElement)) return;
     const form = event.target;
@@ -749,6 +750,8 @@ export function installDeclarativeForms(document: Document, context: ModelContex
       subtree: true,
     });
     root.addEventListener('reset', onReset, true);
+    // ponytail: submit is composed:false, so per-root capture sees every submission; hook
+    // window capture too if a page listener ever stops propagation before this one.
     root.addEventListener('submit', onSubmit, true);
   }
 
@@ -853,8 +856,16 @@ export function installDeclarativeForms(document: Document, context: ModelContex
           },
           { signal: controller.signal }
         )
-        .catch(() => {
+        .catch((error: unknown) => {
           controller.abort();
+          // Invalid toolname/tooldescription attributes reject here. Without this the
+          // form silently never becomes a tool, with no diagnostic in any channel.
+          // Aborts are ordinary teardown, not a failure worth reporting.
+          if ((error as { name?: unknown } | null)?.name === 'AbortError') return;
+          console.error(
+            `[webmcp] declarative form tool "${definition.name}" was not registered:`,
+            error
+          );
         });
     }
   }
@@ -916,7 +927,6 @@ export function installDeclarativeForms(document: Document, context: ModelContex
     active = false;
     restoreFormSubmit();
     restoreAttachShadow();
-    document.defaultView?.removeEventListener('submit', onSubmit, true);
     for (const root of observers.keys()) stopObservingRoot(root);
     blockedDefinitions.clear();
     for (const registration of registrations.values()) {

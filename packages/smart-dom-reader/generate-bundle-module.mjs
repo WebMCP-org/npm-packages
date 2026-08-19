@@ -10,6 +10,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const packageVersion = JSON.parse(
+  readFileSync(resolve(__dirname, 'package.json'), 'utf-8')
+).version;
 
 // Read the bundle
 const bundlePath = resolve(__dirname, 'dist-bundle/smart-dom-reader-bundle.js');
@@ -26,7 +29,7 @@ const moduleContent = `/**
 
 export const SMART_DOM_READER_BUNDLE = ${JSON.stringify(bundleContent)};
 
-export const SMART_DOM_READER_VERSION = '1.0.0';
+export const SMART_DOM_READER_VERSION = ${JSON.stringify(packageVersion)};
 `;
 
 // Write to src directory so it can be imported

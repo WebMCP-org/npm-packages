@@ -16,9 +16,7 @@
 
 # CI/CD and infrastructure
 /.github/ @WebMCP-org/core-devs
-/biome.json @WebMCP-org/core-devs
 /pnpm-workspace.yaml @WebMCP-org/core-devs
-/turbo.json @WebMCP-org/core-devs
 
 # Security-sensitive files require maintainer review
 /SECURITY.md @WebMCP-org/core-devs

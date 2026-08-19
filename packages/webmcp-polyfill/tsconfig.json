@@ -2,10 +2,15 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
-    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+    // The shared conformance suite lives outside this package, so its bare
+    // imports have to resolve through this package's node_modules. Keep this
+    // list exact: a wildcard here also redirects the bundler and bloats dist.
+    "paths": {
+      "vitest": ["./node_modules/vitest"],
+      "@mcp-b/webmcp-types": ["./node_modules/@mcp-b/webmcp-types"]
+    }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "conformance/**/*"],
   "exclude": ["node_modules", "dist"]
 }

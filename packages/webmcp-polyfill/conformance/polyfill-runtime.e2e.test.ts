@@ -10,7 +10,8 @@ runRuntimeCoreConformanceSuite({
   suiteName: 'Runtime core conformance (@mcp-b/webmcp-polyfill)',
   install() {
     initializeWebMCPPolyfill({ installTestingShim: true });
-    if (Reflect.get(document.modelContext, '__isWebMCPPolyfill') !== true) {
+    const modelContext = document.modelContext;
+    if (!modelContext || Reflect.get(modelContext, '__isWebMCPPolyfill') !== true) {
       throw new Error('Expected @mcp-b/webmcp-polyfill to install document.modelContext');
     }
   },

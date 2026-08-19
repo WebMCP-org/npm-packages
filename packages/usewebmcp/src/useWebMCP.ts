@@ -36,7 +36,6 @@ export function useWebMCP<
   const { name, description } = config;
   const [state, setState] = useState<ToolExecutionState<TOutput>>(INITIAL_STATE);
   const committedConfigRef = useRef(config);
-  const isMountedRef = useRef(true);
   const pendingExecutionsRef = useRef(0);
 
   // MCP calls can arrive after commit but before passive effects. A layout effect
@@ -45,18 +44,9 @@ export function useWebMCP<
     committedConfigRef.current = config;
   });
 
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
   const run = useCallback(async (input: TInput): Promise<TOutput> => {
     pendingExecutionsRef.current += 1;
-    if (isMountedRef.current) {
-      setState((previous) => ({ ...previous, isExecuting: true, error: null }));
-    }
+    setState((previous) => ({ ...previous, isExecuting: true, error: null }));
 
     let result: TOutput;
     const executionConfig = committedConfigRef.current;
@@ -73,25 +63,21 @@ export function useWebMCP<
     } catch (error) {
       pendingExecutionsRef.current -= 1;
       const normalizedError = error instanceof Error ? error : new Error(String(error));
-      if (isMountedRef.current) {
-        setState((previous) => ({
-          ...previous,
-          isExecuting: pendingExecutionsRef.current > 0,
-          error: normalizedError,
-        }));
-      }
+      setState((previous) => ({
+        ...previous,
+        isExecuting: pendingExecutionsRef.current > 0,
+        error: normalizedError,
+      }));
       throw normalizedError;
     }
 
     pendingExecutionsRef.current -= 1;
-    if (isMountedRef.current) {
-      setState((previous) => ({
-        isExecuting: pendingExecutionsRef.current > 0,
-        lastResult: result,
-        error: null,
-        executionCount: previous.executionCount + 1,
-      }));
-    }
+    setState((previous) => ({
+      isExecuting: pendingExecutionsRef.current > 0,
+      lastResult: result,
+      error: null,
+      executionCount: previous.executionCount + 1,
+    }));
     return result;
   }, []);
 

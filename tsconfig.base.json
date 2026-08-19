@@ -20,7 +20,7 @@
 
     // Output
     "declaration": true,
-    "declarationMap": true,
+    "declarationMap": false,
     "sourceMap": true,
     "incremental": false,
 

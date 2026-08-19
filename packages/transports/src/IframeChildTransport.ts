@@ -1,6 +1,6 @@
 import { JSONRPCMessageSchema } from '@modelcontextprotocol/core';
 import type { JSONRPCMessage, Transport, TransportSendOptions } from '@modelcontextprotocol/server';
-import { isMcpMessage, postMcpMessage } from './post-message.js';
+import { DEFAULT_IFRAME_CHANNEL_ID, isMcpMessage, postMcpMessage } from './post-message.js';
 
 export interface IframeChildTransportOptions {
   /** Parent origins allowed to connect. Pass `['*']` only to disable validation deliberately. */
@@ -28,7 +28,7 @@ export class IframeChildTransport implements Transport {
     }
 
     this._allowedOrigins = new Set(options.allowedOrigins);
-    this._channelId = options.channelId ?? 'mcp-iframe';
+    this._channelId = options.channelId ?? DEFAULT_IFRAME_CHANNEL_ID;
   }
 
   async start(): Promise<void> {

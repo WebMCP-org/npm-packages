@@ -129,7 +129,6 @@ This is **not a mock** - it uses the actual workspace packages and real MCP prot
 ```
 src/
 ├── App.tsx             # Main React component with all tool implementations
-├── ClientConsumer.tsx  # Component that consumes tools via MCP client
 ├── main.tsx            # React app entry point + MCP client setup
 └── testMiddleware.ts   # Optional middleware for observing MCP events
 ```

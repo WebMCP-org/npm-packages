@@ -57,8 +57,6 @@ config:
           - '*.yaml'
           - '*.yml'
           - '.nvmrc'
-          - 'biome.json'
-          - 'turbo.json'
           - 'pnpm-workspace.yaml'
 
 dependencies:

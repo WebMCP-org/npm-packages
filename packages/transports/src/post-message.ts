@@ -1,3 +1,10 @@
+/**
+ * Channel discriminators. Both ends of a pair must agree or the envelope check in
+ * `isMcpMessage` silently drops every message — no error, just a hang.
+ */
+export const DEFAULT_TAB_CHANNEL_ID = 'mcp-default';
+export const DEFAULT_IFRAME_CHANNEL_ID = 'mcp-iframe';
+
 type McpMessageDirection = 'client-to-server' | 'server-to-client';
 
 interface McpMessageEnvelope {

@@ -113,6 +113,8 @@ function parseNativeToolResult(serialized: string | null): unknown {
 function toMcpInputSchema(
   normalized: NormalizedInputSchema
 ): StandardSchemaWithJSON<Record<string, unknown>> {
+  // normalizeInputSchema() attaches a non-enumerable `~standard` when the caller supplied a
+  // Standard Schema validator, so reuse it instead of recompiling the JSON Schema projection.
   const standardSchema = Object.getOwnPropertyDescriptor(normalized.inputSchema, '~standard');
   return standardSchema && !standardSchema.enumerable
     ? (normalized.inputSchema as unknown as StandardSchemaWithJSON<Record<string, unknown>>)
@@ -192,7 +194,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
         if (this.closed) return;
         this.nativeToolChangeQueue = this.nativeToolChangeQueue.then(async () => {
           try {
-            await this.queueNativeToolSync();
+            await this.syncNativeTools();
           } catch (error) {
             console.warn('[BrowserMcpServer] Native WebMCP tool reconciliation failed:', error);
           }
@@ -245,6 +247,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   ): Promise<void> {
     if (!this.native) return;
 
+    // The overload set keys on a statically known inputSchema; mirrored tools carry a dynamic one.
     const nativeRegister = this.native.registerTool as unknown as NativeRegisterToolFn;
     const signal = options.signal
       ? AbortSignal.any([options.signal, controller.signal])
@@ -286,7 +289,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   private validateToolDescriptor(tool: ToolDescriptor<WebMcpToolInput>): NormalizedInputSchema {
     validateWebMcpToolDescriptor(tool);
     if (this.tools.has(tool.name) || this.pendingTools.has(tool.name)) {
-      throw createInvalidStateError(`Tool ${tool.name} is already registered`);
+      throw createInvalidStateError(`Tool already registered: ${tool.name}`);
     }
     return normalizeInputSchema(tool.inputSchema);
   }
@@ -441,10 +444,6 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   }
 
   syncNativeTools(): Promise<void> {
-    return this.queueNativeToolSync();
-  }
-
-  private queueNativeToolSync(): Promise<void> {
     const sync = this.nativeSyncQueue.then(async () => {
       if (this.closed) return;
       const native = this.getNativeStandardToolsApi();
@@ -493,7 +492,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       const item: ToolListItem = {
         name: tool.name,
         ...(tool.title !== undefined ? { title: tool.title } : {}),
-        description: tool.description ?? '',
+        description: tool.description,
         inputSchema,
         ...(tool.annotations ? { annotations: tool.annotations } : {}),
       };

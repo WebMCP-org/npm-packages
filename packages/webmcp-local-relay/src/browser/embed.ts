@@ -258,7 +258,11 @@ function startToolSyncPolling(): void {
 
 function trySubscribe(): boolean {
   try {
-    document.modelContext.addEventListener('toolchange', scheduleToolSync);
+    // WebMCP may not be installed yet (or at all); the caller retries with
+    // backoff and falls back to polling.
+    const modelContext = document.modelContext;
+    if (!modelContext) return false;
+    modelContext.addEventListener('toolchange', scheduleToolSync);
     return true;
   } catch (error) {
     debugWarn('addEventListener on modelContext threw:', error);
@@ -312,6 +316,8 @@ function respondToSource(
     return;
   }
 
+  // MessageEventSource unions Window/MessagePort/ServiceWorker, whose postMessage
+  // overloads disagree; only Window accepts a target origin.
   (source as Window).postMessage(payload, origin);
 }
 
@@ -353,15 +359,7 @@ function handleListRequest(request: WidgetRequestMessage, event: MessageEvent): 
 }
 
 function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent): void {
-  if (!getDocumentDescriptorContext()) {
-    respondToSource(event.source, event.origin, {
-      type: 'webmcp.tools.invoke.error',
-      requestId: request.requestId,
-      error: 'No executable WebMCP runtime found on this page',
-    });
-    return;
-  }
-
+  // A missing WebMCP runtime surfaces through the rejection path below.
   invokeRelayTool(String(request.toolName ?? ''), toInvokeArgs(request.args))
     .then((result) => {
       respondToSource(event.source, event.origin, {

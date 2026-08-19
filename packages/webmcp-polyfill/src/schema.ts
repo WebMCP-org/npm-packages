@@ -43,9 +43,9 @@ export function coerceWebMcpToolDescriptor(
   tool: Record<string, unknown>
 ): ToolDescriptor<WebMcpToolInput>;
 export function coerceWebMcpToolDescriptor(tool: object): ToolDescriptor<WebMcpToolInput> {
-  const name = Reflect.get(tool, 'name') as unknown;
-  const description = Reflect.get(tool, 'description') as unknown;
-  const title = Reflect.get(tool, 'title') as unknown;
+  const name: unknown = Reflect.get(tool, 'name');
+  const description: unknown = Reflect.get(tool, 'description');
+  const title: unknown = Reflect.get(tool, 'title');
   if (name === undefined) {
     throw new TypeError('Tool "name" is required');
   }
@@ -60,6 +60,7 @@ export function coerceWebMcpToolDescriptor(tool: object): ToolDescriptor<WebMcpT
   const execute: unknown = Reflect.get(tool, 'execute');
 
   // Web IDL dictionaries read known members without retaining the caller's object.
+  // The cast is load-bearing: `execute` stays unnarrowed until validateWebMcpToolDescriptor().
   return {
     name: toDomString(name),
     ...(title === undefined
@@ -407,7 +408,7 @@ function convertStandardInputSchema(schema: StandardInputJsonSchema): InputSchem
       const serialized = serializeInputSchema(converted);
       const parsed: unknown = JSON.parse(serialized);
       if (!isPlainObject(parsed)) throw new TypeError('inputSchema must serialize to an object');
-      return parsed as InputSchema;
+      return parsed;
     } catch {}
   }
 

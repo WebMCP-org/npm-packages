@@ -13,6 +13,7 @@ declare global {
     __WEBMCP_E2E__?: RuntimeContractController;
     mcpClient?: Client;
     mcpIframeHost: {
+      addCollidingChildResources: () => void;
       callTool: (name: string, args: Record<string, unknown>) => Promise<CallToolResult>;
       getMcpIframe: () => MCPIframeElement;
       readResource: (uri: string) => Promise<ReadResourceResult>;
@@ -23,6 +24,8 @@ declare global {
       stopChildRuntime: () => Promise<void>;
     };
     testApp: {
+      counter: () => number;
+      getAPIStatus: () => boolean;
       testRapidToolRegistration: (
         count: number
       ) => Promise<{ registeredCount: number; notificationCount: number }>;
@@ -34,6 +37,6 @@ declare global {
         phase2Notifications: number;
         phase3Notifications: number;
       }>;
-    } & Record<string, unknown>;
+    };
   }
 }

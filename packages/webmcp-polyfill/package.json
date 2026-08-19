@@ -61,8 +61,6 @@
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
-    "test:browser": "vp test run --browser.headless",
-    "test:browser:ui": "vp test --browser",
     "test:conformance": "vp test run conformance/polyfill-runtime.e2e.test.ts --browser.headless",
     "typecheck": "tsc --noEmit && vp test run --typecheck --silent"
   },

@@ -25,7 +25,7 @@ Follow these steps in order. Do not skip steps.
 ### Step 1: Validate
 
 ```bash
-pnpm build && pnpm typecheck && vp check && pnpm test:unit
+pnpm build && pnpm typecheck && vp check && pnpm test:unit && pnpm release:check
 ```
 
 Stop if anything fails. Fix it first.
@@ -45,6 +45,9 @@ This is interactive. It will ask:
 This creates a `.changeset/<random-name>.md` file. You can create multiple changesets
 for different changes before releasing.
 
+Use separate changesets when packages need different release notes. A multi-package
+changeset copies the same summary into every selected package's changelog.
+
 **Fixed versioning note:** Select only packages that actually changed. Changesets
 automatically bumps all packages in the configured fixed group to the same new version.
 `@mcp-b/smart-dom-reader-server` is versioned independently.
@@ -52,14 +55,15 @@ automatically bumps all packages in the configured fixed group to the same new v
 ### Step 3: Apply Version Bumps
 
 ```bash
-pnpm changeset version
+pnpm changeset:version
 ```
 
-This does three things:
+This does four things:
 
 1. Bumps each selected package and every package in its fixed group
 2. Generates `CHANGELOG.md` entries from the changeset summaries
 3. Deletes the consumed `.changeset/*.md` files
+4. Synchronizes checked-in release metadata with the package versions
 
 ### Step 4: Review
 
@@ -69,6 +73,9 @@ git diff packages/*/package.json
 
 # Check generated changelogs
 git diff packages/*/CHANGELOG.md
+
+# Check synchronized metadata
+git diff packages/webmcp-local-relay/manifest.json packages/global/test-unpkg.html
 ```
 
 Verify the CHANGELOGs look correct before proceeding.
@@ -86,7 +93,7 @@ at https://www.npmjs.com/settings/tokens.
 ### Step 6: Publish
 
 ```bash
-pnpm publish -r --access public --no-git-checks
+pnpm -r --filter './packages/**' publish --access public --no-git-checks
 ```
 
 This publishes ALL packages whose local version doesn't yet exist on npm, in
@@ -98,7 +105,7 @@ topological order (dependencies before dependents).
 
 ```bash
 # Quick check: all published versions match local
-for pkg in webmcp-types webmcp-polyfill webmcp-ts-sdk transports global mcp-iframe react-webmcp smart-dom-reader webmcp-local-relay; do
+for pkg in webmcp-types webmcp-polyfill webmcp-ts-sdk transports global mcp-iframe react-webmcp smart-dom-reader webmcp-extension webmcp-local-relay; do
   LOCAL=$(node -p "require('./packages/$pkg/package.json').version" 2>/dev/null)
   NPM=$(npm view @mcp-b/$pkg version 2>/dev/null)
   echo "@mcp-b/$pkg: local=$LOCAL npm=$NPM"
@@ -156,7 +163,7 @@ Instead of publishing locally, let CI handle it:
 1. `pnpm changeset` — create changeset locally
 2. `git add .changeset/ && git commit -m "chore: add changeset" && git push`
 3. CI creates a "Version Packages" PR with bumped versions and changelogs
-4. Merge the PR — CI runs `pnpm ci:publish` (`pnpm publish -r --access public`) automatically
+4. Merge the PR — CI runs the filtered `pnpm ci:publish` command automatically
 5. CI also builds MCPB bundles, creates GitHub releases, and signs with sigstore
 
 ## Beta / Preview Releases
@@ -188,7 +195,7 @@ Install beta versions: `pnpm add @mcp-b/<package-name>@beta`
 
 ```bash
 pnpm changeset version --snapshot canary
-pnpm publish -r --access public --tag canary --no-git-checks
+pnpm -r --filter './packages/**' publish --access public --tag canary --no-git-checks
 # Revert: git checkout .
 ```
 
@@ -218,13 +225,13 @@ Tier 0 (no internal deps):
   @mcp-b/webmcp-local-relay, @mcp-b/smart-dom-reader-server
 
 Tier 1 (← Tier 0):
-  @mcp-b/webmcp-polyfill
+  @mcp-b/webmcp-polyfill, @mcp-b/mcp-iframe, @mcp-b/webmcp-extension
 
 Tier 2 (← Tier 1):
   @mcp-b/webmcp-ts-sdk, usewebmcp
 
 Tier 3 (← Tier 2):
-  @mcp-b/mcp-iframe, @mcp-b/global, @mcp-b/react-webmcp
+  @mcp-b/global, @mcp-b/react-webmcp
 ```
 
 ## Complete Dependency Graph
@@ -236,8 +243,9 @@ Tier 3 (← Tier 2):
 @mcp-b/webmcp-local-relay    (no internal deps)
 @mcp-b/transports            (no internal deps)
 @mcp-b/webmcp-polyfill       → webmcp-types
+@mcp-b/mcp-iframe            → transports
+@mcp-b/webmcp-extension      → transports
 @mcp-b/webmcp-ts-sdk         → webmcp-polyfill, webmcp-types
-@mcp-b/mcp-iframe            → transports, webmcp-ts-sdk, webmcp-types
 @mcp-b/global                → transports, webmcp-polyfill, webmcp-ts-sdk, webmcp-types
 usewebmcp                    → webmcp-polyfill, webmcp-types
 @mcp-b/react-webmcp          → usewebmcp, webmcp-polyfill, webmcp-ts-sdk, webmcp-types
@@ -249,8 +257,8 @@ If you discover a stale dependency after publishing:
 
 1. You cannot unpublish — npm prevents this after 72 hours
 2. Create a changeset for the broken package: `pnpm changeset`
-3. `pnpm changeset version` to bump
-4. `pnpm publish -r --access public --no-git-checks`
+3. `pnpm changeset:version` to bump and synchronize release metadata
+4. `pnpm -r --filter './packages/**' publish --access public --no-git-checks`
 5. Verify the resolved chain is now correct
 
 ## Package Notes
@@ -298,5 +306,6 @@ Set via `gh secret set NPM_TOKEN`.
 | `.changeset/config.json`           | Changesets config (includes fixed versioning groups) |
 | `.npmrc`                           | pnpm registry & auth config                          |
 | `.env`                             | Local NPM_TOKEN (gitignored)                         |
+| `scripts/release-metadata.mjs`     | Version consistency check and metadata synchronizer  |
 | `scripts/validate-publish.js`      | Prevents accidental npm (non-pnpm) publish           |
 | `.github/workflows/changesets.yml` | CI release workflow                                  |

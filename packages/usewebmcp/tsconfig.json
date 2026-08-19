@@ -2,7 +2,6 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "types": ["node"]
   },
   "include": ["src/**/*", "type-tests/**/*", "vite.config.ts"],

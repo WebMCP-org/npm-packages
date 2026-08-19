@@ -1,6 +1,8 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createServer as createNetServer, type Socket } from 'node:net';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 
 import { RelayBridgeServer } from './bridgeServer.js';
@@ -8,6 +10,10 @@ import { RelayBridgeServer } from './bridgeServer.js';
 /**
  * Polls until a value is available or times out.
  */
+// The relay caches its chosen port in ~/.webmcp/relay-port.json by default;
+// tests must never touch the developer's real home directory.
+const persistPath = join(tmpdir(), `webmcp-relay-port-test-${String(process.pid)}.json`);
+
 function waitFor<T>(fn: () => T | undefined, timeoutMs = 2000): Promise<T> {
   const started = Date.now();
   return new Promise((resolve, reject) => {
@@ -399,7 +405,11 @@ describe('RelayBridgeServer', () => {
     ws.close();
   });
 
-  it('wraps invalid tool results as MCP errors', async () => {
+  it.each([
+    ['malformed content blocks', { content: [42, null] }],
+    ['null', null],
+    ['a bare string', 'just a string'],
+  ])('wraps %s returned by a tool as an MCP error', async (_case, badResult) => {
     const bridge = new RelayBridgeServer({
       host: '127.0.0.1',
       port: 0,
@@ -413,7 +423,7 @@ describe('RelayBridgeServer', () => {
       const ws = await connectAndRegister(bridge, {
         tabId: 'tab-1',
         url: 'https://example.com',
-        tools: [{ name: 'bad_result_tool', description: 'Returns malformed content blocks' }],
+        tools: [{ name: 'bad_result_tool' }],
       });
 
       ws.on('message', (raw) => {
@@ -422,15 +432,7 @@ describe('RelayBridgeServer', () => {
           return;
         }
 
-        ws.send(
-          JSON.stringify({
-            type: 'result',
-            callId: msg.callId,
-            result: {
-              content: [42, null],
-            },
-          })
-        );
+        ws.send(JSON.stringify({ type: 'result', callId: msg.callId, result: badResult }));
       });
 
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
@@ -730,6 +732,73 @@ describe('RelayBridgeServer', () => {
     }
   });
 
+  it('closes a browser connection that stops answering heartbeat pings', async () => {
+    // Fake only the heartbeat's own timers; socket I/O and setTimeout stay real.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    const bridge = new RelayBridgeServer({ host: '127.0.0.1', port: 0, allowedOrigins: ['*'] });
+
+    try {
+      await bridge.start();
+
+      const ws = await connectAndRegister(bridge, {
+        tabId: 'tab-silent',
+        url: 'https://example.com',
+        tools: [{ name: 'silent_tool' }],
+      });
+      const closeCode = new Promise<number>((resolve) => {
+        ws.once('close', (code: number) => resolve(code));
+      });
+
+      // First tick stays inside the 25s dead threshold: the relay only pings.
+      vi.advanceTimersByTime(15_000);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(ws.readyState).toBe(WebSocket.OPEN);
+
+      // Second tick crosses the threshold with no pong received.
+      vi.advanceTimersByTime(15_000);
+      await expect(closeCode).resolves.toBe(1001);
+    } finally {
+      vi.useRealTimers();
+      await bridge.stop();
+    }
+  });
+
+  it('keeps a browser connection alive while it answers heartbeat pings', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    const bridge = new RelayBridgeServer({ host: '127.0.0.1', port: 0, allowedOrigins: ['*'] });
+
+    try {
+      await bridge.start();
+
+      const ws = await connectAndRegister(bridge, {
+        tabId: 'tab-healthy',
+        url: 'https://example.com',
+        tools: [{ name: 'healthy_tool' }],
+      });
+
+      let pings = 0;
+      ws.on('message', (raw) => {
+        const message: unknown = JSON.parse(String(raw));
+        if ((message as { type?: unknown }).type !== 'ping') return;
+        pings++;
+        ws.send(JSON.stringify({ type: 'pong' }));
+      });
+
+      for (let tick = 0; tick < 3; tick++) {
+        vi.advanceTimersByTime(15_000);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+
+      expect(pings).toBe(3);
+      expect(ws.readyState).toBe(WebSocket.OPEN);
+
+      ws.close();
+    } finally {
+      vi.useRealTimers();
+      await bridge.stop();
+    }
+  });
+
   it('switches to client mode when the port is already in use', async () => {
     const bridge1 = new RelayBridgeServer({
       host: '127.0.0.1',
@@ -745,6 +814,7 @@ describe('RelayBridgeServer', () => {
       host: '127.0.0.1',
       port: usedPort,
       allowedOrigins: ['*'],
+      persistPath,
     });
 
     await bridge2.start();
@@ -762,6 +832,7 @@ describe('RelayBridgeServer', () => {
       port: preferredPort,
       portRangeEnd: preferredPort + 1,
       allowedOrigins: ['*'],
+      persistPath,
     });
 
     try {
@@ -782,6 +853,7 @@ describe('RelayBridgeServer', () => {
       port: preferredPort,
       portExplicitlySet: true,
       allowedOrigins: ['*'],
+      persistPath,
     });
 
     try {
@@ -1129,6 +1201,7 @@ describe('RelayBridgeServer', () => {
       host: '256.256.256.256',
       port: 9333,
       allowedOrigins: ['*'],
+      persistPath,
     });
 
     await expect(bridge.start()).rejects.toThrow();
@@ -1169,6 +1242,7 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
+        persistPath,
       });
 
       await client.start();
@@ -1230,6 +1304,7 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
+        persistPath,
         invokeTimeoutMs: 2000,
       });
 
@@ -1359,6 +1434,7 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
+        persistPath,
       });
 
       await client.start();
@@ -1409,6 +1485,7 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
+        persistPath,
         invokeTimeoutMs: 500,
       });
 
@@ -1452,6 +1529,7 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
+        persistPath,
       });
 
       await client.start();
@@ -1500,6 +1578,7 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
+        persistPath,
       });
 
       await client.start();
@@ -1556,6 +1635,7 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port,
         allowedOrigins: ['*'],
+        persistPath,
       });
 
       await client.start();
@@ -1619,90 +1699,6 @@ describe('RelayBridgeServer client mode', () => {
     }
   });
 
-  it('wraps null tool results as MCP errors', async () => {
-    const bridge = new RelayBridgeServer({
-      host: '127.0.0.1',
-      port: 0,
-      allowedOrigins: ['*'],
-      invokeTimeoutMs: 500,
-    });
-
-    try {
-      await bridge.start();
-
-      const ws = await connectAndRegister(bridge, {
-        tabId: 'tab-null',
-        url: 'https://example.com',
-        tools: [{ name: 'null_result_tool' }],
-      });
-
-      ws.on('message', (raw) => {
-        const msg = JSON.parse(String(raw));
-        if (msg.type !== 'invoke') return;
-        ws.send(
-          JSON.stringify({
-            type: 'result',
-            callId: msg.callId,
-            result: null,
-          })
-        );
-      });
-
-      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
-      const result = await bridge.invokeTool(toolName, {});
-
-      expect(result.isError).toBe(true);
-      const text = (result.content?.[0] as { text?: string } | undefined)?.text ?? '';
-      expect(text).toMatch(/Tool returned an invalid result/i);
-
-      ws.close();
-    } finally {
-      await bridge.stop();
-    }
-  });
-
-  it('wraps string tool results as MCP errors', async () => {
-    const bridge = new RelayBridgeServer({
-      host: '127.0.0.1',
-      port: 0,
-      allowedOrigins: ['*'],
-      invokeTimeoutMs: 500,
-    });
-
-    try {
-      await bridge.start();
-
-      const ws = await connectAndRegister(bridge, {
-        tabId: 'tab-str',
-        url: 'https://example.com',
-        tools: [{ name: 'string_result_tool' }],
-      });
-
-      ws.on('message', (raw) => {
-        const msg = JSON.parse(String(raw));
-        if (msg.type !== 'invoke') return;
-        ws.send(
-          JSON.stringify({
-            type: 'result',
-            callId: msg.callId,
-            result: 'just a string',
-          })
-        );
-      });
-
-      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
-      const result = await bridge.invokeTool(toolName, {});
-
-      expect(result.isError).toBe(true);
-      const text = (result.content?.[0] as { text?: string } | undefined)?.text ?? '';
-      expect(text).toMatch(/Tool returned an invalid result/i);
-
-      ws.close();
-    } finally {
-      await bridge.stop();
-    }
-  });
-
   it('cleans up pending client invocations on stop', async () => {
     const server = new RelayBridgeServer({
       host: '127.0.0.1',
@@ -1726,6 +1722,7 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
+        persistPath,
         invokeTimeoutMs: 5000,
       });
 
@@ -1825,6 +1822,61 @@ describe('RelayBridgeServer client mode', () => {
       const invokePromise = server.invokeTool('big_response', {});
 
       await expect(invokePromise).rejects.toThrow(/exceeded maximum payload size/);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it('answers relay/invoke for an unknown tool with an error result instead of hanging', async () => {
+    const server = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: 0,
+      allowedOrigins: ['*'],
+      invokeTimeoutMs: 60_000,
+    });
+
+    try {
+      await server.start();
+
+      const relayClient = new WebSocket(`ws://127.0.0.1:${server.port}`, 'webmcp-relay.v1');
+      await new Promise<void>((resolve, reject) => {
+        relayClient.once('open', () => resolve());
+        relayClient.once('error', reject);
+      });
+
+      relayClient.send(JSON.stringify({ type: 'relay/hello' }));
+
+      const resultPromise = new Promise<{
+        callId: string;
+        result: { isError?: boolean; content?: unknown[] };
+      }>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          reject(new Error('Timed out waiting for relay/result'));
+        }, 2000);
+        relayClient.on('message', (raw) => {
+          const msg = JSON.parse(String(raw));
+          if (msg.type === 'relay/result' && msg.callId === 'call-missing') {
+            clearTimeout(timer);
+            resolve(msg);
+          }
+        });
+      });
+
+      relayClient.send(
+        JSON.stringify({
+          type: 'relay/invoke',
+          callId: 'call-missing',
+          toolName: 'no_such_tool',
+          args: {},
+        })
+      );
+
+      const relayResult = await resultPromise;
+      expect(relayResult.result.isError).toBe(true);
+      const text = (relayResult.result.content?.[0] as { text?: string } | undefined)?.text ?? '';
+      expect(text).toMatch(/No active browser source provides tool "no_such_tool"/);
+
+      relayClient.close();
     } finally {
       await server.stop();
     }

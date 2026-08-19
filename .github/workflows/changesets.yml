@@ -64,6 +64,9 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      - name: Check release metadata
+        run: pnpm release:check
+
       - name: Create Release PR or Publish
         id: changesets
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
@@ -71,6 +74,7 @@ jobs:
           # Follow conventional commit format for version commits
           commit: 'chore(release): version packages'
           title: 'chore(release): version packages'
+          version: pnpm changeset:version
           # Publish command
           publish: pnpm ci:publish
           # Create GitHub releases for each published package

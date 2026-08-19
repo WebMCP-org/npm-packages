@@ -7,9 +7,9 @@ import {
   firstTextContent,
   listClientToolNames,
   readInvocations,
-  registerDynamicToolInPage,
+  registerDynamicTool,
   resetInvocations,
-  unregisterDynamicToolInPage,
+  unregisterDynamicTool,
   waitForRuntimePage,
 } from './runtime-contract.helpers.js';
 
@@ -42,7 +42,7 @@ test.describe('Runtime Contract - Tab Transport', () => {
   test('propagates dynamic registration to the connected client without restart', async ({
     page,
   }) => {
-    await expect(registerDynamicToolInPage(page)).resolves.toBe(true);
+    await expect(registerDynamicTool(page)).resolves.toBe(true);
 
     await expect.poll(async () => await listClientToolNames(page)).toContain(DYNAMIC_TOOL_NAME);
 
@@ -53,10 +53,10 @@ test.describe('Runtime Contract - Tab Transport', () => {
   test('removes an unregistered tool from discovery and subsequent calls fail', async ({
     page,
   }) => {
-    await registerDynamicToolInPage(page);
+    await registerDynamicTool(page);
     await expect.poll(async () => await listClientToolNames(page)).toContain(DYNAMIC_TOOL_NAME);
 
-    await expect(unregisterDynamicToolInPage(page)).resolves.toBe(true);
+    await expect(unregisterDynamicTool(page)).resolves.toBe(true);
     await expect.poll(async () => await listClientToolNames(page)).not.toContain(DYNAMIC_TOOL_NAME);
 
     const errorMessage = await callClientToolForError(page, DYNAMIC_TOOL_NAME, { value: 'late' });

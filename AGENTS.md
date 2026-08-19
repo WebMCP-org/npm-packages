@@ -187,6 +187,13 @@ suite and replay the WPT lane with
 deliberately and review the upstream diff first. See
 [`docs/TESTING.md`](./docs/TESTING.md) for the test matrix.
 
+`pnpm test:wpt:idl` is a second lane running upstream
+`webmcp/idlharness.https.window.html`, which checks API _shape_ (prototype
+chain, property descriptors, enumerability) rather than behavior. It needs the
+`interfaces` directory in the `.reference/wpt` sparse checkout. The polyfill
+passes it 20/20, matching native Chrome Canary. CI still reports it with
+`continue-on-error`; promoting it to a hard gate is a pending decision.
+
 ## Before Committing
 
 All code must pass:

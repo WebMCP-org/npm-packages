@@ -12,7 +12,6 @@ import { useMcpRegistration } from './useMcpRegistration.js';
  * - Registers the prompt with the installed MCP-B `BrowserMcpServer`
  * - Automatically unregisters on component unmount
  *
- * @template TArgsSchema - Schema defining argument types
  *
  * @param config - Configuration object for the prompt
  * @returns Object indicating registration status
@@ -69,9 +68,9 @@ import { useMcpRegistration } from './useMcpRegistration.js';
  * ```
  */
 export function useWebMCPPrompt(config: WebMCPPromptConfig): WebMCPPromptReturn {
-  const { name, description, argsSchema, get } = config;
+  const { name, description } = config;
 
-  const getRef = useCommittedRef(get);
+  const configRef = useCommittedRef(config);
 
   const register = useCallback(() => {
     const modelContext = getBrowserMcpServer();
@@ -82,6 +81,10 @@ export function useWebMCPPrompt(config: WebMCPPromptConfig): WebMCPPromptReturn 
       return;
     }
 
+    // ponytail: read at registration time so an inline `argsSchema` literal cannot re-register
+    // every render. Ceiling: a changed schema is picked up only when `name` or `description`
+    // changes; add a caller-supplied deps list, as `useWebMCP` has, if that is ever needed.
+    const { argsSchema } = configRef.current;
     const resolvedArgsSchema = argsSchema
       ? normalizeInputSchema(argsSchema).inputSchema
       : undefined;
@@ -90,9 +93,9 @@ export function useWebMCPPrompt(config: WebMCPPromptConfig): WebMCPPromptReturn 
       name,
       ...(description !== undefined && { description }),
       ...(resolvedArgsSchema && { argsSchema: resolvedArgsSchema }),
-      get: async (args) => getRef.current(args),
+      get: async (args) => configRef.current.get(args),
     });
-  }, [name, description, argsSchema, getRef]);
+  }, [name, description, configRef]);
 
   return { isRegistered: useMcpRegistration(register) };
 }

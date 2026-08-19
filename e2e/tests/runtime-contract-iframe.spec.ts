@@ -7,10 +7,10 @@ import {
   firstTextContent,
   getRuntimeIframeFrame,
   listClientToolNames,
-  readFrameInvocations,
-  registerDynamicToolInFrame,
-  resetFrameInvocations,
-  unregisterDynamicToolInFrame,
+  readInvocations,
+  registerDynamicTool,
+  resetInvocations,
+  unregisterDynamicTool,
   waitForIframeRuntimePage,
 } from './runtime-contract.helpers.js';
 
@@ -28,13 +28,13 @@ test.describe('Runtime Contract - Iframe Transport', () => {
     page,
   }) => {
     const frame = getRuntimeIframeFrame(page);
-    await resetFrameInvocations(frame);
+    await resetInvocations(frame);
 
     const result = await callClientTool(page, 'sum', { a: 7, b: 5 });
     expect(firstTextContent(result)).toBe('sum:12');
 
     await expect
-      .poll(async () => await readFrameInvocations(frame))
+      .poll(async () => await readInvocations(frame))
       .toEqual([
         {
           name: 'sum',
@@ -47,7 +47,7 @@ test.describe('Runtime Contract - Iframe Transport', () => {
     page,
   }) => {
     const frame = getRuntimeIframeFrame(page);
-    await expect(registerDynamicToolInFrame(frame)).resolves.toBe(true);
+    await expect(registerDynamicTool(frame)).resolves.toBe(true);
 
     await expect.poll(async () => await listClientToolNames(page)).toContain(DYNAMIC_TOOL_NAME);
 
@@ -59,10 +59,10 @@ test.describe('Runtime Contract - Iframe Transport', () => {
     page,
   }) => {
     const frame = getRuntimeIframeFrame(page);
-    await registerDynamicToolInFrame(frame);
+    await registerDynamicTool(frame);
     await expect.poll(async () => await listClientToolNames(page)).toContain(DYNAMIC_TOOL_NAME);
 
-    await expect(unregisterDynamicToolInFrame(frame)).resolves.toBe(true);
+    await expect(unregisterDynamicTool(frame)).resolves.toBe(true);
     await expect.poll(async () => await listClientToolNames(page)).not.toContain(DYNAMIC_TOOL_NAME);
 
     const errorMessage = await callClientToolForError(page, DYNAMIC_TOOL_NAME, { value: 'gone' });
@@ -71,13 +71,13 @@ test.describe('Runtime Contract - Iframe Transport', () => {
 
   test('propagates iframe runtime errors to the parent client', async ({ page }) => {
     const frame = getRuntimeIframeFrame(page);
-    await resetFrameInvocations(frame);
+    await resetInvocations(frame);
 
     const errorMessage = await callClientToolForError(page, 'always_fail', { reason: 'iframe' });
     expect(errorMessage).toContain('always_fail:iframe');
 
     await expect
-      .poll(async () => await readFrameInvocations(frame))
+      .poll(async () => await readInvocations(frame))
       .toEqual([
         {
           name: 'always_fail',

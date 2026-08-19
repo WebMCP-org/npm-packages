@@ -9,11 +9,22 @@ import type {
 
 export class DOMTraversal {
   /**
+   * Check if a node is a Document.
+   *
+   * `instanceof Document` tests the *calling* realm's constructor, so a
+   * document reached through an iframe (frameSelector) always fails it.
+   * nodeType is realm-independent — use this everywhere instead.
+   */
+  static isDocument(node: Document | Element): node is Document {
+    return node.nodeType === Node.DOCUMENT_NODE;
+  }
+
+  /**
    * Check if element is visible
    */
-  static isVisible(element: Element, computedStyle?: CSSStyleDeclaration): boolean {
+  static isVisible(element: Element): boolean {
     const rect = element.getBoundingClientRect();
-    const style = computedStyle || element.ownerDocument?.defaultView?.getComputedStyle(element);
+    const style = element.ownerDocument?.defaultView?.getComputedStyle(element);
 
     if (!style) return false;
 
@@ -29,9 +40,9 @@ export class DOMTraversal {
   /**
    * Check if element is in viewport
    */
-  static isInViewport(element: Element, viewport?: { width: number; height: number }): boolean {
+  static isInViewport(element: Element): boolean {
     const rect = element.getBoundingClientRect();
-    const view = viewport || {
+    const view = {
       width: element.ownerDocument?.defaultView?.innerWidth || 0,
       height: element.ownerDocument?.defaultView?.innerHeight || 0,
     };
@@ -44,8 +55,6 @@ export class DOMTraversal {
    */
   static passesFilter(element: Element, filter: FilterOptions | undefined): boolean {
     if (!filter) return true;
-
-    const htmlElement = element as HTMLElement;
 
     // Check exclude selectors first
     if (filter.excludeSelectors?.length) {
@@ -72,7 +81,7 @@ export class DOMTraversal {
     }
 
     // Check text content filters
-    const textContent = htmlElement.textContent?.toLowerCase() || '';
+    const textContent = element.textContent?.toLowerCase() || '';
     if (filter.textContains?.length) {
       let hasText = false;
       for (const text of filter.textContains) {
@@ -181,8 +190,6 @@ export class DOMTraversal {
       return null;
     }
 
-    const htmlElement = element as HTMLElement;
-
     const extracted: ExtractedElement = {
       tag: element.tagName.toLowerCase(),
       text: DOMTraversal.getElementText(element, options),
@@ -198,12 +205,8 @@ export class DOMTraversal {
       const children: ExtractedElement[] = [];
 
       // Handle shadow DOM
-      if (options.includeShadowDOM && htmlElement.shadowRoot) {
-        const shadowChildren = DOMTraversal.extractChildren(
-          htmlElement.shadowRoot,
-          options,
-          depth + 1
-        );
+      if (options.includeShadowDOM && element.shadowRoot) {
+        const shadowChildren = DOMTraversal.extractChildren(element.shadowRoot, options, depth + 1);
         children.push(...shadowChildren);
       }
 
@@ -362,6 +365,7 @@ export class DOMTraversal {
    * Get interaction information for an element (compact format)
    */
   private static getInteractionInfo(element: Element): ElementInteraction {
+    // Element has no inline on* handlers in lib.dom; they live on GlobalEventHandlers.
     const htmlElement = element as HTMLElement;
     const interaction: ElementInteraction = {};
 
@@ -374,24 +378,20 @@ export class DOMTraversal {
       interaction.click = true;
 
     if (
-      (htmlElement as HTMLInputElement).onchange ||
+      htmlElement.onchange ||
       element.getAttribute('onchange') ||
       element.matches('input, select, textarea')
     )
       interaction.change = true;
 
-    if (
-      (htmlElement as HTMLFormElement).onsubmit ||
-      element.getAttribute('onsubmit') ||
-      element.matches('form')
-    )
+    if (htmlElement.onsubmit || element.getAttribute('onsubmit') || element.matches('form'))
       interaction.submit = true;
 
     const triggersNavigation = element.matches('a[href], button[type="submit"]');
     if (triggersNavigation) interaction.nav = true;
 
     const isDisabled =
-      htmlElement.hasAttribute('disabled') || htmlElement.getAttribute('aria-disabled') === 'true';
+      element.hasAttribute('disabled') || element.getAttribute('aria-disabled') === 'true';
     if (isDisabled) interaction.disabled = true;
 
     const isHidden = !DOMTraversal.isVisible(element);
@@ -402,6 +402,8 @@ export class DOMTraversal {
 
     // Check form association
     if (element.matches('input, textarea, select, button')) {
+      // matches() cannot narrow, and instanceof is unsafe here (elements may come
+      // from an iframe realm). All four tags carry .form.
       const form = (element as HTMLInputElement).form || element.closest('form');
       if (form) {
         interaction.form = SelectorGenerator.generateSelectors(form).css;
@@ -416,6 +418,7 @@ export class DOMTraversal {
    */
   private static getElementText(element: Element, options?: ExtractionOptions): string {
     // For input elements, get value or placeholder
+    // (matches() cannot narrow, and instanceof is unsafe across iframe realms)
     if (element.matches('input, textarea')) {
       const input = element as HTMLInputElement;
       return input.value || input.placeholder || '';

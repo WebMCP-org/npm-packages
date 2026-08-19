@@ -62,9 +62,7 @@ export default defineConfig({
       }),
       instances: [{ browser: 'chromium' }],
     },
-    // Test file patterns - exclude esm-resolution tests as they need Node.js
     include: ['src/**/*.{test,spec}.{ts,tsx}', 'conformance/global-runtime.e2e.test.ts'],
-    exclude: ['src/esm-resolution.test.ts'],
     // Limit concurrency in CI to prevent resource exhaustion
     maxConcurrency: isCI ? 2 : 10,
     fileParallelism: !isCI,

@@ -2,6 +2,7 @@
   "name": "@mcp-b/smart-dom-reader-server",
   "version": "0.2.0",
   "description": "MCP server for smart-dom-reader backed by Playwright",
+  "license": "MIT",
   "repository": {
     "directory": "packages/smart-dom-reader/mcp-server"
   },

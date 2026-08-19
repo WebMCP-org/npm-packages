@@ -116,10 +116,10 @@ For coordinated releases across multiple packages:
 pnpm changeset
 
 # Apply versions
-pnpm changeset version
+pnpm changeset:version
 
 # Publish all changed packages
-pnpm changeset publish
+pnpm publish:all
 ```
 
 ## Verifying a Published Package

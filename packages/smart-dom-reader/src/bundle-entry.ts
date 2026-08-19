@@ -31,6 +31,8 @@ export function executeExtraction<M extends ExtractionMethod>(
   try {
     let result: string;
 
+    // TS cannot narrow the indexed type `ExtractionArgs[M]` from a switch on `method`,
+    // so each arm restates the arg type it already knows it has.
     switch (method) {
       case 'extractStructure': {
         const structureArgs = args as ExtractionArgs['extractStructure'];
@@ -102,12 +104,13 @@ export function executeExtraction<M extends ExtractionMethod>(
         const { selector, frameSelector, options, formatOptions } = interactiveArgs;
         const doc = resolveDocument(frameSelector);
 
-        const extractResult = selector
-          ? SmartDOMReader.extractFromElement(
-              doc.querySelector(selector)!,
-              'interactive',
-              options || {}
-            )
+        const target = selector ? doc.querySelector(selector) : null;
+        if (selector && !target) {
+          return { error: `No element found matching selector: ${selector}` };
+        }
+
+        const extractResult = target
+          ? SmartDOMReader.extractFromElement(target, 'interactive', options || {})
           : SmartDOMReader.extractInteractive(doc, options || {});
 
         // Always return markdown formatted result
@@ -125,8 +128,13 @@ export function executeExtraction<M extends ExtractionMethod>(
         const { selector, frameSelector, options, formatOptions } = fullArgs;
         const doc = resolveDocument(frameSelector);
 
-        const extractResult = selector
-          ? SmartDOMReader.extractFromElement(doc.querySelector(selector)!, 'full', options || {})
+        const target = selector ? doc.querySelector(selector) : null;
+        if (selector && !target) {
+          return { error: `No element found matching selector: ${selector}` };
+        }
+
+        const extractResult = target
+          ? SmartDOMReader.extractFromElement(target, 'full', options || {})
           : SmartDOMReader.extractFull(doc, options || {});
 
         // Always return markdown formatted result

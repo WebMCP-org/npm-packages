@@ -606,6 +606,9 @@ test.describe('React WebMCP Combined Hook Tests', () => {
 // structuredContent Tests
 // ============================================================================
 
+/** Shape the test app's `counter_get` tool declares in its outputSchema. */
+type CounterOutput = { counter?: number; timestamp?: string };
+
 test.describe('React WebMCP structuredContent Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('http://localhost:8888');
@@ -618,19 +621,13 @@ test.describe('React WebMCP structuredContent Tests', () => {
 
   test('should return structuredContent for tools with outputSchema', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const w = window as unknown as {
-        mcpClient?: {
-          callTool: (request: { name: string; arguments?: Record<string, unknown> }) => Promise<{
-            structuredContent?: unknown;
-          }>;
-        };
-      };
-      if (!w.mcpClient || typeof w.mcpClient.callTool !== 'function') {
+      const client = window.mcpClient;
+      if (!client) {
         throw new Error('mcpClient not available');
       }
 
       try {
-        const response = await w.mcpClient.callTool({ name: 'counter_get', arguments: {} });
+        const response = await client.callTool({ name: 'counter_get', arguments: {} });
         const structuredContent = response.structuredContent as
           | { counter?: unknown; timestamp?: unknown }
           | undefined;
@@ -658,20 +655,13 @@ test.describe('React WebMCP structuredContent Tests', () => {
 
   test('should normalize JSON results without outputSchema', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const w = window as unknown as {
-        mcpClient?: {
-          callTool: (request: { name: string; arguments?: Record<string, unknown> }) => Promise<{
-            structuredContent?: unknown;
-            content?: Array<{ type: string; text?: string }>;
-          }>;
-        };
-      };
-      if (!w.mcpClient || typeof w.mcpClient.callTool !== 'function') {
+      const client = window.mcpClient;
+      if (!client) {
         throw new Error('mcpClient not available');
       }
 
       try {
-        const response = await w.mcpClient.callTool({
+        const response = await client.callTool({
           name: 'counter_increment',
           arguments: { amount: 1 },
         });
@@ -696,19 +686,13 @@ test.describe('React WebMCP structuredContent Tests', () => {
 
   test('should return correct counter value from structuredContent', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const w = window as unknown as {
-        mcpClient?: {
-          callTool: (request: { name: string; arguments?: Record<string, unknown> }) => Promise<{
-            structuredContent?: { counter?: number; timestamp?: string };
-          }>;
-        };
-      };
-      if (!w.mcpClient || typeof w.mcpClient.callTool !== 'function') {
+      const client = window.mcpClient;
+      if (!client) {
         throw new Error('mcpClient not available');
       }
 
-      const response = await w.mcpClient.callTool({ name: 'counter_get', arguments: {} });
-      const structured = response.structuredContent;
+      const response = await client.callTool({ name: 'counter_get', arguments: {} });
+      const structured = response.structuredContent as CounterOutput | undefined;
 
       return {
         counter: structured?.counter,
@@ -726,25 +710,19 @@ test.describe('React WebMCP structuredContent Tests', () => {
 
   test('should validate structuredContent reflects updated state', async ({ page }) => {
     const results = await page.evaluate(async () => {
-      const w = window as unknown as {
-        mcpClient?: {
-          callTool: (request: { name: string; arguments?: Record<string, unknown> }) => Promise<{
-            structuredContent?: { counter?: number; timestamp?: string };
-          }>;
-        };
-      };
-      if (!w.mcpClient || typeof w.mcpClient.callTool !== 'function') {
+      const client = window.mcpClient;
+      if (!client) {
         throw new Error('mcpClient not available');
       }
 
-      const first = await w.mcpClient.callTool({ name: 'counter_get', arguments: {} });
-      const response1 = first.structuredContent ?? {};
+      const first = await client.callTool({ name: 'counter_get', arguments: {} });
+      const response1 = (first.structuredContent ?? {}) as CounterOutput;
       const initialCounter = response1.counter;
 
-      await w.mcpClient.callTool({ name: 'counter_increment', arguments: { amount: 5 } });
+      await client.callTool({ name: 'counter_increment', arguments: { amount: 5 } });
 
-      const second = await w.mcpClient.callTool({ name: 'counter_get', arguments: {} });
-      const response2 = second.structuredContent ?? {};
+      const second = await client.callTool({ name: 'counter_get', arguments: {} });
+      const response2 = (second.structuredContent ?? {}) as CounterOutput;
       const updatedCounter = response2.counter;
       const hasBothCounters =
         typeof initialCounter === 'number' && typeof updatedCounter === 'number';

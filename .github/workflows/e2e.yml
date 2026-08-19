@@ -133,9 +133,12 @@ jobs:
           repository: web-platform-tests/wpt
           ref: c7fdee80f3f17b4e9813964916afdfd57ace863f
           path: .reference/wpt
+          # "interfaces" carries the .idl files that webmcp/idlharness.https.window.js
+          # fetches at runtime (webmcp.idl plus its html/dom dependencies). ~1.8 MB.
           sparse-checkout: |
             common
             docs
+            interfaces
             resources
             tools
             webmcp
@@ -180,6 +183,15 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
         run: pnpm test:wpt
+
+      # Reports API-shape conformance without gating on it. The polyfill now passes
+      # idlharness 20/20, matching native Chrome Canary; dropping continue-on-error
+      # would make this a hard gate. Left non-blocking pending that decision.
+      - name: Report WebMCP IDL conformance (non-blocking)
+        continue-on-error: true
+        env:
+          CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
+        run: pnpm test:wpt:idl
 
       - name: Run Native Runtime Contract (Chrome Canary)
         env:

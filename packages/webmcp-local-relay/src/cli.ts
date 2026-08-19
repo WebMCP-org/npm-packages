@@ -103,8 +103,6 @@ process.stdout.on('error', () => {
 if (process.platform !== 'win32') {
   parentCheckInterval = setInterval(() => {
     if (process.ppid === 1) {
-      clearInterval(parentCheckInterval);
-      parentCheckInterval = undefined;
       void shutdown('parent-exited');
     }
   }, 30_000);

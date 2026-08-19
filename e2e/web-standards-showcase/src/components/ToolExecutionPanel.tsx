@@ -234,7 +234,7 @@ export const ToolExecutionPanel: FC<ToolExecutionPanelProps> = ({
                           schema={parsedSchema as Record<string, unknown>}
                           validator={validator}
                           disabled={isLoading}
-                          onSubmit={(data: any) => {
+                          onSubmit={(data: { formData?: unknown }) => {
                             handleToolCall(tool.name, data.formData as Record<string, unknown>);
                           }}
                         />

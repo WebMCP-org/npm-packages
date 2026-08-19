@@ -52,10 +52,6 @@ interface PendingInvocation {
   reject: (error: Error) => void;
 }
 
-interface WebSocketErrorWithCode extends Error {
-  code?: string;
-}
-
 function formatPayloadLimit(bytes: number): string {
   if (bytes >= 1_000_000 && bytes % 1_000_000 === 0) {
     return `${String(bytes / 1_000_000)}MB`;
@@ -349,9 +345,7 @@ export class RelayBridgeServer extends EventEmitter {
   private isAddressInUseError(error: unknown): boolean {
     return (
       error instanceof Error &&
-      ('code' in error
-        ? (error as NodeJS.ErrnoException).code === 'EADDRINUSE'
-        : error.message.includes('EADDRINUSE'))
+      ('code' in error ? error.code === 'EADDRINUSE' : error.message.includes('EADDRINUSE'))
     );
   }
 
@@ -372,7 +366,13 @@ export class RelayBridgeServer extends EventEmitter {
         `[webmcp-local-relay] info: discovered compatible relay on port ${port}, switching to client mode\n`
       );
       return true;
-    } catch {
+    } catch (error) {
+      // The caller reports every false here as "occupied by a non-relay service". A slow
+      // but healthy relay hits the 750ms hello timeout and lands here too, so name the
+      // real reason rather than leaving the operator with a wrong hypothesis.
+      process.stderr.write(
+        `[webmcp-local-relay] info: port ${port} did not complete a relay handshake: ${error instanceof Error ? error.message : String(error)}\n`
+      );
       return false;
     }
   }
@@ -553,9 +553,7 @@ export class RelayBridgeServer extends EventEmitter {
           `[webmcp-local-relay] warn: socket error for connection ${connectionId}: ${err.message}\n`
         );
         const code =
-          (err as WebSocketErrorWithCode).code === 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH'
-            ? 1009
-            : undefined;
+          'code' in err && err.code === 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH' ? 1009 : undefined;
         this.onSocketClose(connectionId, code);
       });
 
@@ -573,8 +571,9 @@ export class RelayBridgeServer extends EventEmitter {
     });
 
     wss.on('error', (err: Error) => {
+      // Logged, not re-emitted: nothing listens for 'error' on this EventEmitter, and
+      // emit('error') without a listener rethrows, killing the relay via uncaughtException.
       process.stderr.write(`[webmcp-local-relay] error: WebSocket server error: ${err.message}\n`);
-      this.emit('error', err);
     });
 
     this.wss = wss;
@@ -602,22 +601,22 @@ export class RelayBridgeServer extends EventEmitter {
     };
   }
 
-  private invokeToolLocally(
+  /**
+   * `async` is load-bearing: {@link onRelayClientMessage} consumes this through
+   * `.then(onResult, onError)`, so a synchronous throw would escape the socket
+   * message handler as an uncaught exception and leave the relay client waiting
+   * for a `relay/result` that never arrives.
+   */
+  private async invokeToolLocally(
     toolName: string,
     args: RelayInvokeArgs,
     options: { sourceId?: string; requestTabId?: string }
   ): Promise<RelayCallToolResult> {
-    const resolveOptions: { toolName: string; sourceId?: string; requestTabId?: string } = {
+    const resolved = this.registry.resolveInvocation({
       toolName,
-    };
-    if (options.sourceId !== undefined) {
-      resolveOptions.sourceId = options.sourceId;
-    }
-    if (options.requestTabId !== undefined) {
-      resolveOptions.requestTabId = options.requestTabId;
-    }
-
-    const resolved = this.registry.resolveInvocation(resolveOptions);
+      ...(options.sourceId === undefined ? {} : { sourceId: options.sourceId }),
+      ...(options.requestTabId === undefined ? {} : { requestTabId: options.requestTabId }),
+    });
 
     if (!resolved) {
       throw new Error(`No active browser source provides tool "${toolName}"`);
@@ -684,8 +683,8 @@ export class RelayBridgeServer extends EventEmitter {
     }
 
     const typeField =
-      typeof parsedJson === 'object' && parsedJson !== null
-        ? (parsedJson as Record<string, unknown>).type
+      typeof parsedJson === 'object' && parsedJson !== null && 'type' in parsedJson
+        ? parsedJson.type
         : undefined;
     const socket = this.socketByConnectionId.get(connectionId);
     if (!socket) {
@@ -1016,8 +1015,6 @@ export class RelayBridgeServer extends EventEmitter {
   private async connectToRelayServer(
     port: number
   ): Promise<{ bufferedMessages: RelayServerToClientMessage[]; socket: WebSocket }> {
-    this.stopping = false;
-
     return new Promise((resolve, reject) => {
       const wsUrl = `ws://${this.host}:${port}`;
       const ws = new WebSocket(wsUrl, RELAY_INTERNAL_PROTOCOL);
@@ -1162,9 +1159,7 @@ export class RelayBridgeServer extends EventEmitter {
     const message = RelayServerToClientMessageSchema.safeParse(parsed);
     if (!message.success) {
       const typeField =
-        typeof parsed === 'object' && parsed !== null
-          ? (parsed as Record<string, unknown>).type
-          : 'unknown';
+        typeof parsed === 'object' && parsed !== null && 'type' in parsed ? parsed.type : 'unknown';
       process.stderr.write(
         `[webmcp-local-relay] warn: invalid relay server message (type=${typeField}): ${message.error.message}\n`
       );
@@ -1255,7 +1250,7 @@ export class RelayBridgeServer extends EventEmitter {
     }
   }
 
-  private invokeToolViaRelay(
+  private async invokeToolViaRelay(
     toolName: string,
     args: RelayInvokeArgs
   ): Promise<RelayCallToolResult> {

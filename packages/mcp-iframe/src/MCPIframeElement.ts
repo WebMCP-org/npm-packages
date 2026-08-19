@@ -132,6 +132,20 @@ function createParentResourceUri(
   );
 }
 
+/**
+ * Registration maps are keyed by the parent-visible name or URI, so a second item with the same
+ * key can only shadow a live registration that `#unregisterAll` would then never tear down.
+ */
+function isDuplicateRegistration(
+  registrations: ReadonlyMap<string, unknown>,
+  key: string,
+  kind: string
+): boolean {
+  if (!registrations.has(key)) return false;
+  console.warn(`[MCPIframe] Ignoring duplicate iframe ${kind} "${key}"`);
+  return true;
+}
+
 function decodeTemplateVariables(variables: Variables): Variables {
   return Object.fromEntries(
     Object.entries(variables).map(([name, value]) => [
@@ -168,15 +182,13 @@ export interface MCPIframeItemsEventDetail {
 }
 
 /** Custom event detail for mcp-iframe-ready */
-export type MCPIframeReadyEventDetail = MCPIframeItemsEventDetail;
-
 /** Custom event detail for mcp-iframe-error */
 export interface MCPIframeErrorEventDetail {
   error: unknown;
 }
 
 export interface MCPIframeEventMap {
-  'mcp-iframe-ready': CustomEvent<MCPIframeReadyEventDetail>;
+  'mcp-iframe-ready': CustomEvent<MCPIframeItemsEventDetail>;
   'mcp-iframe-error': CustomEvent<MCPIframeErrorEventDetail>;
   'mcp-iframe-items-changed': CustomEvent<MCPIframeItemsEventDetail>;
 }
@@ -266,10 +278,11 @@ export class MCPIframeElement extends HTMLElement {
     }
 
     if (name === 'id' || name === 'prefix-separator') {
-      const separator = newValue ?? DEFAULT_PREFIX_SEPARATOR;
-      const sanitized = name === 'prefix-separator' ? sanitizeMCPNamePart(separator) : separator;
-      if (name === 'prefix-separator' && sanitized !== separator) {
-        console.warn(`[MCPIframe] Invalid prefix-separator "${separator}". Using "${sanitized}".`);
+      if (name === 'prefix-separator' && newValue !== null) {
+        const sanitized = sanitizeMCPNamePart(newValue);
+        if (sanitized !== newValue) {
+          console.warn(`[MCPIframe] Invalid prefix-separator "${newValue}". Using "${sanitized}".`);
+        }
       }
       const connection = this.#connection;
       if (connection) {
@@ -363,17 +376,10 @@ export class MCPIframeElement extends HTMLElement {
 
     this.#iframe.style.border = 'none';
 
-    // A load is the single source of truth for replacing the iframe connection.
-    this.#iframe.addEventListener('load', () => void this.#handleIframeLoad());
+    // src/srcdoc changes only tear down; the load event rebuilds the connection.
+    this.#iframe.addEventListener('load', () => void this.#reconnect());
 
     this.shadowRoot?.appendChild(this.#iframe);
-  }
-
-  async #handleIframeLoad(): Promise<void> {
-    const requestGeneration = ++this.#connectionRequestGeneration;
-    await this.#disconnect();
-    if (requestGeneration !== this.#connectionRequestGeneration || !this.isConnected) return;
-    await this.#connect(requestGeneration);
   }
 
   async #connect(requestGeneration: number): Promise<void> {
@@ -543,7 +549,7 @@ export class MCPIframeElement extends HTMLElement {
 
   #dispatchItems(type: 'mcp-iframe-ready' | 'mcp-iframe-items-changed'): void {
     this.dispatchEvent(
-      new CustomEvent<MCPIframeReadyEventDetail>(type, {
+      new CustomEvent<MCPIframeItemsEventDetail>(type, {
         detail: {
           tools: this.exposedTools,
           resources: this.exposedResources,
@@ -633,6 +639,7 @@ export class MCPIframeElement extends HTMLElement {
     for (const tool of connection.items.tools) {
       if (!isActive()) return;
       const prefixedName = `${prefix}${tool.name}`;
+      if (isDuplicateRegistration(connection.toolRegistrations, prefixedName, 'tool')) continue;
 
       const descriptor: ModelContextTool<Record<string, unknown>, CallToolResult> & {
         inputSchema: InputSchema;
@@ -671,6 +678,8 @@ export class MCPIframeElement extends HTMLElement {
   ): void {
     for (const resource of connection.items.resources) {
       const parentUri = createParentResourceUri(prefix, resource.uri);
+      if (isDuplicateRegistration(connection.resourceRegistrations, parentUri, 'resource'))
+        continue;
 
       const descriptor: ResourceDescriptor = {
         uri: parentUri,
@@ -690,6 +699,9 @@ export class MCPIframeElement extends HTMLElement {
         resourceTemplate.uriTemplate,
         childTemplate.variableNames
       );
+      if (isDuplicateRegistration(connection.resourceRegistrations, parentUri, 'resource'))
+        continue;
+
       const descriptor: ResourceDescriptor = {
         uri: parentUri,
         name: resourceTemplate.name,
@@ -712,6 +724,7 @@ export class MCPIframeElement extends HTMLElement {
   ): void {
     for (const prompt of connection.items.prompts) {
       const prefixedName = `${prefix}${prompt.name}`;
+      if (isDuplicateRegistration(connection.promptRegistrations, prefixedName, 'prompt')) continue;
 
       const descriptor: PromptDescriptor = {
         name: prefixedName,

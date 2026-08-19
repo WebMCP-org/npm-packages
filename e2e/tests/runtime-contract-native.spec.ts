@@ -4,13 +4,13 @@ import {
   DYNAMIC_TOOL_NAME,
   getCanonicalToolNames,
   readInvocations,
-  registerDynamicToolInPage,
+  registerDynamicTool,
   resetInvocations,
-  unregisterDynamicToolInPage,
+  unregisterDynamicTool,
   waitForRuntimePage,
 } from './runtime-contract.helpers.js';
 
-type NativeModelContext = Pick<Document['modelContext'], 'getTools'> & {
+type NativeModelContext = Pick<NonNullable<Document['modelContext']>, 'getTools'> & {
   executeTool: NonNullable<ChromeModelContextExtensions['executeTool']>;
 };
 
@@ -209,7 +209,7 @@ test.describe('Runtime Contract - Browser API Caller', () => {
   test('reflects dynamic registration changes through the browser API surface', async ({
     page,
   }) => {
-    await expect(registerDynamicToolInPage(page)).resolves.toBe(true);
+    await expect(registerDynamicTool(page)).resolves.toBe(true);
     await expect.poll(async () => await listNativeToolNames(page)).toContain(DYNAMIC_TOOL_NAME);
 
     const text = await executeNativeToolText(page, DYNAMIC_TOOL_NAME, { value: 'browser-api' });
@@ -217,7 +217,7 @@ test.describe('Runtime Contract - Browser API Caller', () => {
   });
 
   test('stops exposing unregistered tools and later execution fails', async ({ page }) => {
-    await registerDynamicToolInPage(page);
+    await registerDynamicTool(page);
     await expect.poll(async () => await listNativeToolNames(page)).toContain(DYNAMIC_TOOL_NAME);
 
     const staleTool = await page.evaluateHandle(async (toolName): Promise<RegisteredTool> => {
@@ -234,7 +234,7 @@ test.describe('Runtime Contract - Browser API Caller', () => {
     }, DYNAMIC_TOOL_NAME);
 
     try {
-      await expect(unregisterDynamicToolInPage(page)).resolves.toBe(true);
+      await expect(unregisterDynamicTool(page)).resolves.toBe(true);
       await expect
         .poll(async () => await listNativeToolNames(page))
         .not.toContain(DYNAMIC_TOOL_NAME);

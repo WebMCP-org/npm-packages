@@ -12,6 +12,24 @@ const dynamicItemSnapshot = (page: Page) =>
     };
   });
 
+const parentResourceState = (page: Page) =>
+  page.evaluate(async () => {
+    const client = window.mcpClient;
+    if (!client) throw new Error('Parent MCP client is unavailable');
+    const [resources, templates] = await Promise.all([
+      client.listResources(undefined, { cacheMode: 'refresh' }),
+      client.listResourceTemplates(undefined, { cacheMode: 'refresh' }),
+    ]);
+    const registered = [
+      ...resources.resources.map((resource) => resource.uri),
+      ...templates.resourceTemplates.map((template) => template.uriTemplate),
+    ].filter((uri) => uri.startsWith('mcp-iframe:'));
+    return {
+      registered: registered.length,
+      exposed: window.mcpIframeHost.getMcpIframe().exposedResources.length,
+    };
+  });
+
 test.beforeEach(async ({ page }) => {
   await page.goto('/mcp-iframe-host.html');
   await expect(page.locator('body')).toHaveAttribute('data-status', 'ready');
@@ -236,6 +254,16 @@ test('clears parent registrations when the child session closes', async ({ page 
       })
     )
     .toEqual({ ready: false, tools: [], resources: [], prompts: [], parentTool: undefined });
+});
+
+test('never registers a child resource it cannot unregister', async ({ page }) => {
+  await page.evaluate(() => window.mcpIframeHost.addCollidingChildResources());
+  await expect
+    .poll(() => page.evaluate(() => window.mcpIframeHost.getMcpIframe().exposedResources.length))
+    .toBe(7);
+
+  await page.evaluate(() => window.mcpIframeHost.stopChildRuntime());
+  await expect.poll(() => parentResourceState(page)).toEqual({ registered: 0, exposed: 0 });
 });
 
 test('validates attributes, reconnects cross-origin, and supports a custom tag entry', async ({
