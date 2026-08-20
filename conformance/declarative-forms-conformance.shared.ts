@@ -1,5 +1,21 @@
-import type { ChromeModelContext, RegisteredTool } from '@mcp-b/webmcp-types';
+import type { ChromeModelContext, InputSchema, RegisteredTool } from '@mcp-b/webmcp-types';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+
+/**
+ * An object since webmcp#241 (Chrome 154.0.8013); the native runner also spans
+ * Chrome 152-154 builds that still return the serialized string, so both
+ * generations resolve here.
+ */
+function requireObjectInputSchema(tool: RegisteredTool): InputSchema {
+  const raw: unknown =
+    typeof tool.inputSchema === 'string' ? JSON.parse(tool.inputSchema) : tool.inputSchema;
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new Error(
+      `Expected ${tool.name} to expose a JSON Schema inputSchema, got ${JSON.stringify(raw)}`
+    );
+  }
+  return raw as InputSchema;
+}
 
 interface DeclarativeFormConformanceOptions {
   suiteName: string;
@@ -112,7 +128,7 @@ export function runDeclarativeFormConformanceSuite(
         title: 'Search',
         description: 'Search the catalog',
       });
-      expect(JSON.parse(tool.inputSchema ?? '')).toEqual({
+      expect(requireObjectInputSchema(tool)).toEqual({
         type: 'object',
         properties: {
           query: { type: 'string', description: 'The search query' },
@@ -143,7 +159,7 @@ export function runDeclarativeFormConformanceSuite(
       const tool = await waitForTool(name);
 
       expect(tool.description).toBe('Search from a component');
-      expect(JSON.parse(tool.inputSchema ?? '')).toMatchObject({
+      expect(requireObjectInputSchema(tool)).toMatchObject({
         properties: { query: { type: 'string', description: 'Search query' } },
       });
     });
@@ -171,7 +187,7 @@ export function runDeclarativeFormConformanceSuite(
       );
 
       const tool = await waitForTool(name);
-      expect(JSON.parse(tool.inputSchema ?? '')).toEqual({
+      expect(requireObjectInputSchema(tool)).toEqual({
         type: 'object',
         properties: {
           invalid_pattern: { type: 'string' },
@@ -237,10 +253,10 @@ export function runDeclarativeFormConformanceSuite(
       ]);
 
       const tool = await waitForTool(name);
-      const schema = JSON.parse(tool.inputSchema ?? '');
+      const properties = requireObjectInputSchema(tool).properties ?? {};
 
-      expect(Object.keys(schema.properties)).toEqual(parameterNames);
-      expect(Object.hasOwn(schema.properties, '__proto__')).toBe(true);
+      expect(Object.keys(properties)).toEqual(parameterNames);
+      expect(Object.hasOwn(properties, '__proto__')).toBe(true);
       await expect(
         executeTool(
           tool,
@@ -759,7 +775,7 @@ export function runDeclarativeFormConformanceSuite(
 
       const updated = await waitForTool(name, (tool) => tool.description === 'Updated form');
       expect(updated.title).toBe('Updated title');
-      expect(JSON.parse(updated.inputSchema ?? '')).toEqual({
+      expect(requireObjectInputSchema(updated)).toEqual({
         type: 'object',
         properties: {
           limit: {

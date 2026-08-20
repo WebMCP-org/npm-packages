@@ -481,7 +481,13 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       let inputSchema: InputSchema | undefined = DEFAULT_INPUT_SCHEMA;
       if (tool.inputSchema !== undefined) {
         try {
-          const parsed: unknown = JSON.parse(tool.inputSchema);
+          // An object since webmcp#241; a serialized string from older Chrome. The
+          // round-trip detaches the object from the page's graph and rejects non-JSON.
+          const serialized =
+            typeof tool.inputSchema === 'string'
+              ? tool.inputSchema
+              : JSON.stringify(tool.inputSchema);
+          const parsed: unknown = JSON.parse(serialized);
           inputSchema = isPlainObject(parsed) ? (parsed as InputSchema) : undefined;
         } catch {
           inputSchema = undefined;
@@ -640,15 +646,23 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     const currentWindow = globalThis.window;
 
     const tools = [...this.tools.values()]
-      .map(({ item, registeredInputSchema }) => ({
-        name: item.name,
-        title: item.title ?? '',
-        description: item.description,
-        ...(registeredInputSchema !== undefined ? { inputSchema: registeredInputSchema } : {}),
-        origin,
-        window: currentWindow,
-        ...(item.annotations ? { annotations: toWebMcpAnnotations(item.annotations) } : {}),
-      }))
+      .map(({ item, registeredInputSchema }) => {
+        // A fresh object per call, aligned with the polyfill's post-webmcp#241
+        // shape. A custom toJSON can serialize to non-object JSON; omit those
+        // rather than emit a value consumers would mistake for a pre-154
+        // serialized string.
+        const parsed: unknown =
+          registeredInputSchema === undefined ? undefined : JSON.parse(registeredInputSchema);
+        return {
+          name: item.name,
+          title: item.title ?? '',
+          description: item.description,
+          ...(isPlainObject(parsed) ? { inputSchema: parsed } : {}),
+          origin,
+          window: currentWindow,
+          ...(item.annotations ? { annotations: toWebMcpAnnotations(item.annotations) } : {}),
+        };
+      })
       .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     await new Promise((resolve) => setTimeout(resolve, 0));
     return tools;

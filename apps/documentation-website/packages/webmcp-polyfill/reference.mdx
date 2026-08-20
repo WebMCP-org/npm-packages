@@ -107,8 +107,8 @@ document origins.
 ### `getTools(options?)`
 
 Returns a sorted `Promise<RegisteredTool[]>`. Each record contains `name`,
-`title`, `description`, `window`, `origin`, and optional serialized
-`inputSchema` and annotations.
+`title`, `description`, `window`, `origin`, and an optional `inputSchema`
+JSON Schema object and annotations.
 
 An empty `fromOrigins` array discovers the current document's tools. A non-empty
 array rejects with `NotSupportedError`; native WebMCP is required for

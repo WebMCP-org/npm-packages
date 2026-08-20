@@ -14,6 +14,7 @@ import {
   createInvalidStateError,
   createToolInvocationFailedError,
   createUnknownError,
+  isPlainObject,
   parseChromeToolInput,
   serializeChromeToolResult,
   serializeInputSchema,
@@ -176,17 +177,23 @@ class StrictWebMCPContext extends EventTarget implements ModelContext {
       );
     }
     const tools = [...this.#tools.values()]
-      .map((tool) => ({
-        name: tool.name,
-        title: tool.title ?? '',
-        description: tool.description,
-        ...(tool[REGISTERED_INPUT_SCHEMA_SYMBOL] === undefined
-          ? {}
-          : { inputSchema: tool[REGISTERED_INPUT_SCHEMA_SYMBOL] }),
-        origin: currentOrigin(),
-        window: globalThis.window,
-        ...(tool.annotations ? { annotations: toWebMcpAnnotations(tool.annotations) } : {}),
-      }))
+      .map((tool) => {
+        // A fresh object per call, like Blink parsing its serialized copy
+        // (webmcp#241). A custom toJSON can serialize to non-object JSON; omit
+        // those rather than emit a value consumers would mistake for a pre-154
+        // serialized string.
+        const serialized = tool[REGISTERED_INPUT_SCHEMA_SYMBOL];
+        const parsed: unknown = serialized === undefined ? undefined : JSON.parse(serialized);
+        return {
+          name: tool.name,
+          title: tool.title ?? '',
+          description: tool.description,
+          ...(isPlainObject(parsed) ? { inputSchema: parsed } : {}),
+          origin: currentOrigin(),
+          window: globalThis.window,
+          ...(tool.annotations ? { annotations: toWebMcpAnnotations(tool.annotations) } : {}),
+        };
+      })
       .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     await new Promise((resolve) => setTimeout(resolve, 0));
     return tools;
@@ -230,6 +237,8 @@ class StrictWebMCPContext extends EventTarget implements ModelContext {
     return [...context.#tools.values()].map((tool) => ({
       name: tool.name,
       description: tool.description,
+      // Pinned to the string: the removed modelContextTesting surface predates
+      // webmcp#241.
       ...(tool[REGISTERED_INPUT_SCHEMA_SYMBOL] === undefined
         ? {}
         : { inputSchema: tool[REGISTERED_INPUT_SCHEMA_SYMBOL] }),

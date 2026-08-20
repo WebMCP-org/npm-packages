@@ -127,14 +127,31 @@ function toInvokeArgs(value: unknown): JsonObject {
   return {};
 }
 
-function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor {
+function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor | null {
+  let inputSchema: unknown;
+  if (tool.inputSchema !== undefined) {
+    // An object since webmcp#241 -- no copy needed, postMessage structured-clones
+    // it out of the page world. A serialized string from older Chrome.
+    if (typeof tool.inputSchema === 'string') {
+      try {
+        inputSchema = JSON.parse(tool.inputSchema) as unknown;
+      } catch {
+        // Unconditional: dropping a tool is a functional loss, not debug noise,
+        // and one bad schema must not take down the page's whole relay list.
+        console.warn(
+          `[webmcp-relay-embed] Tool "${tool.name}" was not relayed because its input schema is malformed.`
+        );
+        return null;
+      }
+    } else {
+      inputSchema = tool.inputSchema;
+    }
+  }
   return {
     name: tool.name,
     ...(tool.title === undefined ? {} : { title: tool.title }),
     description: tool.description,
-    ...(tool.inputSchema === undefined
-      ? {}
-      : { inputSchema: JSON.parse(tool.inputSchema) as unknown }),
+    ...(inputSchema === undefined ? {} : { inputSchema }),
     ...(tool.annotations === undefined ? {} : { annotations: tool.annotations }),
   };
 }
@@ -184,7 +201,9 @@ async function listRelayTools(): Promise<RelayToolDescriptor[]> {
     return [];
   }
 
-  return (await descriptorContext.getTools()).map(mapRegisteredTool);
+  return (await descriptorContext.getTools())
+    .map(mapRegisteredTool)
+    .filter((tool): tool is RelayToolDescriptor => tool !== null);
 }
 
 async function invokeRelayTool(name: string, args: JsonObject): Promise<CallToolResult> {

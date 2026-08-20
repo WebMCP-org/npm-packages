@@ -106,7 +106,7 @@ want the surface installed rather than detected.
 
 Aborting the registration signal removes that registration.
 
-`RegisteredTool` contains `name`, optional `title`, `description`, optional serialized `inputSchema`, `window`, `origin`, and optional standard annotations.
+`RegisteredTool` contains `name`, optional `title`, `description`, optional `inputSchema` (a JSON Schema object since webmcp#241; a serialized string from Chrome builds that predate it), `window`, `origin`, and optional standard annotations.
 
 ### `ChromeModelContext`
 

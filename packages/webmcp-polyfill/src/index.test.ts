@@ -234,7 +234,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     await expect(modelContext().getTools()).resolves.toMatchObject([
       {
         name: 'schema_metadata_tool',
-        inputSchema: '{"type":123}',
+        inputSchema: { type: 123 },
       },
     ]);
   });
@@ -502,8 +502,12 @@ describe('@mcp-b/webmcp-polyfill', () => {
         name: 'native_get_tools_shape',
         title: 'Native Tool',
         description: 'Native getTools shape',
-        inputSchema:
-          '{"type":"object","properties":{"value":{"type":"number"}},"required":["value"]}',
+        // An object since webmcp#241, parsed fresh from the serialized copy.
+        inputSchema: {
+          type: 'object',
+          properties: { value: { type: 'number' } },
+          required: ['value'],
+        },
         origin: window.location.origin,
         window,
       },
@@ -547,12 +551,23 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect(tools.map(({ name }) => name)).toEqual(['Z_tool', '_tool', 'a_tool']);
     expect(tools[0]).toMatchObject({
       title: '',
-      inputSchema: JSON.stringify(exactSchema),
+      inputSchema: exactSchema,
       annotations: {
         readOnlyHint: true,
         untrustedContentHint: false,
       },
     });
+    // Exact: getTools reflects the registered schema verbatim, with no
+    // normalization-injected keys (toMatchObject alone would allow extras).
+    expect(tools[0]?.inputSchema).toEqual(exactSchema);
+    // A fresh, detached object per call: mutating one result must not leak
+    // into the registration or later calls.
+    const schema = tools[0]?.inputSchema;
+    if (typeof schema !== 'object' || schema === null) {
+      throw new Error('expected an object inputSchema');
+    }
+    Object.assign(schema, { mutated: true });
+    expect((await modelContext().getTools())[0]?.inputSchema).toEqual(exactSchema);
     expect(tools[0]?.annotations).toEqual({
       readOnlyHint: true,
       untrustedContentHint: false,
@@ -1210,7 +1225,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       ).rejects.toBe(serializationError);
     });
 
-    it('exposes the exact JSON string produced through inputSchema.toJSON', async () => {
+    it('omits inputSchema when toJSON serializes to a non-object', async () => {
       initializeTestPolyfill();
 
       await modelContext().registerTool({
@@ -1222,12 +1237,11 @@ describe('@mcp-b/webmcp-polyfill', () => {
         execute: async () => ({ content: [] }),
       });
 
-      await expect(modelContext().getTools()).resolves.toMatchObject([
-        {
-          name: 'custom_serialized_schema',
-          inputSchema: '"serialized-schema"',
-        },
-      ]);
+      // A string here would collide with the pre-154 serialized-schema shape
+      // consumers JSON.parse, so the non-object parse result is dropped.
+      const tools = await modelContext().getTools();
+      expect(tools[0]?.name).toBe('custom_serialized_schema');
+      expect(tools[0]).not.toHaveProperty('inputSchema');
     });
   });
 

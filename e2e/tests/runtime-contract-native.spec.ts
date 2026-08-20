@@ -168,7 +168,16 @@ test.describe('Runtime Contract - Browser API Caller', () => {
           name: sumTool.name,
           title: sumTool.title,
           description: sumTool.description,
-          inputSchemaType: typeof sumTool.inputSchema,
+          // An object since webmcp#241; Canary 154 still serves same-document
+          // tools as serialized strings, so both generations are valid here.
+          inputSchemaShape:
+            typeof sumTool.inputSchema === 'string'
+              ? 'string'
+              : typeof sumTool.inputSchema === 'object' &&
+                  sumTool.inputSchema !== null &&
+                  !Array.isArray(sumTool.inputSchema)
+                ? 'object'
+                : 'invalid',
           originType: typeof sumTool.origin,
           hasWindow: typeof sumTool.window === 'object',
         },
@@ -181,10 +190,10 @@ test.describe('Runtime Contract - Browser API Caller', () => {
     expect(result.toolsArePromise).toBe(true);
     expect(result.toolInfo).toMatchObject({
       name: 'sum',
-      inputSchemaType: 'string',
       originType: 'string',
       hasWindow: true,
     });
+    expect(['string', 'object']).toContain(result.toolInfo?.inputSchemaShape);
     expect(result.execution).toContain('sum:11');
   });
 

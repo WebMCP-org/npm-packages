@@ -2,6 +2,7 @@ import { expectTypeOf, test } from 'vitest';
 import type {
   ChromeModelContext,
   ChromeModelContextExecuteToolOptions,
+  InputSchema,
   ModelContext,
   ModelContextExtensions,
   ModelContextGetToolOptions,
@@ -11,6 +12,11 @@ import type {
   RegisteredTool,
   ToolListItem,
 } from './index.js';
+
+test('RegisteredTool.inputSchema spans both schema generations', () => {
+  // webmcp#241: an object from Chrome >=154.0.8013, a serialized string before.
+  expectTypeOf<RegisteredTool['inputSchema']>().toEqualTypeOf<InputSchema | string | undefined>();
+});
 
 test('ModelContext exposes only the standard producer API', () => {
   expectTypeOf<ModelContext['registerTool']>().returns.toEqualTypeOf<Promise<void>>();

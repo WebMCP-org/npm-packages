@@ -845,6 +845,98 @@ describe('BrowserMcpServer', () => {
     }
   });
 
+  it('accepts an object inputSchema from native getTools', async () => {
+    // Chrome ≥154.0.8013 returns inputSchema as an object (webmcp#241); the
+    // serialized-string cases above cover the form older Chrome still sends.
+    // Detachment from the page-world object is pinned by 'preserves known
+    // annotations and returns detached tool metadata'.
+    const objectSchema = { type: 'object', properties: { value: { type: 'string' } } };
+    const nativeContext = Object.assign(new EventTarget(), {
+      registerTool: () => {},
+      getTools: async () => [
+        {
+          name: 'object_schema_tool',
+          description: 'Schema arrives as an object',
+          inputSchema: objectSchema,
+          origin: window.location.origin,
+          window,
+        },
+      ],
+      executeTool: async () => JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }),
+    });
+    const server = new BrowserMcpServer(
+      { name: 'native-object-schema-server', version: '1.0.0' },
+      { native: nativeContext as unknown as ModelContext }
+    );
+
+    try {
+      await expect(server.syncNativeTools()).resolves.toBeUndefined();
+      const [listed] = server.listTools();
+      expect(listed?.inputSchema).toEqual(objectSchema);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('skips a native tool whose object schema is not a plain object', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const nativeContext = Object.assign(new EventTarget(), {
+      registerTool: () => {},
+      getTools: async () => [
+        {
+          name: 'array_schema_tool',
+          description: 'An array is not a JSON Schema root',
+          inputSchema: [],
+          origin: window.location.origin,
+          window,
+        },
+        {
+          name: 'ok_tool',
+          description: 'Still registered',
+          inputSchema: JSON.stringify({ type: 'object', properties: {} }),
+          origin: window.location.origin,
+          window,
+        },
+      ],
+      executeTool: async () => JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }),
+    });
+    const server = new BrowserMcpServer(
+      { name: 'native-malformed-schema-server', version: '1.0.0' },
+      { native: nativeContext as unknown as ModelContext }
+    );
+
+    try {
+      await expect(server.syncNativeTools()).resolves.toBeUndefined();
+      expect(server.listTools().map(({ name }) => name)).toEqual(['ok_tool']);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('array_schema_tool'));
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('input schema is malformed'));
+    } finally {
+      warn.mockRestore();
+      await server.close();
+    }
+  });
+
+  it('serves a parsed object inputSchema from getTools without native', async () => {
+    server = new BrowserMcpServer({ name: 'no-native-gettools', version: '1.0.0' });
+    await Reflect.apply(server.registerTool, server, [
+      {
+        name: 'local_tool',
+        description: 'Registered without a native context',
+        inputSchema: { type: 'object', properties: { value: { type: 'string' } } },
+        async execute() {},
+      },
+      null,
+    ]);
+
+    // Both in-repo producers emit the post-webmcp#241 object shape; only
+    // pre-154 Chrome still returns serialized strings.
+    const [tool] = await server.getTools();
+    expect(tool?.inputSchema).toEqual({
+      type: 'object',
+      properties: { value: { type: 'string' } },
+    });
+  });
+
   it('refreshes native tool identity and metadata through MCP reconciliation', async () => {
     const firstNativeTool = {
       name: 'refreshable_native_tool',

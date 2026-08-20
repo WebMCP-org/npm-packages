@@ -70,7 +70,8 @@ describe('useWebMCP in a browser runtime', () => {
 
     const tool = await findTool('browser_greet');
     expect(tool?.description).toBe('Greets a person');
-    expect(JSON.parse(tool?.inputSchema ?? '{}')).toMatchObject({
+    // An object since webmcp#241.
+    expect(tool?.inputSchema).toMatchObject({
       type: 'object',
       required: ['name'],
     });
@@ -368,13 +369,14 @@ describe('useWebMCP in a browser runtime', () => {
       { initialProps: { revision: 1 } }
     );
 
-    const getValueDescription = async () => {
-      const schema = JSON.parse((await findTool('browser_dependency'))?.inputSchema ?? '{}');
-      return schema.properties.value.description;
+    const expectValueDescription = async (description: string) => {
+      expect((await findTool('browser_dependency'))?.inputSchema).toMatchObject({
+        properties: { value: { description } },
+      });
     };
-    expect(await getValueDescription()).toBe('Revision 1');
+    await expectValueDescription('Revision 1');
     await rerender({ revision: 2 });
-    expect(await getValueDescription()).toBe('Revision 2');
+    await expectValueDescription('Revision 2');
   });
 
   it('converts a real Zod Standard JSON Schema through the registration path', async () => {
@@ -393,7 +395,7 @@ describe('useWebMCP in a browser runtime', () => {
     );
 
     const tool = await findTool('browser_standard_schema');
-    expect(JSON.parse(tool?.inputSchema ?? '{}')).toEqual({
+    expect(tool?.inputSchema).toEqual({
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       type: 'object',
       properties: {
