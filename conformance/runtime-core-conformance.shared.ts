@@ -168,7 +168,8 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
       const metadataTool = (await modelContext.getTools()).find(
         (candidate) => candidate.name === metadataToolName
       );
-      expect(metadataTool?.inputSchema).toBe('{"type":42}');
+      // An object, not a serialized string, since webmcp#241.
+      expect(metadataTool?.inputSchema).toEqual({ type: 42 });
     });
 
     it('executes registered tools via the producer getTools/executeTool API', async () => {

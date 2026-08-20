@@ -1,5 +1,6 @@
 import type {
   ChromeModelContextExecuteToolOptions,
+  InputSchema,
   ModelContext,
   ModelContextGetToolOptions,
   ModelContextRegisterToolOptions,
@@ -180,9 +181,10 @@ class StrictWebMCPContext extends EventTarget implements ModelContext {
         name: tool.name,
         title: tool.title ?? '',
         description: tool.description,
+        // A fresh object per call, like Blink parsing its serialized copy (webmcp#241).
         ...(tool[REGISTERED_INPUT_SCHEMA_SYMBOL] === undefined
           ? {}
-          : { inputSchema: tool[REGISTERED_INPUT_SCHEMA_SYMBOL] }),
+          : { inputSchema: JSON.parse(tool[REGISTERED_INPUT_SCHEMA_SYMBOL]) as InputSchema }),
         origin: currentOrigin(),
         window: globalThis.window,
         ...(tool.annotations ? { annotations: toWebMcpAnnotations(tool.annotations) } : {}),

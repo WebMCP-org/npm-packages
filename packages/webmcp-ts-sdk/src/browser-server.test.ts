@@ -845,6 +845,43 @@ describe('BrowserMcpServer', () => {
     }
   });
 
+  it('backfills native object schemas without sharing the page-world object', async () => {
+    // Chrome ≥154.0.8013 returns inputSchema as an object (webmcp#241); the
+    // string cases above cover the serialized form older Chrome still sends.
+    const objectSchema = { type: 'object', properties: { value: { type: 'string' } } };
+    const nativeContext = Object.assign(new EventTarget(), {
+      registerTool: () => {},
+      getTools: async () => [
+        {
+          name: 'object_schema_tool',
+          description: 'Schema arrives as an object',
+          inputSchema: objectSchema,
+          origin: window.location.origin,
+          window,
+        },
+      ],
+      executeTool: async () => JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }),
+    });
+    const server = new BrowserMcpServer(
+      { name: 'native-object-schema-server', version: '1.0.0' },
+      { native: nativeContext as unknown as ModelContext }
+    );
+
+    try {
+      await expect(server.syncNativeTools()).resolves.toBeUndefined();
+      const [listed] = server.listTools();
+      expect(listed?.inputSchema).toEqual(objectSchema);
+
+      objectSchema.properties.value.type = 'number';
+      expect(listed?.inputSchema).toEqual({
+        type: 'object',
+        properties: { value: { type: 'string' } },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it('refreshes native tool identity and metadata through MCP reconciliation', async () => {
     const firstNativeTool = {
       name: 'refreshable_native_tool',

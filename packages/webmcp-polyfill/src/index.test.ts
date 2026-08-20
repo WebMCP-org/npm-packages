@@ -234,7 +234,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     await expect(modelContext().getTools()).resolves.toMatchObject([
       {
         name: 'schema_metadata_tool',
-        inputSchema: '{"type":123}',
+        inputSchema: { type: 123 },
       },
     ]);
   });
@@ -502,8 +502,12 @@ describe('@mcp-b/webmcp-polyfill', () => {
         name: 'native_get_tools_shape',
         title: 'Native Tool',
         description: 'Native getTools shape',
-        inputSchema:
-          '{"type":"object","properties":{"value":{"type":"number"}},"required":["value"]}',
+        // An object since webmcp#241, parsed fresh from the serialized copy.
+        inputSchema: {
+          type: 'object',
+          properties: { value: { type: 'number' } },
+          required: ['value'],
+        },
         origin: window.location.origin,
         window,
       },
@@ -547,7 +551,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect(tools.map(({ name }) => name)).toEqual(['Z_tool', '_tool', 'a_tool']);
     expect(tools[0]).toMatchObject({
       title: '',
-      inputSchema: JSON.stringify(exactSchema),
+      inputSchema: exactSchema,
       annotations: {
         readOnlyHint: true,
         untrustedContentHint: false,
@@ -1222,10 +1226,12 @@ describe('@mcp-b/webmcp-polyfill', () => {
         execute: async () => ({ content: [] }),
       });
 
+      // The serialized copy round-trips through JSON.parse, so a toJSON that
+      // produced a non-object surfaces as that parsed value.
       await expect(modelContext().getTools()).resolves.toMatchObject([
         {
           name: 'custom_serialized_schema',
-          inputSchema: '"serialized-schema"',
+          inputSchema: 'serialized-schema',
         },
       ]);
     });

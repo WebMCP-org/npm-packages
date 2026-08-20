@@ -481,7 +481,13 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       let inputSchema: InputSchema | undefined = DEFAULT_INPUT_SCHEMA;
       if (tool.inputSchema !== undefined) {
         try {
-          const parsed: unknown = JSON.parse(tool.inputSchema);
+          // An object since webmcp#241; a serialized string from older Chrome. The
+          // round-trip detaches the object from the page's graph and rejects non-JSON.
+          const serialized =
+            typeof tool.inputSchema === 'string'
+              ? tool.inputSchema
+              : JSON.stringify(tool.inputSchema);
+          const parsed: unknown = JSON.parse(serialized);
           inputSchema = isPlainObject(parsed) ? (parsed as InputSchema) : undefined;
         } catch {
           inputSchema = undefined;

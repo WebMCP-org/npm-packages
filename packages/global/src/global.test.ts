@@ -223,8 +223,12 @@ describe('global adapter', () => {
         name: 'native_shape_tool',
         title: 'Native shape tool',
         description: 'Native shape tool',
-        inputSchema:
-          '{"type":"object","properties":{"value":{"type":"number"}},"required":["value"]}',
+        // An object since webmcp#241.
+        inputSchema: {
+          type: 'object',
+          properties: { value: { type: 'number' } },
+          required: ['value'],
+        },
         origin: expect.any(String),
         window: expect.any(Object),
       }),

@@ -131,7 +131,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: web-platform-tests/wpt
-          ref: c7fdee80f3f17b4e9813964916afdfd57ace863f
+          ref: 9ef2de86389e3f388578fe5fc599c979078c6667
           path: .reference/wpt
           # "interfaces" carries the .idl files that webmcp/idlharness.https.window.js
           # fetches at runtime (webmcp.idl plus its html/dom dependencies). ~1.8 MB.

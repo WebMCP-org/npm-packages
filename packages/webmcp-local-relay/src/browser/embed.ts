@@ -132,9 +132,14 @@ function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor {
     name: tool.name,
     ...(tool.title === undefined ? {} : { title: tool.title }),
     description: tool.description,
+    // An object since webmcp#241; a serialized string from older Chrome.
     ...(tool.inputSchema === undefined
       ? {}
-      : { inputSchema: JSON.parse(tool.inputSchema) as unknown }),
+      : {
+          inputSchema: (typeof tool.inputSchema === 'string'
+            ? JSON.parse(tool.inputSchema)
+            : tool.inputSchema) as unknown,
+        }),
     ...(tool.annotations === undefined ? {} : { annotations: tool.annotations }),
   };
 }
