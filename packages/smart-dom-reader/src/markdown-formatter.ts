@@ -48,10 +48,6 @@ function truncate(text: string | undefined, len?: number): string {
   return `${lastSpace > 32 ? slice.slice(0, lastSpace) : slice}…`;
 }
 
-function bestSelector(el: Pick<ExtractedElement, 'selector' | 'tag' | 'text'>): string {
-  return el.selector?.css || '';
-}
-
 function hashId(input: string): string {
   let h = 5381;
   for (let i = 0; i < input.length; i++) h = (h * 33) ^ input.charCodeAt(i);
@@ -82,7 +78,7 @@ function iconForRegion(key: string): string {
 
 function elementLine(el: ExtractedElement, opts?: MarkdownFormatOptions): string {
   const txt = truncate(el.text || el.attributes?.ariaLabel, opts?.maxTextLength ?? 80);
-  const sel = bestSelector(el);
+  const sel = el.selector?.css || '';
   const tag = el.tag.toLowerCase();
   const action = el.interaction?.submit
     ? 'submit'
@@ -117,7 +113,7 @@ function renderInteractive(
 ): string {
   const parts: string[] = [];
 
-  const limit = (arr: ExtractedElement[]) =>
+  const limit = <T>(arr: T[]) =>
     typeof opts?.maxElements === 'number' ? arr.slice(0, opts.maxElements) : arr;
 
   if (inter.buttons.length) {
@@ -138,9 +134,7 @@ function renderInteractive(
   }
   if (inter.forms.length) {
     parts.push('Forms:');
-    for (const f of limit(inter.forms as unknown as ExtractedElement[])) {
-      // FormInfo is not ExtractedElement; render minimally
-      // @ts-expect-error — using selector from FormInfo shape
+    for (const f of limit(inter.forms)) {
       parts.push(`- FORM: action=${f.action ?? '-'} method=${f.method ?? '-'} → \`${f.selector}\``);
     }
   }

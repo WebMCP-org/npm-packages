@@ -36,6 +36,7 @@ async function getToolNames(page: Page): Promise<string[]> {
           __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
         }
       ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+    if (!context) throw new Error('document.modelContext is unavailable');
     return (await context.getTools()).map((tool) => tool.name);
   });
 }

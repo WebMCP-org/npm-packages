@@ -168,7 +168,7 @@ The MCP endpoint and `llms.txt` serve different purposes. `llms.txt` is a static
 
 ## Versioning and changelog
 
-WebMCP uses [Changesets](https://github.com/changesets/changesets) for versioning. Each package in the `@mcp-b/*` scope is versioned independently and published to npm.
+WebMCP uses [Changesets](https://github.com/changesets/changesets) for versioning. The browser packages share one fixed release version. Changesets bumps the full group when any member changes. Private apps, templates, and test packages are not published.
 
 ### Where to find changelogs
 
@@ -185,25 +185,29 @@ All packages follow [Semantic Versioning](https://semver.org/):
 | Increment     | Meaning                           |
 | ------------- | --------------------------------- |
 | Major (X.0.0) | Breaking API changes              |
-| Minor (0.X.0) | New features, backward compatible |
-| Patch (0.0.X) | Bug fixes, backward compatible    |
+| Minor (X.Y.0) | New features, backward compatible |
+| Patch (X.Y.Z) | Bug fixes, backward compatible    |
 
 ### Package scope
 
-The monorepo publishes the following packages. Each has its own version number.
+The fixed release train contains these browser packages:
 
-| Package                     | Purpose                                           |
-| --------------------------- | ------------------------------------------------- |
-| `@mcp-b/global`             | Entry point, auto-initializes polyfill and server |
-| `@mcp-b/webmcp-polyfill`    | Polyfills `document.modelContext`                 |
-| `@mcp-b/webmcp-ts-sdk`      | BrowserMcpServer with MCP extensions              |
-| `@mcp-b/webmcp-types`       | Zero-runtime TypeScript types                     |
-| `@mcp-b/react-webmcp`       | React hooks for tool registration                 |
-| `usewebmcp`                 | Strict-core React hook                            |
-| `@mcp-b/transports`         | Tab and iframe transports                         |
-| `@mcp-b/mcp-iframe`         | Iframe MCP communication                          |
-| `@mcp-b/smart-dom-reader`   | DOM content extraction                            |
-| `@mcp-b/webmcp-local-relay` | Local relay server for desktop agents             |
+| Package                          | Purpose                                           |
+| -------------------------------- | ------------------------------------------------- |
+| `@mcp-b/global`                  | Entry point, auto-initializes polyfill and server |
+| `@mcp-b/webmcp-polyfill`         | Polyfills `document.modelContext`                 |
+| `@mcp-b/webmcp-ts-sdk`           | BrowserMcpServer with MCP extensions              |
+| `@mcp-b/webmcp-types`            | Zero-runtime TypeScript types                     |
+| `@mcp-b/react-webmcp`            | React hooks for tool registration                 |
+| `usewebmcp`                      | Strict-core React hook                            |
+| `@mcp-b/transports`              | Tab and iframe transports                         |
+| `@mcp-b/mcp-iframe`              | Iframe MCP communication                          |
+| `@mcp-b/webmcp-extension`        | MV3 extension template and isolated-world client  |
+| `@mcp-b/smart-dom-reader`        | DOM content extraction                            |
+| `@mcp-b/smart-dom-reader-server` | Node MCP server wrapping the reader               |
+| `@mcp-b/webmcp-local-relay`      | Local relay server for desktop agents             |
+
+See the [package index](/packages/index) for package-specific documentation.
 
 ### Reporting issues
 

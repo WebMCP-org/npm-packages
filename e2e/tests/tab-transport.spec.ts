@@ -1,5 +1,10 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
+
+const listRegisteredToolNames = (page: Page): Promise<string[]> =>
+  page.evaluate(() =>
+    (document.modelContext as BrowserMcpServer).listTools().map((tool) => tool.name)
+  );
 
 test.describe('Web Model Context API E2E Tests', () => {
   test.beforeEach(async ({ page }) => {
@@ -51,9 +56,7 @@ test.describe('Web Model Context API E2E Tests', () => {
     // Wait for tools to be listed
     await page.waitForTimeout(500);
 
-    const toolNames = await page.evaluate(() =>
-      (document.modelContext as BrowserMcpServer).listTools().map((tool) => tool.name)
-    );
+    const toolNames = await listRegisteredToolNames(page);
     expect(toolNames).toHaveLength(4);
     expect(toolNames).toContain('incrementCounter');
     expect(toolNames).toContain('decrementCounter');
@@ -113,9 +116,7 @@ test.describe('Web Model Context API E2E Tests', () => {
     await page.waitForTimeout(500);
 
     // Verify 5 tools total (4 base + 1 dynamic)
-    let toolNames = await page.evaluate(() =>
-      (document.modelContext as BrowserMcpServer).listTools().map((tool) => tool.name)
-    );
+    let toolNames = await listRegisteredToolNames(page);
     expect(toolNames).toHaveLength(5);
     expect(toolNames).toContain('dynamicTool');
 
@@ -123,9 +124,7 @@ test.describe('Web Model Context API E2E Tests', () => {
     await page.click('#replace-base-tools');
     await page.waitForTimeout(500);
 
-    toolNames = await page.evaluate(() =>
-      (document.modelContext as BrowserMcpServer).listTools().map((tool) => tool.name)
-    );
+    toolNames = await listRegisteredToolNames(page);
     expect(toolNames).toHaveLength(3);
     expect(toolNames).toContain('doubleCounter');
     expect(toolNames).toContain('halveCounter');
@@ -133,9 +132,7 @@ test.describe('Web Model Context API E2E Tests', () => {
   });
 
   test('should expose tools via public modelContext API', async ({ page }) => {
-    const toolCount = await page.evaluate(
-      () => (document.modelContext as BrowserMcpServer).listTools().length
-    );
+    const toolCount = (await listRegisteredToolNames(page)).length;
 
     // Should have 4 base tools initially
     expect(toolCount).toBe(4);
@@ -147,21 +144,11 @@ test.describe('Web Model Context API E2E Tests', () => {
     expect(hasTestApp).toBe(true);
 
     // Test counter function
-    const counter = await page.evaluate(() => {
-      const w = window as unknown as {
-        testApp: { counter: () => number; getAPIStatus: () => boolean };
-      };
-      return w.testApp.counter();
-    });
+    const counter = await page.evaluate(() => window.testApp.counter());
     expect(counter).toBe(0);
 
     // Test getAPIStatus function
-    const apiStatus = await page.evaluate(() => {
-      const w = window as unknown as {
-        testApp: { counter: () => number; getAPIStatus: () => boolean };
-      };
-      return w.testApp.getAPIStatus();
-    });
+    const apiStatus = await page.evaluate(() => window.testApp.getAPIStatus());
     expect(apiStatus).toBe(true);
   });
 
@@ -370,6 +357,8 @@ test.describe('Model Context Testing API Tests', () => {
 
   test('should fire toolchange event on tool registration', async ({ page }) => {
     const result = await page.evaluate(async () => {
+      const modelContext = document.modelContext;
+      if (!modelContext) throw new Error('document.modelContext is unavailable');
       const testingAPI = navigator.modelContextTesting;
       if (!testingAPI) return { count: 0, toolName: null };
 
@@ -380,7 +369,7 @@ test.describe('Model Context Testing API Tests', () => {
 
       const toolName = `testingCallbackTool_${Date.now()}`;
       const controller = new AbortController();
-      document.modelContext.registerTool(
+      modelContext.registerTool(
         {
           name: toolName,
           description: 'Callback test tool',

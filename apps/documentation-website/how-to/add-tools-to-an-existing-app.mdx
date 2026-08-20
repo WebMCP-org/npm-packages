@@ -1,5 +1,5 @@
 ---
-title: 'Add Tools to an Existing App'
+title: 'Add tools to an existing app'
 description: 'Expose existing product functionality as WebMCP tools without rewriting your application.'
 keywords:
   [
@@ -33,7 +33,11 @@ If you do not have a build step, add a single script tag. Place it before any co
 <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
 ```
 
-Both approaches auto-initialize `document.modelContext` on load.
+Both approaches auto-initialize `document.modelContext` on load. The property
+is still typed as optional, because no browser ships WebMCP unflagged, so
+TypeScript under `strict` needs a guard that the examples below omit for
+brevity. See
+[`@mcp-b/webmcp-types`](/packages/webmcp-types/reference) for the pattern.
 
 <Note>
   If you only need the strict core API (no MCP bridge, no transports), use `@mcp-b/webmcp-polyfill`

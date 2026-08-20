@@ -1,5 +1,5 @@
 ---
-title: '@mcp-b/webmcp-types'
+title: '@mcp-b/webmcp-types reference'
 description: 'Reference for WebMCP TypeScript contracts, schema inference, and document.modelContext augmentation.'
 keywords:
   [
@@ -52,13 +52,33 @@ Choose one activation method:
   </Tab>
 </Tabs>
 
-Activation adds these globals:
+Activation adds these globals. Every one is optional. No browser ships WebMCP
+unflagged (Chromium exposes it under `--enable-features=WebMCP`), and the
+declarative form members are explainer-only, appearing in neither the
+specification nor WPT's `webmcp.idl`.
 
-| Property                        | Type                               | Status                                   |
-| ------------------------------- | ---------------------------------- | ---------------------------------------- |
-| `document.modelContext`         | `ModelContext`                     | Canonical                                |
-| `navigator.modelContext`        | `ModelContext \| undefined`        | Deprecated compatibility alias           |
-| `navigator.modelContextTesting` | `ModelContextTesting \| undefined` | Deprecated testing compatibility surface |
+| Property                        | Type                                           | Status                                   |
+| ------------------------------- | ---------------------------------------------- | ---------------------------------------- |
+| `document.modelContext`         | `ModelContext?`                                | Canonical                                |
+| `navigator.modelContext`        | `ModelContext \| undefined`                    | Deprecated compatibility alias           |
+| `navigator.modelContextTesting` | `ModelContextTesting \| undefined`             | Deprecated testing compatibility surface |
+| `SubmitEvent.agentInvoked`      | `boolean?`                                     | Declarative forms                        |
+| `SubmitEvent.respondWith`       | `((agentResponse: Promise<unknown>) => void)?` | Declarative forms                        |
+| `ModelContext`                  | interface object or `undefined`                | Branding and `instanceof`                |
+
+The optional members are bare optionals (`?: T`, not `?: T | undefined`). Where
+WebMCP is absent the property is genuinely missing, so `'modelContext' in document`
+is `false`. `ModelContext` is `| undefined` instead, because a `var` declaration
+cannot be optional; guard it with `typeof ModelContext !== 'undefined'`.
+
+```ts "Feature-detect before use"
+const modelContext = document.modelContext;
+if (!modelContext) return;
+await modelContext.registerTool(tool);
+```
+
+Install [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview) when you
+want the surface installed rather than detected.
 
 ## Example
 

@@ -187,6 +187,11 @@ suite and replay the WPT lane with
 deliberately and review the upstream diff first. See
 [`docs/TESTING.md`](./docs/TESTING.md) for the test matrix.
 
+`pnpm test:wpt:idl` is a second lane checking API _shape_ rather than behavior.
+It needs `interfaces` in the `.reference/wpt` sparse checkout and runs
+non-blocking in CI; see
+[`docs/TESTING.md`](./docs/TESTING.md#idl-shape-conformance).
+
 ## Before Committing
 
 All code must pass:

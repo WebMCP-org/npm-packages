@@ -67,10 +67,7 @@
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
-    "typecheck": "tsc --noEmit",
-    "version:major": "pnpm version major --no-git-tag-version",
-    "version:minor": "pnpm version minor --no-git-tag-version",
-    "version:patch": "pnpm version patch --no-git-tag-version"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",

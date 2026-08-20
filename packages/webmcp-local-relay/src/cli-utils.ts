@@ -1,5 +1,7 @@
 import { parseArgs } from 'node:util';
 
+import { DEFAULT_RELAY_PORT } from './portStrategy.js';
+
 /**
  * Parsed CLI options for relay startup.
  */
@@ -47,7 +49,7 @@ export function parseCliOptions(argv: string[]): CliOptions {
     strict: true,
   });
 
-  const port = values.port === undefined ? 9333 : Number(values.port);
+  const port = values.port === undefined ? DEFAULT_RELAY_PORT : Number(values.port);
   if (!Number.isInteger(port) || port <= 0 || port > 65535) {
     throw new Error(`Invalid port "${values.port}". Port must be an integer between 1 and 65535.`);
   }

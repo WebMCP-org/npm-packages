@@ -80,11 +80,6 @@ describe('Native WebMCP conformance', () => {
     expect('clearContext' in modelContext).toBe(false);
   });
 
-  it('treats Chromium executeTool as a feature-detected extension', () => {
-    const executeTool = getChromeExecuteTool(requireNativeModelContext());
-    expect(executeTool === undefined || typeof executeTool === 'function').toBe(true);
-  });
-
   it('registerTool resolves undefined and exposes tools through getTools()', async () => {
     const toolName = uniqueToolName('native_register');
     const controller = new AbortController();

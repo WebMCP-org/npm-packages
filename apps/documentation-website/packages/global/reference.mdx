@@ -1,5 +1,5 @@
 ---
-title: '@mcp-b/global'
+title: '@mcp-b/global reference'
 description: 'Reference for the full MCP-B runtime entry point: initialization, cleanup, transport, and configuration.'
 keywords:
   [
@@ -135,10 +135,10 @@ After cleanup, `initializeWebModelContext()` can be called again to re-initializ
 
 ### `TransportConfiguration`
 
-| Option         | Type                                            | Default | Description                                     |
-| -------------- | ----------------------------------------------- | ------- | ----------------------------------------------- |
-| `tabServer`    | `Partial<TabServerTransportOptions> \| false`   | Auto    | Tab transport options, or `false` to disable    |
-| `iframeServer` | `Partial<IframeChildTransportOptions> \| false` | Auto    | Iframe transport options, or `false` to disable |
+| Option         | Type                                   | Default | Description                                     |
+| -------------- | -------------------------------------- | ------- | ----------------------------------------------- |
+| `tabServer`    | `TabServerTransportOptions \| false`   | Auto    | Tab transport options, or `false` to disable    |
+| `iframeServer` | `IframeChildTransportOptions \| false` | Auto    | Iframe transport options, or `false` to disable |
 
 Transport is auto-selected based on context:
 

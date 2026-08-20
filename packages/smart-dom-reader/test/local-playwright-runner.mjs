@@ -60,6 +60,11 @@ function getBundleCode() {
   return readFileSync(bundlePath, 'utf8');
 }
 
+function getEntryBundleCode() {
+  const bundlePath = resolve(__dirname, '../dist-bundle/smart-dom-reader-bundle.js');
+  return readFileSync(bundlePath, 'utf8');
+}
+
 function parseArgs(argv) {
   const args = { url: null, mode: 'full', screenshot: null, headless: true, selector: null };
   for (const raw of argv) {
@@ -158,6 +163,20 @@ const PAGES = {
       shadow2.innerHTML = '<form><input type="text" name="shadow-field"><button type="submit">Shadow Submit</button></form>';
     </script>
   </body></html>`,
+
+  // Same-origin iframe so extraction can cross into a second realm. Nothing in
+  // the host document says "Widget", so any output mentioning it came from the frame.
+  frameHost: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Host Page Test</title></head><body>
+    <main><h1>Host Document</h1><button id="host-btn">Host Button</button></main>
+    <iframe id="widget-frame" title="Widget frame" width="400" height="300" srcdoc='<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Widget Doc</title></head><body>
+      <header><h1>Widget Header</h1></header>
+      <main><section><h2>Widget Section</h2><p>Widget body copy for the outline.</p></section></main>
+      <form id="widget-form" action="/widget" method="post">
+        <input type="text" id="widget-input" name="widgetField" placeholder="Widget Input">
+        <button type="submit" id="widget-btn">Widget Button</button>
+      </form>
+    </body></html>'></iframe>
+  </body></html>`,
 };
 
 // Playwright inserts the module independently of the page's application scripts.
@@ -245,6 +264,48 @@ async function runShadowTest(page) {
   return [
     { name: 'Shadow button detected', ok: results.shadowBtn, got: JSON.stringify(results) },
     { name: 'Regular button detected', ok: results.regBtn, got: JSON.stringify(results) },
+  ];
+}
+
+// frameSelector lives in the IIFE entry bundle, not the ESM library, so it needs its own script tag.
+async function injectEntryBundle(page) {
+  await page.addScriptTag({ content: getEntryBundleCode() });
+  await page.waitForFunction(
+    () => typeof window.SmartDOMReaderBundle?.executeExtraction === 'function'
+  );
+}
+
+async function runFrameSelectorTest(page) {
+  const results = await page.evaluate(() => {
+    const run = (method) =>
+      window.SmartDOMReaderBundle.executeExtraction(method, { frameSelector: '#widget-frame' });
+    return {
+      structure: run('extractStructure'),
+      interactive: run('extractInteractive'),
+      full: run('extractFull'),
+    };
+  });
+
+  // A cross-realm failure surfaces as { error }; a wrong-realm success omits "Widget".
+  const readFrame = (out) => typeof out === 'string' && out.includes('Widget');
+  const describe = (out) => (typeof out === 'string' ? out.slice(0, 160) : JSON.stringify(out));
+
+  return [
+    {
+      name: 'frameSelector extractStructure',
+      ok: readFrame(results.structure),
+      got: describe(results.structure),
+    },
+    {
+      name: 'frameSelector extractInteractive',
+      ok: readFrame(results.interactive),
+      got: describe(results.interactive),
+    },
+    {
+      name: 'frameSelector extractFull',
+      ok: readFrame(results.full),
+      got: describe(results.full),
+    },
   ];
 }
 
@@ -390,6 +451,18 @@ async function main() {
     await injectLibrary(page);
     const checks3 = await runShadowTest(page);
     for (const c of checks3) {
+      if (c.ok) report.passed++;
+      else report.failed++;
+      report.checks.push(c);
+    }
+
+    await page.setContent(PAGES.frameHost, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(
+      () => !!document.querySelector('#widget-frame')?.contentDocument?.querySelector('#widget-btn')
+    );
+    await injectEntryBundle(page);
+    const checks4 = await runFrameSelectorTest(page);
+    for (const c of checks4) {
       if (c.ok) report.passed++;
       else report.failed++;
       report.checks.push(c);

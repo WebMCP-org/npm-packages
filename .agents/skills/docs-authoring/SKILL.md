@@ -21,13 +21,17 @@ Documentation for [WebMCP](https://webmachinelearning.github.io/webmcp/), a Comm
 `apps/documentation-website/docs.json` is the single source of truth for navigation,
 pages, groups, and hierarchy. Read it first.
 
-| Tab               | Path prefix            | Diataxis type          |
-| ----------------- | ---------------------- | ---------------------- |
-| **Home**          | `index`, `start-here/` | Landing + routing      |
-| **Tutorials**     | `tutorials/`           | Learning-oriented      |
-| **How-To Guides** | `how-to/`              | Goal-oriented          |
-| **Reference**     | `reference/`           | Information-oriented   |
-| **Explanation**   | `explanation/`         | Understanding-oriented |
+| Tab               | Path prefix                      | Diataxis type          |
+| ----------------- | -------------------------------- | ---------------------- |
+| **Home**          | `index`, `start-here/`           | Landing + routing      |
+| **Packages**      | `packages/`, `reference/webmcp/` | Information-oriented   |
+| **Tutorials**     | `tutorials/`                     | Learning-oriented      |
+| **How-To Guides** | `how-to/`                        | Goal-oriented          |
+| **Explanation**   | `explanation/`                   | Understanding-oriented |
+
+Every package gets an `overview` page and a `reference` page under
+`packages/<name>/`. The two `reference/webmcp/` pages describe the standard
+itself and sit in the same tab.
 
 ### Key files
 
@@ -96,16 +100,17 @@ If a concept is covered on multiple pages, one page owns it. All others link to 
 | --------------------------------- | ----------------------------------------------------------------- |
 | What is WebMCP                    | `explanation/what-is-webmcp`                                      |
 | WebMCP vs MCP                     | `explanation/webmcp-vs-mcp`                                       |
-| Native vs polyfill vs global      | `explanation/native-vs-polyfill-vs-global`                        |
+| WebMCP standard API               | `reference/webmcp/standard-api`                                   |
+| Declarative API                   | `reference/webmcp/declarative-api`                                |
 | Strict core vs MCP-B extensions   | `explanation/strict-core-vs-mcp-b-extensions`                     |
 | Runtime layering / initialization | `explanation/architecture/runtime-layering`                       |
 | Transports and bridges            | `explanation/architecture/transports-and-bridges`                 |
 | Tool lifecycle                    | `explanation/architecture/tool-lifecycle-and-context-replacement` |
 | Security model                    | `explanation/design/security-and-human-in-the-loop`               |
-| Tool design principles            | `explanation/design/tool-design`                                  |
+| Schemas and structured output     | `how-to/use-schemas-and-structured-output`                        |
 | Spec status                       | `explanation/design/spec-status-and-limitations`                  |
-| Choosing a runtime                | `how-to/choose-runtime`                                           |
-| Package API details               | the matching `reference/runtime/*` or `reference/tools/*` page    |
+| Choosing a runtime                | `how-to/choose-runtime` (native vs polyfill vs global)            |
+| Package API details               | `packages/<name>/reference`                                       |
 
 ---
 
@@ -285,7 +290,7 @@ This is critical. WebMCP is an active **Web Machine Learning Community Group pro
 
 | Key           | Value                                      |
 | ------------- | ------------------------------------------ |
-| Primary color | #1F5EFF                                    |
+| Primary color | #005F8F (see `docs.json` `colors`)         |
 | Product name  | "WebMCP" (not "MCP-B" in user-facing docs) |
 | Package scope | `@mcp-b/*`                                 |
 | Organization  | WebMCP-org                                 |

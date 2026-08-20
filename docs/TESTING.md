@@ -43,6 +43,9 @@ pnpm --filter @mcp-b/global test:conformance:global
 # Pinned upstream WebMCP WPT (requires .reference/wpt and Chrome Canary)
 CHROME_BIN=/path/to/chrome-canary pnpm test:wpt
 
+# Upstream WebMCP IDL shape conformance (non-blocking; see below)
+CHROME_BIN=/path/to/chrome-canary pnpm test:wpt:idl
+
 # Runtime-specific canonical E2E packages
 pnpm --filter @mcp-b/webmcp-local-relay test:e2e
 pnpm --filter @mcp-b/transports test:e2e
@@ -141,6 +144,24 @@ runs every declarative test plus an explicit allowlist of imperative tests for
 the page-local surface. Frame-tree, origin-policy, and navigation WPT are
 excluded because they require native browser behavior. The shared repository
 suite adds MCP-B-specific polyfill, global, and native integration coverage.
+
+### IDL shape conformance
+
+`pnpm test:wpt:idl` runs upstream `webmcp/idlharness.https.window.html` as a
+separate invocation. It asserts API _shape_ — prototype chain, property
+descriptors, enumerability, `length`/`name` — rather than behavior, so a failure
+there does not mean the API misbehaves.
+
+Two requirements beyond the behavioral lane:
+
+- `.reference/wpt` must include the `interfaces` directory. `idl_test` fetches
+  `/interfaces/{webmcp,html,dom}.idl` over HTTP at runtime, and a sparse
+  checkout without it fails with `Error fetching /interfaces/webmcp.idl`. The
+  workflow's `sparse-checkout` block lists it; fix an existing local clone with
+  `git -C .reference/wpt sparse-checkout add interfaces` (~1.8 MB).
+- The polyfill passes 20/20 subtests, matching native Chrome Canary. CI still
+  runs the lane with `continue-on-error: true`; removing that line makes it
+  blocking, which is a pending decision rather than a known gap.
 
 ## Extension Transport Testing
 

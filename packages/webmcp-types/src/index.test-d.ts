@@ -59,14 +59,17 @@ test('the Chromium testing shim retains its observable contract', () => {
 });
 
 test('global declarations use the document-first API', () => {
-  expectTypeOf<Document['modelContext']>().toEqualTypeOf<ModelContext>();
+  expectTypeOf<Document['modelContext']>().toEqualTypeOf<ModelContext | undefined>();
   expectTypeOf<Navigator['modelContext']>().toEqualTypeOf<ModelContext | undefined>();
   expectTypeOf<Navigator['modelContextTesting']>().toEqualTypeOf<ModelContextTesting | undefined>();
 });
 
 test('the ModelContext interface object brands values but is not constructible', () => {
-  expectTypeOf(ModelContext).toMatchTypeOf<Function>();
-  const hasModelContextBrand = (value: unknown) => value instanceof ModelContext;
+  // The interface object only exists where the realm implements WebMCP, so the
+  // global is declared possibly-undefined and `instanceof` needs a guard.
+  expectTypeOf<NonNullable<typeof ModelContext>>().toMatchTypeOf<Function>();
+  const hasModelContextBrand = (value: unknown) =>
+    typeof ModelContext !== 'undefined' && value instanceof ModelContext;
   expectTypeOf(hasModelContextBrand).returns.toBeBoolean();
 
   const constructModelContext = () => {

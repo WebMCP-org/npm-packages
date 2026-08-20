@@ -58,7 +58,7 @@ describe('createRequestId', () => {
     expect(typeof createRequestId()).toBe('string');
   });
 
-  it('uses crypto.randomUUID when available', () => {
+  it('returns crypto.randomUUID', () => {
     const randomUuid = vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid-123');
     try {
       expect(createRequestId()).toBe('uuid-123');

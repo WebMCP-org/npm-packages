@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 type CompatibilityModelContext = NonNullable<Document['modelContext']> & {
   listTools(): Array<{ name: string; description: string; inputSchema?: unknown }>;
@@ -20,6 +20,11 @@ function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
     return false;
   }
 }
+
+const countRegisteredTools = (page: Page): Promise<number> =>
+  page.evaluate(
+    () => (document.modelContext as unknown as CompatibilityModelContext).listTools().length
+  );
 
 /**
  * E2E tests for the MCP-B browser compatibility surface.
@@ -54,9 +59,7 @@ test.describe('MCP-B compatibility - ModelContext extensions', () => {
     await page.waitForTimeout(500);
 
     // Verify tool exists
-    let toolCount = await page.evaluate(() => {
-      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
-    });
+    let toolCount = await countRegisteredTools(page);
     expect(toolCount).toBe(5); // 4 base + 1 dynamic
 
     // Remove the locally tracked registration.
@@ -64,9 +67,7 @@ test.describe('MCP-B compatibility - ModelContext extensions', () => {
     await page.waitForTimeout(500);
 
     // Verify tool removed
-    toolCount = await page.evaluate(() => {
-      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
-    });
+    toolCount = await countRegisteredTools(page);
     expect(toolCount).toBe(4); // back to 4 base tools
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
@@ -80,9 +81,7 @@ test.describe('MCP-B compatibility - ModelContext extensions', () => {
     await page.click('#register-dynamic');
     await page.waitForTimeout(500);
 
-    let toolCount = await page.evaluate(() => {
-      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
-    });
+    let toolCount = await countRegisteredTools(page);
     expect(toolCount).toBeGreaterThan(0);
 
     // Trigger the app's local cleanup action.
@@ -90,9 +89,7 @@ test.describe('MCP-B compatibility - ModelContext extensions', () => {
     await page.waitForTimeout(500);
 
     // Verify all tools cleared
-    toolCount = await page.evaluate(() => {
-      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
-    });
+    toolCount = await countRegisteredTools(page);
     expect(toolCount).toBe(0);
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
@@ -101,27 +98,21 @@ test.describe('MCP-B compatibility - ModelContext extensions', () => {
 
   test('should clear both locally tracked registration groups', async ({ page }) => {
     // Start with base tools
-    let toolCount = await page.evaluate(() => {
-      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
-    });
+    let toolCount = await countRegisteredTools(page);
     expect(toolCount).toBe(4); // 4 base tools (Bucket A)
 
     // Add dynamic tool (Bucket B)
     await page.click('#register-dynamic');
     await page.waitForTimeout(500);
 
-    toolCount = await page.evaluate(() => {
-      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
-    });
+    toolCount = await countRegisteredTools(page);
     expect(toolCount).toBe(5); // 4 base + 1 dynamic
 
     await page.click('#chromium-clear-context');
     await page.waitForTimeout(500);
 
     // Verify both buckets cleared
-    toolCount = await page.evaluate(() => {
-      return (document.modelContext as unknown as CompatibilityModelContext).listTools().length;
-    });
+    toolCount = await countRegisteredTools(page);
     expect(toolCount).toBe(0);
   });
 });
@@ -165,11 +156,13 @@ test.describe('MCP-B compatibility - deprecated ModelContextTesting shim', () =>
 
   test('should executeTool return correct value', async ({ page }) => {
     const result = await page.evaluate(async () => {
+      const modelContext = document.modelContext;
+      if (!modelContext) throw new Error('document.modelContext is unavailable');
       const testingAPI = navigator.modelContextTesting;
       if (!testingAPI) return null;
 
       // Register a simple echo tool
-      document.modelContext.registerTool({
+      modelContext.registerTool({
         name: 'echoTest',
         description: 'Echo test',
         inputSchema: {
@@ -278,7 +271,9 @@ test.describe('MCP-B compatibility - deprecated ModelContextTesting shim', () =>
     );
   });
 
-  test('should toolchange event fire on AbortSignal cleanup', async ({ page }) => {
+  test('should toolchange event fire when the dynamic tool registration is aborted', async ({
+    page,
+  }) => {
     // First register a tool
     await page.click('#register-dynamic');
     await page.waitForTimeout(500);
@@ -336,6 +331,8 @@ test.describe('MCP-B compatibility - deprecated ModelContextTesting shim', () =>
 
   test('should toolchange event support multiple listeners', async ({ page }) => {
     const callbackCounts = await page.evaluate(async () => {
+      const modelContext = document.modelContext;
+      if (!modelContext) throw new Error('document.modelContext is unavailable');
       const testingAPI = navigator.modelContextTesting;
       if (!testingAPI) return { first: 0, second: 0 };
 
@@ -352,7 +349,7 @@ test.describe('MCP-B compatibility - deprecated ModelContextTesting shim', () =>
       testingAPI.addEventListener('toolchange', callback2);
 
       const controller = new AbortController();
-      document.modelContext.registerTool(
+      modelContext.registerTool(
         {
           name: `tempTool_${Date.now()}`,
           description: 'temp',
@@ -376,6 +373,8 @@ test.describe('MCP-B compatibility - deprecated ModelContextTesting shim', () =>
 
   test('should toolchange event not break on listener error', async ({ page }) => {
     const secondCallbackFired = await page.evaluate(async () => {
+      const modelContext = document.modelContext;
+      if (!modelContext) throw new Error('document.modelContext is unavailable');
       const testingAPI = navigator.modelContextTesting;
       if (!testingAPI) return false;
 
@@ -392,7 +391,7 @@ test.describe('MCP-B compatibility - deprecated ModelContextTesting shim', () =>
       });
 
       const controller = new AbortController();
-      document.modelContext.registerTool(
+      modelContext.registerTool(
         {
           name: `tempTool2_${Date.now()}`,
           description: 'temp',
@@ -450,6 +449,8 @@ test.describe('MCP-B compatibility - integration', () => {
 
   test('should work together: callbacks track all operations', async ({ page }) => {
     const operations = await page.evaluate(async () => {
+      const modelContext = document.modelContext;
+      if (!modelContext) throw new Error('document.modelContext is unavailable');
       const testingAPI = navigator.modelContextTesting;
       if (!testingAPI) return [];
 
@@ -464,7 +465,7 @@ test.describe('MCP-B compatibility - integration', () => {
       const second = new AbortController();
       const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-      document.modelContext.registerTool(
+      modelContext.registerTool(
         {
           name: `test1_${Date.now()}`,
           description: 'test',
@@ -477,7 +478,7 @@ test.describe('MCP-B compatibility - integration', () => {
       );
       await tick();
 
-      document.modelContext.registerTool(
+      modelContext.registerTool(
         {
           name: `test2_${Date.now()}`,
           description: 'test',

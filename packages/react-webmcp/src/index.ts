@@ -18,6 +18,14 @@ export type { ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';
 export type { McpClientProviderProps } from './client/McpClientProvider.js';
 export { McpClientProvider, useMcpClient } from './client/McpClientProvider.js';
 export type {
+  CallToolResult,
+  ModelContextProtocol,
+  PromptDescriptor,
+  PromptMessage,
+  ResourceContents,
+  ResourceDescriptor,
+  ToolAnnotations,
+  ToolDescriptor,
   WebMCPPromptConfig,
   WebMCPPromptReturn,
   WebMCPResourceConfig,

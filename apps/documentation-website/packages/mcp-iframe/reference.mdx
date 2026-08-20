@@ -1,5 +1,5 @@
 ---
-title: '@mcp-b/mcp-iframe'
+title: '@mcp-b/mcp-iframe reference'
 description: 'Reference for the iframe bridge custom element and its event contract.'
 keywords:
   [
@@ -55,9 +55,9 @@ production. A manually created MCP server can instead connect to
 `IframeChildTransport` directly.
 
 <Note>
-  Native cross-document WebMCP does not require this package. It uses iframe `allow="tools"`,
-  child-side `exposedTo`, and parent-side `getTools({fromOrigins})`. Those browser controls are
-  independent of the MCP transport's `target-origin` and `allowedOrigins`.
+  Native cross-document WebMCP does not require this package. It uses iframe `allow="tools"` and
+  parent-side `getTools({fromOrigins})`, both enforced by the browser and independent of the MCP
+  transport's `target-origin` and `allowedOrigins`.
 </Note>
 
 ## Minimal example
@@ -93,6 +93,31 @@ the MCP-B bridge.
 Sandboxed iframes without `allow-same-origin`, and sources whose URL origin is `null`, have opaque origins. Set `target-origin="*"` for those sources. Other sources use the explicit attribute or the origin inferred from `src`.
 
 ---
+
+## Scoping tools to the parent
+
+A child narrows an individual tool to named embedder origins by passing
+`exposedTo` to `registerTool`:
+
+```js "Restrict a tool to one embedder"
+await document.modelContext.registerTool(
+  { name: 'checkout', description: 'Place the order', execute: placeOrder },
+  { exposedTo: ['https://shop.example'] }
+);
+```
+
+Embedded anywhere else, that tool never reaches the parent's `exposedTools` and
+cannot be called through the element. Tools registered without `exposedTo` stay
+visible to whichever parent the child transport already allows.
+
+Two limits apply:
+
+- `exposedTo` only narrows. The child transport's `allowedOrigins` still decides
+  who may connect at all, and no allowlist widens past it.
+- Enforcement is the child's own JavaScript, not the browser. Native WebMCP has
+  the user agent enforce `exposedTo`, so a compromised child cannot opt out.
+  Treat the bridge's version as scoping rather than a boundary against the child
+  itself. See [Security and human in the loop](/explanation/design/security-and-human-in-the-loop).
 
 ## Events
 

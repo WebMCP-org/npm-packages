@@ -209,6 +209,31 @@ describe('useWebMCP in a browser runtime', () => {
     expect(result.current.state.isExecuting).toBe(false);
   });
 
+  it('settles an execution that outlives the component without a React warning', async () => {
+    let settle: ((value: string) => void) | undefined;
+    const { result, unmount } = await renderHook(() =>
+      useWebMCP({
+        name: 'browser_post_unmount',
+        description: 'Settles after unmount',
+        execute: () =>
+          new Promise<string>((resolve) => {
+            settle = resolve;
+          }),
+      })
+    );
+
+    const { execute, reset } = result.current;
+    const pending = execute({});
+    const consoleError = vi.spyOn(console, 'error');
+    await unmount();
+
+    settle?.('done');
+    await expect(pending).resolves.toBe('done');
+    reset();
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
   it('normalizes raw JSON and passes through existing MCP responses', async () => {
     const { act } = await renderHook(() => {
       useWebMCP({

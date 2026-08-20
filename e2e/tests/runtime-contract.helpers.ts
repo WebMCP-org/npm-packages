@@ -91,44 +91,26 @@ export async function callClientToolForError(
   );
 }
 
-export async function resetInvocations(page: Page): Promise<void> {
-  await page.evaluate(async () => {
+type RuntimeHost = Page | Frame;
+
+export async function resetInvocations(host: RuntimeHost): Promise<void> {
+  await host.evaluate(async () => {
     await window.__WEBMCP_E2E__?.resetInvocations();
   });
 }
 
 export async function readInvocations(
-  page: Page
+  host: RuntimeHost
 ): Promise<Array<{ name: string; arguments: Record<string, unknown> }>> {
-  return page.evaluate(() => window.__WEBMCP_E2E__?.readInvocations() ?? []);
+  return host.evaluate(() => window.__WEBMCP_E2E__?.readInvocations() ?? []);
 }
 
-export async function resetFrameInvocations(frame: Frame): Promise<void> {
-  await frame.evaluate(async () => {
-    await window.__WEBMCP_E2E__?.resetInvocations();
-  });
+export async function registerDynamicTool(host: RuntimeHost): Promise<boolean> {
+  return host.evaluate(() => window.__WEBMCP_E2E__?.registerDynamicTool() ?? false);
 }
 
-export async function readFrameInvocations(
-  frame: Frame
-): Promise<Array<{ name: string; arguments: Record<string, unknown> }>> {
-  return frame.evaluate(() => window.__WEBMCP_E2E__?.readInvocations() ?? []);
-}
-
-export async function registerDynamicToolInPage(page: Page): Promise<boolean> {
-  return page.evaluate(() => window.__WEBMCP_E2E__?.registerDynamicTool() ?? false);
-}
-
-export async function unregisterDynamicToolInPage(page: Page): Promise<boolean> {
-  return page.evaluate(() => window.__WEBMCP_E2E__?.unregisterDynamicTool() ?? false);
-}
-
-export async function registerDynamicToolInFrame(frame: Frame): Promise<boolean> {
-  return frame.evaluate(() => window.__WEBMCP_E2E__?.registerDynamicTool() ?? false);
-}
-
-export async function unregisterDynamicToolInFrame(frame: Frame): Promise<boolean> {
-  return frame.evaluate(() => window.__WEBMCP_E2E__?.unregisterDynamicTool() ?? false);
+export async function unregisterDynamicTool(host: RuntimeHost): Promise<boolean> {
+  return host.evaluate(() => window.__WEBMCP_E2E__?.unregisterDynamicTool() ?? false);
 }
 
 export function expectBaseTools(toolNames: string[]) {

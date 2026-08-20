@@ -48,18 +48,11 @@ const SELECTORS = {
 async function waitForToolsRegistered(page: Page, toolNames: string[]): Promise<void> {
   await page.waitForFunction(
     async (names: string[]) => {
-      const w = window as unknown as {
-        mcpClient?: {
-          listTools: () => Promise<{ tools: Array<{ name: string }> }>;
-        };
-      };
-      if (!w.mcpClient || typeof w.mcpClient.listTools !== 'function') {
-        return false;
-      }
-
       try {
-        const tools = await w.mcpClient.listTools();
-        return names.every((name) => tools.tools.some((tool) => tool.name === name));
+        const tools = await window.mcpClient?.listTools();
+        return tools
+          ? names.every((name) => tools.tools.some((tool) => tool.name === name))
+          : false;
       } catch {
         return false;
       }
@@ -75,24 +68,27 @@ async function waitForToolsRegistered(page: Page, toolNames: string[]): Promise<
 async function waitForAnyToolsRegistered(page: Page): Promise<void> {
   await page.waitForFunction(
     async () => {
-      const w = window as unknown as {
-        mcpClient?: {
-          listTools: () => Promise<{ tools: Array<{ name: string }> }>;
-        };
-      };
-      if (!w.mcpClient || typeof w.mcpClient.listTools !== 'function') {
-        return false;
-      }
-
       try {
-        const tools = await w.mcpClient.listTools();
-        return tools.tools.length > 0;
+        const tools = await window.mcpClient?.listTools();
+        return (tools?.tools.length ?? 0) > 0;
       } catch {
         return false;
       }
     },
     { timeout: 10000 }
   );
+}
+
+/** Tool names currently visible to the real MCP client; empty when the client is unreachable. */
+async function listToolNames(page: Page): Promise<string[]> {
+  return page.evaluate(async () => {
+    try {
+      const response = await window.mcpClient?.listTools();
+      return response?.tools.map((tool) => tool.name) ?? [];
+    } catch {
+      return [];
+    }
+  });
 }
 
 async function callToolViaClient(
@@ -102,19 +98,11 @@ async function callToolViaClient(
 ): Promise<void> {
   await page.evaluate(
     async ({ name, arguments_ }) => {
-      const w = window as unknown as {
-        mcpClient?: {
-          callTool: (request: {
-            name: string;
-            arguments?: Record<string, unknown>;
-          }) => Promise<unknown>;
-        };
-      };
-      if (!w.mcpClient || typeof w.mcpClient.callTool !== 'function') {
+      if (!window.mcpClient) {
         throw new Error('mcpClient not available');
       }
 
-      await w.mcpClient.callTool({ name, arguments: arguments_ });
+      await window.mcpClient.callTool({ name, arguments: arguments_ });
     },
     { name: toolName, arguments_: args }
   );
@@ -297,22 +285,7 @@ test.describe('Production Build - Tool Registration Tests', () => {
   test('should register tools only once in production build', async ({ page }) => {
     await waitForAnyToolsRegistered(page);
 
-    const tools = await page.evaluate(async () => {
-      const w = window as unknown as {
-        mcpClient?: {
-          listTools: () => Promise<{ tools: Array<{ name: string }> }>;
-        };
-      };
-      if (!w.mcpClient || typeof w.mcpClient.listTools !== 'function') {
-        return [];
-      }
-      try {
-        const response = await w.mcpClient.listTools();
-        return response.tools.map((tool) => tool.name);
-      } catch {
-        return [];
-      }
-    });
+    const tools = await listToolNames(page);
 
     // Check for duplicates
     const uniqueTools = [...new Set(tools)];
@@ -329,47 +302,16 @@ test.describe('Production Build - Tool Registration Tests', () => {
   test('should not have any duplicate tool registrations', async ({ page }) => {
     await waitForAnyToolsRegistered(page);
 
-    const toolCheck = await page.evaluate(async () => {
-      const w = window as unknown as {
-        mcpClient?: {
-          listTools: () => Promise<{ tools: Array<{ name: string }> }>;
-        };
-      };
-      if (!w.mcpClient || typeof w.mcpClient.listTools !== 'function') {
-        return { tools: [] as string[], hasDuplicates: false };
-      }
+    const tools = await listToolNames(page);
 
-      let tools: string[] = [];
-      try {
-        const response = await w.mcpClient.listTools();
-        tools = response.tools.map((tool) => tool.name);
-      } catch {
-        return { tools: [] as string[], hasDuplicates: false };
-      }
-
-      const toolCounts = tools.reduce(
-        (acc: Record<string, number>, name: string) => {
-          acc[name] = (acc[name] || 0) + 1;
-          return acc;
-        },
-        {} as Record<string, number>
-      );
-
-      const duplicates = (Object.entries(toolCounts) as Array<[string, number]>)
-        .filter(([, count]) => count > 1)
-        .map(([name, count]) => ({ name, count }));
-
-      return {
-        tools,
-        toolCounts,
-        duplicates,
-        hasDuplicates: duplicates.length > 0,
-      };
-    });
-
-    expect(toolCheck.hasDuplicates).toBe(false);
-    if (toolCheck.hasDuplicates) {
-      console.error('Duplicate tools found:', toolCheck.duplicates);
+    const toolCounts = new Map<string, number>();
+    for (const name of tools) {
+      toolCounts.set(name, (toolCounts.get(name) ?? 0) + 1);
     }
+    const duplicates = [...toolCounts]
+      .filter(([, count]) => count > 1)
+      .map(([name, count]) => ({ name, count }));
+
+    expect(duplicates).toEqual([]);
   });
 });

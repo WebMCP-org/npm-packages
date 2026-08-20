@@ -1,6 +1,6 @@
 import { JSONRPCMessageSchema } from '@modelcontextprotocol/core';
 import type { JSONRPCMessage, Transport, TransportSendOptions } from '@modelcontextprotocol/server';
-import { isMcpMessage, postMcpMessage } from './post-message.js';
+import { DEFAULT_TAB_CHANNEL_ID, isMcpMessage, postMcpMessage } from './post-message.js';
 
 export interface TabClientTransportOptions {
   /** Expected server origin. Pass `'*'` only to disable origin validation deliberately. */
@@ -33,7 +33,7 @@ export class TabClientTransport implements Transport {
     }
 
     this._targetOrigin = options.targetOrigin;
-    this._channelId = options.channelId ?? 'mcp-default';
+    this._channelId = options.channelId ?? DEFAULT_TAB_CHANNEL_ID;
     this.serverReadyPromise = new Promise<void>((resolve, reject) => {
       this._serverReadyResolve = resolve;
       this._serverReadyReject = reject;

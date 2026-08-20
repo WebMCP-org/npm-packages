@@ -134,9 +134,16 @@ async function setDynamicItems(enabled: boolean): Promise<void> {
   });
 }
 
+/** Two templates that share a uriTemplate collapse into a single parent wrapper URI. */
+function addCollidingResources(): void {
+  modelContext.registerResource(echoTemplate('iframe://collide/{value}', 'Collide A'));
+  modelContext.registerResource(echoTemplate('iframe://collide/{value}', 'Collide B'));
+}
+
 declare global {
   interface Window {
     iframeChild: {
+      addCollidingResources: typeof addCollidingResources;
       setDynamicItems: typeof setDynamicItems;
       stopRuntime: () => Promise<void>;
     };
@@ -144,6 +151,7 @@ declare global {
 }
 
 window.iframeChild = {
+  addCollidingResources,
   setDynamicItems,
   stopRuntime: () => modelContext.close(),
 };

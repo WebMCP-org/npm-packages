@@ -327,12 +327,3 @@ function logEvent(type: 'info' | 'success' | 'warning' | 'error', message: strin
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', init);
-
-// Expose for parent window testing
-(window as any).iframeTestApp = {
-  getTools: getToolNames,
-  registerBucketA: registerBucketATool,
-  registerBucketB: registerBucketBTool,
-  unregisterBucketB: unregisterBucketBTool,
-  clearContext,
-};

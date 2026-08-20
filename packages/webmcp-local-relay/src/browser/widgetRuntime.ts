@@ -59,10 +59,6 @@ interface RelayHelloMessage {
   workspace?: string;
 }
 
-interface RelayHelloAcceptedMessage {
-  type: 'hello/accepted';
-}
-
 interface RelayHelloRejectedMessage {
   type: 'hello/rejected';
   message: string;
@@ -82,14 +78,13 @@ interface CachedRelayEndpoint {
 
 type RelayRuntimePhase = 'idle' | 'discovering' | 'dormant';
 
-const RECONNECT_INITIAL_DELAY_MS = 500;
+const RECONNECT_DELAY_MS = 500;
 const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
 const RELAY_SERVER_HELLO_TIMEOUT_MS = 1200;
 const RELAY_HELLO_TIMEOUT_MS = 1000;
 
-/** Delay between rediscovery attempts (ms). */
+/** Delay before each rediscovery attempt (ms). Running out of entries goes dormant. */
 const REDISCOVERY_DELAYS_MS = [10000, 20000, 30000];
-const MAX_DISCOVERY_CYCLES_BEFORE_DORMANT = REDISCOVERY_DELAYS_MS.length;
 /** Heartbeat probe interval while dormant (ms). */
 const DORMANT_HEARTBEAT_INTERVAL_MS = 120000;
 
@@ -115,7 +110,9 @@ export function parseConfig(search = window.location.search): WidgetConfig | nul
   const relayHostHint = getParam('relayHost') || '127.0.0.1';
   const relayPortHintRaw = getParam('relayPort');
   const relayPortHint =
-    relayPortHintRaw && relayPortHintRaw.length > 0 ? Number(relayPortHintRaw) : 9333;
+    relayPortHintRaw && relayPortHintRaw.length > 0
+      ? Number(relayPortHintRaw)
+      : RELAY_PORT_RANGE_START;
   const autoConnect = getParam('autoConnect') !== 'false';
   const relayId = getParam('relayId') || undefined;
   const relayWorkspace = getParam('relayWorkspace') || undefined;
@@ -217,16 +214,6 @@ function parseRelayHello(value: unknown): RelayHelloMessage | null {
     ...(typeof value.label === 'string' ? { label: value.label } : {}),
     ...(typeof value.relayId === 'string' ? { relayId: value.relayId } : {}),
     ...(typeof value.workspace === 'string' ? { workspace: value.workspace } : {}),
-  };
-}
-
-function parseRelayHelloAccepted(value: unknown): RelayHelloAcceptedMessage | null {
-  if (!isJsonObject(value) || value.type !== 'hello/accepted') {
-    return null;
-  }
-
-  return {
-    type: 'hello/accepted',
   };
 }
 
@@ -355,7 +342,13 @@ async function probeRelayEndpoint(candidate: {
   host: string;
   port: number;
 }): Promise<{ endpoint: RelayEndpoint; socket: WebSocket } | null> {
-  const url = `ws://${candidate.host}:${String(candidate.port)}`;
+  // isLoopbackHost() accepts the bare '::1' form, which needs brackets in a URL
+  // authority; `ws://::1:9333` is unparseable and makes the WebSocket ctor throw.
+  const host =
+    candidate.host.includes(':') && !candidate.host.startsWith('[')
+      ? `[${candidate.host}]`
+      : candidate.host;
+  const url = `ws://${host}:${String(candidate.port)}`;
 
   return new Promise((resolve) => {
     let settled = false;
@@ -492,15 +485,15 @@ function runWidget(cfg: WidgetConfig): void {
     phase = 'idle';
 
     socket.addEventListener('message', (event) => {
-      let relayMessage: Record<string, unknown>;
+      let parsed: unknown;
       try {
-        relayMessage = JSON.parse(String(event.data)) as Record<string, unknown>;
+        parsed = JSON.parse(String(event.data));
       } catch (parseError) {
         console.warn('[webmcp-relay-widget] Failed to parse relay message:', parseError);
         return;
       }
 
-      const hello = parseRelayHello(relayMessage);
+      const hello = parseRelayHello(parsed);
       if (hello) {
         activeEndpoint = {
           hello,
@@ -510,8 +503,7 @@ function runWidget(cfg: WidgetConfig): void {
         return;
       }
 
-      const helloAcceptedMessage = parseRelayHelloAccepted(relayMessage);
-      if (helloAcceptedMessage) {
+      if (isJsonObject(parsed) && parsed.type === 'hello/accepted') {
         clearHelloAckTimer();
         helloAccepted = true;
         writeCachedEndpoint(cfg, endpoint);
@@ -519,7 +511,7 @@ function runWidget(cfg: WidgetConfig): void {
         return;
       }
 
-      const helloRejected = parseRelayHelloRejected(relayMessage);
+      const helloRejected = parseRelayHelloRejected(parsed);
       if (helloRejected) {
         clearHelloAckTimer();
         helloAccepted = false;
@@ -547,9 +539,10 @@ function runWidget(cfg: WidgetConfig): void {
         return;
       }
 
-      if (!isJsonObject(relayMessage) || typeof relayMessage.type !== 'string') {
+      if (!isJsonObject(parsed) || typeof parsed.type !== 'string') {
         return;
       }
+      const relayMessage = parsed;
 
       if (relayMessage.type === 'ping') {
         safeSend(socket, JSON.stringify({ type: 'pong' }));
@@ -714,7 +707,7 @@ function runWidget(cfg: WidgetConfig): void {
       host: activeEndpoint.host,
       port: activeEndpoint.port,
     };
-    const delay = Math.round(RECONNECT_INITIAL_DELAY_MS * (0.85 + Math.random() * 0.3));
+    const delay = Math.round(RECONNECT_DELAY_MS * (0.85 + Math.random() * 0.3));
 
     scheduledReconnect = setTimeout(() => {
       scheduledReconnect = null;
@@ -728,20 +721,18 @@ function runWidget(cfg: WidgetConfig): void {
 
   /**
    * Schedules a full-range rediscovery attempt with increasing delays.
-   * After {@link MAX_DISCOVERY_CYCLES_BEFORE_DORMANT} failed cycles,
-   * transitions to dormant state.
+   * Once {@link REDISCOVERY_DELAYS_MS} is exhausted, transitions to dormant state.
    */
   const scheduleRediscovery = (): void => {
     if (scheduledReconnect) {
       return;
     }
 
-    if (discoveryCycleCount >= MAX_DISCOVERY_CYCLES_BEFORE_DORMANT) {
+    const delay = REDISCOVERY_DELAYS_MS[discoveryCycleCount];
+    if (delay === undefined) {
       enterDormant();
       return;
     }
-
-    const delay = REDISCOVERY_DELAYS_MS[discoveryCycleCount]!;
 
     scheduledReconnect = setTimeout(() => {
       scheduledReconnect = null;

@@ -285,8 +285,8 @@ The transport is auto-selected based on context:
 
 ```typescript
 interface TransportConfiguration {
-  tabServer?: Partial<TabServerTransportOptions> | false;
-  iframeServer?: Partial<IframeChildTransportOptions> | false;
+  tabServer?: TabServerTransportOptions | false;
+  iframeServer?: IframeChildTransportOptions | false;
 }
 ```
 

@@ -1,9 +1,4 @@
-import {
-  IframeChildTransport,
-  type IframeChildTransportOptions,
-  TabServerTransport,
-  type TabServerTransportOptions,
-} from '@mcp-b/transports';
+import { IframeChildTransport, TabServerTransport } from '@mcp-b/transports';
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer, isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import type { ModelContext } from '@mcp-b/webmcp-types';
@@ -53,8 +48,6 @@ function replaceNavigatorModelContext(value: unknown): void {
     value,
   });
 
-  // Verify the replacement actually worked — the prototype getter cannot
-  // shadow a non-configurable own property on the navigator instance.
   if (navigator.modelContext !== value) {
     console.error(
       '[WebModelContext] Failed to replace navigator.modelContext.',
@@ -64,13 +57,6 @@ function replaceNavigatorModelContext(value: unknown): void {
   }
 }
 
-/**
- * Replace both modelContext surfaces with the given value.
- *
- * document.modelContext is canonical. @mcp-b/global still supports old
- * navigator-first users, so the bridge exposes the BrowserMcpServer wrapper
- * through both properties.
- */
 function restoreProperty(
   target: Document | Navigator,
   key: 'modelContext',
@@ -80,6 +66,13 @@ function restoreProperty(
   else Reflect.deleteProperty(target, key);
 }
 
+/**
+ * Replace both modelContext surfaces with the given value.
+ *
+ * document.modelContext is canonical. @mcp-b/global still supports old
+ * navigator-first users, so the bridge exposes the BrowserMcpServer wrapper
+ * through both properties.
+ */
 function replaceModelContext(
   value: unknown,
   previousDocumentDescriptor: PropertyDescriptor | undefined,
@@ -99,30 +92,18 @@ function createTransport(config: WebModelContextInitOptions['transport']): Trans
   const inIframe = window.parent !== window;
 
   if (inIframe && config?.iframeServer !== false) {
-    const iframeOptions: Partial<IframeChildTransportOptions> =
-      typeof config?.iframeServer === 'object' ? config.iframeServer : {};
-
-    const { allowedOrigins, ...rest } = iframeOptions;
-
-    return new IframeChildTransport({
-      allowedOrigins: allowedOrigins ?? ['*'],
-      ...rest,
-    });
+    return new IframeChildTransport(
+      typeof config?.iframeServer === 'object' ? config.iframeServer : { allowedOrigins: ['*'] }
+    );
   }
 
   if (config?.tabServer === false) {
     throw new Error('tabServer transport is disabled and iframe transport was not selected');
   }
 
-  const tabOptions: Partial<TabServerTransportOptions> =
-    typeof config?.tabServer === 'object' ? config.tabServer : {};
-
-  const { allowedOrigins, ...rest } = tabOptions;
-
-  return new TabServerTransport({
-    allowedOrigins: allowedOrigins ?? ['*'],
-    ...rest,
-  });
+  return new TabServerTransport(
+    typeof config?.tabServer === 'object' ? config.tabServer : { allowedOrigins: ['*'] }
+  );
 }
 
 /** Installs the global bridge on `document.modelContext`. */

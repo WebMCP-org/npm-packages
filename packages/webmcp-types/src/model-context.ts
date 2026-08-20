@@ -17,11 +17,23 @@ export interface ModelContextGetToolOptions {
 /** Tool metadata returned by `document.modelContext.getTools()`. */
 export interface RegisteredTool {
   name: string;
+  /**
+   * Present on every tool Chrome and `@mcp-b/webmcp-polyfill` return today --
+   * the spec defaults it to the empty string when a tool registers no title.
+   * Kept optional deliberately: webmcp#224 proposes dropping that default and
+   * omitting the member instead. Read it as `tool.title || tool.name`: today the
+   * spec default makes it an empty string, which `??` does not fall through.
+   */
   title?: string;
   description: string;
   inputSchema?: string;
   window: Window;
   origin: string;
+  /**
+   * Absent when the tool registered no annotations -- both the spec and the
+   * polyfill omit the member rather than emitting an empty object. Each hint
+   * inside it is always populated, but the object itself is not guaranteed.
+   */
   annotations?: WebMcpToolAnnotations;
 }
 

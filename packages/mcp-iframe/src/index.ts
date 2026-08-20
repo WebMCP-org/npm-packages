@@ -29,7 +29,6 @@ export {
   type MCPIframeErrorEventDetail,
   type MCPIframeEventMap,
   type MCPIframeItemsEventDetail,
-  type MCPIframeReadyEventDetail,
 } from './MCPIframeElement.js';
 
 registerMCPIframeElement();

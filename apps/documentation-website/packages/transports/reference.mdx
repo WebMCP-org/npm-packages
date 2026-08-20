@@ -1,5 +1,5 @@
 ---
-title: '@mcp-b/transports'
+title: '@mcp-b/transports reference'
 description: 'Reference for browser transport classes, options, and transport-specific security boundaries.'
 keywords:
   [
@@ -160,6 +160,16 @@ await server.connect(transport);
 | ---------------- | ---------- | -------- | -------------- | --------------------------------------------------------------------- |
 | `allowedOrigins` | `string[]` | Yes      | --             | Parent origins permitted to connect. Use `["*"]` to allow any origin. |
 | `channelId`      | `string`   | No       | `"mcp-iframe"` | Channel identifier for message routing.                               |
+
+#### Properties
+
+| Property         | Type                          | Description                                                                  |
+| ---------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| `clientOrigin`   | `string \| undefined`         | Origin of the connected parent, `undefined` until its first message arrives. |
+| `onclientorigin` | `((origin: string) => void)?` | Called when the parent origin is first established, and again on a takeover. |
+
+[`BrowserMcpServer`](/packages/webmcp-ts-sdk/reference) reads both to scope tools
+registered with `exposedTo` to the embedder actually connected.
 
 ---
 

@@ -1,5 +1,5 @@
 ---
-title: '@mcp-b/webmcp-ts-sdk'
+title: '@mcp-b/webmcp-ts-sdk reference'
 description: 'Reference for BrowserMcpServer, the WebMCP adapter over MCP TypeScript SDK v2.'
 keywords:
   [
@@ -67,12 +67,24 @@ registerTool(
 
 Registers a WebMCP descriptor and its MCP representation. When `native` is set, registration succeeds only after the native mirror accepts the tool.
 
-| Option      | Type           | Description                                                      |
-| ----------- | -------------- | ---------------------------------------------------------------- |
-| `signal`    | `AbortSignal?` | Removes the MCP registration and native mirror when aborted      |
-| `exposedTo` | `string[]?`    | Requests cross-document exposure from the native browser context |
+| Option      | Type           | Description                                                 |
+| ----------- | -------------- | ----------------------------------------------------------- |
+| `signal`    | `AbortSignal?` | Removes the MCP registration and native mirror when aborted |
+| `exposedTo` | `string[]?`    | Restricts the tool to the listed embedder origins           |
 
-A non-empty `exposedTo` array requires native WebMCP. Invalid descriptors, duplicate names, blocked Permissions Policy, and pre-aborted signals reject the returned promise.
+A tool registered with a non-empty `exposedTo` is advertised only while the
+connected peer's origin appears in that list. `BrowserMcpServer` reads the origin
+from transports that report one, such as
+[`IframeChildTransport`](/packages/transports/reference#iframechildtransport).
+Restricted tools fail closed: they stay hidden before the first peer origin
+arrives, and on transports that never report one.
+
+`exposedTo` only narrows. The child transport's `allowedOrigins` still decides
+who may connect, and enforcement is the page's own JavaScript rather than the
+user agent. See [Bridge tools across iframes](/how-to/bridge-tools-across-iframes)
+for the end-to-end setup.
+
+Invalid descriptors, duplicate names, blocked Permissions Policy, and pre-aborted signals reject the returned promise.
 
 ### `getTools(options?)`
 

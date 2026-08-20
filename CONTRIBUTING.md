@@ -39,7 +39,7 @@ These docs define review expectations for safety, contract synchronization, and 
 
 - All code must pass linting and formatting:
   ```bash
-  pnpm check        # Biome linting and formatting
+  pnpm check        # Oxlint + Oxfmt via Vite+
   pnpm typecheck    # TypeScript type checking
   pnpm build        # Build must succeed
   ```

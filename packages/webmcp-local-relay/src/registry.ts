@@ -8,10 +8,12 @@ import type { BrowserHelloMessage } from './schemas.js';
 interface SourceMetadata {
   sourceId: string;
   tabId: string;
-  origin: string | undefined;
-  url: string | undefined;
-  title: string | undefined;
-  iconUrl: string | undefined;
+  // Optional keys, matching the wire shape in RelaySourceInfoSchema: a browser
+  // source may omit these entirely rather than send them as undefined.
+  origin?: string | undefined;
+  url?: string | undefined;
+  title?: string | undefined;
+  iconUrl?: string | undefined;
   connectedAt: number;
   lastSeenAt: number;
 }
@@ -111,7 +113,6 @@ export class RelayRegistry {
     }
 
     this.touchConnection(connectionId);
-    this.removeConnectionTools(connectionId);
 
     const providers: ToolProvider[] = tools.map((tool) => ({
       sourceId: connectionId,
@@ -128,7 +129,7 @@ export class RelayRegistry {
    * Removes a source and all of its tool registrations.
    */
   removeConnection(connectionId: string): void {
-    this.removeConnectionTools(connectionId);
+    this.toolsByConnectionId.delete(connectionId);
     this.sourceByConnectionId.delete(connectionId);
     this.rebuildPublicNames();
   }
@@ -206,46 +207,17 @@ export class RelayRegistry {
 
     const rankedProviders = this.sortProvidersByRecency(providers);
 
+    let provider: ToolProvider | undefined;
     if (options.sourceId) {
-      const byConnection = rankedProviders.find(
-        (provider) => provider.sourceId === options.sourceId
-      );
-      if (byConnection) {
-        return {
-          connectionId: byConnection.sourceId,
-          tool: byConnection.tool,
-          publicToolName: byConnection.publicToolName,
-        };
-      }
-
-      const byTabId = rankedProviders.find((provider) => provider.tabId === options.sourceId);
-      if (byTabId) {
-        return {
-          connectionId: byTabId.sourceId,
-          tool: byTabId.tool,
-          publicToolName: byTabId.publicToolName,
-        };
-      }
-
-      return null;
+      provider =
+        rankedProviders.find((candidate) => candidate.sourceId === options.sourceId) ??
+        rankedProviders.find((candidate) => candidate.tabId === options.sourceId);
+    } else if (options.requestTabId) {
+      provider = rankedProviders.find((candidate) => candidate.tabId === options.requestTabId);
+    } else {
+      provider = rankedProviders[0];
     }
 
-    if (options.requestTabId) {
-      const byRequestTab = rankedProviders.find(
-        (provider) => provider.tabId === options.requestTabId
-      );
-      if (!byRequestTab) {
-        return null;
-      }
-
-      return {
-        connectionId: byRequestTab.sourceId,
-        tool: byRequestTab.tool,
-        publicToolName: byRequestTab.publicToolName,
-      };
-    }
-
-    const provider = rankedProviders[0];
     if (!provider) {
       return null;
     }
@@ -265,13 +237,6 @@ export class RelayRegistry {
       ...source,
       toolCount: this.toolsByConnectionId.get(source.sourceId)?.length ?? 0,
     };
-  }
-
-  /**
-   * Removes all tool providers for a connection.
-   */
-  private removeConnectionTools(connectionId: string): void {
-    this.toolsByConnectionId.delete(connectionId);
   }
 
   /**

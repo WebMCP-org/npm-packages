@@ -1,6 +1,6 @@
 import { JSONRPCMessageSchema } from '@modelcontextprotocol/core';
 import type { JSONRPCMessage, Transport, TransportSendOptions } from '@modelcontextprotocol/server';
-import { isMcpMessage, postMcpMessage } from './post-message.js';
+import { DEFAULT_IFRAME_CHANNEL_ID, isMcpMessage, postMcpMessage } from './post-message.js';
 
 export interface IframeChildTransportOptions {
   /** Parent origins allowed to connect. Pass `['*']` only to disable validation deliberately. */
@@ -18,6 +18,12 @@ export class IframeChildTransport implements Transport {
   private _messageHandler: ((event: MessageEvent<unknown>) => void) | undefined;
   private _clientOrigin?: string;
 
+  /**
+   * Fires when the connected parent's origin is first established, and again if a
+   * different parent takes over the channel. Lets a server scope per-tool exposure
+   * to the embedder it is actually talking to.
+   */
+  onclientorigin?: (origin: string) => void;
   onclose?: () => void;
   onerror?: (error: Error) => void;
   onmessage?: Transport['onmessage'];
@@ -28,7 +34,12 @@ export class IframeChildTransport implements Transport {
     }
 
     this._allowedOrigins = new Set(options.allowedOrigins);
-    this._channelId = options.channelId ?? 'mcp-iframe';
+    this._channelId = options.channelId ?? DEFAULT_IFRAME_CHANNEL_ID;
+  }
+
+  /** Origin of the connected parent, or `undefined` before its first message arrives. */
+  get clientOrigin(): string | undefined {
+    return this._clientOrigin;
   }
 
   async start(): Promise<void> {
@@ -46,7 +57,10 @@ export class IframeChildTransport implements Transport {
         return;
       }
 
-      this._clientOrigin = event.origin;
+      if (this._clientOrigin !== event.origin) {
+        this._clientOrigin = event.origin;
+        this.onclientorigin?.(event.origin);
+      }
       const { payload } = event.data;
       if (payload === 'mcp-check-ready') {
         this._broadcastServerReady();

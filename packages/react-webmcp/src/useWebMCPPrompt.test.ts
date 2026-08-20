@@ -158,4 +158,51 @@ describe('useWebMCPPrompt in a browser runtime', () => {
     await hook.unmount();
     expect(unregister).toHaveBeenCalledTimes(2);
   });
+
+  it('registers once across re-renders when argsSchema is an inline literal', async () => {
+    const unregister = vi.fn();
+    const registerPrompt = vi
+      .spyOn(modelContext(), 'registerPrompt')
+      .mockReturnValue({ unregister });
+    const hook = await renderHook(
+      ({ version }: { version: string }) =>
+        useWebMCPPrompt({
+          name: 'inline_schema_prompt',
+          description: 'Review source code',
+          argsSchema: {
+            type: 'object',
+            properties: {
+              code: { type: 'string', description: 'The code to review' },
+            },
+            required: ['code'],
+          } as const,
+          get: async ({ code }) => ({
+            messages: [
+              {
+                role: 'user',
+                content: { type: 'text', text: `${version}: ${code}` },
+              },
+            ],
+          }),
+        }),
+      { initialProps: { version: 'first' } }
+    );
+
+    await hook.rerender({ version: 'second' });
+    await hook.rerender({ version: 'third' });
+
+    expect(registerPrompt).toHaveBeenCalledOnce();
+    expect(unregister).not.toHaveBeenCalled();
+
+    const descriptor = registerPrompt.mock.calls[0]?.[0];
+    if (!descriptor) throw new Error('Prompt was not registered');
+    const response = await descriptor.get({ code: 'const answer = 42' });
+    expect(response.messages[0]?.content).toMatchObject({
+      type: 'text',
+      text: 'third: const answer = 42',
+    });
+
+    await hook.unmount();
+    expect(unregister).toHaveBeenCalledOnce();
+  });
 });

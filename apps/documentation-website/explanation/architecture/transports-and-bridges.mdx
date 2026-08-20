@@ -38,16 +38,23 @@ element-specific prefix. Resources receive `mcp-iframe:` wrapper URIs. A strict
 parent context can accept tools; prompts and resources require MCP-B extension
 methods.
 
-| Control          | Native document discovery | MCP-B iframe bridge           |
-| ---------------- | ------------------------- | ----------------------------- |
-| Browser policy   | `allow="tools"`           | Independent of MCP connection |
-| Child exposure   | `exposedTo`               | `allowedOrigins`              |
-| Parent selection | `fromOrigins`             | `target-origin`               |
-| Payload          | Strict WebMCP tools       | MCP protocol items            |
+| Control          | Native document discovery | MCP-B iframe bridge                  |
+| ---------------- | ------------------------- | ------------------------------------ |
+| Browser policy   | `allow="tools"`           | Independent of MCP connection        |
+| Who may connect  | Document tree             | `allowedOrigins`                     |
+| Child exposure   | `exposedTo`               | `exposedTo`, within `allowedOrigins` |
+| Parent selection | `fromOrigins`             | `target-origin`                      |
+| Payload          | Strict WebMCP tools       | MCP protocol items                   |
 
 These controls are complementary, not interchangeable. `allow="tools"` does
 not create an MCP server, and `allowedOrigins` does not grant the native browser
-feature.
+feature. On the bridge the two exposure controls stack: `allowedOrigins` decides
+which parents may connect, and `exposedTo` narrows one tool to a subset of them.
+A tool cannot reach an origin `allowedOrigins` already excludes.
+
+The browser enforces `exposedTo` on the native path. The bridge enforces it in
+the child's own JavaScript, so only the native path holds against a compromised
+child.
 
 ## Other MCP-B bridges
 

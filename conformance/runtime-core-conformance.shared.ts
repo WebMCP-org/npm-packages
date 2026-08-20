@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import type { ChromeModelContext, InputSchema, ModelContextTool } from '@mcp-b/webmcp-types';
+import type { ChromeModelContext, ModelContextTool } from '@mcp-b/webmcp-types';
 
 interface RuntimeCoreConformanceOptions {
   suiteName: string;
@@ -26,7 +26,7 @@ function requireModelContext(): ChromeModelContext {
   if (!modelContext) {
     throw new Error('Expected document.modelContext to be available');
   }
-  return modelContext as ChromeModelContext;
+  return modelContext;
 }
 
 function requireExecuteTool(modelContext: ChromeModelContext) {
@@ -43,8 +43,15 @@ async function listToolNames(): Promise<string[]> {
 async function registerAbortableTool(tool: ModelContextTool): Promise<AbortController> {
   const controller = new AbortController();
   activeControllers.push(controller);
+  const modelContext = requireModelContext();
+  const options = { signal: controller.signal };
+  // registerTool overloads on whether inputSchema is present, so the two shapes
+  // this suite registers have to reach it as distinct calls.
+  const { inputSchema, ...rest } = tool;
   await expect(
-    requireModelContext().registerTool(tool, { signal: controller.signal })
+    inputSchema
+      ? modelContext.registerTool({ ...rest, inputSchema }, options)
+      : modelContext.registerTool(rest, options)
   ).resolves.toBeUndefined();
   return controller;
 }
@@ -71,12 +78,8 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
     it('does not expose removed context APIs', () => {
       const modelContext = requireModelContext();
 
-      expect(typeof (modelContext as unknown as { provideContext?: unknown }).provideContext).toBe(
-        'undefined'
-      );
-      expect(typeof (modelContext as unknown as { clearContext?: unknown }).clearContext).toBe(
-        'undefined'
-      );
+      expect(typeof Reflect.get(modelContext, 'provideContext')).toBe('undefined');
+      expect(typeof Reflect.get(modelContext, 'clearContext')).toBe('undefined');
     });
 
     it('exposes document.modelContext as canonical surface with navigator compatibility alias', async () => {
@@ -103,12 +106,11 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
         (tool) => tool.name === toolName
       );
       expect(documentTool).toBeDefined();
-      expect(navigatorTool).toBeDefined();
+      if (!navigatorTool) {
+        throw new Error(`Expected navigator.modelContext.getTools() to return ${toolName}`);
+      }
 
-      const serialized = await requireExecuteTool(navigatorAlias as ChromeModelContext)(
-        navigatorTool!,
-        '{}'
-      );
+      const serialized = await requireExecuteTool(navigatorAlias)(navigatorTool, '{}');
       expect(serialized).toEqual(expect.any(String));
       expect(serialized).toContain('alias-ok');
     });
@@ -149,8 +151,8 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
       });
 
       const tool = (await modelContext.getTools()).find((candidate) => candidate.name === toolName);
-      expect(tool).toBeDefined();
-      const serialized = await requireExecuteTool(modelContext)(tool!, '{}');
+      if (!tool) throw new Error(`Expected getTools() to return ${toolName}`);
+      const serialized = await requireExecuteTool(modelContext)(tool, '{}');
       expect(serialized).toEqual(expect.any(String));
       expect(serialized).toContain('ok');
 
@@ -158,7 +160,7 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
       await registerAbortableTool({
         name: metadataToolName,
         description: 'Schema vocabulary is metadata at the WebMCP boundary',
-        inputSchema: { type: 42 } as unknown as InputSchema,
+        inputSchema: { type: 42 },
         async execute() {
           return { content: [{ type: 'text', text: 'metadata' }] };
         },
@@ -185,12 +187,9 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
 
       const tools = await modelContext.getTools();
       const tool = tools.find((candidate) => candidate.name === toolName);
-      expect(tool).toBeDefined();
+      if (!tool) throw new Error(`Expected getTools() to return ${toolName}`);
 
-      const serialized = await requireExecuteTool(modelContext)(
-        tool!,
-        JSON.stringify({ value: 9 })
-      );
+      const serialized = await requireExecuteTool(modelContext)(tool, JSON.stringify({ value: 9 }));
       expect(serialized).toEqual(expect.any(String));
       expect(serialized).toContain('producer:9');
     });

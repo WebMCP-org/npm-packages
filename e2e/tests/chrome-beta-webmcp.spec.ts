@@ -188,7 +188,7 @@ test.describe('Chrome WebMCP native smoke', () => {
 
       const nativeContext = context as {
         registerTool: (tool: unknown, options?: { signal?: AbortSignal }) => Promise<void>;
-        getTools: Document['modelContext']['getTools'];
+        getTools: NonNullable<Document['modelContext']>['getTools'];
       };
       const noSchemaName = `beta_no_schema_${Date.now()}`;
       const undefinedSchemaName = `beta_undefined_schema_${Date.now()}`;

@@ -83,6 +83,8 @@ test.describe('Notification Batching Tests', () => {
 
   test('should handle rapid register/unregister cycles', async ({ page }) => {
     const result = await page.evaluate(async () => {
+      const modelContext = document.modelContext;
+      if (!modelContext) throw new Error('document.modelContext is unavailable');
       let notificationCount = 0;
 
       const testing = navigator.modelContextTesting;
@@ -99,7 +101,7 @@ test.describe('Notification Batching Tests', () => {
       for (let i = 0; i < 5; i++) {
         const controller = new AbortController();
         controllers.push(controller);
-        document.modelContext.registerTool(
+        modelContext.registerTool(
           {
             name: `rapidCycleTool_${i}`,
             description: `Rapid cycle test tool ${i}`,
@@ -133,6 +135,8 @@ test.describe('Notification Batching Tests', () => {
 
   test('should correctly batch abort-driven cleanup calls', async ({ page }) => {
     const result = await page.evaluate(async () => {
+      const modelContext = document.modelContext;
+      if (!modelContext) throw new Error('document.modelContext is unavailable');
       let notificationCount = 0;
 
       const testing = navigator.modelContextTesting;
@@ -144,7 +148,7 @@ test.describe('Notification Batching Tests', () => {
 
       const controllers = Array.from({ length: 3 }, (_, index) => {
         const controller = new AbortController();
-        document.modelContext.registerTool(
+        modelContext.registerTool(
           {
             name: `batchAbort${index + 1}`,
             description: 'test',
@@ -178,6 +182,8 @@ test.describe('Notification Batching Tests', () => {
   }) => {
     // This test verifies the core value proposition: 100 registrations → 1 notification
     const result = await page.evaluate(async () => {
+      const modelContext = document.modelContext;
+      if (!modelContext) throw new Error('document.modelContext is unavailable');
       let notificationCount = 0;
 
       const testing = navigator.modelContextTesting;
@@ -193,7 +199,7 @@ test.describe('Notification Batching Tests', () => {
       for (let i = 0; i < 100; i++) {
         const controller = new AbortController();
         controllers.push(controller);
-        document.modelContext.registerTool(
+        modelContext.registerTool(
           {
             name: `reactHookTool_${i}`,
             description: `Simulated React hook tool ${i}`,
@@ -238,6 +244,8 @@ test.describe('Notification Batching - Edge Cases', () => {
 
   test('should handle single registration correctly (no batching needed)', async ({ page }) => {
     const result = await page.evaluate(async () => {
+      const modelContext = document.modelContext;
+      if (!modelContext) throw new Error('document.modelContext is unavailable');
       let notificationCount = 0;
 
       const testing = navigator.modelContextTesting;
@@ -248,7 +256,7 @@ test.describe('Notification Batching - Edge Cases', () => {
       }
 
       const controller = new AbortController();
-      document.modelContext.registerTool(
+      modelContext.registerTool(
         {
           name: 'singleTool',
           description: 'Single tool test',
@@ -275,6 +283,8 @@ test.describe('Notification Batching - Edge Cases', () => {
 
   test('should handle synchronous abort batching', async ({ page }) => {
     const result = await page.evaluate(async () => {
+      const modelContext = document.modelContext;
+      if (!modelContext) throw new Error('document.modelContext is unavailable');
       let notificationCount = 0;
 
       // Register some tools first
@@ -282,7 +292,7 @@ test.describe('Notification Batching - Edge Cases', () => {
       for (let i = 0; i < 5; i++) {
         const controller = new AbortController();
         controllers.push(controller);
-        document.modelContext.registerTool(
+        modelContext.registerTool(
           {
             name: `abortCleanupTool_${i}`,
             description: 'test',
