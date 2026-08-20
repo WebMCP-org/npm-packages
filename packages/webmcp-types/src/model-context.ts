@@ -27,10 +27,11 @@ export interface RegisteredTool {
   title?: string;
   description: string;
   /**
-   * A JSON Schema object since webmcp#241 (Chrome 154.0.8013); Chrome builds
-   * before that -- including the 149-156 Origin Trial population -- return the
-   * serialized JSON string the change replaced. Consumers that support both
-   * must branch on `typeof`.
+   * A JSON Schema object since webmcp#241, rolling out from Chrome 154.0.8013
+   * (cross-document tools first). Chrome 149-153 -- most of the Origin Trial
+   * population -- and 154's same-document tools still return the serialized
+   * JSON string the change replaced. Consumers that support both generations
+   * must branch on `typeof` and guard the parse of the string arm.
    */
   inputSchema?: InputSchema | string;
   window: Window;

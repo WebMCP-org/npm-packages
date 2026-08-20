@@ -369,15 +369,14 @@ describe('useWebMCP in a browser runtime', () => {
       { initialProps: { revision: 1 } }
     );
 
-    const getValueDescription = async () => {
-      const schema = (await findTool('browser_dependency'))?.inputSchema as {
-        properties: { value: { description: string } };
-      };
-      return schema.properties.value.description;
+    const expectValueDescription = async (description: string) => {
+      expect((await findTool('browser_dependency'))?.inputSchema).toMatchObject({
+        properties: { value: { description } },
+      });
     };
-    expect(await getValueDescription()).toBe('Revision 1');
+    await expectValueDescription('Revision 1');
     await rerender({ revision: 2 });
-    expect(await getValueDescription()).toBe('Revision 2');
+    await expectValueDescription('Revision 2');
   });
 
   it('converts a real Zod Standard JSON Schema through the registration path', async () => {

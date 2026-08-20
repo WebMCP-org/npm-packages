@@ -1,15 +1,20 @@
 import type { ChromeModelContext, InputSchema, RegisteredTool } from '@mcp-b/webmcp-types';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
-/** An object since webmcp#241; a string here means pre-154.0.8013 behavior. */
+/**
+ * An object since webmcp#241 (Chrome 154.0.8013); the native runner also spans
+ * Chrome 152-154 builds that still return the serialized string, so both
+ * generations resolve here.
+ */
 function requireObjectInputSchema(tool: RegisteredTool): InputSchema {
-  const { inputSchema } = tool;
-  if (typeof inputSchema !== 'object' || inputSchema === null) {
+  const raw: unknown =
+    typeof tool.inputSchema === 'string' ? JSON.parse(tool.inputSchema) : tool.inputSchema;
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
     throw new Error(
-      `Expected ${tool.name} to expose an object inputSchema, got ${typeof inputSchema}`
+      `Expected ${tool.name} to expose a JSON Schema inputSchema, got ${JSON.stringify(raw)}`
     );
   }
-  return inputSchema;
+  return raw as InputSchema;
 }
 
 interface DeclarativeFormConformanceOptions {

@@ -101,7 +101,11 @@ test.describe('Chrome WebMCP native smoke', () => {
             } catch {
               invalidEntries.push({ index, reason: 'inputSchema-json' });
             }
-          } else if (typeof tool.inputSchema !== 'object' || tool.inputSchema === null) {
+          } else if (
+            typeof tool.inputSchema !== 'object' ||
+            tool.inputSchema === null ||
+            Array.isArray(tool.inputSchema)
+          ) {
             invalidEntries.push({ index, reason: 'inputSchema-type' });
           }
         }

@@ -646,15 +646,23 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     const currentWindow = globalThis.window;
 
     const tools = [...this.tools.values()]
-      .map(({ item, registeredInputSchema }) => ({
-        name: item.name,
-        title: item.title ?? '',
-        description: item.description,
-        ...(registeredInputSchema !== undefined ? { inputSchema: registeredInputSchema } : {}),
-        origin,
-        window: currentWindow,
-        ...(item.annotations ? { annotations: toWebMcpAnnotations(item.annotations) } : {}),
-      }))
+      .map(({ item, registeredInputSchema }) => {
+        // A fresh object per call, aligned with the polyfill's post-webmcp#241
+        // shape. A custom toJSON can serialize to non-object JSON; omit those
+        // rather than emit a value consumers would mistake for a pre-154
+        // serialized string.
+        const parsed: unknown =
+          registeredInputSchema === undefined ? undefined : JSON.parse(registeredInputSchema);
+        return {
+          name: item.name,
+          title: item.title ?? '',
+          description: item.description,
+          ...(isPlainObject(parsed) ? { inputSchema: parsed } : {}),
+          origin,
+          window: currentWindow,
+          ...(item.annotations ? { annotations: toWebMcpAnnotations(item.annotations) } : {}),
+        };
+      })
       .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     await new Promise((resolve) => setTimeout(resolve, 0));
     return tools;

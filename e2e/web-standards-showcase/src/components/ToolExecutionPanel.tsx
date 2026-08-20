@@ -118,6 +118,7 @@ export const ToolExecutionPanel: FC<ToolExecutionPanelProps> = ({
           const hasExecuted = isLoading || isSuccess || isError;
 
           // An object since webmcp#241; a serialized string from older Chrome.
+          // undefined means the tool takes no arguments: render an empty form.
           let parsedSchema: unknown;
           try {
             parsedSchema =

@@ -53,7 +53,8 @@ specified origins. Without it, discovery includes same-origin active documents
 throughout the current top-level frame tree.
 
 `getTools()` returns `RegisteredTool` values. They contain `name`, optional
-`title`, `description`, serialized `inputSchema`, `window`, `origin`, and
+`title`, `description`, an `inputSchema` JSON Schema object (a serialized
+string from Chrome builds that predate webmcp#241), `window`, `origin`, and
 optional annotations. They do not expose the original `execute` callback.
 
 The API is available only in secure contexts. The `tools` Permissions Policy

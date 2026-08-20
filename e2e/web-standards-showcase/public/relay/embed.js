@@ -101,16 +101,25 @@
     return s(e) ? e : (e != null && g(`Tool invocation args must be an object, got`, typeof e), {});
   }
   function x(e) {
+    let t;
+    if (e.inputSchema !== void 0)
+      if (typeof e.inputSchema == `string`)
+        try {
+          t = JSON.parse(e.inputSchema);
+        } catch {
+          return (
+            console.warn(
+              `[webmcp-relay-embed] Tool "${e.name}" was not relayed because its input schema is malformed.`
+            ),
+            null
+          );
+        }
+      else t = e.inputSchema;
     return {
       name: e.name,
       ...(e.title === void 0 ? {} : { title: e.title }),
       description: e.description,
-      ...(e.inputSchema === void 0
-        ? {}
-        : {
-            inputSchema:
-              typeof e.inputSchema == `string` ? JSON.parse(e.inputSchema) : e.inputSchema,
-          }),
+      ...(t === void 0 ? {} : { inputSchema: t }),
       ...(e.annotations === void 0 ? {} : { annotations: e.annotations }),
     };
   }
@@ -147,7 +156,7 @@
   }
   async function T() {
     let e = w();
-    return e ? (await e.getTools()).map(x) : [];
+    return e ? (await e.getTools()).map(x).filter((e) => e !== null) : [];
   }
   async function E(e, t) {
     let n = w();
