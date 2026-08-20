@@ -105,7 +105,12 @@
       name: e.name,
       ...(e.title === void 0 ? {} : { title: e.title }),
       description: e.description,
-      ...(e.inputSchema === void 0 ? {} : { inputSchema: JSON.parse(e.inputSchema) }),
+      ...(e.inputSchema === void 0
+        ? {}
+        : {
+            inputSchema:
+              typeof e.inputSchema == `string` ? JSON.parse(e.inputSchema) : e.inputSchema,
+          }),
       ...(e.annotations === void 0 ? {} : { annotations: e.annotations }),
     };
   }
@@ -191,7 +196,8 @@
   }
   function I() {
     try {
-      return (document.modelContext.addEventListener(`toolchange`, P), !0);
+      let e = document.modelContext;
+      return e ? (e.addEventListener(`toolchange`, P), !0) : !1;
     } catch (e) {
       return (g(`addEventListener on modelContext threw:`, e), !1);
     }
@@ -243,14 +249,6 @@
       });
   }
   function V(e, t) {
-    if (!w()) {
-      R(t.source, t.origin, {
-        type: `webmcp.tools.invoke.error`,
-        requestId: e.requestId,
-        error: `No executable WebMCP runtime found on this page`,
-      });
-      return;
-    }
     E(String(e.toolName ?? ``), b(e.args))
       .then((n) => {
         R(t.source, t.origin, {

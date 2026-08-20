@@ -70,7 +70,8 @@ describe('useWebMCP in a browser runtime', () => {
 
     const tool = await findTool('browser_greet');
     expect(tool?.description).toBe('Greets a person');
-    expect(JSON.parse(tool?.inputSchema ?? '{}')).toMatchObject({
+    // An object since webmcp#241.
+    expect(tool?.inputSchema).toMatchObject({
       type: 'object',
       required: ['name'],
     });
@@ -369,7 +370,9 @@ describe('useWebMCP in a browser runtime', () => {
     );
 
     const getValueDescription = async () => {
-      const schema = JSON.parse((await findTool('browser_dependency'))?.inputSchema ?? '{}');
+      const schema = (await findTool('browser_dependency'))?.inputSchema as {
+        properties: { value: { description: string } };
+      };
       return schema.properties.value.description;
     };
     expect(await getValueDescription()).toBe('Revision 1');
@@ -393,7 +396,7 @@ describe('useWebMCP in a browser runtime', () => {
     );
 
     const tool = await findTool('browser_standard_schema');
-    expect(JSON.parse(tool?.inputSchema ?? '{}')).toEqual({
+    expect(tool?.inputSchema).toEqual({
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       type: 'object',
       properties: {

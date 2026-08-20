@@ -117,10 +117,13 @@ export const ToolExecutionPanel: FC<ToolExecutionPanelProps> = ({
           const isError = toolState.status === 'error';
           const hasExecuted = isLoading || isSuccess || isError;
 
-          // Parse the inputSchema from JSON string
+          // An object since webmcp#241; a serialized string from older Chrome.
           let parsedSchema: unknown;
           try {
-            parsedSchema = JSON.parse(tool.inputSchema ?? '{"type":"object","properties":{}}');
+            parsedSchema =
+              typeof tool.inputSchema === 'string'
+                ? JSON.parse(tool.inputSchema)
+                : (tool.inputSchema ?? { type: 'object', properties: {} });
           } catch (e) {
             console.error(`Failed to parse schema for tool ${tool.name}:`, e);
             parsedSchema = { type: 'object', properties: {} };
