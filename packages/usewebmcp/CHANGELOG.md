@@ -1,5 +1,43 @@
 # usewebmcp
 
+## 5.0.0
+
+### Major Changes
+
+- de0b41c: Use the strict `document.modelContext` lifecycle directly, remove duplicate
+  runtime and schema contracts, and clean up registrations with `AbortSignal`.
+- de0b41c: Drop React 17 from the supported peer range; `react` is now `^18.0.0 || ^19.0.0`.
+  The hooks no longer carry mounted-ref guards, which React 18 made unnecessary by
+  turning post-unmount state updates into a no-op, so React 17 was already
+  unsupported in practice.
+
+### Patch Changes
+
+- de0b41c: Declare `sideEffects: false` and a top-level `types` entry. Both packages are
+  pure re-exports, so bundlers can now tree-shake unused hooks, and consumers on
+  `moduleResolution: "node"` resolve types without reading the `exports` map.
+- de0b41c: Require Node 20 or newer. `@mcp-b/global`, `@mcp-b/mcp-iframe`,
+  `@mcp-b/webmcp-polyfill` and `@mcp-b/webmcp-ts-sdk` previously allowed Node 18;
+  the rest declared no `engines` range at all and now state the same floor. Node 18
+  reached end of life in April 2025. Browser builds are unaffected — this governs
+  build tooling and the relay CLI.
+- de0b41c: Stop emitting declaration source maps, and ship the MIT `LICENSE` text these
+  packages already declared. Each package shipped `dist` without `src`, so every
+  published `.d.ts.map` pointed at a file that was not in the tarball; editors
+  already fall back to the `.d.ts` itself. `@mcp-b/webmcp-types` keeps its maps —
+  it is the one package that ships `src`, so its maps resolve.
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [f1dbaa0]
+- Updated dependencies [f80daeb]
+  - @mcp-b/webmcp-types@5.0.0
+  - @mcp-b/webmcp-polyfill@5.0.0
+
 ## 4.0.0
 
 ### Major Changes

@@ -1,5 +1,70 @@
 # @mcp-b/webmcp-types
 
+## 5.0.0
+
+### Major Changes
+
+- de0b41c: Align the public types with the current document-first WebMCP draft and the MCP
+  SDK v2 JSON Schema contracts. Remove legacy aliases and model tool lifetime with
+  `AbortSignal`.
+- de0b41c: Stop declaring the WebMCP globals as unconditionally present.
+
+  `Document.modelContext`, `SubmitEvent.agentInvoked`, `SubmitEvent.respondWith()`
+  and the `ModelContext` interface object are now optional. No browser ships
+  WebMCP unflagged — Chromium exposes it only under `--enable-features=WebMCP` —
+  and the declarative form members are explainer-only, appearing in neither the
+  specification nor WPT's `webmcp.idl`. Declaring them as always-there made
+  feature detection read as dead code under our own types.
+
+  The modifiers are bare optionals (`?: T`, not `?: T | undefined`): where WebMCP
+  is absent the property is genuinely missing, so `'modelContext' in document` is
+  false rather than the property being present and holding `undefined`. The
+  `ModelContext` interface object is `| undefined` because a `var` declaration
+  cannot be optional; guard it with `typeof ModelContext !== 'undefined'`.
+
+  Migration — feature-detect, or install `@mcp-b/webmcp-polyfill`:
+
+  ```ts
+  const modelContext = document.modelContext;
+  if (!modelContext) return;
+  await modelContext.registerTool(tool);
+  ```
+
+  `RegisteredTool.title` and `RegisteredTool.annotations` stay optional and are
+  now documented. `annotations` is absent entirely when a tool registers none, and
+  `title` is only guaranteed by a specification default that webmcp#224 proposes
+  removing, so `tool.title || tool.name` is the correct read — the spec default
+  makes `title` an empty string today, which `??` does not fall through.
+
+  `@mcp-b/webmcp-local-relay` no longer relies on a thrown `TypeError` to detect a
+  missing `document.modelContext` when subscribing to `toolchange`; it checks
+  first and falls back to polling as before.
+
+- f80daeb: Return `RegisteredTool.inputSchema` from `getTools()` as a JSON Schema object
+  instead of a serialized string, following webmcp#241 and Chrome 154.0.8013.
+  The polyfill and the standalone `BrowserMcpServer` both parse a fresh object
+  per call, exactly like Blink parsing its serialized copy; a schema whose
+  custom `toJSON` serializes to non-object JSON is omitted rather than surfaced
+  as a value consumers would mistake for a pre-154 serialized string.
+
+  Consumers stay compatible with both generations of Chrome: the browser-server
+  native backfill and the relay embed accept the object shape from new Chrome and
+  the string shape that the 149–156 Origin Trial population still returns. The
+  `RegisteredTool.inputSchema` type widens to `InputSchema | string` to make that
+  branching explicit.
+
+  Before this, Chrome ≥154.0.8013 broke native tool mirroring entirely:
+  `JSON.parse` on the new object threw, and every native tool — including
+  child-frame tools — was dropped as malformed.
+
+### Patch Changes
+
+- de0b41c: Require Node 20 or newer. `@mcp-b/global`, `@mcp-b/mcp-iframe`,
+  `@mcp-b/webmcp-polyfill` and `@mcp-b/webmcp-ts-sdk` previously allowed Node 18;
+  the rest declared no `engines` range at all and now state the same floor. Node 18
+  reached end of life in April 2025. Browser builds are unaffected — this governs
+  build tooling and the relay CLI.
+
 ## 4.0.0
 
 ### Major Changes

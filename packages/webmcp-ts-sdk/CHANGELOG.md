@@ -1,5 +1,90 @@
 # @mcp-b/webmcp-ts-sdk
 
+## 5.0.0
+
+### Major Changes
+
+- de0b41c: Honor `exposedTo` over the iframe bridge instead of rejecting it.
+
+  `registerTool(tool, { exposedTo })` previously threw `NotSupportedError` unless native
+  WebMCP was present, so spec-conformant child code crashed under the polyfill inside an
+  `<mcp-iframe>` — the one place a userland cross-document channel actually exists. The
+  composed server now stores the allowlist and only advertises a restricted tool once the
+  connected embedder's origin matches it.
+
+  `IframeChildTransport` gained `clientOrigin` and an `onclientorigin` callback that report
+  the connected parent. `BrowserMcpServer` reads them duck-typed, so transports that cannot
+  name a peer keep every restricted tool off the wire.
+
+  Restricted tools fail closed. The MCP handle is disabled in the same synchronous step that
+  creates it, so a tool is never listable between registration and its first audience check,
+  and it stays hidden when no peer origin is ever established. Tools registered without
+  `exposedTo` are untouched.
+
+  Two limits, stated because the spec's guarantee is stronger:
+  - `exposedTo` only narrows. `allowedOrigins` on the child transport still decides who may
+    connect, and no allowlist widens past it.
+  - Enforcement is the child's own JavaScript, not the user agent. Native WebMCP enforces
+    `exposedTo` in the browser; this does not, so treat it as scoping rather than a boundary
+    against a compromised child.
+
+  `getTools({ fromOrigins })` still throws `NotSupportedError`. Parent-side discovery stays
+  `@mcp-b/mcp-iframe`'s job rather than something the SDK reaches across documents to do.
+
+- de0b41c: Move protocol behavior to the official MCP TypeScript SDK v2. The browser
+  adapter exposes its composed `McpServer`, removes legacy helper APIs, and keeps
+  global initialization side-effect-only through `document.modelContext`.
+- de0b41c: Drop the `zod` peer dependency and remove the `zodToJsonSchema` / `isZodSchema`
+  helpers. Tool, prompt and resource schemas are now plain JSON Schema objects,
+  matching what `document.modelContext` accepts natively, so passing a Zod schema
+  to `useWebMCPPrompt` or `registerTool` no longer works. Convert at the call site
+  with `z.toJSONSchema(schema)` (Zod 4) and keep Zod as your own dependency if you
+  still want it for validation.
+- f80daeb: Return `RegisteredTool.inputSchema` from `getTools()` as a JSON Schema object
+  instead of a serialized string, following webmcp#241 and Chrome 154.0.8013.
+  The polyfill and the standalone `BrowserMcpServer` both parse a fresh object
+  per call, exactly like Blink parsing its serialized copy; a schema whose
+  custom `toJSON` serializes to non-object JSON is omitted rather than surfaced
+  as a value consumers would mistake for a pre-154 serialized string.
+
+  Consumers stay compatible with both generations of Chrome: the browser-server
+  native backfill and the relay embed accept the object shape from new Chrome and
+  the string shape that the 149–156 Origin Trial population still returns. The
+  `RegisteredTool.inputSchema` type widens to `InputSchema | string` to make that
+  branching explicit.
+
+  Before this, Chrome ≥154.0.8013 broke native tool mirroring entirely:
+  `JSON.parse` on the new object threw, and every native tool — including
+  child-frame tools — was dropped as malformed.
+
+### Patch Changes
+
+- de0b41c: Require Node 20 or newer. `@mcp-b/global`, `@mcp-b/mcp-iframe`,
+  `@mcp-b/webmcp-polyfill` and `@mcp-b/webmcp-ts-sdk` previously allowed Node 18;
+  the rest declared no `engines` range at all and now state the same floor. Node 18
+  reached end of life in April 2025. Browser builds are unaffected — this governs
+  build tooling and the relay CLI.
+- de0b41c: Stop emitting declaration source maps, and ship the MIT `LICENSE` text these
+  packages already declared. Each package shipped `dist` without `src`, so every
+  published `.d.ts.map` pointed at a file that was not in the tarball; editors
+  already fall back to the `.d.ts` itself. `@mcp-b/webmcp-types` keeps its maps —
+  it is the one package that ships `src`, so its maps resolve.
+- f1dbaa0: Align declarative form execution with Chromium and the upstream Web Platform
+  Tests. Autosubmit now preserves native event ordering, opaque documents report
+  their effective origin, and the composed runtime forwards behavior-only form
+  registration changes.
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [f1dbaa0]
+- Updated dependencies [f80daeb]
+  - @mcp-b/webmcp-types@5.0.0
+  - @mcp-b/webmcp-polyfill@5.0.0
+
 ## 4.0.0
 
 ### Major Changes
