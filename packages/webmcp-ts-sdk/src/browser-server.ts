@@ -191,7 +191,11 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     });
     this.native = native;
     this.ownerDocument = globalThis.document ?? null;
-    if (native) {
+    if (
+      native &&
+      typeof native.addEventListener === 'function' &&
+      typeof native.removeEventListener === 'function'
+    ) {
       this.nativeToolChangeListener = () => {
         if (this.closed) return;
         this.nativeToolChangeQueue = this.nativeToolChangeQueue.then(async () => {

@@ -23,6 +23,11 @@ function readCurrentModelContext(): ModelContext | undefined {
   return document.modelContext ?? navigator.modelContext;
 }
 
+function canReplaceModelContext(target: Document | Navigator): boolean {
+  const descriptor = Object.getOwnPropertyDescriptor(target, 'modelContext');
+  return descriptor ? descriptor.configurable === true : Object.isExtensible(target);
+}
+
 function replaceDocumentModelContext(value: unknown): void {
   Object.defineProperty(document, 'modelContext', {
     configurable: true,
@@ -132,6 +137,12 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
   const native = readCurrentModelContext();
   if (!native) {
     throw new Error('modelContext is not available');
+  }
+
+  // Some browser hosts expose a frozen native context through non-configurable
+  // own properties. It is already usable and cannot legally be wrapped.
+  if (!canReplaceModelContext(document) || !canReplaceModelContext(navigator)) {
+    return;
   }
 
   // 3. Resolve transport before mutating either browser surface.
