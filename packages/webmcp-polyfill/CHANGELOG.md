@@ -1,5 +1,11 @@
 # @mcp-b/webmcp-polyfill
 
+## 5.0.1
+
+### Patch Changes
+
+- @mcp-b/webmcp-types@5.0.1
+
 ## 5.0.0
 
 ### Major Changes

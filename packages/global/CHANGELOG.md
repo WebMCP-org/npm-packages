@@ -1,5 +1,16 @@
 # @mcp-b/global
 
+## 5.0.1
+
+### Patch Changes
+
+- 2056346: Handle legacy native WebMCP contexts that omit EventTarget methods or expose immutable modelContext properties.
+- Updated dependencies [2056346]
+  - @mcp-b/webmcp-ts-sdk@5.0.1
+  - @mcp-b/transports@5.0.1
+  - @mcp-b/webmcp-types@5.0.1
+  - @mcp-b/webmcp-polyfill@5.0.1
+
 ## 5.0.0
 
 ### Major Changes

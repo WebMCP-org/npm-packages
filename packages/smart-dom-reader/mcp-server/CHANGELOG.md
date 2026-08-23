@@ -1,5 +1,7 @@
 # @mcp-b/smart-dom-reader-server
 
+## 5.0.1
+
 ## 5.0.0
 
 ### Major Changes
