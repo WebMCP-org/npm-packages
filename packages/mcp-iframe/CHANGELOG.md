@@ -1,5 +1,11 @@
 # @mcp-b/mcp-iframe
 
+## 5.0.1
+
+### Patch Changes
+
+- @mcp-b/transports@5.0.1
+
 ## 5.0.0
 
 ### Major Changes
