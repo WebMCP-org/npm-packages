@@ -95,6 +95,29 @@ describe('global adapter', () => {
     expect(typeof getModelContext().listTools).toBe('function');
   });
 
+  it('leaves a non-configurable native modelContext untouched', () => {
+    const nativeContext = createNativeModelContextStub();
+    const previousNavigatorContext = navigator.modelContext;
+    setDocumentModelContext(nativeContext);
+    const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+    const descriptorSpy = vi
+      .spyOn(Object, 'getOwnPropertyDescriptor')
+      .mockImplementation((target, key) => {
+        const descriptor = getOwnPropertyDescriptor(target, key);
+        return target === document && key === 'modelContext' && descriptor
+          ? { ...descriptor, configurable: false }
+          : descriptor;
+      });
+
+    try {
+      expect(initializeWebModelContext()).toBeUndefined();
+      expect(document.modelContext).toBe(nativeContext);
+      expect(navigator.modelContext).toBe(previousNavigatorContext);
+    } finally {
+      descriptorSpy.mockRestore();
+    }
+  });
+
   it('leaves the native surface untouched when transport selection fails', () => {
     const nativeContext = createNativeModelContextStub();
     setDocumentModelContext(nativeContext);
@@ -342,7 +365,7 @@ describe('global adapter', () => {
     });
   });
 
-  it('backfills tools from a native document modelContext using getTools and executeTool', async () => {
+  it('backfills tools from a legacy native context without EventTarget methods', async () => {
     const nativeTool = {
       name: 'standard_native_tool',
       description: 'registered before wrapper init through the standard API',
@@ -367,9 +390,6 @@ describe('global adapter', () => {
       registerTool: () => {},
       getTools,
       executeTool,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      dispatchEvent: () => true,
     };
 
     setDocumentModelContext(nativeContext);
