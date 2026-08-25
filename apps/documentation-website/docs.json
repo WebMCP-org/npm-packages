@@ -27,7 +27,7 @@
     "decoration": "gradient"
   },
   "banner": {
-    "content": "**Hackathon:** [OpenAI WebMCP Challenge](https://openai.com/webmcp-challenge). Build an agent-native web app. Submissions close September 3 at 5 p.m. PT.",
+    "content": "**Hackathon:** [OpenAI WebMCP Challenge](https://webmcp.devpost.com/). Build an agent-native web app. Submissions close September 3 at 1 p.m. PT.",
     "dismissible": true
   },
   "redirects": [

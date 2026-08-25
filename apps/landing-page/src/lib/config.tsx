@@ -59,8 +59,8 @@ export const siteConfig = {
   },
   hackathonBanner: {
     title: 'OpenAI WebMCP Challenge',
-    description: 'Build an agent-native web app. Submissions close September 3 at 5 p.m. PT.',
-    href: 'https://openai.com/webmcp-challenge',
+    description: 'Build an agent-native web app. Submissions close September 3 at 1 p.m. PT.',
+    href: 'https://webmcp.devpost.com/',
   },
   hero: {
     badge: {
@@ -81,7 +81,14 @@ export const siteConfig = {
         variant: 'products',
         preview: { title: 'Packages' },
       },
-      { text: ' that help people and agents use WebMCP.' },
+      { text: ' that help people and agents use ' },
+      {
+        text: 'WebMCP',
+        href: 'https://docs.mcp-b.ai/explanation/what-is-webmcp',
+        variant: 'spec',
+        preview: { title: 'What is WebMCP?' },
+      },
+      { text: '.' },
     ],
     description: [
       {

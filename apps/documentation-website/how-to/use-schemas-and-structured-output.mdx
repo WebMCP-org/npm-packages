@@ -1,6 +1,6 @@
 ---
-title: 'Use schemas and structured output'
-description: 'Define tool input schemas with JSON Schema or Standard JSON Schema, and add output schemas for typed agent responses.'
+title: 'Use WebMCP input schemas and structured output'
+description: 'Define WebMCP inputSchema values with JSON Schema or Zod, then add MCP-B outputSchema metadata for typed structured responses.'
 keywords:
   [
     'inputSchema',
@@ -14,6 +14,9 @@ keywords:
   ]
 icon: 'brackets-curly'
 ---
+
+Use `inputSchema` to describe and infer WebMCP tool arguments. Add MCP-B `outputSchema` metadata
+when an agent needs typed structured data in addition to human-readable content.
 
 ## Define input schemas
 

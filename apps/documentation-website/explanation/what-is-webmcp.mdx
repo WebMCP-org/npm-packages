@@ -1,29 +1,71 @@
 ---
-title: 'What is WebMCP?'
-description: 'Why WebMCP exists, what the browser standard defines, and where MCP-B adds tooling.'
-keywords: ['webmcp', 'document.modelContext', 'web standard', 'mcp-b']
+title: 'What is WebMCP? Browser tools for AI agents'
+description: 'Learn how WebMCP lets websites expose structured tools to AI agents through browser APIs, authenticated sessions, and visible user interfaces.'
+keywords:
+  ['WebMCP', 'WebMCP API', 'WebMCP standard', 'document.modelContext', 'AI agents', 'browser tools']
 icon: 'circle-question'
 ---
 
-WebMCP proposes browser APIs for publishing structured tools. JavaScript uses
-`document.modelContext`, while the declarative proposal lets HTML forms describe
-tools without replacing their visible controls or validation.
+WebMCP is a proposal for browser APIs that let websites expose structured tools to AI agents. A
+site defines what an agent can do, which inputs each action accepts, and where the action runs. The
+agent uses that contract instead of guessing from screenshots, DOM structure, or click sequences.
 
-These tools run inside the document's origin, authenticated session,
-application state, and event loop. Unlike a remote MCP server, a WebMCP tool can
-operate on the page the user is currently viewing and remain tied to that
-document's lifecycle.
+## Why WebMCP exists
 
-That location is the point of the design. Agents get an explicit capability
-contract from the site instead of inferring intent from screenshots, DOM shape,
-or brittle automation scripts.
+Websites already contain the application logic, permissions, and data needed to complete useful
+tasks. Traditional browser automation approaches the site from the outside. It tries to infer the
+meaning of visible controls, then reproduces the same clicks and keystrokes a person would make.
 
-The [WebMCP Community Group draft](https://webmachinelearning.github.io/webmcp/)
-is authoritative for the proposed standard surface. Chrome currently exposes
-an experimental implementation. MCP-B supplies implementation and integration
-tooling, including the strict polyfill, React bindings, browser transports,
-iframe bridges, and local relays. MCP-B capabilities beyond the standard tool
-surface are extensions.
+WebMCP lets the site publish its own capability contract. A travel site can expose a flight search
+tool, an issue tracker can expose an issue creation tool, and a storefront can expose a cart update
+tool. The page remains visible, so the person can inspect results, change inputs, and confirm
+sensitive actions in the interface they already trust.
 
-For implementation, follow [Build your first tool](/tutorials/first-tool) and
-[Choose a runtime](/how-to/choose-runtime).
+## How WebMCP works
+
+The proposal has two complementary surfaces:
+
+- The **imperative API** lets JavaScript register tools through `document.modelContext`. Each tool
+  has a name, description, input schema, and handler tied to the current document.
+- The **declarative API** lets HTML forms describe tools while keeping their existing controls,
+  validation, and submission behavior.
+
+Both approaches make an application's actions machine-readable without replacing its human
+interface. The [Community Group draft](https://webmachinelearning.github.io/webmcp/) defines the
+proposed standard surface. The [standard API reference](/reference/webmcp/standard-api) provides a
+short lookup for the current methods and links back to that authoritative draft.
+
+## Why the browser location matters
+
+A WebMCP tool runs with the document's origin, authenticated session, application state, and event
+loop. It can operate on the page the user is viewing and disappears with that document's lifecycle.
+
+This location avoids duplicating the site's business logic in a separate service. It also preserves
+the site's existing authorization checks. WebMCP does not make an action safe by itself: the
+application must still validate inputs, enforce permissions, and require confirmation where the
+consequence warrants it. See [Security and human-in-the-loop
+design](/explanation/design/security-and-human-in-the-loop) for those boundaries.
+
+## WebMCP and MCP solve different problems
+
+The Model Context Protocol connects AI applications to servers that provide tools, resources, and
+prompts. WebMCP publishes tools from the active website instead. The two approaches can complement
+each other: a page can expose actions through WebMCP, while a bridge or relay makes those actions
+available to an MCP client.
+
+[WebMCP vs MCP](/explanation/webmcp-vs-mcp) compares their runtime, lifecycle, authentication, and
+trust boundaries in more detail.
+
+## Is WebMCP a completed web standard?
+
+No. WebMCP is a Web Machine Learning Community Group proposal, not a completed W3C standard.
+Chrome exposes an experimental implementation, and the API can change as browser vendors and the
+community test it. Track [spec status and limitations](/explanation/design/spec-status-and-limitations)
+before relying on native behavior in production.
+
+MCP-B provides tooling around the proposal, including a strict polyfill, React bindings, browser
+transports, iframe bridges, and local relays. Features beyond the standard tool surface are MCP-B
+extensions rather than WebMCP methods.
+
+To try the API, follow [Build your first tool](/tutorials/first-tool). To choose between native
+support, the polyfill, and the extended runtime, see [Choose a runtime](/how-to/choose-runtime).
