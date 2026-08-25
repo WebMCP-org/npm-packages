@@ -18,68 +18,72 @@ export const LiveLandingTool = () => {
       const registration = new AbortController();
       controller = registration;
 
-      void document.modelContext
-        .registerTool(
-          {
-            name: TOOL_NAME,
-            description:
-              'Returns information about the current WebMCP documentation page: title, URL, headings, link count, and navigation structure.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                include_headings: {
-                  type: 'boolean',
-                  description: 'Include the list of section headings (default: true)',
-                },
-                include_links: {
-                  type: 'boolean',
-                  description: 'Include outbound link URLs (default: false)',
+      void Promise.resolve()
+        .then(() =>
+          document.modelContext.registerTool(
+            {
+              name: TOOL_NAME,
+              description:
+                'Returns information about the current WebMCP documentation page: title, URL, headings, link count, and navigation structure.',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  include_headings: {
+                    type: 'boolean',
+                    description: 'Include the list of section headings (default: true)',
+                  },
+                  include_links: {
+                    type: 'boolean',
+                    description: 'Include outbound link URLs (default: false)',
+                  },
                 },
               },
+              execute: (args) => {
+                setCallCount((c) => c + 1);
+
+                const includeHeadings = args.include_headings !== false;
+                const includeLinks = args.include_links === true;
+
+                const info = {
+                  title: document.title,
+                  url: location.href,
+                  description:
+                    document.querySelector('meta[name="description"]')?.getAttribute('content') ||
+                    null,
+                  headingCount: document.querySelectorAll('h1, h2, h3').length,
+                  linkCount: document.querySelectorAll('a[href]').length,
+                };
+
+                if (includeHeadings) {
+                  info.headings = Array.from(document.querySelectorAll('h1, h2, h3')).map((h) => ({
+                    level: Number.parseInt(h.tagName[1]),
+                    text: h.textContent.trim(),
+                  }));
+                }
+
+                if (includeLinks) {
+                  const seen = new Set();
+                  info.links = Array.from(document.querySelectorAll('a[href]'))
+                    .map((a) => a.href)
+                    .filter((href) => {
+                      if (seen.has(href)) return false;
+                      seen.add(href);
+                      return true;
+                    })
+                    .slice(0, 50);
+                }
+
+                return {
+                  content: [{ type: 'text', text: JSON.stringify(info, null, 2) }],
+                };
+              },
             },
-            execute: (args) => {
-              setCallCount((c) => c + 1);
-
-              const includeHeadings = args.include_headings !== false;
-              const includeLinks = args.include_links === true;
-
-              const info = {
-                title: document.title,
-                url: location.href,
-                description:
-                  document.querySelector('meta[name="description"]')?.getAttribute('content') ||
-                  null,
-                headingCount: document.querySelectorAll('h1, h2, h3').length,
-                linkCount: document.querySelectorAll('a[href]').length,
-              };
-
-              if (includeHeadings) {
-                info.headings = Array.from(document.querySelectorAll('h1, h2, h3')).map((h) => ({
-                  level: Number.parseInt(h.tagName[1]),
-                  text: h.textContent.trim(),
-                }));
-              }
-
-              if (includeLinks) {
-                const seen = new Set();
-                info.links = Array.from(document.querySelectorAll('a[href]'))
-                  .map((a) => a.href)
-                  .filter((href) => {
-                    if (seen.has(href)) return false;
-                    seen.add(href);
-                    return true;
-                  })
-                  .slice(0, 50);
-              }
-
-              return {
-                content: [{ type: 'text', text: JSON.stringify(info, null, 2) }],
-              };
-            },
-          },
-          { signal: registration.signal }
+            { signal: registration.signal }
+          )
         )
-        .then(() => setIsRegistered(true))
+        .then(() => {
+          if (!registration.signal.aborted) setIsRegistered(true);
+        })
         .catch((error) => {
           if (!registration.signal.aborted) console.error(error);
         });
