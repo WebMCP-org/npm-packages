@@ -381,6 +381,7 @@ Contributions welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md) for guideline
 
 ## Links
 
+- [What is WebMCP?](https://docs.mcp-b.ai/explanation/what-is-webmcp)
 - [MCP-b Documentation](https://docs.mcp-b.ai)
 - [MCP-B Browser Extension](https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa)
 - [W3C WebMCP Spec](https://webmachinelearning.github.io/webmcp/)

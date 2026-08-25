@@ -13,6 +13,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   site: 'https://mcp-b.ai',
   output: 'server',
+  trailingSlash: 'always',
   prefetch: { defaultStrategy: 'hover', prefetchAll: false },
   build: { inlineStylesheets: 'auto' },
 
