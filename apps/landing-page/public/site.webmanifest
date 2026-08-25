@@ -1,13 +1,23 @@
 {
   "name": "MCP-B",
   "short_name": "MCP-B",
-  "description": "WebMCP extensions that let AI agents work with your internal tools.",
+  "description": "Open-source WebMCP packages and browser tooling.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#161619",
   "theme_color": "#161619",
   "icons": [
-    { "src": "/images/logos/logo-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/images/logos/logo-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }

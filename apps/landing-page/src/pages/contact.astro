@@ -1,0 +1,67 @@
+---
+export const prerender = true;
+
+import Base from '../layouts/Codeforge.astro';
+import CalendarEmbed from '../components/calendar-embed.astro';
+---
+
+<Base
+  title="Book a call"
+  description="Book a 15-minute call about making your website or product agent-ready with WebMCP."
+>
+  <section class="contact-page">
+    <header class="contact-page__header">
+      <h1>Make your product agent-ready.</h1>
+      <p>
+        Book a 15-minute call to talk through WebMCP, browser agents, or the fastest path from
+        prototype to production.
+      </p>
+    </header>
+
+    <div class="contact-page__content">
+      <CalendarEmbed />
+    </div>
+  </section>
+</Base>
+
+<style>
+  .contact-page {
+    width: 100%;
+    padding: clamp(4rem, 7vw, 6rem) clamp(1.5rem, 4vw, 2.5rem);
+  }
+
+  .contact-page__header,
+  .contact-page__content {
+    width: 100%;
+    max-width: 71rem;
+    margin-inline: auto;
+  }
+
+  .contact-page__header {
+    margin-bottom: clamp(1.25rem, 2vw, 1.75rem);
+  }
+
+  .contact-page__header h1 {
+    margin: 0;
+    color: #4a8fb7;
+    font-size: clamp(3.25rem, 6vw, 5.5rem);
+    font-weight: 460;
+    letter-spacing: -0.055em;
+    line-height: 0.94;
+    white-space: nowrap;
+  }
+
+  .contact-page__header p {
+    max-width: 50rem;
+    margin: 1.25rem 0 0;
+    color: var(--muted-foreground);
+    font-size: clamp(1.05rem, 1.5vw, 1.25rem);
+    line-height: 1.5;
+  }
+
+  @media (max-width: 40rem) {
+    .contact-page__header h1 {
+      white-space: normal;
+    }
+  }
+</style>

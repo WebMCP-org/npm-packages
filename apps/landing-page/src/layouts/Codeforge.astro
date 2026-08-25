@@ -22,16 +22,16 @@ const pageTitle = title === SITE_TITLE ? title : `${title} | ${SITE_TITLE}`;
 ---
 
 <!doctype html>
-<html lang="en" dir="ltr">
+<html lang="en" dir="ltr" data-theme="light">
   <head>
     <BaseHead title={pageTitle} description={description} image={image} article={article} />
     <slot name="head" />
   </head>
   <body class="antialiased font-sans overflow-x-hidden">
     <a href="#main" class="sr-only skip-link">Skip to main content</a>
-    <div class="max-w-7xl mx-auto border-x border-border">
+    <div class="mx-auto w-full min-w-0 max-w-7xl border-x border-border">
       <Navbar client:only="react" />
-      <main id="main" class="flex flex-col divide-y divide-border pt-16">
+      <main id="main" class="flex min-w-0 flex-col divide-y divide-border pt-16">
         <slot />
       </main>
       <Footer />

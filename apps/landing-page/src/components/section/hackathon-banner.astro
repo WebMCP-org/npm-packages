@@ -1,0 +1,118 @@
+---
+import { siteConfig } from '@/lib/config';
+
+const { hackathonBanner } = siteConfig;
+---
+
+<aside class="challenge-banner" aria-label={hackathonBanner.title}>
+  <div class="challenge-banner__inner">
+    <span class="challenge-banner__label">Hackathon</span>
+    <p class="challenge-banner__copy">
+      <strong>
+        <a href={hackathonBanner.href} target="_blank" rel="noreferrer">
+          {hackathonBanner.title}
+        </a>
+      </strong>
+      <span>{hackathonBanner.description}</span>
+    </p>
+  </div>
+</aside>
+
+<style>
+  .challenge-banner {
+    background: var(--sigvelo-color-surface-under);
+    color: var(--sigvelo-color-text);
+    padding: var(--sigvelo-spacing-3) var(--sigvelo-spacing-6);
+  }
+
+  .challenge-banner__inner {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--sigvelo-spacing-4);
+    max-width: 76rem;
+    margin-inline: auto;
+  }
+
+  .challenge-banner__label {
+    padding-inline-end: var(--sigvelo-spacing-4);
+    border-inline-end: 1px solid var(--sigvelo-color-primary-border-muted);
+    color: var(--sigvelo-color-primary-text);
+    font-size: var(--sigvelo-text-xs);
+    font-weight: var(--sigvelo-font-weight-bold);
+    line-height: var(--sigvelo-text-xs-leading);
+    letter-spacing: var(--sigvelo-tracking-wider);
+    text-transform: uppercase;
+  }
+
+  .challenge-banner__copy {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sigvelo-spacing-1) var(--sigvelo-spacing-3);
+    margin: 0;
+    color: var(--sigvelo-color-text-muted);
+    font-size: var(--sigvelo-text-sm);
+    line-height: var(--sigvelo-text-sm-leading);
+  }
+
+  .challenge-banner__copy strong {
+    color: var(--sigvelo-color-text);
+    font-weight: var(--sigvelo-font-weight-semibold);
+    white-space: nowrap;
+  }
+
+  .challenge-banner__copy a {
+    color: inherit;
+    text-decoration-line: underline;
+    text-decoration-color: color-mix(in oklab, var(--sigvelo-color-primary-text), transparent 58%);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.18em;
+    transition:
+      color var(--sigvelo-motion-duration-interaction) var(--sigvelo-motion-ease-change),
+      text-decoration-color var(--sigvelo-motion-duration-interaction)
+        var(--sigvelo-motion-ease-change);
+  }
+
+  .challenge-banner__copy a:hover {
+    color: var(--sigvelo-color-primary-text);
+    text-decoration-color: currentColor;
+  }
+
+  .challenge-banner__copy a:focus-visible {
+    border-radius: var(--sigvelo-radius-xs);
+    outline: var(--sigvelo-focus-width) solid var(--sigvelo-color-focus);
+    outline-offset: var(--sigvelo-focus-offset);
+  }
+
+  @media (max-width: 600px) {
+    .challenge-banner {
+      padding-inline: var(--sigvelo-spacing-4);
+    }
+
+    .challenge-banner__inner {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--sigvelo-spacing-1);
+    }
+
+    .challenge-banner__label {
+      padding-inline-end: 0;
+      border-inline-end: 0;
+    }
+
+    .challenge-banner__copy {
+      display: grid;
+      gap: var(--sigvelo-spacing-1);
+    }
+
+    .challenge-banner__copy strong {
+      white-space: normal;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .challenge-banner__copy a {
+      transition: none;
+    }
+  }
+</style>

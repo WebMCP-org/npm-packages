@@ -26,7 +26,9 @@ function HamburgerButton({ isOpen, onClick }: { isOpen: boolean; onClick: () => 
     <button
       onClick={onClick}
       className="md:hidden relative z-50 flex size-8 items-center justify-center rounded-full border border-border bg-background transition-colors hover:bg-accent"
-      aria-label="Toggle menu"
+      aria-label={isOpen ? 'Close menu' : 'Open menu'}
+      aria-controls="mobile-navigation"
+      aria-expanded={isOpen}
     >
       <div className="relative size-5 flex items-center justify-center">
         <motion.span
@@ -63,6 +65,8 @@ function DesktopNav() {
                       <a
                         key={item.id}
                         href={item.href}
+                        target={item.href.startsWith('http') ? '_blank' : undefined}
+                        rel={item.href.startsWith('http') ? 'noopener' : undefined}
                         className="flex items-start gap-3 rounded-lg p-3 hover:bg-accent/50 transition-colors"
                       >
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center border border-border rounded-lg bg-muted">
@@ -106,6 +110,7 @@ function MobileNav({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
       {isOpen && (
         <>
           <motion.div
+            id="mobile-navigation"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -176,6 +181,8 @@ function MobileNav({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
                                     <a
                                       href={item.href}
                                       onClick={onClose}
+                                      target={item.href.startsWith('http') ? '_blank' : undefined}
+                                      rel={item.href.startsWith('http') ? 'noopener' : undefined}
                                       className="flex items-start gap-3 transition-colors"
                                     >
                                       <div className="flex h-8 w-8 shrink-0 items-center justify-center bg-muted border border-border rounded-lg">
@@ -256,15 +263,13 @@ function MobileNav({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }
                   className="mt-4 w-full px-0 py-3 text-center"
                 >
                   <p className="text-sm text-muted-foreground">
-                    Need agents, consulting, or our blog?{' '}
+                    Need help making your site agent-ready?{' '}
                     <a
-                      href="https://sigvelo.com"
-                      target="_blank"
-                      rel="noopener"
+                      href={siteConfig.booking.href}
                       onClick={onClose}
                       className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
                     >
-                      Visit SigVelo
+                      Book a 15-minute call
                       <ArrowRight className="h-3.5 w-3.5" />
                     </a>
                   </p>
@@ -324,17 +329,6 @@ export function Navbar() {
         <a href="/" className="flex items-center gap-2.5 text-lg font-semibold">
           <img src="/mcp-b-logo.svg" alt="" width="28" height="28" aria-hidden="true" />
           <span>MCP-B</span>
-          <span className="text-sm font-normal text-muted-foreground">
-            by{' '}
-            <a
-              href="https://sigvelo.com"
-              target="_blank"
-              rel="noopener"
-              className="hover:text-foreground transition-colors"
-            >
-              SigVelo
-            </a>
-          </span>
         </a>
 
         <DesktopNav />

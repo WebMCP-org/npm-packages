@@ -1,28 +1,226 @@
 ---
 import HeaderBadge from "@/components/header-badge.astro";
-import { StatefulButton } from "@/components/ui/stateful-button";
+import HeroCopyLink from "@/components/hero-copy-link.astro";
+import CalendarEmbed from "@/components/calendar-embed.astro";
 import { siteConfig } from "@/lib/config";
 
 const { hero } = siteConfig;
 ---
 
-<section id="hero" class="relative flex flex-col items-center justify-center px-4 py-16 md:py-24">
+<section id="hero" class="relative flex flex-col items-center justify-center px-4 pt-12 pb-8 md:pt-16 md:pb-12">
   <div class="absolute inset-0 -z-1 h-full w-full bg-radial-[at_45%_85%] from-[#2CD5FF]/40 via-[#2C30FF]/4 mask-[linear-gradient(to_bottom,transparent,black_100%)]"></div>
   <div class="absolute inset-0 -z-1 h-full w-full bg-radial-[at_45%_68%] from-[#2CD5FF]/68 via-[#2C30FF]/3 mask-[linear-gradient(to_bottom,transparent,black_100%)] blur-[50px]"></div>
-  <div class="relative z-10 mx-auto flex max-w-4xl flex-col items-center justify-center space-y-6 text-center">
-    <HeaderBadge icon={hero.badge.icon} text={hero.badge.text} className="max-[350px]:hidden" />
-    <h1 class="text-4xl font-semibold tracking-tighter text-balance md:text-5xl lg:text-6xl">
-      {hero.title}
+  <div class="hero-content relative z-10 mx-auto flex w-full max-w-4xl flex-col items-center justify-center gap-5 text-center">
+    <div class="hero-badge-slot">
+      <HeaderBadge icon={hero.badge.icon} text={hero.badge.text} className="max-[350px]:hidden" />
+    </div>
+    <h1 class="hero-title text-4xl font-semibold tracking-tighter text-balance md:text-5xl lg:text-6xl">
+      {
+        hero.title.map((part) =>
+          part.href && part.preview ? (
+            <HeroCopyLink {...part} />
+          ) : (
+            part.text
+          ),
+        )
+      }
     </h1>
-    <p class="mx-auto max-w-2xl text-center text-balance text-lg text-secondary-foreground/70">
-      {hero.description}
+    <p class="hero-lede">
+      {
+        hero.description.map((part) =>
+          part.href && part.preview ? (
+            <HeroCopyLink {...part} />
+          ) : (
+            part.text
+          ),
+        )
+      }
     </p>
-    <StatefulButton
-      client:visible
-      href={hero.cta.primary.href}
-      className="px-8 py-3.5"
-    >
-      {hero.cta.primary.text}
-    </StatefulButton>
+    <div class="hero-link-previews">
+      {
+        [...hero.title, ...hero.description].map((part) =>
+          part.href && part.preview ? <HeroCopyLink {...part} mode="panel" /> : null,
+        )
+      }
+    </div>
+    <div class="hero-actions">
+      <a
+        class="cursor-button cursor-button--chrome"
+        href="https://chromewebstore.google.com/detail/opojeelojlkcinlhkbahpcekdolfjmhi"
+        target="_blank"
+        rel="noopener"
+      >
+        <img src="/assets/google-chrome.svg" alt="" width="22" height="22" />
+        Get it on Chrome - It's free!
+      </a>
+      <button
+        class="cursor-button cursor-button--secondary"
+        type="button"
+        aria-expanded="false"
+        aria-controls="hero-booking-panel"
+        data-calendar-toggle
+      >
+        Book a call
+      </button>
+      <a class="cursor-button cursor-button--secondary" href="https://docs.mcp-b.ai">
+        Read the docs
+      </a>
+    </div>
+    <div id="hero-booking-panel" class="hero-booking-panel" data-calendar-panel hidden>
+      <CalendarEmbed />
+    </div>
   </div>
 </section>
+
+<script>
+  const toggle = document.querySelector('[data-calendar-toggle]');
+  const panel = document.querySelector('[data-calendar-panel]');
+
+  if (toggle instanceof HTMLButtonElement && panel instanceof HTMLElement) {
+    toggle.addEventListener('click', () => {
+      const isOpen = toggle.getAttribute('aria-expanded') !== 'true';
+      toggle.setAttribute('aria-expanded', String(isOpen));
+      panel.hidden = !isOpen;
+      if (isOpen) panel.dispatchEvent(new Event('calendar:open'));
+    });
+  }
+</script>
+
+<style is:global>
+  .hero-badge-slot {
+    transition: opacity var(--sigvelo-motion-duration-interaction)
+      var(--sigvelo-motion-ease-change);
+  }
+
+  .hero-lede {
+    max-width: 40rem;
+    margin: 0 auto;
+    color: var(--secondary-foreground);
+    font-size: 1.125rem;
+    line-height: 1.55;
+    text-align: center;
+    text-wrap: pretty;
+    opacity: 0.78;
+  }
+
+  .hero-link-previews {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .hero-link-previews .hero-link-popover {
+    pointer-events: auto;
+  }
+
+  .hero-content:has(.hero-title a:hover) .hero-badge-slot,
+  .hero-content:has(.hero-title a:focus-visible) .hero-badge-slot,
+  .hero-content:has(.hero-link-popover:popover-open) .hero-badge-slot {
+    opacity: 0;
+  }
+
+  .cursor-button {
+    min-block-size: 3.15rem;
+    padding-inline: 1.4rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: var(--sigvelo-public-blue);
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.98rem;
+    font-weight: 650;
+    cursor: pointer;
+    text-decoration: none;
+    transition:
+      background-color 150ms ease,
+      transform 150ms ease;
+  }
+
+  .cursor-button--chrome {
+    gap: 0.65rem;
+  }
+
+  .cursor-button--chrome img {
+    inline-size: 1.35rem;
+    block-size: 1.35rem;
+  }
+
+  .cursor-button--secondary {
+    border-color: var(--sigvelo-public-rule);
+    background: transparent;
+    color: var(--foreground);
+  }
+
+  .cursor-button:hover {
+    background: var(--sigvelo-public-action);
+    color: #fff;
+    transform: translateY(-1px);
+  }
+
+  .cursor-button--secondary:hover {
+    border-color: var(--foreground);
+    background: transparent;
+    color: var(--foreground);
+  }
+
+  .hero-actions {
+    margin-block-start: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0.75rem;
+    width: 100%;
+  }
+
+  .hero-booking-panel {
+    width: 100%;
+    text-align: start;
+    animation: hero-calendar-reveal 220ms var(--sigvelo-motion-ease-enter) both;
+  }
+
+  @keyframes hero-calendar-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(-0.5rem);
+    }
+  }
+
+  .cursor-button:focus-visible {
+    outline: 2px solid var(--sigvelo-public-focus);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-badge-slot,
+    .cursor-button {
+      transition: none;
+    }
+
+    .cursor-button:hover {
+      transform: none;
+    }
+
+    .hero-booking-panel {
+      animation: none;
+    }
+  }
+
+  @media (max-width: 40rem) {
+    .hero-actions {
+      display: grid;
+      justify-content: stretch;
+      width: 20rem;
+      max-width: 100%;
+    }
+
+    .cursor-button {
+      width: 100%;
+    }
+  }
+</style>

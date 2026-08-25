@@ -1,7 +1,7 @@
 ---
 import { siteConfig } from "@/lib/config";
 
-const { links, name, parentName, parentUrl } = siteConfig;
+const { booking, links, name } = siteConfig;
 const contactEmail = links.email;
 
 const footerSections = [
@@ -10,8 +10,8 @@ const footerSections = [
     links: [
       { label: "Documentation", href: "https://docs.mcp-b.ai" },
       {
-        label: "Extension",
-        href: "https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa",
+        label: "Rook",
+        href: links.rook,
       },
       { label: "npm packages", href: "https://www.npmjs.com/org/mcp-b" },
     ],
@@ -19,8 +19,8 @@ const footerSections = [
   {
     title: "Company",
     links: [
-      { label: "SigVelo", href: parentUrl },
-      { label: "Blog", href: "https://sigvelo.com/blog" },
+      { label: "Book a call", href: booking.href },
+      { label: "Blog", href: "/blog" },
       { label: "Privacy", href: "/privacy" },
       { label: "Terms", href: "/terms" },
     ],
@@ -143,9 +143,6 @@ const socialLinks = [
     <div class="footer-legal">
       <span>&copy; {new Date().getFullYear()} {name}. All rights reserved.</span
       >
-      <span>
-        A <a href={parentUrl} target="_blank" rel="noreferrer">{parentName}</a> product.
-      </span>
     </div>
   </div>
 </footer>

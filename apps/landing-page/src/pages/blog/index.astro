@@ -1,0 +1,72 @@
+---
+export const prerender = true;
+
+import Base from '../../layouts/Codeforge.astro';
+
+const posts = [
+  {
+    title: 'Build with WebMCP in the OpenAI WebMCP Challenge',
+    description:
+      'Build an agent-native web app, test it in ChatGPT, and submit it by September 3.',
+    href: '/blog/webmcp-challenge',
+    published: '2026-08-25',
+    publishedLabel: 'August 25, 2026',
+  },
+  {
+    title: 'MCP-B: The right place to build your MCP server is in your website',
+    description:
+      'With all the major security issues and data leakages the MCP ecosystem has been facing recently, the pre-authorized, user-scoped sandbox of the browser feels like more of the promised land than ever.',
+    href: '/blog/mcp-b-introduction',
+    published: '2025-01-15',
+    publishedLabel: 'January 15, 2025',
+  },
+];
+---
+
+<Base
+  title="Blog"
+  description="WebMCP project updates, implementation notes, and community announcements."
+>
+  <section class="mx-auto w-full max-w-5xl px-6 py-16 md:px-10 md:py-24">
+    <header class="max-w-3xl">
+      <p class="text-sm font-semibold text-primary">MCP-B / Blog</p>
+      <h1 class="mt-4 text-4xl font-semibold tracking-[-0.04em] text-balance md:text-6xl">
+        Notes from the agent-native web.
+      </h1>
+      <p class="mt-6 text-lg leading-8 text-muted-foreground">
+        Project updates, implementation notes, and announcements from the people building MCP-B.
+      </p>
+    </header>
+
+    <div class="mt-14 border-t border-border">
+      {
+        posts.map((post) => (
+          <article class="border-b border-border">
+            <a
+              href={post.href}
+              class="group grid gap-5 py-8 text-foreground no-underline transition-colors hover:text-primary md:grid-cols-[9rem_1fr_auto] md:items-start md:py-10"
+            >
+              <time datetime={post.published} class="text-sm text-muted-foreground">
+                {post.publishedLabel}
+              </time>
+              <span>
+                <span class="block text-2xl font-semibold tracking-[-0.025em] md:text-3xl">
+                  {post.title}
+                </span>
+                <span class="mt-3 block max-w-2xl leading-7 text-muted-foreground">
+                  {post.description}
+                </span>
+              </span>
+              <span
+                class="inline-flex items-center gap-2 text-sm font-semibold text-primary md:pt-1"
+              >
+                Read
+                <span aria-hidden="true">→</span>
+              </span>
+            </a>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+</Base>

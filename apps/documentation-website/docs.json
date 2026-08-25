@@ -26,6 +26,10 @@
   "background": {
     "decoration": "gradient"
   },
+  "banner": {
+    "content": "**Hackathon:** [OpenAI WebMCP Challenge](https://openai.com/webmcp-challenge). Build an agent-native web app. Submissions close September 3 at 5 p.m. PT.",
+    "dismissible": true
+  },
   "navbar": {
     "links": [
       {
@@ -37,8 +41,8 @@
         "href": "https://github.com/WebMCP-org/npm-packages"
       },
       {
-        "label": "Chrome Extension",
-        "href": "https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa"
+        "label": "Rook Extension",
+        "href": "https://chromewebstore.google.com/detail/opojeelojlkcinlhkbahpcekdolfjmhi"
       },
       {
         "label": "Discord",

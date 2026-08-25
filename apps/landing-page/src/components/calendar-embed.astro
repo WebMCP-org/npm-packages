@@ -1,0 +1,226 @@
+---
+import { siteConfig } from '@/lib/config';
+
+const { booking, links } = siteConfig;
+---
+
+<section class="scheduler" aria-label="Book a 15-minute call">
+  <div class="scheduler__frame" data-cal-state="loading">
+    <div id="cal-inline-15min" class="scheduler__embed"></div>
+    <div class="scheduler__scrim">
+      <span class="scheduler__spinner" aria-hidden="true"></span>
+      <span>Loading available times…</span>
+    </div>
+    <p class="scheduler__error" role="status" hidden>
+      The calendar didn’t load. <a href={booking.externalHref}>Book directly on Cal.com</a> or email
+      <a href={`mailto:${links.email}`}>{links.email}</a>.
+    </p>
+  </div>
+</section>
+
+<noscript>
+  <p class="scheduler__fallback">
+    Scheduling needs JavaScript. <a href={booking.externalHref}>Book directly on Cal.com</a> or email
+    <a href={`mailto:${links.email}`}>{links.email}</a>.
+  </p>
+</noscript>
+
+<script is:inline define:vars={{ calLink: booking.calLink }}>
+  const container = document.getElementById('cal-inline-15min');
+  const initializeCalendar = () => {
+    if (!container || container.dataset.calReady === 'true') return;
+    container.dataset.calReady = 'true';
+
+    ((windowObject, embedUrl, initCommand) => {
+      const enqueue = (api, args) => api.q.push(args);
+      const documentObject = windowObject.document;
+      windowObject.Cal =
+        windowObject.Cal ||
+        function () {
+          const cal = windowObject.Cal;
+          const args = arguments;
+          if (!cal.loaded) {
+            cal.ns = {};
+            cal.q = cal.q || [];
+            documentObject.head.appendChild(documentObject.createElement('script')).src = embedUrl;
+            cal.loaded = true;
+          }
+          if (args[0] === initCommand) {
+            const api = (...namespaceArgs) => enqueue(api, namespaceArgs);
+            const namespace = args[1];
+            api.q = api.q || [];
+            if (typeof namespace === 'string') {
+              cal.ns[namespace] = cal.ns[namespace] || api;
+              enqueue(cal.ns[namespace], args);
+              enqueue(cal, ['initNamespace', namespace]);
+            } else enqueue(cal, args);
+            return;
+          }
+          enqueue(cal, args);
+        };
+    })(window, 'https://app.cal.com/embed/embed.js', 'init');
+
+    Cal('init', '15min', { origin: 'https://app.cal.com' });
+    Cal.ns['15min']('inline', {
+      elementOrSelector: '#cal-inline-15min',
+      config: { layout: 'month_view', theme: 'light', useSlotsViewOnSmallScreen: true },
+      calLink,
+    });
+    Cal.ns['15min']('ui', {
+      layout: 'month_view',
+      hideEventTypeDetails: true,
+      showTimezoneWhenEventDetailsHidden: true,
+      cssVarsPerTheme: {
+        light: {
+          'cal-brand': '#005f8f',
+          'cal-brand-emphasis': '#004d73',
+          'cal-brand-text': '#ffffff',
+          'cal-bg': '#ffffff',
+          'cal-bg-subtle': '#eef2f4',
+          'cal-bg-muted': '#f8fafc',
+          'cal-bg-emphasis': '#dde5e9',
+          'cal-text': '#111827',
+          'cal-text-emphasis': '#111827',
+          'cal-text-subtle': '#475569',
+          'cal-text-muted': '#475569',
+          'cal-border': '#c3d4dc',
+          'cal-border-subtle': '#dde5e9',
+          'cal-border-muted': '#eef2f4',
+          'cal-border-emphasis': '#8fb0bf',
+          'cal-border-booker': '#dde5e9',
+        },
+      },
+    });
+
+    const frame = container.closest('[data-cal-state]');
+    if (!frame) return;
+    const settle = (state) => {
+      frame.dataset.calState = state;
+      const error = frame.querySelector('.scheduler__error');
+      if (error) error.hidden = state !== 'failed';
+    };
+    const readState = () => {
+      const iframe = container.querySelector('iframe');
+      if (iframe && !iframe.title) iframe.title = 'Book a 15-minute call';
+      const state = container.querySelector('cal-inline')?.getAttribute('loading');
+      if (state !== 'done' && state !== 'failed') return false;
+      settle(state);
+      return true;
+    };
+    if (!readState()) {
+      const observer = new MutationObserver(() => {
+        if (readState()) observer.disconnect();
+      });
+      observer.observe(container, { attributes: true, childList: true, subtree: true });
+      window.setTimeout(() => {
+        if (frame.dataset.calState !== 'loading') return;
+        observer.disconnect();
+        settle('failed');
+      }, 15000);
+    }
+  };
+
+  const disclosure = container?.closest('details');
+  const panel = container?.closest('[data-calendar-panel]');
+  if (disclosure && !disclosure.open) {
+    disclosure.addEventListener('toggle', () => disclosure.open && initializeCalendar(), {
+      once: true,
+    });
+  } else if (panel?.hidden) {
+    panel.addEventListener('calendar:open', initializeCalendar, { once: true });
+  } else initializeCalendar();
+</script>
+
+<style>
+  .scheduler {
+    min-width: 0;
+  }
+
+  .scheduler__frame {
+    position: relative;
+    width: min(100%, 48rem);
+    margin-inline: auto;
+  }
+
+  .scheduler__embed {
+    min-height: 31rem;
+  }
+
+  .scheduler__frame[data-cal-state='loading'] .scheduler__embed {
+    visibility: hidden;
+  }
+
+  .scheduler__frame:not([data-cal-state='loading']) .scheduler__scrim {
+    display: none;
+  }
+
+  .scheduler__frame[data-cal-state='failed'] .scheduler__embed {
+    display: none;
+  }
+
+  .scheduler__scrim {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.875rem;
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+  }
+
+  .scheduler__spinner {
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 2px solid var(--sigvelo-public-rule-strong);
+    border-top-color: var(--sigvelo-public-action);
+    border-radius: 50%;
+    animation: scheduler-spin 720ms linear infinite;
+  }
+
+  .scheduler__error {
+    margin: 0;
+    padding: 5rem 1.5rem;
+    color: var(--muted-foreground);
+    text-align: center;
+  }
+
+  .scheduler__error a,
+  .scheduler__fallback a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .scheduler__fallback {
+    margin: 1.5rem auto 0;
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    text-align: center;
+  }
+
+  .scheduler__embed :global(iframe) {
+    display: block;
+    width: 100%;
+    border: 0;
+  }
+
+  @keyframes scheduler-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (max-width: 40rem) {
+    .scheduler__embed {
+      min-height: 42rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scheduler__spinner {
+      animation: none;
+    }
+  }
+</style>

@@ -155,12 +155,22 @@ html.dark,
 
 .docs-landing-copy {
   position: relative;
-  max-width: 44rem;
+  max-width: 64rem;
 }
 
 .docs-landing-hero-diagram {
   position: relative;
   display: none;
+}
+
+.docs-landing-bottom-visual {
+  display: block;
+  max-width: 64rem;
+  margin-inline: auto;
+}
+
+.docs-landing-bottom-visual .docs-landing-hero-diagram-svg {
+  max-width: none;
 }
 
 .docs-landing-hero-diagram-svg {
@@ -198,7 +208,8 @@ html.dark,
   font-weight: 620;
   line-height: 1;
   letter-spacing: -0.055em;
-  white-space: nowrap;
+  white-space: normal;
+  text-wrap: balance;
   color: #f4f7ff;
   background-image: linear-gradient(
     120deg,

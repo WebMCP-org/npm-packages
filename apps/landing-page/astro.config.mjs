@@ -1,5 +1,5 @@
 // @ts-check
-import { defineConfig, fontProviders } from 'astro/config';
+import { defineConfig } from 'astro/config';
 import cloudflare from '@astrojs/cloudflare';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
@@ -15,19 +15,6 @@ export default defineConfig({
   output: 'server',
   prefetch: { defaultStrategy: 'hover', prefetchAll: false },
   build: { inlineStylesheets: 'auto' },
-
-  fonts: [
-    {
-      name: 'Inter',
-      cssVariable: '--font-sans',
-      provider: fontProviders.fontsource(),
-    },
-    {
-      name: 'JetBrains Mono',
-      cssVariable: '--font-mono',
-      provider: fontProviders.fontsource(),
-    },
-  ],
 
   markdown: {
     shikiConfig: {
@@ -54,5 +41,10 @@ export default defineConfig({
 
   vite: {
     plugins: [tailwindcss()],
+    ssr: {
+      optimizeDeps: {
+        include: ['@sentry/astro', '@sentry/astro/middleware'],
+      },
+    },
   },
 });

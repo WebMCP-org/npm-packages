@@ -1,0 +1,575 @@
+---
+interface Props {
+  text: string;
+  href: string;
+  variant: string;
+  preview: {
+    title: string;
+    image?: string;
+    imageFit?: 'cover' | 'contain';
+  };
+  mode?: 'link' | 'panel';
+}
+
+const { text, href, variant, preview, mode = 'link' } = Astro.props as Props;
+const popoverId = `hero-popover-${variant}`;
+const isExternal = href.startsWith('http');
+const showImage = Boolean(preview.image);
+---
+
+{
+  mode === 'link' && (
+    <a
+      class:list={['hero-copy-link', `hero-copy-link--${variant}`]}
+      href={href}
+      id={`${popoverId}-trigger`}
+      target={isExternal ? '_blank' : undefined}
+      rel={isExternal ? 'noopener' : undefined}
+    >
+      {text}
+    </a>
+  )
+}
+{
+  mode === 'panel' && (
+  <div
+    class:list={['hero-link-popover', `hero-copy-link--${variant}`]}
+    id={popoverId}
+    popover="manual"
+    data-slot="hover-card-content"
+    data-side="top"
+  >
+    <a
+      class="hero-link-popover__link"
+      href={href}
+      target={isExternal ? '_blank' : undefined}
+      rel={isExternal ? 'noopener' : undefined}
+    >
+      <span class="hero-link-popover__media" aria-hidden="true">
+        {showImage && (
+          <img
+            class:list={[
+              'hero-link-popover__image',
+              preview.imageFit === 'contain' && 'hero-link-popover__image--contain',
+            ]}
+            src={preview.image}
+            alt=""
+            width="260"
+            height="140"
+            decoding="async"
+          />
+        )}
+        {!showImage && variant === 'consulting' && (
+          <span class="hero-link-scene">
+            <span class="hero-link-cal">
+              <span class="hero-link-cal__bar">
+                <span></span>
+                <span></span>
+                <span></span>
+              </span>
+              <strong>15</strong>
+              <small>min</small>
+            </span>
+          </span>
+        )}
+        {!showImage && variant === 'products' && (
+          <span class="hero-link-scene">
+            <span class="hero-link-stack">
+              <span class="hero-link-stack__card">
+                <img src="/mcp-b-logo.svg" alt="" width="18" height="18" />
+                <span>global</span>
+              </span>
+              <span class="hero-link-stack__card">
+                <span class="hero-link-stack__dot"></span>
+                <span>polyfill</span>
+              </span>
+              <span class="hero-link-stack__card">
+                <span class="hero-link-stack__dot"></span>
+                <span>extension</span>
+              </span>
+            </span>
+          </span>
+        )}
+        {!showImage && variant === 'developers' && (
+          <span class="hero-link-scene">
+            <span class="hero-link-term">
+              <span class="hero-link-term__chrome">
+                <span></span>
+                <span></span>
+                <span></span>
+              </span>
+              <code>
+                <b>document</b>.modelContext
+                <br />
+                &nbsp;&nbsp;.<em>registerTool</em>()
+              </code>
+            </span>
+          </span>
+        )}
+        {!showImage && variant === 'companies' && (
+          <span class="hero-link-scene">
+            <span class="hero-link-nodes">
+              <span class="hero-link-nodes__pill">Site</span>
+              <span class="hero-link-nodes__wire"></span>
+              <span class="hero-link-nodes__pill hero-link-nodes__pill--agent">Agent</span>
+            </span>
+          </span>
+        )}
+        {!showImage && variant === 'origin' && (
+          <span class="hero-link-scene">
+            <span class="hero-link-post">
+              <img src="/mcp-b-logo.svg" alt="" width="22" height="22" />
+              <span class="hero-link-post__rule"></span>
+              <span class="hero-link-post__line hero-link-post__line--title"></span>
+              <span class="hero-link-post__line"></span>
+              <span class="hero-link-post__line"></span>
+              <span class="hero-link-post__line hero-link-post__line--short"></span>
+            </span>
+          </span>
+        )}
+      </span>
+      <span class="hero-link-popover__footer">
+        <span class="hero-link-popover__title">{preview.title}</span>
+        <span class="hero-link-popover__go" aria-hidden="true">{isExternal ? '↗' : '→'}</span>
+      </span>
+    </a>
+  </div>
+  )
+}
+
+<script>
+  import { initHeroCopyPopovers } from '../lib/hero-copy-popover';
+
+  initHeroCopyPopovers();
+</script>
+
+<style>
+  .hero-copy-link,
+  .hero-link-popover {
+    --link-accent: var(--primary);
+    --link-decoration: solid;
+    --link-thickness: 0.07em;
+    --popover-width: 16.25rem;
+  }
+
+  .hero-copy-link--consulting {
+    --link-accent: var(--primary);
+    --link-thickness: 0.055em;
+    --scene-wash: color-mix(in oklab, var(--primary) 18%, var(--card));
+  }
+
+  .hero-copy-link--products {
+    --link-accent: color-mix(in oklab, var(--primary), var(--foreground) 55%);
+    --link-thickness: 0.05em;
+    --scene-wash: color-mix(in oklab, var(--primary) 12%, var(--muted));
+  }
+
+  .hero-copy-link--origin {
+    --link-accent: color-mix(in oklab, var(--primary), var(--foreground) 35%);
+    --link-thickness: 0.07em;
+    --scene-wash: color-mix(in oklab, var(--primary) 10%, var(--card));
+  }
+
+  .hero-copy-link--spec {
+    --link-accent: var(--chart-5);
+    --link-decoration: dotted;
+    --link-thickness: 0.09em;
+    --scene-wash: var(--card);
+  }
+
+  .hero-copy-link--developers {
+    --link-accent: var(--chart-2);
+    --link-decoration: dashed;
+    --scene-wash: #0e1b23;
+  }
+
+  .hero-copy-link--companies {
+    --link-accent: var(--chart-4);
+    --link-thickness: 0.1em;
+    --scene-wash: color-mix(in oklab, var(--chart-4) 16%, var(--card));
+  }
+
+  .hero-copy-link--users {
+    --link-accent: color-mix(in oklab, var(--chart-3), var(--foreground) 30%);
+    --link-decoration: wavy;
+    --link-thickness: 0.06em;
+    --scene-wash: #1d6fe8;
+  }
+
+  .hero-copy-link {
+    color: inherit;
+    text-decoration-line: underline;
+    text-decoration-color: var(--link-accent);
+    text-decoration-style: var(--link-decoration);
+    text-decoration-thickness: var(--link-thickness);
+    text-underline-offset: 0.16em;
+    background-image: linear-gradient(
+      color-mix(in oklab, var(--link-accent) 14%, transparent),
+      color-mix(in oklab, var(--link-accent) 14%, transparent)
+    );
+    background-position: 0 88%;
+    background-repeat: no-repeat;
+    background-size: 100% 0;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    transition:
+      color var(--sigvelo-motion-duration-interaction) var(--sigvelo-motion-ease-change),
+      background-size var(--sigvelo-motion-duration-interaction) var(--sigvelo-motion-ease-change),
+      text-decoration-color var(--sigvelo-motion-duration-interaction)
+        var(--sigvelo-motion-ease-change);
+  }
+
+  .hero-copy-link:hover,
+  .hero-copy-link:focus-visible,
+  .hero-copy-link[data-popover-open] {
+    color: color-mix(in oklab, var(--link-accent), var(--foreground) 18%);
+    background-size: 100% 0.34em;
+    text-decoration-color: currentColor;
+  }
+
+  .hero-copy-link:focus-visible {
+    border-radius: var(--sigvelo-radius-xs);
+    outline: var(--sigvelo-focus-width) solid var(--sigvelo-color-focus);
+    outline-offset: var(--sigvelo-focus-offset);
+  }
+
+  .hero-link-popover {
+    display: none;
+    box-sizing: border-box;
+    width: min(var(--popover-width), calc(100vw - 2rem));
+    max-width: min(var(--popover-width), calc(100vw - 2rem));
+    padding: 0;
+    overflow: hidden;
+    border: var(--sigvelo-border-style, solid) var(--sigvelo-border-width, 1px) transparent;
+    border-radius: var(--sigvelo-radius-lg, var(--radius-lg));
+    background: var(--sigvelo-color-surface-raised, var(--popover));
+    box-shadow: var(--sigvelo-elevation-overlay, var(--shadow-xl));
+    color: var(--sigvelo-color-text, var(--popover-foreground));
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    letter-spacing: normal;
+    line-height: 1.3;
+    text-align: left;
+    text-wrap: wrap;
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    opacity: 0;
+    scale: 0.96;
+    transform-origin: 50% 100%;
+    transition:
+      opacity var(--sigvelo-motion-duration-interaction) var(--sigvelo-motion-ease-enter),
+      scale var(--sigvelo-motion-duration-interaction) var(--sigvelo-motion-ease-enter),
+      overlay var(--sigvelo-motion-duration-interaction) allow-discrete,
+      display var(--sigvelo-motion-duration-interaction) allow-discrete;
+  }
+
+  .hero-link-popover:is(:popover-open, .\:popover-open) {
+    display: block;
+    opacity: 1;
+    scale: 1;
+  }
+
+  @starting-style {
+    .hero-link-popover:is(:popover-open, .\:popover-open) {
+      opacity: 0;
+      scale: 0.96;
+    }
+  }
+
+  .hero-link-popover[data-side='bottom'] {
+    transform-origin: 50% 0;
+  }
+
+  .hero-link-popover__link {
+    display: grid;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .hero-link-popover__link:focus-visible {
+    border-radius: inherit;
+    outline: var(--sigvelo-focus-width) solid var(--sigvelo-color-focus);
+    outline-offset: calc(-1 * var(--sigvelo-focus-width));
+  }
+
+  .hero-link-popover__link:hover .hero-link-popover__title,
+  .hero-link-popover__link:focus-visible .hero-link-popover__title {
+    color: color-mix(in oklab, var(--link-accent), var(--foreground) 18%);
+  }
+
+  .hero-link-popover__link:hover .hero-link-popover__go,
+  .hero-link-popover__link:focus-visible .hero-link-popover__go {
+    translate: 0.15em 0;
+  }
+
+  .hero-link-popover__media {
+    display: grid;
+    width: 100%;
+    height: 8.75rem;
+    overflow: hidden;
+    background: var(--scene-wash, var(--muted));
+  }
+
+  .hero-link-popover__image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: left center;
+  }
+
+  .hero-link-popover__image--contain {
+    object-fit: contain;
+    object-position: center;
+    padding: 1.25rem 1.5rem;
+    background: var(--card);
+  }
+
+  .hero-link-popover__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.65rem 0.8rem 0.7rem;
+    border-top: var(--sigvelo-border-width, 1px) solid
+      var(--sigvelo-color-neutral-border-muted, var(--border));
+  }
+
+  .hero-link-popover__title {
+    min-width: 0;
+    font-size: 0.8125rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+
+  .hero-link-popover__go {
+    color: var(--link-accent);
+    font-size: 0.95rem;
+    line-height: 1;
+    transition: translate var(--sigvelo-motion-duration-interaction)
+      var(--sigvelo-motion-ease-change);
+  }
+
+  .hero-link-scene {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 0.9rem;
+  }
+
+  .hero-link-cal {
+    display: grid;
+    justify-items: center;
+    width: 6.25rem;
+    padding: 0.55rem 0.7rem 0.7rem;
+    border: 1px solid color-mix(in oklab, var(--primary) 28%, var(--border));
+    border-radius: var(--sigvelo-radius-md, var(--radius-md));
+    background: var(--card);
+    box-shadow: var(--sigvelo-elevation-raised, var(--shadow-md));
+    color: var(--foreground);
+  }
+
+  .hero-link-cal__bar {
+    display: flex;
+    gap: 0.35rem;
+    margin-bottom: 0.2rem;
+  }
+
+  .hero-link-cal__bar span {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--primary) 55%, white);
+  }
+
+  .hero-link-cal strong {
+    font-size: 2.1rem;
+    font-weight: 760;
+    letter-spacing: -0.06em;
+    line-height: 0.9;
+  }
+
+  .hero-link-cal small {
+    color: var(--muted-foreground);
+    font-size: 0.7rem;
+    font-weight: 650;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .hero-link-stack {
+    position: relative;
+    width: 11.5rem;
+    height: 6.4rem;
+  }
+
+  .hero-link-stack__card {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 9.6rem;
+    height: 2.15rem;
+    padding: 0 0.7rem;
+    border: 1px solid color-mix(in oklab, var(--primary) 22%, var(--border));
+    border-radius: var(--sigvelo-radius-sm, var(--radius-sm));
+    background: var(--card);
+    box-shadow: var(--sigvelo-elevation-raised, var(--shadow-sm));
+    color: var(--foreground);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.72rem;
+    font-weight: 650;
+  }
+
+  .hero-link-stack__card:nth-child(1) {
+    top: 0.1rem;
+    left: 0.15rem;
+    z-index: 3;
+  }
+
+  .hero-link-stack__card:nth-child(2) {
+    top: 2.05rem;
+    left: 1.1rem;
+    z-index: 2;
+  }
+
+  .hero-link-stack__card:nth-child(3) {
+    top: 4rem;
+    left: 2rem;
+    z-index: 1;
+  }
+
+  .hero-link-stack__dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 2px;
+    background: var(--primary);
+  }
+
+  .hero-link-term {
+    display: grid;
+    gap: 0.55rem;
+    width: 13.25rem;
+    padding: 0.65rem 0.75rem 0.8rem;
+    border-radius: var(--sigvelo-radius-md, var(--radius-md));
+    background: #081117;
+    box-shadow: var(--sigvelo-elevation-raised, var(--shadow-md));
+    color: #d7f5ff;
+  }
+
+  .hero-link-term__chrome {
+    display: flex;
+    gap: 0.3rem;
+  }
+
+  .hero-link-term__chrome span {
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 999px;
+    background: #3d5560;
+  }
+
+  .hero-link-term code {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 1.45;
+  }
+
+  .hero-link-term b {
+    color: #8bd9f0;
+    font-weight: 700;
+  }
+
+  .hero-link-term em {
+    color: #9ed8ea;
+    font-style: normal;
+    font-weight: 700;
+  }
+
+  .hero-link-nodes {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .hero-link-nodes__pill {
+    padding: 0.45rem 0.7rem;
+    border: 1px solid color-mix(in oklab, var(--chart-4) 40%, var(--border));
+    border-radius: 999px;
+    background: var(--card);
+    box-shadow: var(--sigvelo-elevation-raised, var(--shadow-sm));
+    color: var(--foreground);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .hero-link-nodes__pill--agent {
+    background: color-mix(in oklab, var(--chart-4) 22%, var(--card));
+  }
+
+  .hero-link-nodes__wire {
+    width: 2.4rem;
+    height: 2px;
+    background: linear-gradient(90deg, var(--primary), var(--chart-4));
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 12%, transparent);
+  }
+
+  .hero-link-post {
+    display: grid;
+    justify-items: start;
+    gap: 0.45rem;
+    width: 11.5rem;
+    padding: 0.85rem 0.9rem 1rem;
+    border: 1px solid color-mix(in oklab, var(--primary) 22%, var(--border));
+    border-radius: var(--sigvelo-radius-md, var(--radius-md));
+    background: var(--card);
+    box-shadow: var(--sigvelo-elevation-raised, var(--shadow-md));
+  }
+
+  .hero-link-post__rule {
+    width: 100%;
+    height: 1px;
+    background: var(--sigvelo-color-neutral-border-muted, var(--border));
+  }
+
+  .hero-link-post__line {
+    display: block;
+    width: 100%;
+    height: 0.38rem;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--foreground) 16%, var(--muted));
+  }
+
+  .hero-link-post__line--title {
+    width: 72%;
+    height: 0.5rem;
+    background: color-mix(in oklab, var(--foreground) 28%, var(--muted));
+  }
+
+  .hero-link-post__line--short {
+    width: 54%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-copy-link,
+    .hero-link-popover,
+    .hero-link-popover__go {
+      transition: none;
+    }
+
+    .hero-link-popover,
+    .hero-link-popover:is(:popover-open, .\:popover-open) {
+      scale: 1;
+    }
+
+    .hero-link-popover__link:hover .hero-link-popover__go,
+    .hero-link-popover__link:focus-visible .hero-link-popover__go {
+      translate: none;
+    }
+  }
+</style>

@@ -539,14 +539,14 @@ ${schemaProps}
                 <p className="text-xs text-blue-700 dark:text-blue-300">
                   <strong>Try it with AI:</strong> Open the{' '}
                   <a
-                    href="https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa"
+                    href="https://chromewebstore.google.com/detail/opojeelojlkcinlhkbahpcekdolfjmhi"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="underline hover:no-underline font-medium"
                   >
-                    MCP-B extension
+                    Rook extension
                   </a>{' '}
-                  and ask Claude to use your{' '}
+                  and ask it to use your{' '}
                   <code className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-800 font-mono">
                     {toolConfig.name}
                   </code>{' '}
