@@ -62,13 +62,13 @@ const socialLinks = [
 
         <form
           class="footer-contact"
-          action={`mailto:${contactEmail}`}
+          action="/contact"
           method="get"
           data-footer-contact
           data-contact-email={contactEmail}
         >
           <p class="footer-heading">
-            Stay in touch / <a href={`mailto:${contactEmail}`}>{contactEmail}</a
+            Stay in touch / <a href="/contact">{contactEmail}</a
             >
           </p>
           <div class="footer-contact-row">
@@ -203,14 +203,14 @@ const socialLinks = [
   .footer-tagline {
     max-width: 30ch;
     margin: 1rem 0 0;
-    color: rgb(255 255 255 / 0.82);
+    color: rgb(255 255 255 / 0.92);
     font-size: 1.0625rem;
     line-height: 1.6;
   }
 
   .footer-heading {
     margin: 0 0 1rem;
-    color: rgb(255 255 255 / 0.78);
+    color: rgb(255 255 255 / 0.92);
     font-size: 1rem;
   }
 
@@ -241,7 +241,7 @@ const socialLinks = [
   }
 
   .footer-links a:hover {
-    color: rgb(255 255 255 / 0.78);
+    color: rgb(255 255 255 / 0.92);
   }
 
   .footer-socials a {

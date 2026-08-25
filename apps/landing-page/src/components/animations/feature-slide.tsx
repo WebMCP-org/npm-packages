@@ -9,12 +9,13 @@ const tokenPattern =
 function getTokenClassName(token: string): string {
   if (/^\s+$/.test(token)) return '';
   if (token.startsWith('//')) return 'text-muted-foreground';
-  if (/^['"`].*['"`]$/.test(token)) return 'text-emerald-500';
+  if (/^['"`].*['"`]$/.test(token)) return 'text-emerald-700 dark:text-emerald-300';
   if (/^(import|from|export|function|const|return|async|await|type|interface|extends)$/.test(token))
-    return 'text-sky-500';
+    return 'text-sky-700 dark:text-sky-300';
   if (/^(document|modelContext|registerTool|useWebMCP|useState)$/.test(token))
-    return 'text-violet-500';
-  if (/^(string|object|number|boolean|void|Promise|Record)$/.test(token)) return 'text-amber-500';
+    return 'text-violet-700 dark:text-violet-300';
+  if (/^(string|object|number|boolean|void|Promise|Record)$/.test(token))
+    return 'text-amber-700 dark:text-amber-300';
   if (/^[{}()[\].,:<>=;|?&]$/.test(token)) return 'text-muted-foreground';
   return 'text-foreground';
 }
@@ -95,7 +96,11 @@ const codeTabs = [
 
 const productLinks = [
   { label: 'Documentation', href: 'https://docs.mcp-b.ai', icon: '→' },
-  { label: 'GitHub', href: 'https://github.com/WebMCP-org/npm-packages', icon: '→' },
+  {
+    label: 'npm-packages on GitHub',
+    href: 'https://github.com/WebMCP-org/npm-packages',
+    icon: '→',
+  },
   { label: 'npm organization', href: 'https://www.npmjs.com/org/mcp-b', icon: 'npm' },
 ];
 
@@ -159,7 +164,7 @@ export function WebMCPPackagesContent() {
           <div className="space-y-0.5">
             {tab.lines.map((line, i) => (
               <div key={`${activeTab}-${i}`} className="flex">
-                <span className="mr-4 w-6 select-none text-right text-[10px] leading-5 text-muted-foreground/40">
+                <span className="mr-4 w-6 select-none text-right text-[10px] leading-5 text-foreground/70">
                   {i + 1}
                 </span>
                 <span className="whitespace-pre">
