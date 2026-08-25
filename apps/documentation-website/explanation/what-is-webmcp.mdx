@@ -23,11 +23,11 @@ sensitive actions in the interface they already trust.
 
 ## How WebMCP works
 
-The proposal has two complementary surfaces:
+Sites can expose tools from JavaScript or HTML:
 
-- The **imperative API** lets JavaScript register tools through `document.modelContext`. Each tool
-  has a name, description, input schema, and handler tied to the current document.
-- The **declarative API** lets HTML forms describe tools while keeping their existing controls,
+- With the imperative API, JavaScript registers tools through `document.modelContext`. Each tool has
+  a name, description, input schema, and handler tied to the current document.
+- With the declarative API, HTML forms describe tools while keeping their existing controls,
   validation, and submission behavior.
 
 Both approaches make an application's actions machine-readable without replacing its human
