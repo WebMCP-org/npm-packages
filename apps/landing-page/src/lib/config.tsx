@@ -81,7 +81,7 @@ export const siteConfig = {
         variant: 'products',
         preview: { title: 'Packages' },
       },
-      { text: ' that people and agents use WebMCP.' },
+      { text: ' that help people and agents use WebMCP.' },
     ],
     description: [
       {
