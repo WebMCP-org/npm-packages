@@ -30,6 +30,88 @@
     "content": "**Hackathon:** [OpenAI WebMCP Challenge](https://openai.com/webmcp-challenge). Build an agent-native web app. Submissions close September 3 at 5 p.m. PT.",
     "dismissible": true
   },
+  "redirects": [
+    {
+      "source": "/packages/chrome-devtools-mcp/:slug*",
+      "destination": "/how-to/use-devtools-mcp"
+    },
+    {
+      "source": "/packages/extension-tools/:slug*",
+      "destination": "/packages/webmcp-extension/overview"
+    },
+    {
+      "source": "/packages/agent-skills/:slug*",
+      "destination": "/packages"
+    },
+    {
+      "source": "/packages/types",
+      "destination": "/packages/webmcp-types/overview"
+    },
+    {
+      "source": "/explanation/webmcp/standard-api",
+      "destination": "/reference/webmcp/standard-api"
+    },
+    {
+      "source": "/explanation/webmcp/declarative-api",
+      "destination": "/reference/webmcp/declarative-api"
+    },
+    {
+      "source": "/explanation/webmcp/browser-support-and-flags",
+      "destination": "/explanation/design/spec-status-and-limitations"
+    },
+    {
+      "source": "/explanation/native-vs-polyfill-vs-global",
+      "destination": "/how-to/choose-runtime"
+    },
+    {
+      "source": "/getting-started/quickstart",
+      "destination": "/tutorials/first-tool"
+    },
+    {
+      "source": "/quickstart",
+      "destination": "/tutorials/first-tool"
+    },
+    {
+      "source": "/introduction",
+      "destination": "/explanation/what-is-webmcp"
+    },
+    {
+      "source": "/troubleshooting",
+      "destination": "/how-to/debug-and-troubleshoot"
+    },
+    {
+      "source": "/native-host-setup",
+      "destination": "/how-to/connect-desktop-agents-with-local-relay"
+    },
+    {
+      "source": "/security",
+      "destination": "/explanation/design/security-and-human-in-the-loop"
+    },
+    {
+      "source": "/mcp-integration",
+      "destination": "/explanation/webmcp-vs-mcp"
+    },
+    {
+      "source": "/frameworks/:slug*",
+      "destination": "/how-to/frameworks"
+    },
+    {
+      "source": "/concepts/:slug*",
+      "destination": "/explanation"
+    },
+    {
+      "source": "/calling-tools/:slug*",
+      "destination": "/start-here/choose-your-path"
+    },
+    {
+      "source": "/extension/:slug*",
+      "destination": "/packages/webmcp-extension/overview"
+    },
+    {
+      "source": "/official-spec/:slug*",
+      "destination": "/reference/webmcp/standard-api"
+    }
+  ],
   "navbar": {
     "links": [
       {
