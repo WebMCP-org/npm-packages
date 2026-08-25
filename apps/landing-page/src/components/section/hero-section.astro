@@ -49,6 +49,7 @@ const { hero } = siteConfig;
         target="_blank"
         rel="noopener"
       >
+        <span class="cursor-button__badge">New</span>
         <img src="/assets/google-chrome.svg" alt="" width="22" height="22" />
         Get it on Chrome - It's free!
       </a>
@@ -142,6 +143,18 @@ const { hero } = siteConfig;
 
   .cursor-button--chrome {
     gap: 0.65rem;
+  }
+
+  .cursor-button__badge {
+    padding: 0.2rem 0.42rem;
+    border-radius: 999px;
+    background: var(--sigvelo-public-highlight);
+    color: var(--sigvelo-public-ink);
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
   }
 
   .cursor-button--chrome img {
