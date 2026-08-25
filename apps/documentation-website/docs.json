@@ -346,25 +346,14 @@
       "author": "WebMCP Team",
       "robots": "index, follow",
       "googlebot": "index, follow",
-      "og:title": "WebMCP Documentation",
       "og:type": "website",
-      "og:url": "https://docs.mcp-b.ai",
       "og:image": "https://docs.mcp-b.ai/logo/mcp-b-logo.png",
-      "og:description": "Package references, tutorials, how-to guides, and concise concepts for the WebMCP standard and MCP-B tooling.",
       "og:site_name": "WebMCP Documentation",
       "og:locale": "en_US",
       "twitter:card": "summary_large_image",
       "twitter:site": "@webmcp",
       "twitter:creator": "@webmcp",
-      "twitter:title": "WebMCP Documentation",
-      "twitter:description": "Tutorials, how-to guides, package references, and concise concepts for WebMCP and MCP-B.",
-      "twitter:image": "https://docs.mcp-b.ai/logo/mcp-b-logo.png",
-      "twitter:image:alt": "WebMCP Documentation",
-      "article:published_time": "2024-01-01T00:00:00+00:00",
-      "article:modified_time": "2026-06-13T00:00:00+00:00",
-      "article:author": "WebMCP Team",
-      "article:section": "Technology",
-      "article:tag": "MCP, Model Context Protocol, AI, Web Development, Browser Extension"
+      "twitter:image": "https://docs.mcp-b.ai/logo/mcp-b-logo.png"
     }
   },
   "contextual": {
