@@ -1,11 +1,11 @@
 ---
 title: 'usewebmcp reference'
-description: 'Reference for the strict-core React hook: installation, useWebMCP, config fields, state, and type inference.'
-keywords: ['usewebmcp', 'useWebMCP', 'react', 'strict core', 'tool registration', 'reference']
+description: 'Reference for the tool-only React hook: installation, useWebMCP, config fields, state, and type inference.'
+keywords: ['usewebmcp', 'useWebMCP', 'react', 'tool registration', 'reference']
 icon: 'react'
 ---
 
-`usewebmcp` is the strict-core React package. It registers tools with `document.modelContext` on mount and unregisters them on unmount without adding MCP-B-only hooks.
+`usewebmcp` is the tool-only React package. It registers tools with `document.modelContext` on mount and unregisters them on unmount without adding prompt, resource, server, or transport hooks.
 
 `document.modelContext` must already exist at runtime through native browser support, [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview), or [`@mcp-b/global`](/packages/global/overview).
 
@@ -48,12 +48,12 @@ import { useWebMCP } from 'usewebmcp';
 | `description`    | `string`                               | Yes      | Human-readable description for AI assistants                     |
 | `inputSchema`    | JSON Schema or Standard JSON Schema v1 | No       | Defines input parameters. Use `as const` for inference.          |
 | `outputSchema`   | JSON Schema                            | No       | MCP-B helper metadata for output typing and `structuredContent`. |
-| `annotations`    | `ToolAnnotations`                      | No       | Standard and MCP-B behavior hints                                |
+| `annotations`    | `ToolAnnotations`                      | No       | WebMCP and MCP behavior hints                                    |
 | `execute(input)` | `(input) => T \| Promise<T>`           | Yes      | Tool implementation                                              |
 
-The WebMCP draft standardizes `readOnlyHint` and `untrustedContentHint`.
+The WebMCP draft defines `readOnlyHint` and `untrustedContentHint`.
 MCP-specific hints such as `idempotentHint` remain available when the hook
-registers against an MCP-B runtime, but they are not standard WebMCP metadata.
+registers against an MCP-B runtime, but they are not part of the current WebMCP proposal.
 
 ## `ToolExecutionState`
 
@@ -125,7 +125,7 @@ implementation must return a JSON-serializable value. The schema drives TypeScri
 hook does not validate the returned value against it at runtime. Object, array, string, number,
 boolean, and null schemas are supported for inference.
 
-Native Chrome WebMCP does not currently define or enforce `outputSchema`; the browser standard tool dictionary defines `inputSchema`.
+The current WebMCP draft does not define or enforce `outputSchema`; its tool dictionary defines `inputSchema`.
 
 ## Exported types
 

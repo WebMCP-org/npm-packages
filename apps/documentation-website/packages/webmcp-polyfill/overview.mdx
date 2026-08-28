@@ -1,15 +1,16 @@
 ---
 title: '@mcp-b/webmcp-polyfill overview'
-description: 'When to use the strict WebMCP polyfill, where it fits in the stack, and when to move up to the full runtime.'
-keywords: ['@mcp-b/webmcp-polyfill', 'overview', 'polyfill', 'document.modelContext', 'strict core']
+description: 'When to use the WebMCP polyfill, where it fits in the stack, and when to move up to the full runtime.'
+keywords:
+  ['@mcp-b/webmcp-polyfill', 'overview', 'polyfill', 'document.modelContext', 'tool registration']
 icon: 'puzzle-piece'
 ---
 
-`@mcp-b/webmcp-polyfill` installs the strict WebMCP core on `document.modelContext` when the browser does not ship it yet. It is the runtime choice for teams that want the browser-facing standard surface without MCP-B-only extensions.
+`@mcp-b/webmcp-polyfill` installs the package-supported WebMCP surface on `document.modelContext` when the browser does not ship it yet. It provides browser-facing tool registration and discovery without MCP-B prompt, resource, server, or transport extensions.
 
 ## When to use this package
 
-- You want the standard `registerTool` and `getTools` APIs, plus a feature-detectable Chrome-compatible `executeTool` extension, in browsers today.
+- You want `registerTool` and `getTools`, plus the package's feature-detectable serialized-JSON `executeTool` compatibility method, in browsers today.
 - You are building a site or reusable library that wants to stay close to the Community Group draft surface.
 - You want to pair runtime behavior with [`@mcp-b/webmcp-types`](/packages/webmcp-types/overview) for type inference.
 
@@ -24,7 +25,7 @@ This package sits directly above `@mcp-b/webmcp-types`. The full runtime in [`@m
 
 ## First step
 
-Initialize the polyfill before your app registers tools. The [reference page](/packages/webmcp-polyfill/reference) documents initialization, declarative forms, testing shim behavior, and the strict-core lifecycle.
+Initialize the polyfill before your app registers tools. The [reference page](/packages/webmcp-polyfill/reference) documents initialization, declarative forms, testing shim behavior, and registration lifecycle.
 
 ## Related pages
 
@@ -33,7 +34,7 @@ Initialize the polyfill before your app registers tools. The [reference page](/p
     Initialization options, testing shim details, and runtime behavior.
   </Card>
   <Card title="First tool tutorial" icon="graduation-cap" href="/tutorials/first-tool">
-    Build your first strict-core tool.
+    Build your first browser tool.
   </Card>
   <Card title="Choose a runtime" icon="layer-group" href="/how-to/choose-runtime">
     Compare the three runtime strategies.

@@ -22,7 +22,7 @@ have to wire the client and transport classes themselves.
 - The iframe does not run an MCP server connected through
   `IframeChildTransport`. A standalone `document.modelContext` implementation
   is not sufficient.
-- You only need native strict-tool discovery across a document tree. Use the
+- You only need native tool discovery across a document tree. Use the
   browser's `allow="tools"` and `getTools({ fromOrigins })` surfaces instead.
 
 ## MCP-B bridge versus native discovery
@@ -33,7 +33,7 @@ have to wire the client and transport classes themselves.
 | Child setup   | `allow="tools"` delegation           | MCP server connected to `IframeChildTransport`      |
 | Tool exposure | `exposedTo`, enforced by the browser | `exposedTo`, enforced by the child page             |
 | Parent lookup | `getTools({ fromOrigins })`          | Namespaced registrations on `document.modelContext` |
-| Item types    | Strict WebMCP tools                  | Tools, plus MCP-B prompts and resources             |
+| Item types    | WebMCP tools                         | Tools, plus MCP-B prompts and resources             |
 
 `allow="tools"` delegates the native browser feature. It does not create the
 MCP server or authorize transport messages.
@@ -74,11 +74,11 @@ contract.
   <Card title="Global runtime reference" icon="globe" href="/packages/global/reference">
     Configure the child server transport and its allowed parent origins.
   </Card>
-  <Card title="WebMCP standard API" icon="brackets-curly" href="/reference/webmcp/standard-api">
+  <Card title="WebMCP API sources" icon="brackets-curly" href="/reference/webmcp/standard-api">
     Use native cross-document discovery without an MCP-B bridge.
   </Card>
   <Card
-    title="Spec status and limitations"
+    title="WebMCP resources and status"
     icon="flag"
     href="/explanation/design/spec-status-and-limitations"
   >

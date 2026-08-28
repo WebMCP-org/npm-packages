@@ -11,12 +11,12 @@ icon: 'layer-group'
 
 - You need direct control over the browser server instead of the automatic [`@mcp-b/global`](/packages/global/overview) setup.
 - You need to mirror MCP tools to an existing `document.modelContext`.
-- You need to backfill tools from native Chrome or expose MCP-B prompts and resources.
+- You need to backfill tools from a compatible native context or expose MCP-B prompts and resources.
 
 ## When not to use this package
 
 - You are building a typical web application. Use [`@mcp-b/global`](/packages/global/overview).
-- You only need the strict WebMCP surface. Use [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview).
+- You only need browser tool registration and discovery. Use [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview).
 - You only need an MCP server. Use the official [`@modelcontextprotocol/server`](https://ts.sdk.modelcontextprotocol.io/v2/api/%40modelcontextprotocol/server/).
 
 ## What changed in v2
@@ -31,7 +31,7 @@ SDK v2 also owns schema conversion and validation. It accepts Standard Schema im
 | ------------------------------------------------------ | ------------------------------------------------- |
 | MCP registration handles and list-change notifications | WebMCP `registerTool(tool, options?)`             |
 | Standard Schema, Zod 4.2+, and `fromJsonSchema`        | `document.modelContext` events and tool discovery |
-| MCP transport, validation, and protocol behavior       | Native Chrome mirroring and backfill              |
+| MCP transport, validation, and protocol behavior       | Native-context mirroring and backfill             |
 | MCP prompts, resources, and client requests            | MCP-B descriptor helpers and `mcpServer` access   |
 
 <Note>
@@ -52,7 +52,7 @@ SDK v2 also owns schema conversion and validation. It accepts Standard Schema im
 
 `@mcp-b/global` creates the adapter with the current `document.modelContext` as its `native` target. The adapter mirrors browser-facing registrations down to that target and delegates MCP work to its composed v2 `McpServer`.
 
-The [reference page](/packages/webmcp-ts-sdk/reference) describes the adapter methods and its native Chrome behavior. Use the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd) recommended by Chrome's WebMCP documentation to inspect mirrored tools. The [MCP TypeScript SDK v2 documentation](https://ts.sdk.modelcontextprotocol.io/v2/) owns the upstream server API.
+The [reference page](/packages/webmcp-ts-sdk/reference) describes the adapter methods and native-context behavior. Use [Chrome's built-in WebMCP panel](https://developer.chrome.com/docs/devtools/application/webmcp) to inspect mirrored tools. The [MCP TypeScript SDK v2 documentation](https://ts.sdk.modelcontextprotocol.io/v2/) owns the upstream server API.
 
 ## Related pages
 
@@ -68,13 +68,13 @@ The [reference page](/packages/webmcp-ts-sdk/reference) describes the adapter me
     See how this layer fits between the polyfill and @mcp-b/global.
   </Card>
   <Card
-    title="Strict core and extensions"
+    title="WebMCP and MCP-B extensions"
     icon="arrows-left-right"
     href="/explanation/strict-core-vs-mcp-b-extensions"
   >
-    Separate the standard browser API from MCP-B helpers.
+    Separate the evolving browser proposal from MCP-B helpers.
   </Card>
-  <Card title="WebMCP standard API" icon="globe" href="/reference/webmcp/standard-api">
+  <Card title="WebMCP API sources" icon="globe" href="/reference/webmcp/standard-api">
     Consult the browser surface and its upstream specification.
   </Card>
 </CardGroup>

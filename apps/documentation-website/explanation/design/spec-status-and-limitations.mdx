@@ -1,55 +1,79 @@
 ---
-title: 'Spec status and limitations'
-description: 'What the WebMCP proposal offers today and where implementations have room to grow.'
-keywords: ['webmcp spec', 'w3c', 'preview', 'limitations']
+title: 'WebMCP resources and status'
+description: 'Canonical sources for the WebMCP proposal, browser support, Chrome guidance, debugging, and testing.'
+keywords: ['webmcp spec', 'w3c', 'browser support', 'chrome', 'developer tools']
 icon: 'flag'
 ---
 
-WebMCP is a Draft Community Group Report, not a completed W3C standard. It
-defines the direction of the browser API, but several details remain a work in
-progress.
+WebMCP is a Draft Community Group Report. It is not a W3C Standard or a
+Standards Track document. The proposal, browser implementations, and MCP-B
+packages can change on separate schedules.
 
-The imperative draft now defines cross-document exposure, discovery, and the
-`tools` Permissions Policy. Declarative attributes, testing surfaces,
-browser-agent mediation, cancellation, and output-schema behavior may continue
-to change.
+Use this page as a directory. Each linked source owns the details in its row.
 
-Chrome offers WebMCP through an origin trial beginning in Chrome 149. Local
-development uses the dedicated `chrome://flags/#enable-webmcp-testing` flag.
-Track the [Chrome WebMCP overview](https://developer.chrome.com/docs/ai/webmcp)
-for current availability.
+## Proposal and implementation status
 
-Implementations should track the current [Community Group draft](https://webmachinelearning.github.io/webmcp/),
-keep domain operations separate from the browser registration adapter, use
-feature detection, and test both native and polyfill paths. MCP-B extensions
-must remain clearly distinguished from the standard surface.
+| Source                                                                                                   | Owns                                                  |
+| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| [WebMCP Community Group draft](https://webmachinelearning.github.io/webmcp/)                             | Proposed API, algorithms, and security considerations |
+| [WebMCP repository](https://github.com/webmachinelearning/webmcp)                                        | Explainers, issues, and proposal development          |
+| [Implementation status](https://github.com/webmachinelearning/webmcp/blob/main/implementation-status.md) | Browser and agent implementation links                |
+| [Web Platform Status](https://webstatus.dev/features/document-modelcontext)                              | Aggregated implementation and test status             |
+| [Chrome Status](https://chromestatus.com/feature/5117755740913664)                                       | Chrome rollout and experiment status                  |
+| [Web Platform Tests](https://wpt.fyi/results/webmcp)                                                     | Cross-browser conformance results                     |
 
-The current proposal defines `document.modelContext`. Navigator-based model
-context APIs are not part of that surface; MCP-B retains them only as
-compatibility shims. Adapter boundaries reduce migration cost.
+Do not infer compatibility from a cached browser version or copied API table.
+Check the implementation source when making a release decision.
 
-See [Try the native Chrome preview](/tutorials/first-native-preview) and
-[Test native and polyfill](/how-to/test-native-and-polyfill).
+## Chrome developer documentation
 
-## Upstream sources to track
+| Resource                                                                       | Use it for                                            |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| [WebMCP overview](https://developer.chrome.com/docs/ai/webmcp)                 | Chrome setup, availability, and limitations           |
+| [Imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api)   | JavaScript registration, discovery, and execution     |
+| [Declarative API](https://developer.chrome.com/docs/ai/webmcp/declarative-api) | Form attributes, submission, events, and focus states |
+| [User journeys](https://developer.chrome.com/docs/ai/webmcp/use-cases)         | Candidate tasks and tool boundaries                   |
+| [Best practices](https://developer.chrome.com/docs/ai/webmcp/best-practices)   | Tool names, schemas, outputs, and lifecycle design    |
+| [Tool security](https://developer.chrome.com/docs/ai/webmcp/secure-tools)      | Guidance for sites that expose tools                  |
+| [Agent security](https://developer.chrome.com/docs/agents/security)            | Guidance for agents that consume tools                |
+| [WebMCP and MCP](https://developer.chrome.com/docs/ai/webmcp/compare-mcp)      | Browser API and client-server protocol differences    |
 
-Use first-party sources for compatibility decisions:
+## Inspection and testing tools
 
-| Source                                                                                                   | Owns                                                                                    |
-| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| [WebMCP Community Group draft](https://webmachinelearning.github.io/webmcp/)                             | Standard API shape, `document.modelContext`, permissions policy, and security model     |
-| [Chrome WebMCP overview](https://developer.chrome.com/docs/ai/webmcp)                                    | Current Chrome availability, testing flag, origin isolation, and permissions policy     |
-| [Chrome WebMCP imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api)               | Chrome behavior for registration, discovery, `executeTool()`, and `AbortSignal` cleanup |
-| [Chrome WebMCP declarative API](https://developer.chrome.com/docs/ai/webmcp/declarative-api)             | Form annotation behavior and declarative schema synthesis                               |
-| [Chrome secure tools guidance](https://developer.chrome.com/docs/ai/webmcp/secure-tools)                 | Browser-facing tool security guidance                                                   |
-| [Current MCP tools specification](https://modelcontextprotocol.io/specification/2026-07-28/server/tools) | MCP tool schemas, output schemas, and `structuredContent`                               |
+| Resource                                                                                                                            | Use it for                                              |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| [Chrome DevTools WebMCP panel](https://developer.chrome.com/docs/devtools/application/webmcp)                                       | Inspecting schemas, invoking tools, and reviewing calls |
+| [Model Context Tool Inspector](https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd) | Manual and model-assisted tool inspection               |
+| [Chrome DevTools MCP WebMCP tools](https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/tool-reference.md#webmcp)   | Letting a coding agent inspect and invoke page tools    |
+| [Lighthouse registered tools audit](https://developer.chrome.com/docs/lighthouse/agentic-browsing/registered-webmcp-tools)          | Listing tools discovered on a page                      |
+| [Lighthouse schema validity audit](https://developer.chrome.com/docs/lighthouse/agentic-browsing/webmcp-schema-validity)            | Finding declarative schema problems                     |
+| [WebMCP eval guidance](https://developer.chrome.com/docs/ai/webmcp/evals)                                                           | Designing deterministic tests and model evaluations     |
+| [WebMCP Evals](https://github.com/GoogleChromeLabs/webmcp-tools/tree/main/webmcp-evals)                                             | Running experimental model evaluations                  |
+| [GoogleChromeLabs WebMCP tools](https://github.com/GoogleChromeLabs/webmcp-tools)                                                   | Experimental utilities, eval tooling, and demos         |
 
-MCP-B follows those boundaries by making `document.modelContext` the primary
-surface, using `getTools()` for discovery, feature-detecting Chrome's optional
-`executeTool()` extension, using `AbortSignal` for cleanup, and keeping legacy
-helpers as compatibility APIs.
+<Note>
+  GoogleChromeLabs projects are experimental and are not officially supported Google products. Use
+  the Chrome developer documentation above for supported Chrome guidance.
+</Note>
 
-`outputSchema` is not part of the current W3C/Chrome WebMCP tool dictionary.
-MCP-B keeps it as helper metadata for TypeScript inference, structured MCP
-responses, and package/runtime adapters. Do not rely on native browser WebMCP
-to validate tool output against it.
+## Frameworks, automation, and examples
+
+| Resource                                                                                       | Use it for                                      |
+| ---------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| [Angular WebMCP](https://angular.dev/ai/webmcp)                                                | Angular lifecycle, forms, and testing guidance  |
+| [Puppeteer WebMCP](https://pptr.dev/guides/webmcp)                                             | Programmatic discovery and browser testing      |
+| [GoogleChromeLabs explainer](https://googlechromelabs.github.io/webmcp-tools/demos/explainer/) | Runnable comparison and WebMCP examples         |
+| [WebMCP Studio](https://github.com/GoogleChromeLabs/webmcp-tools/tree/main/webmcp-studio)      | Experimental prompt-driven site instrumentation |
+| [Awesome WebMCP](https://github.com/webmachinelearning/awesome-webmcp)                         | Community-maintained ecosystem directory        |
+
+Angular and Puppeteer label their WebMCP APIs experimental. Follow their own
+documentation for compatibility and release requirements.
+
+## MCP-B documentation
+
+The [WebMCP API sources](/reference/webmcp/standard-api) and
+[declarative API sources](/reference/webmcp/declarative-api) route
+proposal questions upstream. [WebMCP and MCP-B
+extensions](/explanation/strict-core-vs-mcp-b-extensions) defines this
+project's boundary, while [Choose a runtime](/how-to/choose-runtime) and the
+[package index](/packages/index) document MCP-B behavior.

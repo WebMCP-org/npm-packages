@@ -143,7 +143,7 @@ Tools and prompts from the iframe are registered on the parent as `{id}{separato
 
 The parent model context performs final tool-name validation. A rejected registration emits `mcp-iframe-error` and disconnects the element without leaving a partial registration set.
 
-Bridged tools retain their `title` and strict WebMCP `readOnlyHint` annotation.
+Bridged tools retain their `title` and WebMCP `readOnlyHint` annotation.
 
 ## Resource URI wrapping
 
@@ -209,5 +209,5 @@ Changing `src`, `srcdoc`, `target-origin`, or `channel` while connected triggers
 - [Bridge tools across iframes](/how-to/bridge-tools-across-iframes) for a step-by-step guide
 - [@mcp-b/transports](/packages/transports/reference) for the underlying `IframeParentTransport` and `IframeChildTransport`
 - [@mcp-b/global](/packages/global/reference) for child transport configuration
-- [WebMCP standard API](/reference/webmcp/standard-api) for native cross-document discovery
+- [WebMCP API sources](/reference/webmcp/standard-api) for native cross-document discovery
 - [Transports and bridges](/explanation/architecture/transports-and-bridges) for the architectural context

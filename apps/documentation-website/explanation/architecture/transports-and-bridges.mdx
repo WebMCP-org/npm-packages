@@ -44,7 +44,7 @@ methods.
 | Who may connect  | Document tree             | `allowedOrigins`                     |
 | Child exposure   | `exposedTo`               | `exposedTo`, within `allowedOrigins` |
 | Parent selection | `fromOrigins`             | `target-origin`                      |
-| Payload          | Strict WebMCP tools       | MCP protocol items                   |
+| Payload          | WebMCP tools              | MCP protocol items                   |
 
 These controls are complementary, not interchangeable. `allow="tools"` does
 not create an MCP server, and `allowedOrigins` does not grant the native browser
@@ -86,5 +86,5 @@ in the child page even after the parent republishes its descriptor.
 - [Bridge tools across iframes](/how-to/bridge-tools-across-iframes) for the MCP-B setup
 - [mcp-iframe reference](/packages/mcp-iframe/reference) for element behavior and namespacing
 - [Transports reference](/packages/transports/reference) for low-level class contracts
-- [WebMCP standard API](/reference/webmcp/standard-api) for `exposedTo` and `fromOrigins`
+- [WebMCP API sources](/reference/webmcp/standard-api) for `exposedTo` and `fromOrigins`
 - [Connect desktop agents with local relay](/how-to/connect-desktop-agents-with-local-relay) for the localhost bridge

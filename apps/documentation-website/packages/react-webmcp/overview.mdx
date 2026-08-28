@@ -7,10 +7,6 @@ icon: 'react'
 
 `@mcp-b/react-webmcp` is the full React surface for MCP-B. It covers tool registration, prompt and resource hooks, and client/provider APIs for consuming MCP servers from a React tree.
 
-## Version
-
-The 4.0 release line aligns with the document-first WebMCP API. The core `useWebMCP` hook registers tools against the strict `document.modelContext` surface. Prompt and resource hooks require the `BrowserMcpServer` installed by `@mcp-b/global`. An internal fallback to the deprecated `navigator.modelContext` alias remains only for older preview runtimes; application code should not use it.
-
 ## When to use this package
 
 - You want WebMCP tool, prompt, and resource registration from React.
@@ -19,17 +15,17 @@ The 4.0 release line aligns with the document-first WebMCP API. The core `useWeb
 
 ## When not to use this package
 
-- You only need strict-core `registerTool` behavior. Use [`usewebmcp`](/packages/usewebmcp/overview).
+- You only need tool registration. Use [`usewebmcp`](/packages/usewebmcp/overview).
 
 ## Where it sits in the package graph
 
-This package combines two layers: `useWebMCP` works with native or polyfilled strict WebMCP, while prompt and resource hooks use the `BrowserMcpServer` from `@mcp-b/global`.
+This package combines two layers: `useWebMCP` works with native or polyfilled tool registration, while prompt and resource hooks use the `BrowserMcpServer` from `@mcp-b/global`.
 
-React peer dependency: `^17.0.0 || ^18.0.0 || ^19.0.0`.
+React peer dependency: `^18.0.0 || ^19.0.0`.
 
 ## First step
 
-Choose the owner for the hooks you use: `useWebMCP` needs native WebMCP or an initialized strict polyfill; prompt and resource hooks need [`@mcp-b/global`](/packages/global/overview); client/provider hooks use their configured MCP client and transport without requiring a browser runtime. The [reference page](/packages/react-webmcp/reference) covers each surface.
+Choose the owner for the hooks you use: `useWebMCP` needs native WebMCP or an initialized polyfill; prompt and resource hooks need [`@mcp-b/global`](/packages/global/overview); client/provider hooks use their configured MCP client and transport without requiring a browser runtime. The [reference page](/packages/react-webmcp/reference) covers each surface.
 
 ## Related pages
 
@@ -48,7 +44,7 @@ Choose the owner for the hooks you use: `useWebMCP` needs native WebMCP or an in
     Apply the full MCP-B React surface.
   </Card>
   <Card
-    title="Strict core vs MCP-B extensions"
+    title="WebMCP and MCP-B extensions"
     icon="diagram-venn"
     href="/explanation/strict-core-vs-mcp-b-extensions"
   >

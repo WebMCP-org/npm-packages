@@ -14,9 +14,12 @@ keywords:
 icon: 'brackets-curly'
 ---
 
-`@mcp-b/webmcp-types` emits TypeScript declarations only. It defines the standard browser surface separately from MCP-B and Chromium extensions.
+`@mcp-b/webmcp-types` emits TypeScript declarations only. It defines the browser contracts implemented by MCP-B packages separately from MCP-B extensions and serialized-JSON execution compatibility.
 
 The [WebMCP draft](https://webmachinelearning.github.io/webmcp/) is authoritative for the browser API.
+For ambient declarations that track that proposal directly, use the Community Group's
+[`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) package. Use
+`@mcp-b/webmcp-types` when you need MCP-B package contracts or schema inference.
 
 ## Installation
 
@@ -52,10 +55,10 @@ Choose one activation method:
   </Tab>
 </Tabs>
 
-Activation adds these globals. Every one is optional. No browser ships WebMCP
-unflagged (Chromium exposes it under `--enable-features=WebMCP`), and the
-declarative form members are explainer-only, appearing in neither the
-specification nor WPT's `webmcp.idl`.
+Activation adds these globals. Every one is optional, so feature-detect before
+use. Check [WebMCP resources and
+status](/explanation/design/spec-status-and-limitations) for current browser and
+declarative API support.
 
 | Property                        | Type                                           | Status                                   |
 | ------------------------------- | ---------------------------------------------- | ---------------------------------------- |
@@ -88,7 +91,7 @@ want the surface installed rather than detected.
 
 ### `ModelContext`
 
-`ModelContext` is the type of `document.modelContext`.
+`ModelContext` is the package-supported registration and discovery type for `document.modelContext`. The live proposal may contain additional or changed members.
 
 | Member                         | Type                         |
 | ------------------------------ | ---------------------------- |
@@ -97,20 +100,20 @@ want the surface installed rather than detected.
 | `ontoolchange`                 | Event handler or `null`      |
 | EventTarget methods            | Inherited from `EventTarget` |
 
-| Option type                            | Field         | Type           | Meaning                                      |
-| -------------------------------------- | ------------- | -------------- | -------------------------------------------- |
-| `ModelContextRegisterToolOptions`      | `signal`      | `AbortSignal?` | Owns the registration lifetime               |
-| `ModelContextRegisterToolOptions`      | `exposedTo`   | `string[]?`    | Requests exposure to descendant origins      |
-| `ModelContextGetToolOptions`           | `fromOrigins` | `string[]?`    | Requests tools exposed by descendant origins |
-| `ChromeModelContextExecuteToolOptions` | `signal`      | `AbortSignal?` | Aborts a Chromium descriptor execution       |
+| Option type                            | Field         | Type           | Meaning                                                      |
+| -------------------------------------- | ------------- | -------------- | ------------------------------------------------------------ |
+| `ModelContextRegisterToolOptions`      | `signal`      | `AbortSignal?` | Owns the registration lifetime                               |
+| `ModelContextRegisterToolOptions`      | `exposedTo`   | `string[]?`    | Requests exposure to listed origins in the active frame tree |
+| `ModelContextGetToolOptions`           | `fromOrigins` | `string[]?`    | Requests tools from listed origins in the active frame tree  |
+| `ChromeModelContextExecuteToolOptions` | `signal`      | `AbortSignal?` | Aborts a Chromium descriptor execution                       |
 
 Aborting the registration signal removes that registration.
 
-`RegisteredTool` contains `name`, optional `title`, `description`, optional `inputSchema` (a JSON Schema object since webmcp#241; a serialized string from Chrome builds that predate it), `window`, `origin`, and optional standard annotations.
+`RegisteredTool` contains `name`, optional `title`, `description`, optional `inputSchema`, `window`, `origin`, and optional WebMCP annotations. The compatibility type accepts either a JSON Schema object or serialized JSON string. Branch on `typeof` and follow the [Chrome imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api) for current browser behavior.
 
 ### `ChromeModelContext`
 
-`ChromeModelContextExtensions` declares the optional Chromium `executeTool()` method. `ChromeModelContext` combines that extension with `ModelContext`. Feature-detect the method before calling it.
+`ChromeModelContextExtensions` declares the serialized-JSON `executeTool()` signature supported by MCP-B and current Chrome builds. `ChromeModelContext` combines that compatibility shape with `ModelContext`. Feature-detect the method before calling it.
 
 ```ts "execute-chrome-tool.ts"
 import type { ChromeModelContext } from '@mcp-b/webmcp-types';
@@ -127,13 +130,13 @@ if (tool && modelContext.executeTool) {
 
 The MCP-B extension surface provides schema-aware `registerTool()` overloads and `listTools()`. It does not add removed name-based unregistration.
 
-`ModelContextWithExtensions` keeps the standard event and discovery members while replacing standard registration with the MCP-B descriptor overloads.
+`ModelContextWithExtensions` keeps the package's event and discovery members while replacing registration with the MCP-B descriptor overloads.
 
 ## Tool contracts
 
 ### `ModelContextTool<TArgs, TResult, TName>`
 
-The standard tool dictionary.
+The generic tool dictionary used by the package's browser registration contracts.
 
 | Property      | Type                                      | Required |
 | ------------- | ----------------------------------------- | -------- |
@@ -162,7 +165,7 @@ The MCP-B descriptor adds `outputSchema` and MCP annotations.
 
 ### Annotation types
 
-`WebMcpToolAnnotations` contains the standard `readOnlyHint` and `untrustedContentHint` fields. `ToolAnnotations` combines those fields with the annotation contract from `@modelcontextprotocol/server` for MCP-B descriptors.
+`WebMcpToolAnnotations` contains the proposal's `readOnlyHint` and `untrustedContentHint` fields. `ToolAnnotations` combines those fields with the annotation contract from `@modelcontextprotocol/server` for MCP-B descriptors.
 
 ### Result types
 
@@ -211,7 +214,7 @@ That fallback applies to widened `InputSchema`, unknown compositions, and scalar
 | `executeTool(name, inputJson, options?)` | `Promise<string \| null>`       |
 | `ontoolchange`                           | Event handler or `null`         |
 
-New native integrations use `document.modelContext.getTools()` and feature-detect Chromium `executeTool()`.
+New native integrations use `document.modelContext.getTools()` and feature-detect `executeTool()`. Follow the [Chrome imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api) for the browser's current serialized-JSON signature.
 
 `ModelContextTestingToolInfo` contains `name`, `description`, and an optional serialized `inputSchema`.
 
@@ -227,6 +230,6 @@ New native integrations use `document.modelContext.getTools()` and feature-detec
 
 ## Related pages
 
-- [WebMCP standard API](/reference/webmcp/standard-api)
+- [WebMCP API sources](/reference/webmcp/standard-api)
 - [Use schemas and structured output](/how-to/use-schemas-and-structured-output)
-- [Strict core versus MCP-B extensions](/explanation/strict-core-vs-mcp-b-extensions)
+- [WebMCP and MCP-B extensions](/explanation/strict-core-vs-mcp-b-extensions)

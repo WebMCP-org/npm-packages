@@ -1,105 +1,45 @@
 ---
-title: 'WebMCP standard API'
+title: 'WebMCP API sources'
 description: 'Quick lookup for the document-first WebMCP surface and its compatibility APIs.'
 keywords: ['document.modelContext', 'registerTool', 'getTools', 'executeTool']
 icon: 'brackets-curly'
 ---
 
-The authoritative API definition is the
-[WebMCP Community Group draft](https://webmachinelearning.github.io/webmcp/).
-Chrome's current implementation notes live in the
-[Chrome WebMCP imperative API docs](https://developer.chrome.com/docs/ai/webmcp/imperative-api).
+`document.modelContext` belongs to the evolving WebMCP Community Group
+proposal. Use the source that owns the behavior you need.
 
-## Canonical surface
+## Upstream sources
 
-New code uses `document.modelContext`.
+| Need                                             | Source                                                                                                          |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| Proposed interface, dictionaries, and algorithms | [WebMCP Community Group draft](https://webmachinelearning.github.io/webmcp/)                                    |
+| Chrome's implemented imperative behavior         | [Chrome imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api)                             |
+| Browser and agent availability                   | [WebMCP implementation status](https://github.com/webmachinelearning/webmcp/blob/main/implementation-status.md) |
+| Executable browser conformance                   | [Web Platform Tests](https://wpt.fyi/results/webmcp)                                                            |
+| Ambient TypeScript declarations                  | [Upstream `webmcp-types`](https://github.com/webmachinelearning/webmcp-types)                                   |
+| Open design and specification work               | [WebMCP issue tracker](https://github.com/webmachinelearning/webmcp/issues)                                     |
 
-| Member                         | Purpose                                                           |
-| ------------------------------ | ----------------------------------------------------------------- |
-| `registerTool(tool, options?)` | Register a tool with the current document                         |
-| `getTools(options?)`           | Discover registered tools                                         |
-| `ontoolchange`                 | Handle the `toolchange` event when the available tool set changes |
+<Warning>
+  The proposal and browser implementations can differ while changes land. Use the Community Group
+  draft for the proposed API, and use implementation docs and tests for browser compatibility.
+</Warning>
 
-```ts title="Register a tool with abort cleanup"
-const controller = new AbortController();
+## MCP-B package behavior
 
-await document.modelContext.registerTool(tool, {
-  signal: controller.signal,
-});
+MCP-B package references describe the code shipped by this project. They do
+not redefine the proposal.
 
-controller.abort();
-```
+| Package surface                        | Reference                                                       |
+| -------------------------------------- | --------------------------------------------------------------- |
+| Type contracts and compatibility types | [`@mcp-b/webmcp-types`](/packages/webmcp-types/reference)       |
+| Portable runtime behavior              | [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference) |
+| Extended server behavior               | [`@mcp-b/webmcp-ts-sdk`](/packages/webmcp-ts-sdk/reference)     |
 
-`registerTool()` returns `Promise<void>`, and tool cleanup is tied to the
-optional `AbortSignal` passed at registration time. Invalid descriptors and
-duplicate names reject the returned promise, so await registration or handle
-its rejection.
+MCP-B preserves some compatibility surfaces that differ from the live draft.
+The upstream `webmcp-types` package provides ambient proposal declarations;
+the scoped `@mcp-b/webmcp-types` package adds MCP-B schema inference and
+compatibility types. They are separate packages.
 
-`ModelContextTool` has the following fields:
-
-| Field         | Required | Purpose                                                  |
-| ------------- | :------: | -------------------------------------------------------- |
-| `name`        |   Yes    | Unique tool identifier                                   |
-| `description` |   Yes    | Natural-language description of the tool                 |
-| `execute`     |   Yes    | Callback invoked with the tool input                     |
-| `title`       |    No    | Localizable label for browser UI                         |
-| `inputSchema` |    No    | JSON Schema describing the input                         |
-| `annotations` |    No    | `readOnlyHint` and `untrustedContentHint` behavior hints |
-
-Registration options are `signal`, which unregisters the tool when aborted,
-and `exposedTo`, an array of origins in the current document tree to which the
-tool may be exposed. `getTools()` accepts `fromOrigins` to include tools from
-specified origins. Without it, discovery includes same-origin active documents
-throughout the current top-level frame tree.
-
-`getTools()` returns `RegisteredTool` values. They contain `name`, optional
-`title`, `description`, an `inputSchema` JSON Schema object (a serialized
-string from Chrome builds that predate webmcp#241), `window`, `origin`, and
-optional annotations. They do not expose the original `execute` callback.
-
-The API is available only in secure contexts. The `tools` Permissions Policy
-defaults to `self`. Cross-origin discovery requires policy delegation with
-`allow="tools"`, owner exposure through `exposedTo`, and caller opt-in through
-`fromOrigins`.
-
-## Chrome execution extension
-
-Chrome's current preview adds `executeTool(tool, inputJson, options?)`. It is
-not part of the strict WebMCP Community Group draft, so feature-detect
-it:
-
-```ts title="Execute a discovered tool in Chrome"
-import type { ChromeModelContext } from '@mcp-b/webmcp-types';
-
-const modelContext = document.modelContext as ChromeModelContext;
-const tool = (await modelContext.getTools()).find((candidate) => candidate.name === 'search');
-const executeTool = modelContext.executeTool;
-
-if (tool && executeTool) {
-  const resultJson = await executeTool.call(
-    modelContext,
-    tool,
-    JSON.stringify({ query: 'webmcp' })
-  );
-}
-```
-
-The extension accepts a descriptor returned by `getTools()`, a JSON object or
-array string, and optional abort options. It resolves to a JSON string or
-`null`.
-
-## Compatibility
-
-- `navigator.modelContext` is a deprecated compatibility alias. Current Chrome
-  exposes `document.modelContext` only.
-- `navigator.modelContextTesting` is a removed Chromium preview API retained
-  only by older runtimes and MCP-B/polyfill compatibility shims.
-- `listTools()`, prompt and resource registration, `mcpServer`, and transports
-  belong to MCP-B runtimes. Sampling and elicitation remain protocol-specific
-  APIs on the composed official MCP server, not `document.modelContext` methods.
-- `outputSchema` is not part of the current W3C/Chrome WebMCP tool
-  dictionary. MCP-B packages expose it as helper metadata for type inference,
-  structured MCP responses, and polyfill/runtime adapters.
-
-See [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference) for the
-portable strict runtime.
+Use [WebMCP and MCP-B extensions](/explanation/strict-core-vs-mcp-b-extensions)
+for the boundary and [Choose a runtime](/how-to/choose-runtime) for package
+selection.

@@ -1,34 +1,45 @@
 ---
-title: 'Strict core vs MCP-B extensions'
-description: 'Why the WebMCP core stays small and which capabilities MCP-B layers around it.'
+title: 'WebMCP and MCP-B extensions'
+description: 'How MCP-B package behavior relates to the evolving WebMCP proposal.'
 keywords: ['webmcp core', 'mcp-b extensions', 'document.modelContext']
 icon: 'diagram-venn'
 ---
 
-The standards-owned WebMCP core publishes tools through
-`document.modelContext`: `registerTool()`, `getTools()`, and `ontoolchange`.
-Keeping that core small makes it portable across native browser
-implementations, strict polyfills, and libraries that only need to expose
-tools. Chrome's optional `executeTool()` method is an implementation extension,
-not part of this core.
+The WebMCP proposal and MCP-B packages evolve on separate schedules. The
+[Community Group draft](https://webmachinelearning.github.io/webmcp/) owns the
+proposed browser API. MCP-B package references own the behavior shipped by this
+project.
 
-`@mcp-b/webmcp-types`, `@mcp-b/webmcp-polyfill`, and `usewebmcp` stay close to
-this portable surface.
+The phrase **strict core** describes MCP-B's portable package boundary. It is
+not a second definition of the WebMCP proposal. Keeping that boundary narrow
+lets libraries publish tools through native implementations or the polyfill
+without depending on an MCP server or transport.
 
-MCP-B adds `listTools()`, prompt and resource registration, browser transports,
-and a composed official MCP server. `BrowserMcpServer`, `@mcp-b/global`, and
-related packages own these additions. They are not standard WebMCP methods.
+## Three related layers
 
-The composed server is available through `BrowserMcpServer.mcpServer`.
-Protocol-version-specific SDK features, including elicitation and deprecated
-sampling, stay behind that boundary. They are not methods on
-`document.modelContext` or direct `BrowserMcpServer` helpers.
+| Layer                 | Responsibility                                                      |
+| --------------------- | ------------------------------------------------------------------- |
+| WebMCP proposal       | Defines the evolving `document.modelContext` browser API            |
+| MCP-B portable layer  | Supplies package types, registration helpers, and polyfill behavior |
+| MCP-B extension layer | Adds MCP server features and transports around page tools           |
 
-Libraries and sites that only publish tools should target the strict core.
-The standard can expose tools across a document tree with permissions and
-origin controls. Applications that also need namespaced iframe routing,
-prompts, resources, relays, desktop clients, or full MCP transport use the MCP-B
-extension layer.
-This boundary preserves runtime portability.
+The live draft owns the exact `ModelContext` members and signatures. MCP-B may
+retain compatibility types or adapters while browser implementations converge.
+Do not infer proposal status from where a method appears in an MCP-B type.
 
-Use [Choose a runtime](/how-to/choose-runtime) for package selection.
+## Why the extension boundary exists
+
+`BrowserMcpServer` adds `listTools()`, prompt and resource registration, and a
+composed official MCP server. Transports, iframe routing, and the local relay
+connect that server to explicit MCP clients. These capabilities solve MCP-B
+integration problems; they are not browser API methods.
+
+Protocol-specific features remain available through
+`BrowserMcpServer.mcpServer`. Keeping them behind the composed server prevents
+the browser surface from becoming a second copy of the MCP SDK.
+
+Sites that only publish browser tools can use the portable layer. Applications
+that need prompts, resources, bridges, or desktop MCP clients use the extension
+layer. See [Runtime layering](/explanation/architecture/runtime-layering) for
+the composition model and [Choose a runtime](/how-to/choose-runtime) for
+package selection.
