@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Codex WebMCP child-frame probe</title>
+  </head>
+  <body>
+    <h1>Child frame</h1>
+    <pre id="results">Starting…</pre>
+    <script>
+      const results = document.querySelector('#results');
+      const context = document.modelContext;
+      results.textContent = `document.modelContext: ${typeof context}`;
+      if (context) {
+        context
+          .registerTool({
+            name: 'codex_probe_child_frame',
+            description: 'Returns the child frame URL.',
+            inputSchema: { type: 'object', properties: {} },
+            execute: async () => ({ url: location.href }),
+          })
+          .then(() => {
+            results.textContent += '\nRegistered child-frame tool';
+          })
+          .catch((error) => {
+            results.textContent += `\n${error.name}: ${error.message}`;
+          });
+      }
+    </script>
+  </body>
+</html>

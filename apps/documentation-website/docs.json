@@ -189,11 +189,12 @@
             "pages": ["packages/index"]
           },
           {
-            "group": "WebMCP proposal",
+            "group": "WebMCP platforms and agents",
             "pages": [
               "explanation/design/spec-status-and-limitations",
               "reference/webmcp/standard-api",
-              "reference/webmcp/declarative-api"
+              "reference/webmcp/declarative-api",
+              "reference/webmcp/codex-site-tools"
             ]
           },
           {

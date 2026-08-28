@@ -1,0 +1,132 @@
+---
+title: 'Codex site tools compatibility'
+description: "Dated comparison of Codex site tools in ChatGPT's built-in browser with the WebMCP Community Group draft."
+keywords: ['Codex WebMCP', 'site tools', 'ChatGPT browser', 'document.modelContext']
+sidebarTitle: 'Codex site tools'
+icon: 'robot'
+---
+
+OpenAI calls its WebMCP implementation **site tools**. The [official site tools
+documentation](https://learn.chatgpt.com/docs/webmcp) owns availability, setup,
+security, and supported features. This page records an independent compatibility
+snapshot from August 27, 2026. It is not an OpenAI release document or a formal
+conformance claim.
+
+## Authoritative sources
+
+| Source                                                                                                            | Owns                                                       |
+| ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| [OpenAI site tools documentation](https://learn.chatgpt.com/docs/webmcp)                                          | Product availability, setup, security, API example, limits |
+| [OpenAI Help Center](https://help.openai.com/en/articles/20001423-using-site-tools-in-the-chatgpt-desktop-app)    | User-facing availability, scope, and controls              |
+| [ChatGPT built-in browser](https://learn.chatgpt.com/docs/browser)                                                | Browser profiles and supported Codex surfaces              |
+| [WebMCP Community Group draft](https://webmachinelearning.github.io/webmcp/)                                      | Proposed WebMCP interfaces, algorithms, and security model |
+| [Runme and WebMCP with Codex](https://developers.openai.com/blog/automating-repetitive-work-at-openai-with-codex) | First-party example of a WebMCP workflow                   |
+
+OpenAI documents site tools for ChatGPT Work and Codex in the ChatGPT desktop
+app's built-in browser. This snapshot does not cover Chrome, Codex CLI, or the
+Codex IDE extension. Check OpenAI's documentation for current model, account,
+workspace, and rollout requirements.
+
+## Test scope
+
+| Field          | Value                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------- |
+| Date           | August 27, 2026                                                                             |
+| Agent          | Codex with GPT-5.6 Sol                                                                      |
+| Browser        | ChatGPT desktop app's built-in browser; build identifier unavailable                        |
+| Host           | macOS                                                                                       |
+| Test page      | `http://127.0.0.1:41739` top-level page with `window.isSecureContext === true`              |
+| Runtime        | `document.modelContext` provided by ChatGPT's built-in browser, without MCP-B or a polyfill |
+| Draft baseline | WebMCP Draft Community Group Report dated August 26, 2026                                   |
+
+One manual probe produced the observations below. Its [fixtures and captured
+results](https://github.com/WebMCP-org/npm-packages/tree/main/docs/research/codex-site-tools-2026-08-27)
+are preserved in this repository. The test covered imperative registration,
+discovery, execution, results, registration lifecycle, declarative markup, a
+same-origin iframe, invalid registrations, origin options, and the `tools`
+Permissions Policy. It did not run the Web Platform Tests or test every app build,
+account configuration, origin, or active-call cancellation path.
+
+Agent integration results came from Codex's agent-facing tool bridge. Page API
+results came from JavaScript calls inside the test page. The probe inspected but
+did not call the undocumented `codexGetTools` or `codexExecuteTool` properties.
+
+## Agent integration
+
+| Capability                 | Observed on August 27, 2026                                                                                                        | Source                  |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| Top-level imperative tools | Discovered and invoked tools registered with `document.modelContext.registerTool()`                                                | OpenAI and manual probe |
+| Tool listing               | Included name, title, description, input schema, `readOnlyHint`, `untrustedContentHint`, origin, and page URL                      | Manual probe            |
+| Dynamic registration       | Refreshed the agent's tool list after registration and abort-based removal                                                         | Manual probe            |
+| Page lifecycle             | Removed tools after navigation                                                                                                     | OpenAI and manual probe |
+| Inputs                     | Passed a JavaScript object to the tool callback                                                                                    | Manual probe            |
+| Results                    | Preserved JSON-compatible objects, arrays, primitives, and `null`; converted `undefined` to `null`                                 | Manual probe            |
+| Non-JSON results           | Rejected `BigInt` and circular values                                                                                              | Manual probe            |
+| Declarative tools          | Did not discover tools declared through form attributes                                                                            | OpenAI and manual probe |
+| Iframe tools               | OpenAI documents them as unsupported; the tested same-origin child had no `document.modelContext`, so it could not register a tool | OpenAI and manual probe |
+| Disabled `tools` policy    | Discovered a registration from a response with `Permissions-Policy: tools=()`                                                      | Manual probe            |
+
+The draft's execution algorithm does not validate calls against `inputSchema`. In
+Codex agent-bridge probes, missing required values, wrong types, extra properties,
+and out-of-range values reached the handler. Validate and authorize every call in
+application code.
+
+On the agent path, `undefined` became `null`. The draft's public execution path
+treats `undefined`, `BigInt`, and circular results as serialization failures. It
+does not specify the browser agent's result transport.
+
+## Page API comparison
+
+The draft defines `getTools()` and `executeTool()` for in-page JavaScript agents. A
+browser agent receives an implementation-defined observation instead, and the
+draft does not prescribe the format used to expose tools to it. This table compares
+direct page calls only.
+
+| Surface                          | August 26 draft                                                                                                                       | Observed in Codex                                                                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `document.modelContext`          | Same-object `ModelContext` in secure contexts                                                                                         | Repeated reads returned the same object                                                                                                           |
+| `navigator.modelContext`         | Not defined                                                                                                                           | `undefined`                                                                                                                                       |
+| Event interface                  | `ModelContext` extends `EventTarget` and exposes `ontoolchange`                                                                       | `addEventListener()` and `ontoolchange` were absent                                                                                               |
+| `registerTool()`                 | Resolves with `undefined` after registration; supports registration `signal`                                                          | Resolved with `undefined`; abort-based removal worked                                                                                             |
+| `getTools()`                     | Returns entries with a deep-copied object `inputSchema`, owning `window`, and origin                                                  | Returned a serialized JSON schema and origin, without `window`                                                                                    |
+| `executeTool()` input and result | Accepts an optional object input, defaults to `{}`, and resolves to a JSON string                                                     | Accepted an object, rejected a JSON string, and resolved to a JSON string; omitted input was untested                                             |
+| Tool callback                    | Receives `(input, { signal })`                                                                                                        | Received the input, but callback options did not contain an `AbortSignal`                                                                         |
+| `tools` Permissions Policy       | Keeps the interface exposed, but methods reject `NotAllowedError` when denied; default allowlist is `'self'`                          | The interface remained present and `registerTool()` resolved under `Permissions-Policy: tools=()`                                                 |
+| `exposedTo`                      | Lists cross-origin callers that may discover and execute a registration; rejects invalid or non-trustworthy URLs with `SecurityError` | Accepted `http://insecure.example`; cross-document behavior was untested because the child lacked `modelContext`                                  |
+| `fromOrigins`                    | Requests tools from matching cross-origin descendant documents; rejects invalid or non-trustworthy URLs with `SecurityError`          | Accepted `http://insecure.example`; cross-document behavior was untested                                                                          |
+| Registration errors              | Duplicate, empty, or invalid names and empty descriptions reject with `InvalidStateError`; schema serialization errors propagate      | Named cases rejected with a plain `Object` whose `name` and `message` were `null` and JSON form was `{}`; a circular schema rejected with `Error` |
+
+The object also exposed `codexGetTools` and `codexExecuteTool` during the test.
+They are undocumented product internals, not WebMCP APIs. Do not call them or use
+their presence for feature detection.
+
+## Compatibility notes
+
+| Constraint                 | Compatibility requirement                                                                                                                      |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Feature detection          | Check that `document.modelContext?.registerTool` is a function.                                                                                |
+| Registration location      | Register site tools in the top-level page.                                                                                                     |
+| Callback options           | Treat callback options as optional and use `options?.signal` when present. The draft requires it.                                              |
+| Input enforcement          | Validate and authorize inputs in application code.                                                                                             |
+| Results                    | Return JSON-compatible values.                                                                                                                 |
+| Cleanup                    | Use the registration `AbortSignal` to remove tools when their application scope ends.                                                          |
+| Origin and policy controls | The tested build accepted non-trustworthy origin options and allowed registration under `tools=()`. Cross-document enforcement was not tested. |
+| Product internals          | Use only documented WebMCP properties, not `codexGetTools` or `codexExecuteTool`.                                                              |
+
+These observations describe the tested build. Recheck the [official site tools
+documentation](https://learn.chatgpt.com/docs/webmcp) and this page's date before
+depending on them.
+
+## Codex with Chrome DevTools MCP
+
+[Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) is a
+separate integration that lets Codex inspect a Chrome instance through MCP. Its
+experimental WebMCP category exposes tool discovery and execution; see the
+[WebMCP tool
+reference](https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/tool-reference.md#webmcp).
+This integration is separate from site tools in ChatGPT's built-in browser.
+
+Codex site tools use the current page directly and do not require the MCP-B local
+relay. For other implementations, see [WebMCP resources and
+status](/explanation/design/spec-status-and-limitations) and the [package
+index](/packages/index).
