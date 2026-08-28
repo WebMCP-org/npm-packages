@@ -30,10 +30,10 @@ pages, groups, and hierarchy. Read it first.
 | **Explanation**   | `explanation/`                   | Understanding-oriented |
 
 Every package gets an `overview` page and a `reference` page under
-`packages/<name>/`. The `reference/webmcp/` pages route proposal details to
-upstream sources and sit in the same tab.
+`packages/<name>/`. The `reference/webmcp/` pages route proposal and platform
+details to upstream sources and sit in the same tab.
 `explanation/design/spec-status-and-limitations` keeps its legacy URL but is a
-reference directory in the **WebMCP proposal** navigation group.
+reference directory in the **WebMCP platforms and agents** navigation group.
 
 ### Key files
 
@@ -104,6 +104,7 @@ If a concept is covered on multiple pages, one page owns it. All others link to 
 | WebMCP vs MCP                     | Chrome's external `compare-mcp` guide                             |
 | WebMCP API sources                | `reference/webmcp/standard-api`                                   |
 | Declarative API                   | `reference/webmcp/declarative-api`                                |
+| Codex site tools compatibility    | `reference/webmcp/codex-site-tools`                               |
 | WebMCP and MCP-B extensions       | `explanation/strict-core-vs-mcp-b-extensions`                     |
 | Runtime layering / initialization | `explanation/architecture/runtime-layering`                       |
 | Transports and bridges            | `explanation/architecture/transports-and-bridges`                 |
@@ -241,13 +242,14 @@ This is critical. WebMCP is an active **Web Machine Learning Community Group pro
 | Declarative API       | https://developer.chrome.com/docs/ai/webmcp/declarative-api   |
 | Use cases             | https://developer.chrome.com/docs/ai/webmcp/use-cases         |
 | Best practices        | https://developer.chrome.com/docs/ai/webmcp/best-practices    |
+| Build tools           | https://developer.chrome.com/docs/ai/webmcp/build-tools       |
 | WebMCP and MCP        | https://developer.chrome.com/docs/ai/webmcp/compare-mcp       |
 | Evaluation            | https://developer.chrome.com/docs/ai/webmcp/evals             |
 | Secure tools          | https://developer.chrome.com/docs/ai/webmcp/secure-tools      |
 | Chrome DevTools panel | https://developer.chrome.com/docs/devtools/application/webmcp |
 | Chrome DevTools MCP   | https://github.com/ChromeDevTools/chrome-devtools-mcp         |
 
-**Chrome team tools and demos:**
+**Chrome-linked experimental tools and demos:**
 
 | Topic                                           | URL                                                                                                 | Local clone                                  |
 | ----------------------------------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------- |
@@ -255,7 +257,15 @@ This is critical. WebMCP is an active **Web Machine Learning Community Group pro
 | Tool Inspector source                           | https://github.com/beaufortfrancois/model-context-tool-inspector                                    | `webmcp-tools/model-context-tool-inspector/` |
 | webmcp-tools repo (demos + utilities)           | https://github.com/GoogleChromeLabs/webmcp-tools                                                    | `webmcp-tools/`                              |
 | Live WebMCP explainer                           | https://googlechromelabs.github.io/webmcp-tools/demos/explainer/                                    | `webmcp-tools/demos/explainer/`              |
-| Awesome WebMCP list                             | `webmcp-tools/AWESOME_WEBMCP.md`                                                                    | `webmcp-tools/AWESOME_WEBMCP.md`             |
+| Awesome WebMCP list                             | https://github.com/GoogleChromeLabs/webmcp-tools/blob/main/AWESOME_WEBMCP.md                        | `webmcp-tools/AWESOME_WEBMCP.md`             |
+
+**OpenAI product documentation (link to these, don't re-document):**
+
+| Topic                    | URL                                                                                      |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
+| Codex site tools         | https://learn.chatgpt.com/docs/webmcp                                                    |
+| ChatGPT built-in browser | https://learn.chatgpt.com/docs/browser                                                   |
+| Site tools Help Center   | https://help.openai.com/en/articles/20001423-using-site-tools-in-the-chatgpt-desktop-app |
 
 **Rules for proposal vs. package content:**
 
@@ -269,14 +279,16 @@ This is critical. WebMCP is an active **Web Machine Learning Community Group pro
 - When showing the proposal working, prefer the Chrome team's [live explainer](https://googlechromelabs.github.io/webmcp-tools/demos/explainer/) or an individual demo from `GoogleChromeLabs/webmcp-tools` rather than recreating it.
 - Security model documentation should summarize our approach but link to the draft's [security and privacy considerations](https://webmachinelearning.github.io/webmcp/#security-and-privacy-considerations) and Chrome's [secure tools guidance](https://developer.chrome.com/docs/ai/webmcp/secure-tools) for the full threat model.
 - When mentioning native Chrome support, link to the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd) extension recommended by Chrome's WebMCP documentation. Do not describe it as an officially supported Google product.
+- When documenting Codex site tools, link to OpenAI for availability, setup, security, and current limitations. Keep our page dated and limited to independently observed compatibility differences. Do not treat those observations as permanent product behavior or generalize them to Chrome, Codex CLI, or the Codex IDE extension.
 
 **Page-specific guidance:**
 
-| Our page                               | What to keep                                     | What to defer upstream                                                                          |
-| -------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `reference/webmcp/standard-api.mdx`    | Upstream source map and MCP-B package boundary   | API tables, signatures, dictionaries, and algorithms → Community Group draft                    |
-| `reference/webmcp/declarative-api.mdx` | Upstream source map and MCP-B coverage links     | Attributes, events, schema synthesis, and browser behavior → Chrome and Community Group sources |
-| `explanation/what-is-webmcp.mdx`       | High-level "what and why", ecosystem positioning | Detailed API walkthrough → link to the Community Group draft                                    |
+| Our page                                | What to keep                                     | What to defer upstream                                                                          |
+| --------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `reference/webmcp/standard-api.mdx`     | Upstream source map and MCP-B package boundary   | API tables, signatures, dictionaries, and algorithms → Community Group draft                    |
+| `reference/webmcp/declarative-api.mdx`  | Upstream source map and MCP-B coverage links     | Attributes, events, schema synthesis, and browser behavior → Chrome and Community Group sources |
+| `reference/webmcp/codex-site-tools.mdx` | Dated compatibility observations and source map  | Availability, setup, product security, and supported features → OpenAI                          |
+| `explanation/what-is-webmcp.mdx`        | High-level "what and why", ecosystem positioning | Detailed API walkthrough → link to the Community Group draft                                    |
 
 ### What we own (document fully)
 

@@ -1,7 +1,15 @@
 ---
 title: 'WebMCP documentation and MCP-B packages'
-description: 'Use official WebMCP and Chrome resources for browser behavior, and use these docs for @mcp-b packages and integrations.'
-keywords: ['WebMCP documentation', 'Chrome WebMCP', 'MCP-B packages', 'polyfill', 'React']
+description: 'Use official WebMCP, Chrome, and OpenAI resources for platform behavior, and use these docs for @mcp-b packages and integrations.'
+keywords:
+  [
+    'WebMCP documentation',
+    'Chrome WebMCP',
+    'Codex site tools',
+    'MCP-B packages',
+    'polyfill',
+    'React',
+  ]
 icon: 'house'
 mode: 'custom'
 ---
@@ -15,8 +23,8 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
         <h1 className="docs-landing-title">WebMCP documentation and MCP-B packages</h1>
 
         <p className="docs-landing-lead">
-          Use the upstream WebMCP and Chrome documentation for the browser platform. Use this site
-          for <code>@mcp-b/*</code> packages, integrations, and project-specific guidance.
+          Use upstream WebMCP, Chrome, and OpenAI documentation for platform behavior. Use this
+          site for <code>@mcp-b/*</code> packages, integrations, and compatibility notes.
         </p>
 
         <div className="docs-landing-links">
@@ -44,10 +52,10 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
 
       <div className="docs-landing-two-up">
         <div className="docs-landing-list-card">
-          <p className="docs-landing-kicker">WebMCP and Chrome</p>
+          <p className="docs-landing-kicker">WebMCP platforms and agents</p>
           <p className="docs-landing-body">
-            Find the current proposal, native browser behavior, demos, security guidance, and
-            Chrome tooling upstream.
+            Find the current proposal, implementation documentation, compatibility notes, demos,
+            security guidance, and tools.
           </p>
           <ul>
             <li>
@@ -55,6 +63,9 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
             </li>
             <li>
               <a href="https://developer.chrome.com/docs/ai/webmcp">Chrome WebMCP documentation</a>
+            </li>
+            <li>
+              <a href="/reference/webmcp/codex-site-tools">Codex site tools compatibility</a>
             </li>
             <li>
               <a href="/explanation/design/spec-status-and-limitations">
@@ -101,8 +112,9 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
         <h2 className="docs-landing-heading">Try a registered WebMCP tool.</h2>
         <p className="docs-landing-section-copy">
           This page registers <code>get_docs_info</code> through{' '}
-          <code>document.modelContext</code>. Call it with a compatible browser agent, then follow
-          the <a href="/tutorials/first-tool">first tool tutorial</a> to register your own.
+          <code>document.modelContext</code>. If site tools are available in ChatGPT's built-in
+          browser, ask Codex to call it. You can also use another compatible browser agent. Then
+          follow the <a href="/tutorials/first-tool">first tool tutorial</a> to register your own.
         </p>
       </div>
 
