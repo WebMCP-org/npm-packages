@@ -1,15 +1,7 @@
 ---
-title: 'WebMCP documentation and MCP-B packages'
-description: 'Use official WebMCP, Chrome, and OpenAI resources for platform behavior, and use these docs for @mcp-b packages and integrations.'
-keywords:
-  [
-    'WebMCP documentation',
-    'Chrome WebMCP',
-    'Codex site tools',
-    'MCP-B packages',
-    'polyfill',
-    'React',
-  ]
+title: 'WebMCP documentation and developer tools'
+description: 'Build with WebMCP using browser API guides, working tutorials, polyfills, React packages, extensions, and debugging tools.'
+keywords: ['WebMCP documentation', 'WebMCP tools', 'polyfills', 'React', 'browser API']
 icon: 'house'
 mode: 'custom'
 ---
@@ -19,20 +11,20 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
 <div className="docs-landing">
   <section className="docs-landing-hero">
     <div className="docs-landing-inner">
-      <div className="docs-landing-hero-grid">
+      <div>
         <div className="docs-landing-copy">
-          <h1 className="docs-landing-title">WebMCP documentation and MCP-B packages</h1>
+          <h1 className="docs-landing-title">WebMCP documentation and developer tools</h1>
 
           <p className="docs-landing-lead">
-            Use upstream WebMCP and browser documentation for platform behavior. Use this site for{' '}
-            <code>@mcp-b/*</code> packages, integrations, and project-specific compatibility notes.
+            Browser API guides, working tutorials, polyfills, React packages, extensions, and debugging tools.
+          </p>
+
+          <p className="docs-landing-note docs-landing-note-tight">
+            <strong>New:</strong> The OpenAI WebMCP Challenge is live. <a href="https://webmcp.devpost.com/">Enter the challenge.</a>
           </p>
 
           <div className="docs-landing-links">
-            <a
-              className="docs-landing-link docs-landing-link-primary"
-              href="/start-here/choose-your-path"
-            >
+            <a className="docs-landing-link docs-landing-link-primary" href="/start-here/choose-your-path">
               Get started
             </a>
             <a className="docs-landing-link" href="/tutorials/first-tool">
@@ -42,30 +34,12 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
               Browse the packages
             </a>
           </div>
+
+          <p className="docs-landing-note docs-landing-note-tight docs-landing-hero-note">
+            Read <a href="/explanation/what-is-webmcp">What is WebMCP?</a>, <a href="/explanation/webmcp-vs-mcp">WebMCP vs MCP</a>, and <a href="/how-to/choose-runtime">Choose a runtime</a>.
+          </p>
         </div>
 
-        <div
-          className="docs-landing-hero-diagram"
-          role="img"
-          aria-label="WebMCP exposes website tools through the browser, MCP is a separate protocol, and MCP-B connects the two with runtime and transport packages."
-        >
-          <img
-            className="docs-landing-hero-diagram-svg docs-landing-hero-diagram-light"
-            src="/logo/mcp-b-architecture-light.svg"
-            alt=""
-            width="800"
-            height="420"
-            noZoom
-          />
-          <img
-            className="docs-landing-hero-diagram-svg docs-landing-hero-diagram-dark"
-            src="/logo/mcp-b-architecture-dark.svg"
-            alt=""
-            width="800"
-            height="420"
-            noZoom
-          />
-        </div>
       </div>
     </div>
 
@@ -75,76 +49,342 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
     <div className="docs-landing-inner">
       <div className="docs-landing-section-head">
         <p className="docs-landing-kicker">Live on this page</p>
-        <h2 className="docs-landing-heading">Try a registered WebMCP tool.</h2>
+        <h2 className="docs-landing-heading">This page has a real WebMCP tool. Try calling it.</h2>
         <p className="docs-landing-section-copy">
-          This page registers <code>get_docs_info</code> through{' '}
-          <code>document.modelContext</code>. Ask a compatible browser agent to call it, including
-          Codex when site tools are available. Then follow the{' '}
-          <a href="/tutorials/first-tool">first tool tutorial</a> to register your own.
+          The tool below is registered right now using <code>document.modelContext.registerTool()</code>. Use the <a href="https://chromewebstore.google.com/detail/opojeelojlkcinlhkbahpcekdolfjmhi">Rook extension</a> or Chrome's native WebMCP support to call it from an AI agent.
         </p>
       </div>
 
       <LiveLandingTool />
+
+      <div className="docs-landing-code">
+        <div className="docs-landing-code-grid">
+          <div className="docs-landing-code-card">
+            <p className="docs-landing-code-label">Tool registration (live)</p>
+            ```javascript
+            await document.modelContext.registerTool({
+              name: "get_docs_info",
+              description: "Returns info about the current docs page",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  include_headings: { type: "boolean" },
+                  include_links: { type: "boolean" },
+                },
+              },
+              execute: (args) => {
+                const info = {
+                  title: document.title,
+                  url: location.href,
+                  headingCount: document.querySelectorAll("h1,h2,h3").length,
+                  linkCount: document.querySelectorAll("a[href]").length,
+                };
+                return {
+                  content: [{ type: "text", text: JSON.stringify(info) }]
+                };
+              }
+            });
+            ```
+          </div>
+
+          <div className="docs-landing-code-card">
+            <p className="docs-landing-code-label">Resource registration (MCP-B)</p>
+            ```javascript resource.js
+            import '@mcp-b/global';
+
+            const modelContext = document.modelContext;
+            if (typeof modelContext?.registerResource !== 'function') {
+              throw new Error('MCP-B extensions are unavailable');
+            }
+
+            modelContext.registerResource({
+              uri: 'app://config',
+              name: 'App Configuration',
+              mimeType: 'application/json',
+              read: async () => ({
+                contents: [{ uri: 'app://config', text: JSON.stringify(config) }]
+              })
+            });
+            ```
+          </div>
+        </div>
+      </div>
+
+      <p className="docs-landing-note docs-landing-note-tight">
+        Continue with the [first tool tutorial](/tutorials/first-tool), the [`@mcp-b/webmcp-polyfill` reference](/packages/webmcp-polyfill/reference), or the [`@mcp-b/webmcp-ts-sdk` reference](/packages/webmcp-ts-sdk/reference).
+      </p>
     </div>
 
   </section>
 
-  <section className="docs-landing-section docs-landing-section-end">
+  <section className="docs-landing-section">
     <div className="docs-landing-inner">
       <div className="docs-landing-section-head">
-        <p className="docs-landing-kicker">Choose a path</p>
-        <h2 className="docs-landing-heading">Start with the source that owns your question.</h2>
+        <p className="docs-landing-kicker">Packages</p>
+        <h2 className="docs-landing-heading">Browse the package set in one place.</h2>
+        <p className="docs-landing-section-copy">
+          These are the main packages in the workspace, grouped by the standard boundary.
+        </p>
       </div>
 
-      <div className="docs-landing-two-up">
-        <div className="docs-landing-list-card">
-          <p className="docs-landing-kicker">WebMCP and browser agents</p>
-          <p className="docs-landing-body">
-            Find the proposal, implementation documentation, compatibility notes, and tools.
-          </p>
-          <ul>
-            <li>
-              <a href="https://webmachinelearning.github.io/webmcp/">Community Group draft</a>
-            </li>
-            <li>
-              <a href="https://developer.chrome.com/docs/ai/webmcp">Chrome WebMCP documentation</a>
-            </li>
-            <li>
-              <a href="https://learn.chatgpt.com/docs/webmcp">OpenAI site tools documentation</a>
-            </li>
-            <li>
-              <a href="/reference/webmcp/codex-site-tools">Codex site tools compatibility</a>
-            </li>
-            <li>
-              <a href="/explanation/design/spec-status-and-limitations">
-                Resources and implementation status
-              </a>
-            </li>
-          </ul>
+      <div className="docs-landing-package-group">
+        <p className="docs-landing-package-group-label">Core WebMCP</p>
+        <div className="docs-landing-package-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Package</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div className="docs-landing-package-name">
+                    <a href="/packages/webmcp-polyfill/reference"><code>@mcp-b/webmcp-polyfill</code></a>
+                    <div className="docs-landing-links-cell">
+                      <a className="docs-landing-icon-link docs-landing-icon-github" href="https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-polyfill" title="GitHub" aria-label="View webmcp-polyfill on GitHub">
+                        <span className="sr-only">View webmcp-polyfill on GitHub</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+                      </a>
+                      <a className="docs-landing-icon-link docs-landing-icon-npm" href="https://www.npmjs.com/package/@mcp-b/webmcp-polyfill" title="npm" aria-label="View webmcp-polyfill on npm">
+                        <span className="sr-only">View webmcp-polyfill on npm</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M0 0v16h16V0H0zm13 13H8V5h-2v8H3V3h10v10z" /></svg>
+                      </a>
+                    </div>
+                  </div>
+                </td>
+                <td className="docs-landing-package-desc">Polyfills <code>document.modelContext</code> for browsers without native support</td>
+              </tr>
+              <tr>
+                <td>
+                  <div className="docs-landing-package-name">
+                    <a href="/packages/webmcp-types/reference"><code>@mcp-b/webmcp-types</code></a>
+                    <div className="docs-landing-links-cell">
+                      <a className="docs-landing-icon-link docs-landing-icon-github" href="https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-types" title="GitHub">
+                        <span className="sr-only">View webmcp-types on GitHub</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+                      </a>
+                      <a className="docs-landing-icon-link docs-landing-icon-npm" href="https://www.npmjs.com/package/@mcp-b/webmcp-types" title="npm">
+                        <span className="sr-only">View webmcp-types on npm</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M0 0v16h16V0H0zm13 13H8V5h-2v8H3V3h10v10z" /></svg>
+                      </a>
+                    </div>
+                  </div>
+                </td>
+                <td className="docs-landing-package-desc">TypeScript types for the WebMCP standard surface</td>
+              </tr>
+              <tr>
+                <td>
+                  <div className="docs-landing-package-name">
+                    <a href="/packages/usewebmcp/reference"><code>usewebmcp</code></a>
+                    <div className="docs-landing-links-cell">
+                      <a className="docs-landing-icon-link docs-landing-icon-github" href="https://github.com/WebMCP-org/npm-packages/tree/main/packages/usewebmcp" title="GitHub">
+                        <span className="sr-only">View usewebmcp on GitHub</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+                      </a>
+                      <a className="docs-landing-icon-link docs-landing-icon-npm" href="https://www.npmjs.com/package/usewebmcp" title="npm">
+                        <span className="sr-only">View usewebmcp on npm</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M0 0v16h16V0H0zm13 13H8V5h-2v8H3V3h10v10z" /></svg>
+                      </a>
+                    </div>
+                  </div>
+                </td>
+                <td className="docs-landing-package-desc">React hook for tool registration with automatic lifecycle</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
+      </div>
 
-        <div className="docs-landing-list-card">
-          <p className="docs-landing-kicker">MCP-B packages</p>
-          <p className="docs-landing-body">
-            Choose a runtime, add tools to your app, or connect browser tools to other contexts.
-          </p>
-          <ul>
-            <li>
-              <a href="/packages/index">Package index</a>
-            </li>
-            <li>
-              <a href="/how-to/choose-runtime">Choose a runtime</a>
-            </li>
-            <li>
-              <a href="/tutorials/first-tool">Build your first tool</a>
-            </li>
-            <li>
-              <a href="/tutorials/first-react-tool">Build your first React tool</a>
-            </li>
-          </ul>
+      <div className="docs-landing-package-group">
+        <p className="docs-landing-package-group-label">MCP-B</p>
+        <div className="docs-landing-package-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Package</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div className="docs-landing-package-name">
+                    <a href="/packages/global/reference"><code>@mcp-b/global</code></a>
+                    <div className="docs-landing-links-cell">
+                      <a className="docs-landing-icon-link docs-landing-icon-github" href="https://github.com/WebMCP-org/npm-packages/tree/main/packages/global" title="GitHub">
+                        <span className="sr-only">View global on GitHub</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+                      </a>
+                      <a className="docs-landing-icon-link docs-landing-icon-npm" href="https://www.npmjs.com/package/@mcp-b/global" title="npm">
+                        <span className="sr-only">View global on npm</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M0 0v16h16V0H0zm13 13H8V5h-2v8H3V3h10v10z" /></svg>
+                      </a>
+                    </div>
+                  </div>
+                </td>
+                <td className="docs-landing-package-desc">Entry point — sets up polyfill + MCP server in one import</td>
+              </tr>
+              <tr>
+                <td>
+                  <div className="docs-landing-package-name">
+                    <a href="/packages/webmcp-ts-sdk/reference"><code>@mcp-b/webmcp-ts-sdk</code></a>
+                    <div className="docs-landing-links-cell">
+                      <a className="docs-landing-icon-link docs-landing-icon-github" href="https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-ts-sdk" title="GitHub">
+                        <span className="sr-only">View webmcp-ts-sdk on GitHub</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+                      </a>
+                      <a className="docs-landing-icon-link docs-landing-icon-npm" href="https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk" title="npm">
+                        <span className="sr-only">View webmcp-ts-sdk on npm</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M0 0v16h16V0H0zm13 13H8V5h-2v8H3V3h10v10z" /></svg>
+                      </a>
+                    </div>
+                  </div>
+                </td>
+                <td className="docs-landing-package-desc">WebMCP adapter over the official MCP TypeScript SDK</td>
+              </tr>
+              <tr>
+                <td>
+                  <div className="docs-landing-package-name">
+                    <a href="/packages/transports/reference"><code>@mcp-b/transports</code></a>
+                    <div className="docs-landing-links-cell">
+                      <a className="docs-landing-icon-link docs-landing-icon-github" href="https://github.com/WebMCP-org/npm-packages/tree/main/packages/transports" title="GitHub">
+                        <span className="sr-only">View transports on GitHub</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+                      </a>
+                      <a className="docs-landing-icon-link docs-landing-icon-npm" href="https://www.npmjs.com/package/@mcp-b/transports" title="npm">
+                        <span className="sr-only">View transports on npm</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M0 0v16h16V0H0zm13 13H8V5h-2v8H3V3h10v10z" /></svg>
+                      </a>
+                    </div>
+                  </div>
+                </td>
+                <td className="docs-landing-package-desc">PostMessage and WebSocket transports for cross-context communication</td>
+              </tr>
+              <tr>
+                <td>
+                  <div className="docs-landing-package-name">
+                    <a href="/packages/mcp-iframe/reference"><code>@mcp-b/mcp-iframe</code></a>
+                    <div className="docs-landing-links-cell">
+                      <a className="docs-landing-icon-link docs-landing-icon-github" href="https://github.com/WebMCP-org/npm-packages/tree/main/packages/mcp-iframe" title="GitHub">
+                        <span className="sr-only">View mcp-iframe on GitHub</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+                      </a>
+                      <a className="docs-landing-icon-link docs-landing-icon-npm" href="https://www.npmjs.com/package/@mcp-b/mcp-iframe" title="npm">
+                        <span className="sr-only">View mcp-iframe on npm</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M0 0v16h16V0H0zm13 13H8V5h-2v8H3V3h10v10z" /></svg>
+                      </a>
+                    </div>
+                  </div>
+                </td>
+                <td className="docs-landing-package-desc">Bridges tools across iframes via PostMessage</td>
+              </tr>
+              <tr>
+                <td>
+                  <div className="docs-landing-package-name">
+                    <a href="/packages/react-webmcp/reference"><code>@mcp-b/react-webmcp</code></a>
+                    <div className="docs-landing-links-cell">
+                      <a className="docs-landing-icon-link docs-landing-icon-github" href="https://github.com/WebMCP-org/npm-packages/tree/main/packages/react-webmcp" title="GitHub">
+                        <span className="sr-only">View react-webmcp on GitHub</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+                      </a>
+                      <a className="docs-landing-icon-link docs-landing-icon-npm" href="https://www.npmjs.com/package/@mcp-b/react-webmcp" title="npm">
+                        <span className="sr-only">View react-webmcp on npm</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M0 0v16h16V0H0zm13 13H8V5h-2v8H3V3h10v10z" /></svg>
+                      </a>
+                    </div>
+                  </div>
+                </td>
+                <td className="docs-landing-package-desc">React provider and hooks for MCP-B extensions</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="docs-landing-package-group">
+        <p className="docs-landing-package-group-label">Calling tools</p>
+        <div className="docs-landing-package-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Package</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div className="docs-landing-package-name">
+                    <a href="/packages/webmcp-local-relay/reference"><code>@mcp-b/webmcp-local-relay</code></a>
+                    <div className="docs-landing-links-cell">
+                      <a className="docs-landing-icon-link docs-landing-icon-github" href="https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-local-relay" title="GitHub">
+                        <span className="sr-only">View webmcp-local-relay on GitHub</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+                      </a>
+                      <a className="docs-landing-icon-link docs-landing-icon-npm" href="https://www.npmjs.com/package/@mcp-b/webmcp-local-relay" title="npm">
+                        <span className="sr-only">View webmcp-local-relay on npm</span>
+                        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M0 0v16h16V0H0zm13 13H8V5h-2v8H3V3h10v10z" /></svg>
+                      </a>
+                    </div>
+                  </div>
+                </td>
+                <td className="docs-landing-package-desc">Bridges browser tools to desktop MCP clients via WebSocket + stdio</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
 
+  </section>
+
+<section className="docs-landing-section">
+  <div className="docs-landing-inner">
+    <div className="docs-landing-footer">
+      <p className="docs-landing-kicker">Source of truth</p>
+      <p className="docs-landing-footer-copy">
+        This site documents libraries, polyfills, extensions, and tooling for WebMCP, with
+        quick-look pages for the proposal draft. For proposal details and browser behavior, use:
+        <a href="https://webmachinelearning.github.io/webmcp/"> Community Group draft</a>,
+        <a href="https://developer.chrome.com/docs/ai/webmcp"> Chrome WebMCP documentation</a>,
+        <a href="https://developer.chrome.com/docs/devtools/application/webmcp">
+          {' '}
+          Chrome DevTools WebMCP panel
+        </a>
+        ,<a href="https://modelcontextprotocol.io/specification/latest"> Model Context Protocol</a>,
+        and
+        <a href="https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd">
+          {' '}
+          Model Context Tool Inspector
+        </a>
+        .
+      </p>
+    </div>
+  </div>
+</section>
+
+  <section className="docs-landing-section docs-landing-section-end">
+    <div className="docs-landing-inner">
+      <div className="docs-landing-hero-diagram docs-landing-bottom-visual">
+        <img
+          className="docs-landing-hero-diagram-svg docs-landing-hero-diagram-light"
+          src="/logo/mcp-b-architecture-light.svg"
+          alt="WebMCP runtime architecture"
+          width="800"
+          height="420"
+          noZoom
+        />
+        <img
+          className="docs-landing-hero-diagram-svg docs-landing-hero-diagram-dark"
+          src="/logo/mcp-b-architecture-dark.svg"
+          alt="WebMCP runtime architecture"
+          width="800"
+          height="420"
+          noZoom
+        />
+      </div>
+    </div>
   </section>
 </div>
