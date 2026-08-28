@@ -6,8 +6,6 @@ icon: 'house'
 mode: 'custom'
 ---
 
-import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
-
 <div className="docs-landing">
   <section className="docs-landing-hero">
     <div className="docs-landing-inner">
@@ -55,7 +53,33 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
         </p>
       </div>
 
-      <LiveLandingTool />
+      <span
+        id="live-landing-tool"
+        className="not-prose"
+        aria-live="polite"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          fontSize: '0.8rem',
+        }}
+      >
+        <span
+          data-status-dot
+          aria-hidden="true"
+          style={{
+            width: '0.5rem',
+            height: '0.5rem',
+            borderRadius: '50%',
+            backgroundColor: '#eab308',
+            display: 'inline-block',
+            animation: 'pulse 1.5s infinite',
+          }}
+        />
+        <span data-status-label style={{ opacity: 0.7 }}>
+          Loading...
+        </span>
+      </span>
 
       <div className="docs-landing-code">
         <div className="docs-landing-code-grid">
