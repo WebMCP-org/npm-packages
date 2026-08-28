@@ -14,12 +14,18 @@ initializes those layers and connects the selected browser transport.
 
 Global initialization preserves the browser-shaped programming model:
 
-1. Install or adopt a compatible `document.modelContext` implementation.
-2. Capture that implementation as the native context.
-3. Wrap it with `BrowserMcpServer`, which mirrors core registrations down to
-   the captured context.
-4. Replace `document.modelContext` with the wrapper and connect the selected
-   transport in the background.
+<Columns cols={3}>
+  <Card title="1. Browser context" icon="browser">
+    A native implementation or `@mcp-b/webmcp-polyfill` supplies the browser surface.
+  </Card>
+  <Card title="2. MCP-B runtime" icon="layer-group">
+    `BrowserMcpServer` mirrors core tools, adds MCP-B extensions, and becomes
+    `document.modelContext`.
+  </Card>
+  <Card title="3. Selected transport" icon="plug">
+    The transport connects explicit MCP clients without changing page code.
+  </Card>
+</Columns>
 
 Initialization returns no server handle. Application and library code keeps
 using `document.modelContext` normally, whether the active implementation is
