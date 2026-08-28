@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    # Docs and app-only merges cannot change publishable package state.
+    paths:
+      - '.changeset/**'
+      - 'packages/**'
   workflow_dispatch:
     inputs:
       tag:
