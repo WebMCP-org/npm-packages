@@ -15,6 +15,17 @@ authorization or guarantee a confirmation prompt. Human review should follow
 consequence: financial, destructive, external-communication, and
 privacy-sensitive actions need stronger confirmation than read-only lookup.
 
+<Columns cols={2}>
+  <Card title="Context and signals" icon="circle-info">
+    Browser mediation, session identity, schemas, and annotations provide context. They do not
+    authorize a call or guarantee confirmation.
+  </Card>
+  <Card title="Enforced controls" icon="shield-halved">
+    The application validates input, authorizes the current user, and requires human review when the
+    consequence warrants it.
+  </Card>
+</Columns>
+
 The Community Group draft's [security and privacy
 considerations](https://webmachinelearning.github.io/webmcp/#security-and-privacy-considerations)
 cover the proposal's threat model. Chrome publishes separate guidance for

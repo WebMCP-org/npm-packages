@@ -12,6 +12,17 @@ Agents should see only actions that are currently
 meaningful and authorized, with descriptions and schemas that match the active
 application context.
 
+```mermaid
+flowchart TD
+  Current["Current registration"] -->|"context changes or cleanup"| Abort["Abort the old signal"]
+  Abort --> Removed["Old tool is removed"]
+  Removed -->|"another tool is valid"| Register["Register replacement<br/>with a new signal"]
+  Removed -->|"no tool is valid"| None["No registered tool"]
+  Register --> Current
+  Removed -. "toolchange" .-> Refresh["Consumers refresh their catalog"]
+  Register -. "toolchange" .-> Refresh
+```
+
 The current registration pattern ties a tool to an `AbortSignal`:
 
 ```ts title="Registration lifetime"

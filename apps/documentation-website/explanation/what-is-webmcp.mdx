@@ -17,6 +17,18 @@ reuse that context without moving browser-only logic into a separate service.
 The application still validates inputs, enforces permissions, and asks for
 confirmation when the consequence warrants it.
 
+```mermaid
+sequenceDiagram
+  participant Site as Web application
+  participant Context as Browser WebMCP context
+  participant Agent as AI agent
+  Site->>Context: Register structured tools
+  Agent->>Context: Discover and invoke a tool
+  Context->>Site: Run the registered handler
+  Site-->>Context: Return a structured result
+  Context-->>Agent: Return the result
+```
+
 ## Learn about the proposal
 
 The [Community Group draft](https://webmachinelearning.github.io/webmcp/) owns

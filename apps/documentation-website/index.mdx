@@ -19,24 +19,52 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
 <div className="docs-landing">
   <section className="docs-landing-hero">
     <div className="docs-landing-inner">
-      <div className="docs-landing-copy">
-        <h1 className="docs-landing-title">WebMCP documentation and MCP-B packages</h1>
+      <div className="docs-landing-hero-grid">
+        <div className="docs-landing-copy">
+          <h1 className="docs-landing-title">WebMCP documentation and MCP-B packages</h1>
 
-        <p className="docs-landing-lead">
-          Use upstream WebMCP, Chrome, and OpenAI documentation for platform behavior. Use this
-          site for <code>@mcp-b/*</code> packages, integrations, and compatibility notes.
-        </p>
+          <p className="docs-landing-lead">
+            Use upstream WebMCP and browser documentation for platform behavior. Use this site for{' '}
+            <code>@mcp-b/*</code> packages, integrations, and project-specific compatibility notes.
+          </p>
 
-        <div className="docs-landing-links">
-          <a
-            className="docs-landing-link docs-landing-link-primary"
-            href="https://developer.chrome.com/docs/ai/webmcp"
-          >
-            Read Chrome's WebMCP docs
-          </a>
-          <a className="docs-landing-link" href="/packages/index">
-            Browse MCP-B packages
-          </a>
+          <div className="docs-landing-links">
+            <a
+              className="docs-landing-link docs-landing-link-primary"
+              href="/start-here/choose-your-path"
+            >
+              Get started
+            </a>
+            <a className="docs-landing-link" href="/tutorials/first-tool">
+              Build your first tool
+            </a>
+            <a className="docs-landing-link" href="/packages/index">
+              Browse the packages
+            </a>
+          </div>
+        </div>
+
+        <div
+          className="docs-landing-hero-diagram"
+          role="img"
+          aria-label="WebMCP exposes website tools through the browser, MCP is a separate protocol, and MCP-B connects the two with runtime and transport packages."
+        >
+          <img
+            className="docs-landing-hero-diagram-svg docs-landing-hero-diagram-light"
+            src="/logo/mcp-b-architecture-light.svg"
+            alt=""
+            width="800"
+            height="420"
+            noZoom
+          />
+          <img
+            className="docs-landing-hero-diagram-svg docs-landing-hero-diagram-dark"
+            src="/logo/mcp-b-architecture-dark.svg"
+            alt=""
+            width="800"
+            height="420"
+            noZoom
+          />
         </div>
       </div>
     </div>
@@ -46,16 +74,33 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
   <section className="docs-landing-section">
     <div className="docs-landing-inner">
       <div className="docs-landing-section-head">
+        <p className="docs-landing-kicker">Live on this page</p>
+        <h2 className="docs-landing-heading">Try a registered WebMCP tool.</h2>
+        <p className="docs-landing-section-copy">
+          This page registers <code>get_docs_info</code> through{' '}
+          <code>document.modelContext</code>. Ask a compatible browser agent to call it, including
+          Codex when site tools are available. Then follow the{' '}
+          <a href="/tutorials/first-tool">first tool tutorial</a> to register your own.
+        </p>
+      </div>
+
+      <LiveLandingTool />
+    </div>
+
+  </section>
+
+  <section className="docs-landing-section docs-landing-section-end">
+    <div className="docs-landing-inner">
+      <div className="docs-landing-section-head">
         <p className="docs-landing-kicker">Choose a path</p>
         <h2 className="docs-landing-heading">Start with the source that owns your question.</h2>
       </div>
 
       <div className="docs-landing-two-up">
         <div className="docs-landing-list-card">
-          <p className="docs-landing-kicker">WebMCP platforms and agents</p>
+          <p className="docs-landing-kicker">WebMCP and browser agents</p>
           <p className="docs-landing-body">
-            Find the current proposal, implementation documentation, compatibility notes, demos,
-            security guidance, and tools.
+            Find the proposal, implementation documentation, compatibility notes, and tools.
           </p>
           <ul>
             <li>
@@ -65,16 +110,14 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
               <a href="https://developer.chrome.com/docs/ai/webmcp">Chrome WebMCP documentation</a>
             </li>
             <li>
+              <a href="https://learn.chatgpt.com/docs/webmcp">OpenAI site tools documentation</a>
+            </li>
+            <li>
               <a href="/reference/webmcp/codex-site-tools">Codex site tools compatibility</a>
             </li>
             <li>
               <a href="/explanation/design/spec-status-and-limitations">
                 Resources and implementation status
-              </a>
-            </li>
-            <li>
-              <a href="https://developer.chrome.com/docs/devtools/application/webmcp">
-                Chrome DevTools WebMCP panel
               </a>
             </li>
           </ul>
@@ -101,24 +144,6 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
           </ul>
         </div>
       </div>
-    </div>
-
-  </section>
-
-  <section className="docs-landing-section docs-landing-section-end">
-    <div className="docs-landing-inner">
-      <div className="docs-landing-section-head">
-        <p className="docs-landing-kicker">Live on this page</p>
-        <h2 className="docs-landing-heading">Try a registered WebMCP tool.</h2>
-        <p className="docs-landing-section-copy">
-          This page registers <code>get_docs_info</code> through{' '}
-          <code>document.modelContext</code>. If site tools are available in ChatGPT's built-in
-          browser, ask Codex to call it. You can also use another compatible browser agent. Then
-          follow the <a href="/tutorials/first-tool">first tool tutorial</a> to register your own.
-        </p>
-      </div>
-
-      <LiveLandingTool />
     </div>
 
   </section>

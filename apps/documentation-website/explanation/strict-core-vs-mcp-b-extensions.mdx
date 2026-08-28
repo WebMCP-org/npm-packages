@@ -17,11 +17,20 @@ without depending on an MCP server or transport.
 
 ## Three related layers
 
-| Layer                 | Responsibility                                                      |
-| --------------------- | ------------------------------------------------------------------- |
-| WebMCP proposal       | Defines the evolving `document.modelContext` browser API            |
-| MCP-B portable layer  | Supplies package types, registration helpers, and polyfill behavior |
-| MCP-B extension layer | Adds MCP server features and transports around page tools           |
+```mermaid
+flowchart TB
+  subgraph Upstream["Community Group"]
+    Proposal["WebMCP proposal<br/>evolving document.modelContext API"]
+  end
+
+  subgraph Project["MCP-B packages"]
+    Portable["Portable layer<br/>types, helpers, polyfill"]
+    Extensions["Extension layer<br/>BrowserMcpServer, MCP features, transports"]
+    Portable -->|"extended by"| Extensions
+  end
+
+  Proposal -->|"target browser contract"| Portable
+```
 
 The live draft owns the exact `ModelContext` members and signatures. MCP-B may
 retain compatibility types or adapters while browser implementations converge.

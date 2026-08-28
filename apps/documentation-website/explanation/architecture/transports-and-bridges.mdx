@@ -11,6 +11,22 @@ a native mechanism for document-tree discovery. MCP-B transports solve a
 different problem: carrying MCP protocol messages between an explicit client
 and server.
 
+<Columns cols={2}>
+  <Card title="Native document discovery" icon="window-restore">
+    **Child:** registers and executes the tool. **Parent:** discovers its descriptor through the
+    browser.
+
+    Execution remains in the child document.
+
+  </Card>
+  <Card title="MCP-B iframe bridge" icon="bridge">
+    **Parent:** MCP client. **Child:** MCP server and tool handler.
+
+    A transport carries MCP messages across the frame boundary; execution remains in the child.
+
+  </Card>
+</Columns>
+
 ## Native cross-document discovery
 
 Native WebMCP stays within the browser's document model:
