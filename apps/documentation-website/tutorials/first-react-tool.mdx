@@ -5,7 +5,7 @@ keywords: ['react', 'usewebmcp', 'hook', 'webmcp-polyfill', 'vite', 'registertoo
 icon: 'react'
 ---
 
-In this tutorial, we will create a minimal React app that registers one WebMCP tool using the `useWebMCP` hook. The hook handles registration on mount and cleanup on unmount automatically. By the end, you will have a React component that exposes a tool to AI agents and shows execution state in the UI.
+In this tutorial, we will create a minimal React app that registers one WebMCP tool using the `useWebMCP` hook. The hook handles registration on mount and cleanup on unmount automatically. By the end, you will have a React component that exposes a tool to browser-side WebMCP consumers and shows execution state in the UI.
 
 ## Prerequisites
 
@@ -93,7 +93,7 @@ export function App() {
   return (
     <div>
       <h1>My First React WebMCP Tool</h1>
-      <p>Tool "say_hello" registered.</p>
+      <p>Browser tool: "say_hello"</p>
       <p>Executions: {helloTool.state.executionCount}</p>
       <p>
         Last result:{' '}
@@ -122,7 +122,7 @@ Open `http://localhost:5173` in your browser. You should see:
 
 ```text title="Expected page"
 My First React WebMCP Tool
-Tool "say_hello" registered.
+Browser tool: "say_hello"
 Executions: 0
 Last result: none
 ```
@@ -152,7 +152,7 @@ const tools = await modelContext.getTools();
 console.log(tools);
 ```
 
-You should see an array containing your `say_hello` tool. Now feature-detect the Chrome-compatible execution extension and call it:
+You should see an array containing your `say_hello` tool. Now feature-detect the polyfill's serialized-JSON execution method and call it:
 
 ```javascript
 const tool = tools.find((candidate) => candidate.name === 'say_hello');
@@ -160,7 +160,7 @@ if (!tool) throw new Error('say_hello is not registered');
 
 const executeTool = modelContext.executeTool;
 if (typeof executeTool !== 'function') {
-  throw new Error('This runtime does not expose the optional Chrome executeTool extension');
+  throw new Error('This runtime does not expose a compatible executeTool method');
 }
 
 const result = await executeTool.call(modelContext, tool, JSON.stringify({ name: 'Console' }));
@@ -187,10 +187,10 @@ Notice that the execution count in the UI also incremented, because the same und
 - `useWebMCP` registers a tool on mount and unregisters on unmount
 - Schema object identity does not trigger re-registration; use `deps` when registered metadata changes
 - The hook returns `state` (with `executionCount`, `lastResult`, `error`, `isExecuting`) and an `execute` function for local invocation
-- Tools registered via the hook are discoverable with `document.modelContext.getTools()` and callable when the runtime exposes Chrome's optional `executeTool()` extension
+- Tools registered via the hook are discoverable with `document.modelContext.getTools()` and callable when the runtime exposes its serialized-JSON `executeTool()` signature
 
 ## Next steps
 
-- [Try the Native Chrome Preview](/tutorials/first-native-preview) to use the browser's built-in WebMCP API without a polyfill
+- [WebMCP resources and status](/explanation/design/spec-status-and-limitations) for current native browser guidance
 - [Connect a Desktop Agent](/tutorials/desktop-agent-relay) to let Claude or Cursor call your tools
 - See the [`usewebmcp` reference](/packages/usewebmcp/reference) for the full hook API, output schemas, and advanced patterns

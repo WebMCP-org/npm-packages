@@ -1,26 +1,55 @@
 ---
 title: 'Essential concepts'
-description: 'Background concepts for understanding WebMCP, MCP-B, and their design boundaries.'
-keywords: ['webmcp', 'mcp-b', 'architecture', 'concepts']
+description: 'Understand where MCP-B fits, how its runtime works, and which trust boundaries it preserves.'
+keywords: ['WebMCP', 'MCP-B', 'architecture', 'transports', 'security']
 icon: 'lightbulb'
 ---
 
-The explanations below cover the basic background concepts behind WebMCP and MCP-B, focusing on design boundaries, tradeoffs, and terminology.
+These explanations cover the concepts this project owns: MCP-B boundaries, runtime layers,
+transports, tool lifecycles, and security decisions. For current browser behavior, use the
+[WebMCP resources and status page](/explanation/design/spec-status-and-limitations).
+
+## Platform and package boundaries
 
 <CardGroup cols={2}>
-  <Card title="What is WebMCP?" href="/explanation/what-is-webmcp" />
-  <Card title="WebMCP vs MCP" href="/explanation/webmcp-vs-mcp" />
-  <Card title="Core vs MCP-B extensions" href="/explanation/strict-core-vs-mcp-b-extensions" />
-  <Card title="Runtime layering" href="/explanation/architecture/runtime-layering" />
-  <Card title="Transports and bridges" href="/explanation/architecture/transports-and-bridges" />
+  <Card title="What is WebMCP?" href="/explanation/what-is-webmcp">
+    Understand the proposal and where browser-hosted tools fit.
+  </Card>
+  <Card title="WebMCP and MCP-B extensions" href="/explanation/strict-core-vs-mcp-b-extensions">
+    See which capabilities belong to WebMCP and which MCP-B adds.
+  </Card>
+</CardGroup>
+
+## Architecture
+
+<CardGroup cols={2}>
+  <Card title="Runtime layering" href="/explanation/architecture/runtime-layering">
+    Follow initialization from the browser API through the MCP-B runtime.
+  </Card>
+  <Card title="Transports and bridges" href="/explanation/architecture/transports-and-bridges">
+    Understand how tools move between pages, frames, tabs, and desktop clients.
+  </Card>
   <Card
     title="Tool lifecycle"
     href="/explanation/architecture/tool-lifecycle-and-context-replacement"
-  />
-  <Card title="Security" href="/explanation/design/security-and-human-in-the-loop" />
-  <Card title="Spec status" href="/explanation/design/spec-status-and-limitations" />
+  >
+    Understand registration lifetime, context replacement, and cleanup.
+  </Card>
 </CardGroup>
 
-For executable guidance, use [Tutorials](/tutorials/index) and
-[How-to guides](/how-to/index). For API details, use [Packages](/packages/index)
-and the WebMCP standard references.
+## Trust and status
+
+<CardGroup cols={2}>
+  <Card
+    title="Security and human control"
+    href="/explanation/design/security-and-human-in-the-loop"
+  >
+    Understand MCP-B trust boundaries and user-controlled execution.
+  </Card>
+  <Card title="WebMCP resources and status" href="/explanation/design/spec-status-and-limitations">
+    Find upstream specifications, browser support, debugging tools, examples, and tests.
+  </Card>
+</CardGroup>
+
+For executable guidance, open the [tutorials](/tutorials/index) or [how-to guides](/how-to/index).
+For package APIs, open the [package index](/packages/index).

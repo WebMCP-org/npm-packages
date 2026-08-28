@@ -1,20 +1,20 @@
 ---
 title: 'Runtime layering'
-description: 'Why MCP-B separates the standard browser surface, server runtime, and transports.'
+description: 'Why MCP-B separates browser tool contracts, its server runtime, and transports.'
 keywords: ['runtime layering', 'browsermcpserver', '@mcp-b/global']
 icon: 'bars-staggered'
 ---
 
-MCP-B keeps the standard browser surface separate from its server runtime and
+MCP-B keeps browser tool contracts separate from its server runtime and
 transport adapters. A native implementation or `@mcp-b/webmcp-polyfill`
-supplies the strict `document.modelContext` surface.
+supplies the package-supported `document.modelContext` surface.
 `@mcp-b/webmcp-ts-sdk` adds `BrowserMcpServer`, which mirrors core tool
 operations while providing MCP-B-only capabilities. `@mcp-b/global`
 initializes those layers and connects the selected browser transport.
 
 Global initialization preserves the browser-shaped programming model:
 
-1. Install or adopt the strict `document.modelContext` implementation.
+1. Install or adopt a compatible `document.modelContext` implementation.
 2. Capture that implementation as the native context.
 3. Wrap it with `BrowserMcpServer`, which mirrors core registrations down to
    the captured context.
@@ -28,7 +28,7 @@ descriptors that existed before wrapping; it does not uninstall the separately
 owned polyfill.
 
 This separation allows a library to depend only on types, a site to use only
-the strict polyfill, or an application to install the complete MCP-B runtime.
+the tool-only polyfill, or an application to install the complete MCP-B runtime.
 Core tool registrations remain visible to native browser tooling, while
 cleanup can restore the context that existed before initialization.
 

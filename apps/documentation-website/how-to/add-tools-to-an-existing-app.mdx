@@ -1,285 +1,93 @@
 ---
 title: 'Add tools to an existing app'
-description: 'Expose existing product functionality as WebMCP tools without rewriting your application.'
+description: 'Expose existing product functions as WebMCP tools with an MCP-B runtime.'
 keywords:
-  [
-    'registerTool',
-    '@mcp-b/global',
-    'document.modelContext',
-    'tool registration',
-    'inputSchema',
-    'annotations',
-  ]
+  ['registerTool', '@mcp-b/global', 'document.modelContext', 'tool registration', 'AbortSignal']
 icon: 'puzzle-piece'
 ---
 
-Expose existing application functionality to AI agents while keeping your app's own UI and state model intact. For framework-specific lifecycle patterns (React hooks, Vue composables, Svelte actions), see [Integrate with your framework](/how-to/frameworks).
+Wrap the functions your application already uses, then register those wrappers with
+`document.modelContext`. Keep business rules, authorization, and UI updates in the existing
+application path.
 
 ## Install the runtime
 
-If you have a build step, install `@mcp-b/global` from npm:
+For the complete MCP-B runtime, install and import `@mcp-b/global` before registering tools:
 
-```bash
-npm install @mcp-b/global
+```bash title="Install the runtime"
+pnpm add @mcp-b/global
 ```
 
 ```ts title="main.ts"
 import '@mcp-b/global';
 ```
 
-If you do not have a build step, add a single script tag. Place it before any code that registers tools:
+If you only need WebMCP tool registration, use the tool-only polyfill instead. See [Choose a
+runtime](/how-to/choose-runtime) before selecting a package.
 
-```html
-<script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
-```
+## Wrap an existing function
 
-Both approaches auto-initialize `document.modelContext` on load. The property
-is still typed as optional, because no browser ships WebMCP unflagged, so
-TypeScript under `strict` needs a guard that the examples below omit for
-brevity. See
-[`@mcp-b/webmcp-types`](/packages/webmcp-types/reference) for the pattern.
+Call the same function used by your interface from the tool handler. Use an `AbortSignal` to remove
+the tool when the capability is no longer available.
 
-<Note>
-  If you only need the strict core API (no MCP bridge, no transports), use `@mcp-b/webmcp-polyfill`
-  instead. See [Choose a Runtime](/how-to/choose-runtime) for guidance.
-</Note>
+```ts title="cart-tool.ts"
+const controller = new AbortController();
 
-## Register tools that wrap existing functions
-
-Identify functions in your app that an AI agent would find useful (search, add to cart, submit a form, fetch data). Wrap each one as a tool descriptor and register it.
-
-### Register tools with `registerTool`
-
-Call `registerTool` for each tool you want to expose. You can register them all at startup or add them incrementally (for example, after user login or after a feature flag check).
-
-```ts title="tools.ts"
-import '@mcp-b/global';
-
-await document.modelContext.registerTool({
-  name: 'search-products',
-  description: 'Search products by keyword, category, or price range',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      query: { type: 'string', description: 'Search terms' },
-      category: { type: 'string', description: 'Product category' },
-      maxPrice: { type: 'number', description: 'Maximum price filter' },
-    },
-    required: ['query'],
-  },
-  async execute(args) {
-    const results = await fetch(
-      `/api/products?q=${args.query}&cat=${args.category ?? ''}&max=${args.maxPrice ?? ''}`
-    );
-    return { content: [{ type: 'text', text: await results.text() }] };
-  },
-});
-
-await document.modelContext.registerTool({
-  name: 'add-to-cart',
-  description: 'Add a product to the shopping cart',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      productId: { type: 'string' },
-      quantity: { type: 'integer' },
-    },
-    required: ['productId'],
-  },
-  async execute(args) {
-    await fetch('/api/cart', {
-      method: 'POST',
-      body: JSON.stringify({ productId: args.productId, quantity: args.quantity ?? 1 }),
-    });
-    return { content: [{ type: 'text', text: 'Added to cart' }] };
-  },
-});
-```
-
-### Register tools conditionally
-
-```ts title="admin-tools.ts"
-import '@mcp-b/global';
-
-if (currentUser.isAdmin) {
-  await document.modelContext.registerTool({
-    name: 'delete-user',
-    description: 'Delete a user account (admin only)',
+await document.modelContext.registerTool(
+  {
+    name: 'add-to-cart',
+    description: 'Add a product to the shopping cart',
     inputSchema: {
       type: 'object',
-      properties: { userId: { type: 'string' } },
-      required: ['userId'],
+      properties: {
+        productId: { type: 'string' },
+        quantity: { type: 'integer' },
+      },
+      required: ['productId'],
     },
     async execute(args) {
-      await fetch(`/api/users/${args.userId}`, { method: 'DELETE' });
-      return { content: [{ type: 'text', text: 'User deleted' }] };
+      const item = await addToCart(args.productId, args.quantity ?? 1);
+      return {
+        content: [{ type: 'text', text: `Added ${item.name} to cart` }],
+      };
     },
-  });
-}
-```
-
-`registerTool` returns a rejected promise if a tool with the same name already
-exists. To update a tool, abort the previous registration signal, then await the
-new registration.
-
-## Update tools when app state changes
-
-If your available tools depend on state (logged in vs. guest, current page, feature flags), update the registry when that state changes.
-
-```ts title="auth.ts"
-import type { ToolDescriptor } from '@mcp-b/webmcp-types';
-
-const registeredToolControllers = new Map<string, AbortController>();
-
-function registerRoleTool(tool: ToolDescriptor): Promise<void> {
-  registeredToolControllers.get(tool.name)?.abort();
-
-  const controller = new AbortController();
-  registeredToolControllers.set(tool.name, controller);
-  return document.modelContext.registerTool(tool, { signal: controller.signal });
-}
-
-async function onLogin(user: User) {
-  // Register tools appropriate for the user's role
-  for (const tool of getToolsForRole(user.role)) {
-    await registerRoleTool(tool);
-  }
-}
-
-function onLogout() {
-  // Abort each registration signal
-  for (const controller of registeredToolControllers.values()) {
-    controller.abort();
-  }
-  registeredToolControllers.clear();
-}
-```
-
-Use `registerTool` and an `AbortController` to add or remove individual tools:
-
-```ts title="registration-lifetime.ts"
-const controller = new AbortController();
-await document.modelContext.registerTool(adminTool, { signal: controller.signal });
-
-// later:
-controller.abort();
-```
-
-## Interact with the DOM
-
-Tools can read from and write to the DOM. This is useful for form-filling, page navigation, or surfacing visible content.
-
-```ts title="form-tools.ts"
-const nameInput = document.querySelector<HTMLInputElement>('#name');
-const emailInput = document.querySelector<HTMLInputElement>('#email');
-const messageInput = document.querySelector<HTMLInputElement>('#message');
-const contactForm = document.querySelector<HTMLFormElement>('#contact-form');
-
-if (!nameInput || !emailInput || !messageInput || !contactForm) {
-  throw new Error('Contact form is incomplete');
-}
-
-await document.modelContext.registerTool({
-  name: 'fill-contact-form',
-  description: 'Fill the contact form with provided details',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      name: { type: 'string' },
-      email: { type: 'string' },
-      message: { type: 'string' },
-    },
-    required: ['name', 'email', 'message'],
   },
-  async execute(args) {
-    nameInput.value = args.name;
-    emailInput.value = args.email;
-    messageInput.value = args.message;
-    return { content: [{ type: 'text', text: 'Form filled' }] };
-  },
-});
-
-await document.modelContext.registerTool({
-  name: 'submit-form',
-  description: 'Submit the contact form',
-  inputSchema: { type: 'object', properties: {} },
-  async execute() {
-    contactForm.requestSubmit();
-    return { content: [{ type: 'text', text: 'Form submitted' }] };
-  },
-});
-```
-
-## Return errors from tools
-
-If a tool execution fails, return an error response instead of throwing. This gives the AI agent a structured signal to retry or adjust its approach.
-
-```ts title="tool-errors.ts"
-async execute(args) {
-  try {
-    const result = await riskyOperation(args);
-    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      content: [{ type: 'text', text: `Operation failed: ${message}` }],
-      isError: true,
-    };
-  }
-}
-```
-
-## Add annotations for AI planning
-
-Tool annotations give the AI agent hints about side effects. They do not change execution behavior, but help the agent decide when and how to call the tool.
-
-```ts title="Read-only tool annotations"
-await document.modelContext.registerTool({
-  name: 'get-cart',
-  title: 'Get shopping cart',
-  description: 'Get the current shopping cart contents',
-  inputSchema: { type: 'object', properties: {} },
-  annotations: {
-    readOnlyHint: true,
-    untrustedContentHint: true,
-  },
-  async execute() {
-    return { content: [{ type: 'text', text: JSON.stringify(getCart()) }] };
-  },
-});
-```
-
-The WebMCP draft standardizes `readOnlyHint` and `untrustedContentHint`.
-`title` is a top-level tool field. MCP-B runtimes also accept the MCP-specific
-`destructiveHint`, `idempotentHint`, and `openWorldHint` annotations for MCP
-clients. Annotations are planning hints, not authorization checks.
-
-## Verify tools are registered
-
-Use standard discovery, then feature-detect Chrome's optional execution extension:
-
-```ts
-import type { ChromeModelContext } from '@mcp-b/webmcp-types';
-
-const modelContext = document.modelContext as ChromeModelContext;
-const tools = await modelContext.getTools();
-const searchTool = tools.find((tool) => tool.name === 'search-products');
-if (!searchTool) throw new Error('search-products is not available');
-
-const executeTool = modelContext.executeTool;
-if (!executeTool) throw new Error('This runtime does not expose Chrome executeTool');
-
-const resultJson = await executeTool.call(
-  modelContext,
-  searchTool,
-  JSON.stringify({ query: 'laptop' })
+  { signal: controller.signal }
 );
-const result = resultJson === null ? null : JSON.parse(resultJson);
+
+export function removeCartTool() {
+  controller.abort();
+}
 ```
 
-## Next steps
+Create the controller when the user, route, or feature state makes the capability available. Call
+`removeCartTool()` when that state becomes invalid. A later registration can reuse the same tool
+name after the previous signal is aborted.
 
-- [Use Schemas and Structured Output](/how-to/use-schemas-and-structured-output) to add type-safe input validation and structured responses.
-- [Choose a Runtime](/how-to/choose-runtime) if you are unsure whether `@mcp-b/global` is the right package.
-- [Framework integration guide](/how-to/frameworks) for framework-specific patterns.
-- [Debug and Troubleshoot](/how-to/debug-and-troubleshoot) if tools are not appearing to AI agents.
+For React components, use the lifecycle-aware hooks in [Integrate with your
+framework](/how-to/frameworks).
+
+## Verify the registration
+
+Check the page registry after your registration promise resolves:
+
+```js title="Browser console"
+const tools = await document.modelContext.getTools();
+console.table(tools.map(({ name, description }) => ({ name, description })));
+```
+
+Use Chrome's [WebMCP DevTools
+panel](https://developer.chrome.com/docs/devtools/application/webmcp) to inspect schemas and invoke
+tools without maintaining a separate browser-debugging workflow.
+
+## Finish the integration
+
+- Add MCP-B input adapters or structured output in [Use input schemas and structured
+  output](/how-to/use-schemas-and-structured-output).
+- Follow Chrome's [WebMCP best
+  practices](https://developer.chrome.com/docs/ai/webmcp/best-practices) for tool boundaries,
+  names, descriptions, and agent-facing errors.
+- Follow Chrome's [secure tools guidance](https://developer.chrome.com/docs/ai/webmcp/secure-tools)
+  before exposing destructive or externally visible actions.
+- If discovery fails, use [Debug and troubleshoot](/how-to/debug-and-troubleshoot) to trace the
+  MCP-B runtime and transport.

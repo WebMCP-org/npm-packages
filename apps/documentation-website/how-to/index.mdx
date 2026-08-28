@@ -1,40 +1,37 @@
 ---
-title: 'How-To Guides'
-description: 'Goal-oriented guides for adopting WebMCP, integrating with frameworks, and connecting tools across environments.'
-keywords: ['webmcp', 'how-to', 'integration', 'tools', 'frameworks', 'document.modelContext']
+title: 'How-to guides'
+description: 'Add WebMCP to an app, choose MCP-B packages, connect tools, and troubleshoot integrations.'
+keywords: ['WebMCP', 'how-to', 'integration', 'MCP-B', 'document.modelContext']
 icon: 'compass-drafting'
 ---
 
-This section contains how-to guides for WebMCP. Each guide addresses a specific goal and assumes you already understand the basics of the WebMCP standard and the `document.modelContext` API.
+Use these guides to complete a specific task in an existing project. If you need a guided first
+experience, start with the [tutorials](/tutorials/index).
 
-If you are new to WebMCP, start with the [Tutorials](/tutorials/index) instead.
+## Adopt WebMCP
 
-## Adoption
-
-Get WebMCP running in your project.
+Choose a runtime and expose application behavior to agents.
 
 <CardGroup cols={2}>
-  <Card title="Choose a Runtime" icon="code-branch" href="/how-to/choose-runtime">
-    Decide between the native browser API, the strict polyfill, or the full `@mcp-b/global` runtime
-    based on your project's needs.
+  <Card title="Choose a runtime" icon="code-branch" href="/how-to/choose-runtime">
+    Choose native WebMCP, the tool-only polyfill, or the full `@mcp-b/global` runtime.
   </Card>
   <Card
-    title="Add Tools to an Existing App"
+    title="Add tools to an existing app"
     icon="puzzle-piece"
     href="/how-to/add-tools-to-an-existing-app"
   >
-    Expose existing application functionality as WebMCP tools without rewriting your app.
+    Expose existing application functions as WebMCP tools.
   </Card>
   <Card
-    title="Use Schemas and Structured Output"
+    title="Use schemas and structured output"
     icon="brackets-curly"
     href="/how-to/use-schemas-and-structured-output"
   >
-    Define input schemas with JSON Schema or Standard JSON Schema, and add output schemas for typed
-    agent responses.
+    Add input schemas, output schemas, and typed results to MCP-B tools.
   </Card>
   <Card
-    title="Register Prompts and Resources"
+    title="Register prompts and resources"
     icon="layer-group"
     href="/how-to/register-prompts-and-resources"
   >
@@ -42,43 +39,41 @@ Get WebMCP running in your project.
   </Card>
 </CardGroup>
 
-## Frameworks
-
-Wire WebMCP into your frontend framework.
+## Integrate a framework
 
 <CardGroup cols={2}>
-  <Card title="Integrate with your framework" icon="code" href="/how-to/frameworks">
-    Register tools in React, Vue, Svelte, Angular, Next.js, Astro, or vanilla JS using
-    framework-native lifecycle patterns.
+  <Card title="Integrate with a framework" icon="code" href="/how-to/frameworks">
+    Register tools through the lifecycle patterns used by your frontend framework.
   </Card>
 </CardGroup>
 
-## Connectivity
+## Connect and verify tools
 
-Connect tools across tabs, iframes, and desktop agents.
+Bridge tools across contexts, diagnose failures, and test runtime behavior.
 
 <CardGroup cols={2}>
   <Card
-    title="Connect Desktop Agents with Local Relay"
+    title="Connect desktop agents with the local relay"
     icon="tower-broadcast"
     href="/how-to/connect-desktop-agents-with-local-relay"
   >
-    Bridge browser tools to desktop AI agents like Claude Desktop or Cursor.
+    Bridge browser tools to desktop MCP clients.
   </Card>
   <Card
-    title="Bridge Tools Across Iframes"
+    title="Bridge tools across iframes"
     icon="window-restore"
     href="/how-to/bridge-tools-across-iframes"
   >
-    Expose tools from embedded iframes to the parent page.
+    Expose tools from an embedded iframe to its parent page.
   </Card>
-  <Card title="Use DevTools MCP" icon="screwdriver-wrench" href="/how-to/use-devtools-mcp">
-    Connect desktop agents to the browser through Chrome DevTools Protocol.
+  <Card title="Debug and troubleshoot" icon="bug" href="/how-to/debug-and-troubleshoot">
+    Diagnose registration, transport, and execution failures.
   </Card>
-  <Card title="Debug and Troubleshoot" icon="bug" href="/how-to/debug-and-troubleshoot">
-    Diagnose tool registration, transport, and execution issues.
-  </Card>
-  <Card title="Test Native and Polyfill" icon="flask-vial" href="/how-to/test-native-and-polyfill">
-    Write tests that work against both native and polyfilled implementations.
+  <Card
+    title="Test native and polyfill runtimes"
+    icon="flask-vial"
+    href="/how-to/test-native-and-polyfill"
+  >
+    Run the same checks against native and polyfilled implementations.
   </Card>
 </CardGroup>

@@ -30,7 +30,7 @@ WebMCP rejects tool execution from opaque `file:` origins.
 
 A single HTML page that:
 
-1. Loads the strict `@mcp-b/webmcp-polyfill` runtime via a script tag
+1. Loads the tool-only `@mcp-b/webmcp-polyfill` runtime via a script tag
 2. Registers a tool called `get-page-title`
 3. Displays confirmation in the page when the tool is ready
 
@@ -59,7 +59,7 @@ Create a new file called `index.html` and paste in this starting point:
 </html>
 ```
 
-The `<script>` tag in the `<head>` loads `@mcp-b/webmcp-polyfill`, which installs the strict WebMCP surface on `document.modelContext`. No import statements or bundler needed.
+The `<script>` tag in the `<head>` loads `@mcp-b/webmcp-polyfill`, which installs its WebMCP-compatible tool surface on `document.modelContext`. No import statements or bundler needed.
 
 </Step>
 
@@ -125,7 +125,13 @@ console.log(tools);
 You should see an array containing your tool:
 
 ```javascript title="Browser console"
-[{ name: 'get-page-title', description: 'Get the current page title', inputSchema: '...' }];
+[
+  {
+    name: 'get-page-title',
+    description: 'Get the current page title',
+    inputSchema: { type: 'object', properties: {} },
+  },
+];
 ```
 
 Now call the tool:
@@ -136,7 +142,7 @@ if (!tool) throw new Error('get-page-title is not registered');
 
 const executeTool = modelContext.executeTool;
 if (typeof executeTool !== 'function') {
-  throw new Error('This runtime does not expose the optional Chrome executeTool extension');
+  throw new Error('This runtime does not expose a compatible executeTool method');
 }
 
 const result = await executeTool.call(modelContext, tool, '{}');
@@ -151,7 +157,7 @@ The output should be an object containing your tool's response:
 }
 ```
 
-You have registered a WebMCP tool, discovered it through the standard API, and executed it through the Chrome-compatible extension supplied by the polyfill.
+You have registered a WebMCP tool, discovered it through `getTools()`, and executed it through the polyfill's serialized-JSON compatibility method.
 
 </Step>
 
@@ -214,14 +220,14 @@ Here is the full `index.html` for reference:
 
 ## What you learned
 
-- `@mcp-b/webmcp-polyfill` installs the strict WebMCP surface when loaded via a script tag
+- `@mcp-b/webmcp-polyfill` installs its WebMCP-compatible tool surface when loaded via a script tag
 - `registerTool()` returns a promise that resolves after registering a tool with a name, description, input schema, and execute function
-- `document.modelContext.getTools()` discovers registered tools; execution requires a feature-detected Chrome-compatible `executeTool()` extension
+- `document.modelContext.getTools()` discovers registered tools; this polyfill executes them through its feature-detected, serialized-JSON `executeTool()` signature
 - A WebMCP callback can return any serializable value; this example returns an MCP-shaped `content` array
 
 ## Next steps
 
 - [Build Your First React Tool](/tutorials/first-react-tool) to register tools from React components
-- [Choose a Runtime](/how-to/choose-runtime) to see when to move from the strict core to the full MCP-B runtime
-- [Try the Native Chrome Preview](/tutorials/first-native-preview) to use the browser's built-in WebMCP API
+- [Choose a Runtime](/how-to/choose-runtime) to compare the tool-only and full MCP-B runtimes
+- [WebMCP resources and status](/explanation/design/spec-status-and-limitations) for current native browser guidance
 - [Connect a Desktop Agent](/tutorials/desktop-agent-relay) to let Claude or Cursor call your tools

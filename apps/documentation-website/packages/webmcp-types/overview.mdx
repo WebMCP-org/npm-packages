@@ -6,18 +6,19 @@ keywords:
 icon: 'brackets-curly'
 ---
 
-`@mcp-b/webmcp-types` is the lowest-level package in the MCP-B stack. It provides `document.modelContext` contracts, schema inference utilities, and browser global augmentation without runtime code.
+`@mcp-b/webmcp-types` is the lowest-level package in the MCP-B stack. It provides the contracts used by MCP-B packages, schema inference utilities, and browser global augmentation without runtime code.
 
 ## When to use this package
 
-- You are authoring a library that wants to type against the WebMCP core surface.
+- You are authoring a library that integrates with MCP-B runtimes.
 - You want compile-time inference from JSON Schema literals.
-- You need `document.modelContext` types in TypeScript without choosing a runtime yet.
+- You need the compatibility contracts exported by MCP-B packages.
 
 ## When not to use this package
 
 - You need a runtime implementation in the browser. Use [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview) or [`@mcp-b/global`](/packages/global/overview).
 - You want prompts, resources, or transport features. Those live higher in the stack.
+- You only need ambient declarations that track the current proposal. Use the Community Group's [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) package.
 
 ## Where it sits in the package graph
 
@@ -41,11 +42,11 @@ Install the package as a dev dependency, then choose one activation path from th
     Practical guidance for schema-driven tool inputs and outputs.
   </Card>
   <Card
-    title="Strict core vs MCP-B extensions"
+    title="WebMCP and MCP-B extensions"
     icon="diagram-venn"
     href="/explanation/strict-core-vs-mcp-b-extensions"
   >
-    Background on where the standard surface ends.
+    Background on the proposal and MCP-B extension boundary.
   </Card>
   <Card title="Choose a runtime" icon="compass" href="/how-to/choose-runtime">
     Pick the runtime layer that pairs with these types.

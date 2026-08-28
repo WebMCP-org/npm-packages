@@ -1,16 +1,16 @@
 ---
 title: 'usewebmcp overview'
-description: 'When to use the strict-core React hook, how it differs from @mcp-b/react-webmcp, and what runtime it expects.'
-keywords: ['usewebmcp', 'overview', 'react', 'strict core', 'useWebMCP']
+description: 'When to use the tool-only React hook, how it differs from @mcp-b/react-webmcp, and what runtime it expects.'
+keywords: ['usewebmcp', 'overview', 'react', 'tool registration', 'useWebMCP']
 icon: 'react'
 ---
 
-`usewebmcp` is the strict-core React package. It gives React components a hook-based way to register WebMCP tools without taking a dependency on the broader MCP-B runtime surface.
+`usewebmcp` is the tool-only React package. It gives React components a hook-based way to register WebMCP tools without taking a dependency on the broader MCP-B runtime surface.
 
 ## When to use this package
 
 - You are building a React app that only needs `registerTool`.
-- You want React ergonomics while staying on the standard-owned browser surface.
+- You want React ergonomics without MCP-B prompt, resource, server, or transport extensions.
 - You want to pair React components with [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview) or native support.
 
 ## When not to use this package
@@ -20,7 +20,7 @@ icon: 'react'
 
 ## Where it sits in the package graph
 
-`usewebmcp` sits on top of the strict-core runtime and types. It does not depend on `BrowserMcpServer`, prompts, or transport helpers.
+`usewebmcp` sits on top of the polyfill and type packages. It does not depend on `BrowserMcpServer`, prompts, or transport helpers.
 
 ## First step
 
@@ -39,6 +39,6 @@ Ensure `document.modelContext` exists through native support, [`@mcp-b/webmcp-po
     Runtime setup patterns across React and other frameworks.
   </Card>
   <Card title="@mcp-b/react-webmcp overview" icon="react" href="/packages/react-webmcp/overview">
-    Compare the full React package to the strict-core hook.
+    Compare the full React package to the tool-only hook.
   </Card>
 </CardGroup>

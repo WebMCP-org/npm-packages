@@ -4,7 +4,7 @@
     "packageName": "@mcp-b/webmcp-types",
     "sidebarLabel": "webmcp-types",
     "category": "Core runtime",
-    "summary": "Zero-runtime TypeScript types for the WebMCP core surface, schema inference, and Navigator augmentation.",
+    "summary": "Zero-runtime TypeScript types for MCP-B's WebMCP surface, schema inference, and document and navigator augmentation.",
     "installCommand": "npm install --save-dev @mcp-b/webmcp-types",
     "overviewPath": "/packages/webmcp-types/overview",
     "referencePath": "/packages/webmcp-types/reference",
@@ -16,7 +16,7 @@
     "packageName": "@mcp-b/webmcp-polyfill",
     "sidebarLabel": "webmcp-polyfill",
     "category": "Core runtime",
-    "summary": "Strict WebMCP runtime polyfill for document.modelContext in browsers that do not ship the API yet.",
+    "summary": "Tool registration and discovery polyfill for browsers without a compatible document.modelContext implementation.",
     "installCommand": "npm install @mcp-b/webmcp-polyfill",
     "overviewPath": "/packages/webmcp-polyfill/overview",
     "referencePath": "/packages/webmcp-polyfill/reference",
@@ -28,7 +28,7 @@
     "packageName": "@mcp-b/global",
     "sidebarLabel": "global",
     "category": "Core runtime",
-    "summary": "Full MCP-B runtime entry point that layers transport and extension APIs on top of the strict WebMCP surface.",
+    "summary": "Full MCP-B runtime entry point that layers transport and extension APIs on top of its browser-facing tool surface.",
     "installCommand": "npm install @mcp-b/global",
     "overviewPath": "/packages/global/overview",
     "referencePath": "/packages/global/reference",
@@ -86,7 +86,7 @@
     "packageName": "usewebmcp",
     "sidebarLabel": "usewebmcp",
     "category": "React",
-    "summary": "Strict-core React hook for registering document.modelContext tools without the broader MCP-B runtime layer.",
+    "summary": "Tool-only React hook for registering document.modelContext tools without the broader MCP-B runtime layer.",
     "installCommand": "npm install usewebmcp react",
     "overviewPath": "/packages/usewebmcp/overview",
     "referencePath": "/packages/usewebmcp/reference",
@@ -95,7 +95,7 @@
     "note": "usewebmcp requires document.modelContext at runtime. Pair it with native browser support, @mcp-b/webmcp-polyfill, or @mcp-b/global.",
     "skill": {
       "name": "usewebmcp",
-      "description": "Use when registering WebMCP tools from React components using the useWebMCP hook. Lightweight strict-core hook for document.modelContext tool registration without MCP-B extensions."
+      "description": "Use when registering WebMCP tools from React components with the useWebMCP hook. Lightweight document.modelContext tool registration without MCP-B prompt, resource, server, or transport extensions."
     }
   },
   {

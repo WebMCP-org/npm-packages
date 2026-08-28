@@ -5,35 +5,30 @@ keywords: ['security', 'authorization', 'human in the loop', 'prompt injection']
 icon: 'shield-halved'
 ---
 
-WebMCP tools can reuse a site's authenticated browser session. That does not
-make the agent trusted. Every call must pass through the same validation and
-authorization rules as the corresponding human workflow.
+WebMCP tools can reuse a site's authenticated browser session. The session
+identifies the user; it does not make the agent trusted. Tool calls still pass
+through the application's validation and authorization rules.
 
-A tool name, hidden control, or agent instruction is not a permission check.
+Tool metadata, page content, and tool output can contain prompt injection.
+Annotations provide information to browsers and agents, but they do not enforce
+authorization or guarantee a confirmation prompt. Human review should follow
+consequence: financial, destructive, external-communication, and
+privacy-sensitive actions need stronger confirmation than read-only lookup.
 
-Side effects should be explicit. Financial, destructive,
-external-communication, and privacy-sensitive operations require stronger
-review or confirmation. Tool metadata, page content, and tool output must be
-treated as untrusted language-model input because each can carry prompt
-injection.
+The Community Group draft's [security and privacy
+considerations](https://webmachinelearning.github.io/webmcp/#security-and-privacy-considerations)
+cover the proposal's threat model. Chrome publishes separate guidance for
+[sites that expose tools](https://developer.chrome.com/docs/ai/webmcp/secure-tools)
+and [agents that consume them](https://developer.chrome.com/docs/agents/security).
+Those sources own browser and agent mitigation details.
 
-The standard annotations are behavioral hints, not access controls.
-`readOnlyHint` describes tools that do not modify state, while
-`untrustedContentHint` marks output that may contain untrusted content. Browsers
-and agents can use those hints when deciding how to mediate a call, but WebMCP
-does not guarantee a confirmation prompt for every invocation.
+## MCP-B bridges add another boundary
 
-`exposedTo` controls which origins in the current document tree may discover a
-registered tool. The `tools` Permissions Policy defaults to `self`, so
-cross-origin access also requires explicit policy delegation. Neither mechanism
-replaces application-level authorization.
+Iframe, tab, extension, and localhost bridges carry tools beyond their original
+page surface. Each bridge must validate its own origin, connection identity,
+permissions, and exposure controls. Browser mediation does not configure an
+MCP-B transport, and transport access does not grant application permission.
 
-Iframe, tab, extension, and localhost bridges add transport-level boundaries.
-Their origin, connection identity, permissions, and exposure controls must be
-validated separately.
-
-The Community Group draft's
-[security and privacy considerations](https://webmachinelearning.github.io/webmcp/#security-and-privacy-considerations)
-define the standards threat model. Chrome's
-[secure tools guidance](https://developer.chrome.com/docs/ai/webmcp/secure-tools)
-describes implementation-specific defenses.
+[Transports and bridges](/explanation/architecture/transports-and-bridges)
+describes these trust boundaries. The relevant package references define their
+specific controls.
