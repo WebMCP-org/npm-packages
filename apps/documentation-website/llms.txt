@@ -1,0 +1,34 @@
+# WebMCP Documentation
+
+> WebMCP is a Draft Community Group Report for exposing website tools through `document.modelContext`. It is not a W3C Standard. These docs cover the `@mcp-b/*` packages and route proposal, browser, and agent behavior to the sources that own it.
+
+## Start here
+
+- [Documentation home](https://docs.mcp-b.ai/index.md): Live example, package directory, source guide, and architecture overview.
+- [Choose your path](https://docs.mcp-b.ai/start-here/choose-your-path.md): Find the right tutorial, guide, reference, or upstream source.
+- [Build your first tool](https://docs.mcp-b.ai/tutorials/first-tool.md): Register a tool with `document.modelContext`.
+- [Choose a runtime](https://docs.mcp-b.ai/how-to/choose-runtime.md): Select native WebMCP, the polyfill, the full runtime, or React hooks.
+
+## Proposal and platform sources
+
+- [WebMCP Community Group draft](https://webmachinelearning.github.io/webmcp/): Proposed API, algorithms, and security considerations.
+- [WebMCP repository](https://github.com/webmachinelearning/webmcp): Explainers, implementation status, and open design work.
+- [Chrome WebMCP documentation](https://developer.chrome.com/docs/ai/webmcp): Chrome availability, imperative and declarative APIs, security, and tooling.
+- [OpenAI site tools documentation](https://learn.chatgpt.com/docs/webmcp): Current Codex and ChatGPT Work product behavior.
+- [Web Platform Tests](https://wpt.fyi/results/webmcp): Executable cross-browser conformance results.
+- [Resources and implementation status](https://docs.mcp-b.ai/explanation/design/spec-status-and-limitations.md): Directory of proposal, browser, agent, inspection, and testing sources.
+
+## MCP-B documentation
+
+- [Package index](https://docs.mcp-b.ai/packages/index.md): Runtime, React, transport, relay, extension, and tooling packages.
+- [WebMCP API sources](https://docs.mcp-b.ai/reference/webmcp/standard-api.md): Proposal and implementation source map with the MCP-B boundary.
+- [WebMCP and MCP-B extensions](https://docs.mcp-b.ai/explanation/strict-core-vs-mcp-b-extensions.md): Ownership boundaries between the proposal and package extensions.
+- [Tutorials](https://docs.mcp-b.ai/tutorials/index.md): Guided learning paths.
+- [How-to guides](https://docs.mcp-b.ai/how-to/index.md): Task-focused implementation guidance.
+- [Explanation](https://docs.mcp-b.ai/explanation/index.md): Architecture, lifecycle, transports, and security concepts.
+
+## Complete documentation
+
+- [Full documentation export](https://docs.mcp-b.ai/llms-full.txt): Markdown content for all published pages.
+- [Documentation MCP server](https://docs.mcp-b.ai/mcp): Search and retrieve the published documentation through MCP.
+- [Source repository](https://github.com/WebMCP-org/npm-packages): Package source, tests, examples, and documentation.
