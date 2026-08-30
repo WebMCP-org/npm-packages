@@ -1,32 +1,29 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ExtensionServerTransport } from './ExtensionServerTransport.js';
+import { type ExtensionPort, ExtensionServerTransport } from './ExtensionServerTransport.js';
 
 type Listener<T extends unknown[]> = (...args: T) => void;
 
 function createPort() {
-  const messageListeners = new Set<Listener<[unknown, chrome.runtime.Port]>>();
-  const disconnectListeners = new Set<Listener<[chrome.runtime.Port]>>();
+  const messageListeners = new Set<Listener<[unknown]>>();
+  const disconnectListeners = new Set<Listener<[]>>();
   const port = {
     disconnect: vi.fn(),
     postMessage: vi.fn(),
     onMessage: {
-      addListener: (listener: Listener<[unknown, chrome.runtime.Port]>) =>
-        messageListeners.add(listener),
-      removeListener: (listener: Listener<[unknown, chrome.runtime.Port]>) =>
-        messageListeners.delete(listener),
+      addListener: (listener: Listener<[unknown]>) => messageListeners.add(listener),
+      removeListener: (listener: Listener<[unknown]>) => messageListeners.delete(listener),
     },
     onDisconnect: {
-      addListener: (listener: Listener<[chrome.runtime.Port]>) => disconnectListeners.add(listener),
-      removeListener: (listener: Listener<[chrome.runtime.Port]>) =>
-        disconnectListeners.delete(listener),
+      addListener: (listener: Listener<[]>) => disconnectListeners.add(listener),
+      removeListener: (listener: Listener<[]>) => disconnectListeners.delete(listener),
     },
-  } as unknown as chrome.runtime.Port;
+  } satisfies ExtensionPort;
 
   return {
     port,
     remoteDisconnect() {
-      for (const listener of disconnectListeners) listener(port);
+      for (const listener of disconnectListeners) listener();
     },
   };
 }
