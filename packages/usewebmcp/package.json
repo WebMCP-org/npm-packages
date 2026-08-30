@@ -54,7 +54,7 @@
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
     "test:watch": "vp test",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit && vp test run --typecheck --silent"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit"
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",

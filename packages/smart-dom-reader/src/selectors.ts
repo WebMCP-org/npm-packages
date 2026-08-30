@@ -16,11 +16,11 @@ export class SelectorGenerator {
     // 2) data-testid variants
     const testId = SelectorGenerator.getDataTestId(element);
     if (testId) {
-      const v = `[data-testid="${CSS.escape(testId)}"]`;
+      const v = `[${testId.name}="${CSS.escape(testId.value)}"]`;
       candidates.push({
         type: 'data-testid',
         value: v,
-        score: 90 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+        score: 90 + (SelectorGenerator.isUniqueSelector(v, doc) ? 5 : 0),
       });
     }
 
@@ -32,7 +32,7 @@ export class SelectorGenerator {
       candidates.push({
         type: 'role-aria',
         value: v,
-        score: 85 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+        score: 85 + (SelectorGenerator.isUniqueSelector(v, doc) ? 5 : 0),
       });
     }
 
@@ -43,7 +43,7 @@ export class SelectorGenerator {
       candidates.push({
         type: 'name',
         value: v,
-        score: 78 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+        score: 78 + (SelectorGenerator.isUniqueSelector(v, doc) ? 5 : 0),
       });
     }
 
@@ -66,7 +66,12 @@ export class SelectorGenerator {
     candidates.sort((a, b) => b.score - a.score);
 
     const bestCss =
-      candidates.find((c) => c.type !== 'xpath' && c.type !== 'text')?.value || pathCss;
+      candidates.find(
+        (c) =>
+          c.type !== 'xpath' &&
+          c.type !== 'text' &&
+          SelectorGenerator.isUniqueSelector(c.value, doc, element)
+      )?.value || pathCss;
 
     const selector: ElementSelector = {
       css: bestCss,
@@ -75,7 +80,7 @@ export class SelectorGenerator {
     };
 
     if (textBased) selector.textBased = textBased;
-    if (testId) selector.dataTestId = testId;
+    if (testId) selector.dataTestId = testId.value;
     if (aria) selector.ariaLabel = aria;
 
     return selector;
@@ -90,10 +95,11 @@ export class SelectorGenerator {
       return `#${CSS.escape(element.id)}`;
     }
 
-    // Try data-testid or data-test-id
+    // A repeated test ID still needs the structural fallback.
     const testId = SelectorGenerator.getDataTestId(element);
     if (testId) {
-      return `[data-testid="${CSS.escape(testId)}"]`;
+      const selector = `[${testId.name}="${CSS.escape(testId.value)}"]`;
+      if (SelectorGenerator.isUniqueSelector(selector, doc, element)) return selector;
     }
 
     // Build a path from the element to the root
@@ -136,18 +142,18 @@ export class SelectorGenerator {
    * Generate XPath for an element
    */
   private static generateXPath(element: Element, doc: Document): string {
-    if (element.id && SelectorGenerator.isUniqueId(element.id, doc)) {
-      return `//*[@id="${element.id}"]`;
-    }
-
     const path: string[] = [];
     let current: Element | null = element;
 
     while (current && current.nodeType === Node.ELEMENT_NODE) {
       const tagName = current.nodeName.toLowerCase();
 
-      if (current.id && SelectorGenerator.isUniqueId(current.id, doc)) {
-        path.unshift(`//*[@id="${current.id}"]`);
+      if (
+        current.id &&
+        !current.id.includes('"') &&
+        SelectorGenerator.isUniqueId(current.id, doc)
+      ) {
+        path.unshift(`*[@id="${current.id}"]`);
         break;
       }
 
@@ -192,14 +198,12 @@ export class SelectorGenerator {
   /**
    * Get data-testid or similar attributes
    */
-  private static getDataTestId(element: Element): string | undefined {
-    return (
-      element.getAttribute('data-testid') ||
-      element.getAttribute('data-test-id') ||
-      element.getAttribute('data-test') ||
-      element.getAttribute('data-cy') ||
-      undefined
-    );
+  private static getDataTestId(element: Element): Attr | undefined {
+    for (const name of ['data-testid', 'data-test-id', 'data-test', 'data-cy']) {
+      const attribute = element.getAttributeNode(name);
+      if (attribute?.value) return attribute;
+    }
+    return undefined;
   }
 
   /**
@@ -212,17 +216,14 @@ export class SelectorGenerator {
   /**
    * Check if a selector is unique within a container
    */
-  private static isUniqueSelector(selector: string, container: Element): boolean {
+  private static isUniqueSelector(
+    selector: string,
+    container: ParentNode,
+    element?: Element
+  ): boolean {
     try {
-      return container.querySelectorAll(selector).length === 1;
-    } catch {
-      return false;
-    }
-  }
-
-  private static isUniqueSelectorSafe(selector: string, doc: Document): boolean {
-    try {
-      return doc.querySelectorAll(selector).length === 1;
+      const matches = container.querySelectorAll(selector);
+      return matches.length === 1 && (element === undefined || matches[0] === element);
     } catch {
       return false;
     }
@@ -258,7 +259,7 @@ export class SelectorGenerator {
    */
   private static optimizePath(path: string[], element: Element, doc: Document): string {
     // Try progressively shorter paths
-    for (let i = 0; i < path.length - 1; i++) {
+    for (let i = path.length - 1; i >= 0; i--) {
       const shortPath = path.slice(i).join(' > ');
       try {
         const matches = doc.querySelectorAll(shortPath);

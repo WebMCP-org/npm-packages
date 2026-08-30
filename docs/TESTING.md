@@ -21,7 +21,7 @@ For type-surface rules and the repo-wide no-cast policy, see [TYPE_TESTING.md](.
 # Repo default: unit + canonical runtime E2E
 pnpm test
 
-# Canonical zero-mock runtime E2E umbrella
+# Zero-mock runtime and DOM reader E2E umbrella
 pnpm test:e2e
 
 # Playwright browser-runtime contract lane only (tab/global + iframe + native)
@@ -53,11 +53,16 @@ pnpm --filter @mcp-b/webmcp-extension test:e2e
 
 # Tarball validation
 pnpm test:e2e:tarball:global
+
+# DOM reader browser and stdio checks (after pnpm build)
+pnpm --filter @mcp-b/smart-dom-reader test:local
+pnpm --filter @mcp-b/smart-dom-reader-server test:e2e
 ```
 
 Notes:
 
-- `pnpm test:e2e` is the canonical zero-mock umbrella and runs sequentially for stability.
+- `pnpm test:e2e` runs the canonical runtime suites and DOM reader checks sequentially for stability.
+- Set `CHROME_BIN` to select an installed Chrome binary for both DOM reader checks.
 - `pnpm test:e2e:ui`, `pnpm test:e2e:headed`, and `pnpm test:e2e:debug` drive the Playwright `e2e/` package only. They do not run the relay, DevTools, or extension package E2E lanes.
 
 ## Runtime Coverage Matrix
@@ -128,7 +133,7 @@ The canonical runtime gate lives in `.github/workflows/e2e.yml`.
 
 The workflow runs:
 
-1. Tab, iframe, local-relay, framework, and `@mcp-b/global` tarball E2E coverage
+1. DOM reader, reader-server lifecycle, tab, iframe, local-relay, framework, and `@mcp-b/global` tarball E2E coverage
 2. Extension transport and extension-template E2E coverage
 3. The pinned upstream WebMCP Web Platform Tests against the standalone polyfill
 4. Native contract and showcase integration coverage on Chrome Canary

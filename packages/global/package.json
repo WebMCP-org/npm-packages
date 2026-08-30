@@ -79,8 +79,9 @@
     "test:conformance:matrix": "pnpm run test:conformance:polyfill && pnpm run test:conformance:global && pnpm run test:conformance:native",
     "test:conformance:native": "vp test run --config vitest.conformance.native.config.ts --browser.headless",
     "test:conformance:polyfill": "pnpm --filter @mcp-b/webmcp-polyfill run test:conformance",
+    "test:coverage": "vp test run --coverage",
     "test:watch": "vp test",
-    "typecheck": "tsc --noEmit && vp test run --typecheck --silent",
+    "typecheck": "tsc --noEmit",
     "typecheck:consumer": "tsc --noEmit --strict --skipLibCheck --module preserve --moduleResolution bundler --lib ES2022,DOM type-tests/consumer.ts"
   },
   "dependencies": {

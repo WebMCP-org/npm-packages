@@ -196,6 +196,53 @@ describe('McpClientProvider with an MCP v2 in-memory connection', () => {
     }
   });
 
+  it('clears the previous server inventory when replacement connection fails', async () => {
+    const original = await createConnection((server) => {
+      server.registerTool('original_tool', {}, async () => ({ content: [] }));
+      server.registerResource('original_resource', 'original://resource', {}, async (uri) => ({
+        contents: [{ uri: uri.href, text: 'original' }],
+      }));
+    });
+    const replacement = await createConnection(() => {});
+    replacement.transport.start = async () => {
+      throw new Error('replacement unavailable');
+    };
+    let connection = original;
+    function Provider({ children }: { children: ReactNode }) {
+      return (
+        <McpClientProvider client={connection.client} transport={connection.transport}>
+          {children}
+        </McpClientProvider>
+      );
+    }
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const hook = await renderHook(() => useMcpClient(), { wrapper: Provider });
+
+    try {
+      await vi.waitFor(() => {
+        expect(hook.result.current.tools).toHaveLength(1);
+        expect(hook.result.current.resources).toHaveLength(1);
+        expect(hook.result.current.capabilities).not.toBeNull();
+      });
+
+      connection = replacement;
+      await hook.rerender();
+
+      await vi.waitFor(() => {
+        expect(hook.result.current.error?.message).toBe('replacement unavailable');
+        expect(hook.result.current.client).toBe(replacement.client);
+        expect(hook.result.current.isConnected).toBe(false);
+        expect(hook.result.current.tools).toEqual([]);
+        expect(hook.result.current.resources).toEqual([]);
+        expect(hook.result.current.capabilities).toBeNull();
+      });
+    } finally {
+      await hook.unmount();
+      await Promise.all([closeConnection(original), closeConnection(replacement)]);
+      consoleError.mockRestore();
+    }
+  });
+
   it('reconnects after remote closure when given a fresh one-shot transport', async () => {
     const connection = await createConnection((server) => {
       server.registerTool('remote_close_tool', {}, async () => ({

@@ -413,7 +413,8 @@ export class RelayBridgeServer extends EventEmitter {
 
     this.off('stateChanged', this.onStateChangedPushRelay);
 
-    for (const socket of this.socketByConnectionId.values()) {
+    for (const [connectionId, socket] of this.socketByConnectionId) {
+      this.registry.removeConnection(connectionId);
       try {
         socket.close(1001, 'Relay shutting down');
       } catch (err) {

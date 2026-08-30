@@ -36,7 +36,10 @@ export function executeExtraction<M extends ExtractionMethod>(
         const { selector, frameSelector, formatOptions } = structureArgs;
         const doc = resolveDocument(frameSelector);
 
-        const target = selector ? (doc.querySelector(selector) ?? doc) : doc;
+        const target = selector ? doc.querySelector(selector) : doc;
+        if (!target) {
+          return { error: `No element found matching selector: ${selector}` };
+        }
         const overview = ProgressiveExtractor.extractStructure(target);
 
         const meta = { title: document.title, url: location.href };
