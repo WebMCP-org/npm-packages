@@ -2,6 +2,10 @@
 
 ## 5.1.0
 
+### Patch Changes
+
+- 43ad4de: Update Playwright and the TypeScript loader to include upstream fixes.
+
 ## 5.0.3
 
 ### Patch Changes
