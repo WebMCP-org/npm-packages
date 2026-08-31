@@ -73,21 +73,26 @@ import { useWebMCP } from '@mcp-b/react-webmcp';
 This package re-exports the same hook implementation and function signature as
 [`usewebmcp`](/packages/usewebmcp/reference).
 
-| Field            | Type                                   | Required | Description                  |
-| ---------------- | -------------------------------------- | -------- | ---------------------------- |
-| `name`           | `string`                               | Yes      | Unique tool identifier       |
-| `description`    | `string`                               | Yes      | Human-readable description   |
-| `inputSchema`    | JSON Schema or Standard JSON Schema v1 | No       | Input parameters             |
-| `outputSchema`   | JSON Schema                            | No       | MCP-B output helper metadata |
-| `annotations`    | `ToolAnnotations`                      | No       | Metadata hints               |
-| `execute(input)` | `(input) => T \| Promise<T>`           | Yes      | Tool implementation          |
+| Field            | Type                                   | Required | Description                              |
+| ---------------- | -------------------------------------- | -------- | ---------------------------------------- |
+| `name`           | `string`                               | Yes      | Unique tool identifier                   |
+| `description`    | `string`                               | Yes      | Human-readable description               |
+| `enabled`        | `boolean`                              | No       | Whether to register. Defaults to `true`. |
+| `inputSchema`    | JSON Schema or Standard JSON Schema v1 | No       | Input parameters                         |
+| `outputSchema`   | JSON Schema                            | No       | MCP-B output helper metadata             |
+| `annotations`    | `ToolAnnotations`                      | No       | Metadata hints                           |
+| `execute(input)` | `(input) => T \| Promise<T>`           | Yes      | Tool implementation                      |
 
 **Returns:** `WebMCPReturn`
 
 Native Chrome WebMCP does not currently define or enforce `outputSchema`. The
 React hooks use it for output typing and structured MCP responses.
 
-### `useWebMCPContext(name, description, getValue)`
+`enabled` controls registration, not local execution. See
+[conditional registration](/packages/usewebmcp/reference#conditional-registration) for state and
+in-flight execution behavior.
+
+### `useWebMCPContext(name, description, getValue, options?)`
 
 ```ts title="Import useWebMCPContext"
 import { useWebMCPContext } from '@mcp-b/react-webmcp';
@@ -95,11 +100,14 @@ import { useWebMCPContext } from '@mcp-b/react-webmcp';
 
 Convenience wrapper around `useWebMCP` for read-only context tools. It automatically sets `readOnlyHint: true`, `idempotentHint: true`, `destructiveHint: false`, and `openWorldHint: false`.
 
-| Parameter     | Type      | Description                                  |
-| ------------- | --------- | -------------------------------------------- |
-| `name`        | `string`  | Tool identifier                              |
-| `description` | `string`  | Description for AI assistants                |
-| `getValue`    | `() => T` | Function returning the current context value |
+| Parameter     | Type                    | Description                                                 |
+| ------------- | ----------------------- | ----------------------------------------------------------- |
+| `name`        | `string`                | Tool identifier                                             |
+| `description` | `string`                | Description for AI assistants                               |
+| `getValue`    | `() => T`               | Function returning the current context value                |
+| `options`     | `{ enabled?: boolean }` | Optional registration control; `enabled` defaults to `true` |
+
+The `enabled` option has the same behavior as `useWebMCP`.
 
 ### `useWebMCPPrompt(config)`
 
@@ -109,12 +117,13 @@ import { useWebMCPPrompt } from '@mcp-b/react-webmcp';
 
 Registers an MCP prompt through the `BrowserMcpServer` installed by `@mcp-b/global`. It does not register against a native tool-only context.
 
-| Config field  | Type                                      | Required | Description                |
-| ------------- | ----------------------------------------- | -------- | -------------------------- |
-| `name`        | `string`                                  | Yes      | Prompt identifier          |
-| `description` | `string`                                  | No       | Human-readable description |
-| `argsSchema`  | JSON Schema or Standard Schema v1         | No       | Argument schema            |
-| `get(args)`   | `(args) => { messages: PromptMessage[] }` | Yes      | Message generator          |
+| Config field  | Type                                      | Required | Description                              |
+| ------------- | ----------------------------------------- | -------- | ---------------------------------------- |
+| `name`        | `string`                                  | Yes      | Prompt identifier                        |
+| `description` | `string`                                  | No       | Human-readable description               |
+| `enabled`     | `boolean`                                 | No       | Whether to register. Defaults to `true`. |
+| `argsSchema`  | JSON Schema or Standard Schema v1         | No       | Argument schema                          |
+| `get(args)`   | `(args) => { messages: PromptMessage[] }` | Yes      | Message generator                        |
 
 **Returns:** `WebMCPPromptReturn`, with `isRegistered: boolean` indicating whether the prompt's
 registration is active.
@@ -127,16 +136,21 @@ import { useWebMCPResource } from '@mcp-b/react-webmcp';
 
 Registers an MCP resource through the `BrowserMcpServer` installed by `@mcp-b/global`. It does not register against a native tool-only context.
 
-| Config field         | Type                                                               | Required | Description                       |
-| -------------------- | ------------------------------------------------------------------ | -------- | --------------------------------- |
-| `uri`                | `string`                                                           | Yes      | Resource URI or URI template      |
-| `name`               | `string`                                                           | Yes      | Human-readable name               |
-| `description`        | `string`                                                           | No       | Resource description              |
-| `mimeType`           | `string`                                                           | No       | MIME type of the resource content |
-| `read(uri, params?)` | `(uri: URL, params?) => Promise<{ contents: ResourceContents[] }>` | Yes      | Read handler                      |
+| Config field         | Type                                                               | Required | Description                              |
+| -------------------- | ------------------------------------------------------------------ | -------- | ---------------------------------------- |
+| `uri`                | `string`                                                           | Yes      | Resource URI or URI template             |
+| `name`               | `string`                                                           | Yes      | Human-readable name                      |
+| `description`        | `string`                                                           | No       | Resource description                     |
+| `mimeType`           | `string`                                                           | No       | MIME type of the resource content        |
+| `enabled`            | `boolean`                                                          | No       | Whether to register. Defaults to `true`. |
+| `read(uri, params?)` | `(uri: URL, params?) => Promise<{ contents: ResourceContents[] }>` | Yes      | Read handler                             |
 
 **Returns:** `WebMCPResourceReturn`, with `isRegistered: boolean` indicating whether the resource's
 registration is active.
+
+For prompts and resources, `enabled: false` skips or removes the registration and sets
+`isRegistered` to `false`. Re-enabling registers the latest committed configuration. Call these
+hooks unconditionally and pass the condition through `enabled`.
 
 The prompt `get` and resource `read` handlers follow the same
 [committed-ref lifecycle as `useWebMCP`](/packages/usewebmcp/reference#re-registration-triggers):

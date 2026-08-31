@@ -33,7 +33,7 @@ export function useWebMCP<
 ): WebMCPReturn<TOutputSchema, TInputSchema> {
   type TOutput = InferOutput<TOutputSchema>;
   type TInput = InferToolInput<TInputSchema>;
-  const { name, description } = config;
+  const { name, description, enabled = true } = config;
   const [state, setState] = useState<ToolExecutionState<TOutput>>(INITIAL_STATE);
   const committedConfigRef = useRef(config);
   const pendingExecutionsRef = useRef(0);
@@ -46,7 +46,11 @@ export function useWebMCP<
 
   const run = useCallback(async (input: TInput): Promise<TOutput> => {
     pendingExecutionsRef.current += 1;
-    setState((previous) => ({ ...previous, isExecuting: true, error: null }));
+    setState((previous) =>
+      previous.isExecuting && previous.error === null
+        ? previous
+        : { ...previous, isExecuting: true, error: null }
+    );
 
     let result: TOutput;
     const executionConfig = committedConfigRef.current;
@@ -81,12 +85,21 @@ export function useWebMCP<
     return result;
   }, []);
 
-  const reset = useCallback(
-    () => setState({ ...INITIAL_STATE, isExecuting: pendingExecutionsRef.current > 0 }),
-    []
-  );
+  const reset = useCallback(() => {
+    const isExecuting = pendingExecutionsRef.current > 0;
+    setState((previous) =>
+      previous.isExecuting === isExecuting &&
+      previous.lastResult === null &&
+      previous.error === null &&
+      previous.executionCount === 0
+        ? previous
+        : { ...INITIAL_STATE, isExecuting }
+    );
+  }, []);
 
   useEffect(() => {
+    if (!enabled) return;
+
     const modelContext =
       typeof document === 'undefined'
         ? undefined
@@ -144,7 +157,7 @@ export function useWebMCP<
     return () => controller.abort();
     // `deps` lets callers explicitly opt descriptor values into re-registration.
     // oxlint-disable-next-line react-doctor/exhaustive-deps -- Public API deliberately forwards caller deps.
-  }, [name, description, ...(deps ?? [])]);
+  }, [name, description, enabled, ...(deps ?? [])]);
 
   return { state, execute: run, reset };
 }

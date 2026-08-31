@@ -82,6 +82,7 @@
   },
   "devDependencies": {
     "@mcp-b/global": "workspace:*",
+    "@mcp-b/transports": "workspace:*",
     "@modelcontextprotocol/server": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",

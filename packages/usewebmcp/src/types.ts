@@ -53,6 +53,8 @@ export interface WebMCPConfig<
   name: string;
   /** Description shown to MCP clients. */
   description: string;
+  /** Whether to register with the runtime. Defaults to `true`. */
+  enabled?: boolean;
   /** JSON Schema literal or Standard JSON Schema for the tool input. */
   inputSchema?: TInputSchema;
   /** JSON Schema used for output inference and structured content. */

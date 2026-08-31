@@ -5,7 +5,7 @@ keywords: ['usewebmcp', 'useWebMCP', 'react', 'tool registration', 'reference']
 icon: 'react'
 ---
 
-`usewebmcp` is the tool-only React package. It registers tools with `document.modelContext` on mount and unregisters them on unmount without adding prompt, resource, server, or transport hooks.
+`usewebmcp` is the tool-only React package. It registers enabled tools with `document.modelContext` and unregisters them when disabled or unmounted, without adding prompt, resource, server, or transport hooks.
 
 `document.modelContext` must already exist at runtime through native browser support, [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview), or [`@mcp-b/global`](/packages/global/overview).
 
@@ -46,6 +46,7 @@ import { useWebMCP } from 'usewebmcp';
 | ---------------- | -------------------------------------- | -------- | ---------------------------------------------------------------- |
 | `name`           | `string`                               | Yes      | Unique tool identifier                                           |
 | `description`    | `string`                               | Yes      | Human-readable description for AI assistants                     |
+| `enabled`        | `boolean`                              | No       | Whether the tool is registered. Defaults to `true`.              |
 | `inputSchema`    | JSON Schema or Standard JSON Schema v1 | No       | Defines input parameters. Use `as const` for inference.          |
 | `outputSchema`   | JSON Schema                            | No       | MCP-B helper metadata for output typing and `structuredContent`. |
 | `annotations`    | `ToolAnnotations`                      | No       | WebMCP and MCP behavior hints                                    |
@@ -54,6 +55,16 @@ import { useWebMCP } from 'usewebmcp';
 The WebMCP draft defines `readOnlyHint` and `untrustedContentHint`.
 MCP-specific hints such as `idempotentHint` remain available when the hook
 registers against an MCP-B runtime, but they are not part of the current WebMCP proposal.
+
+## Conditional registration
+
+`enabled: false` skips registration. Changing `enabled` to `true` registers the latest committed
+configuration; changing it to `false` aborts the registration. The hook must still be called
+unconditionally, following the [Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks).
+
+Execution state and the local `execute` and `reset` controls remain available while disabled.
+Disabling does not cancel the `execute` implementation, but the runtime may reject an in-flight
+MCP request when its registration is removed. `enabled` controls exposure, not authorization.
 
 ## `ToolExecutionState`
 
@@ -97,11 +108,13 @@ const tool = useWebMCP({
 
 ## Re-registration triggers
 
-The hook unregisters and re-registers when any of these values change:
+While enabled, the hook unregisters and re-registers when any of these values change:
 
 - `name`
 - `description`
 - values in `deps`
+
+Re-enabling also registers the latest metadata, without needing an entry in `deps`.
 
 The latest committed `execute` implementation applies without re-registration. The hook also stores
 `inputSchema`, `outputSchema`, and `annotations` in a committed ref, so new object references do not
