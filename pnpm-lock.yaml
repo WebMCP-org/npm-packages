@@ -30,6 +30,9 @@ catalogs:
     '@vitest/coverage-v8':
       specifier: 4.1.6
       version: 4.1.6
+    chrome-types:
+      specifier: 0.1.438
+      version: 0.1.438
     playwright:
       specifier: ^1.60.0
       version: 1.60.0
@@ -749,9 +752,6 @@ importers:
       '@modelcontextprotocol/server':
         specifier: 'catalog:'
         version: 2.0.0
-      '@types/chrome':
-        specifier: 'catalog:'
-        version: 0.0.326
     devDependencies:
       '@mcp-b/webmcp-ts-sdk':
         specifier: workspace:*
@@ -759,12 +759,18 @@ importers:
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
         version: 2.0.0
+      '@types/chrome':
+        specifier: 'catalog:'
+        version: 0.0.326
       '@types/node':
         specifier: 'catalog:'
         version: 22.17.2
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.6(@voidzero-dev/vite-plus-test@0.1.22)
+      chrome-types:
+        specifier: 'catalog:'
+        version: 0.1.438
       playwright:
         specifier: 'catalog:'
         version: 1.60.0
@@ -7152,6 +7158,9 @@ packages:
   chownr@3.0.0:
     resolution: {integrity: sha512-+IxzY9BZOQd/XuYPRmrvEVjF/nqj5kgT4kEq7VofrDoM1MxoRjEWkrCC3EtLi59TVawxTAn+orJwFQcrqEN1+g==}
     engines: {node: '>=18'}
+
+  chrome-types@0.1.438:
+    resolution: {integrity: sha512-eh9Zh3rg+svzT7zYzDbJ+ePITAlZvuNXrYymsYanzZCYTDvnD4GsFkFnlEYIqpa2RzC+f4w40xhBYvI1qj5mTQ==}
 
   chromium-bidi@0.6.2:
     resolution: {integrity: sha512-4WVBa6ijmUTVr9cZD4eicQD8Mdy/HCX3bzEIYYpmk0glqYLoWH+LqQEvV9RpDRzoQSbY1KJHloYXbDMXMbDPhg==}
@@ -19242,6 +19251,8 @@ snapshots:
     optional: true
 
   chownr@3.0.0: {}
+
+  chrome-types@0.1.438: {}
 
   chromium-bidi@0.6.2(devtools-protocol@0.0.1312386):
     dependencies:

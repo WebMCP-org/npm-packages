@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-local-relay",
-  "version": "5.0.1",
+  "version": "5.0.2",
   "description": "Local MCP relay for browser WebMCP tools via embed iframe and localhost WebSocket",
   "keywords": [
     "ai-agents",

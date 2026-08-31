@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "webmcp-local-relay",
   "display_name": "WebMCP Local Relay",
-  "version": "5.0.1",
+  "version": "5.0.2",
   "description": "Relay browser-registered WebMCP tools to any MCP client via localhost WebSocket bridge",
   "long_description": "WebMCP Local Relay connects your browser tabs to AI agents like Claude. Websites that register WebMCP tools through document.modelContext are automatically discovered and relayed through a local WebSocket bridge, making them available as standard MCP tools. Tools are dynamically added and removed as you navigate between pages.",
   "author": {

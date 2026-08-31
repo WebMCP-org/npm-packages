@@ -1,6 +1,20 @@
 import { JSONRPCMessageSchema } from '@modelcontextprotocol/core';
 import type { JSONRPCMessage, Transport, TransportSendOptions } from '@modelcontextprotocol/server';
 
+/** The runtime Port methods used by this transport, independent of Chrome ambient types. */
+export interface ExtensionPort {
+  postMessage(message: unknown): void;
+  disconnect(): void;
+  onMessage: {
+    addListener(callback: (message: unknown) => void): void;
+    removeListener(callback: (message: unknown) => void): void;
+  };
+  onDisconnect: {
+    addListener(callback: () => void): void;
+    removeListener(callback: () => void): void;
+  };
+}
+
 export interface ExtensionServerTransportOptions {
   /** Send keep-alive messages (default: true). */
   keepAlive?: boolean;
@@ -10,11 +24,11 @@ export interface ExtensionServerTransportOptions {
 
 /** Server transport for one Chrome extension Port connection. */
 export class ExtensionServerTransport implements Transport {
-  private _port: chrome.runtime.Port | undefined;
+  private _port: ExtensionPort | undefined;
   private _started = false;
   private _closed = false;
-  private _messageHandler: ((message: unknown, port: chrome.runtime.Port) => void) | undefined;
-  private _disconnectHandler: ((port: chrome.runtime.Port) => void) | undefined;
+  private _messageHandler: ((message: unknown) => void) | undefined;
+  private _disconnectHandler: (() => void) | undefined;
   private _keepAliveTimer: ReturnType<typeof setInterval> | undefined;
   private readonly _keepAliveInterval: number | undefined;
   private readonly _connectionInfo = {
@@ -27,7 +41,7 @@ export class ExtensionServerTransport implements Transport {
   onerror?: (error: Error) => void;
   onmessage?: Transport['onmessage'];
 
-  constructor(port: chrome.runtime.Port, options: ExtensionServerTransportOptions = {}) {
+  constructor(port: ExtensionPort, options: ExtensionServerTransportOptions = {}) {
     this._port = port;
     this._keepAliveInterval =
       options.keepAlive === false ? undefined : (options.keepAliveInterval ?? 25_000);
