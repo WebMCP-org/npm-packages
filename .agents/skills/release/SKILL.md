@@ -110,6 +110,16 @@ an already published version. If npm publishing succeeded but a later GitHub art
 failed, recover those missing artifacts explicitly: existing tags can make Changesets
 report no new publication on a rerun. A rerun of snapshot versioning creates a new timestamp.
 
+If only signing failed after stable GitHub releases were created, recover signatures with:
+
+```bash
+gh workflow run "Release" --ref main -f recover_signatures_version=5.0.3
+```
+
+Use the affected stable version. This checks out its `usewebmcp@<version>` tag, validates
+every public package's version, tag commit and existing release, then signs source archives
+with Sigstore bundles. It never publishes npm packages or replaces SBOM/MCPB/R2 artifacts.
+
 Verify exact versions (`npm view <name>@<version> version`) and dist-tags, including unscoped
 `usewebmcp` and nested `@mcp-b/smart-dom-reader-server`. Do not use the default `npm view`
 version as a prerelease check: it reads `latest`.
