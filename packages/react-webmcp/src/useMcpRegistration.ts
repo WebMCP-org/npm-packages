@@ -1,11 +1,14 @@
 import type { RegistrationHandle } from '@mcp-b/webmcp-types';
 import { useEffect, useState } from 'react';
 
-export function useMcpRegistration(register: () => RegistrationHandle | undefined): boolean {
+export function useMcpRegistration(
+  register: () => RegistrationHandle | undefined,
+  enabled = true
+): boolean {
   const [isRegistered, setIsRegistered] = useState(false);
 
   useEffect(() => {
-    const registration = register();
+    const registration = enabled ? register() : undefined;
     if (!registration) {
       setIsRegistered(false);
       return;
@@ -15,7 +18,7 @@ export function useMcpRegistration(register: () => RegistrationHandle | undefine
     return () => {
       registration.unregister();
     };
-  }, [register]);
+  }, [register, enabled]);
 
   return isRegistered;
 }

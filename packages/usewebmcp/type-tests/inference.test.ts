@@ -24,6 +24,7 @@ type StandardInput = {
 const config: WebMCPConfig<Input, Output> = {
   name: 'search',
   description: 'Search items',
+  enabled: false,
   outputSchema: {
     type: 'object',
     properties: { total: { type: 'number' }, tags: { type: 'array', items: { type: 'string' } } },
@@ -42,6 +43,7 @@ const invalidConfig = {
 
 export type InferenceAssertions = [
   Assert<Equal<InferOutput<undefined>, unknown>>,
+  Assert<Equal<WebMCPConfig['enabled'], boolean | undefined>>,
   Assert<Equal<IsAny<InferOutput<undefined>>, false>>,
   Assert<Equal<InferOutput<{ type: 'string' }>, string>>,
   Assert<Equal<InferOutput<{ type: 'array'; items: { type: 'number' } }>, number[]>>,

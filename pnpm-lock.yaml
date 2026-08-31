@@ -670,6 +670,9 @@ importers:
       '@mcp-b/global':
         specifier: workspace:*
         version: link:../global
+      '@mcp-b/transports':
+        specifier: workspace:*
+        version: link:../transports
       '@modelcontextprotocol/server':
         specifier: 'catalog:'
         version: 2.0.0
