@@ -1,5 +1,14 @@
 # @mcp-b/react-webmcp
 
+## 5.0.2
+
+### Patch Changes
+
+- usewebmcp@5.0.2
+- @mcp-b/webmcp-types@5.0.2
+- @mcp-b/webmcp-polyfill@5.0.2
+- @mcp-b/webmcp-ts-sdk@5.0.2
+
 ## 5.0.1
 
 ### Patch Changes

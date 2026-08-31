@@ -1,5 +1,12 @@
 # @mcp-b/mcp-iframe
 
+## 5.0.2
+
+### Patch Changes
+
+- Updated dependencies [8fa4f02]
+  - @mcp-b/transports@5.0.2
+
 ## 5.0.1
 
 ### Patch Changes

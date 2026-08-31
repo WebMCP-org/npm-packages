@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-extension",
-  "version": "5.0.1",
+  "version": "5.0.2",
   "description": "Inject WebMCP from a Chromium extension and call page tools from an isolated content script",
   "keywords": [
     "browser-extension",
