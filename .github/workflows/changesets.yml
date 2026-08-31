@@ -114,7 +114,7 @@ jobs:
       - name: Create Release PR or Publish
         if: inputs.recover_signatures_version == ''
         id: changesets
-        uses: changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1 # v1
+        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
           # Follow conventional commit format for version commits
           commit: 'chore(release): version packages'

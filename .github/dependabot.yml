@@ -28,6 +28,10 @@ updates:
     labels:
       - 'dependencies'
       - 'github-actions'
+    ignore:
+      # Action v2 requires a coordinated Changesets CLI v3 migration.
+      - dependency-name: 'changesets/action'
+        update-types: ['version-update:semver-major']
     groups:
       actions:
         patterns:

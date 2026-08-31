@@ -1,5 +1,11 @@
 # @mcp-b/webmcp-local-relay
 
+## 5.1.0
+
+### Patch Changes
+
+- 0bdad43: Update the ws dependency to include upstream WebSocket fixes.
+
 ## 5.0.3
 
 ### Patch Changes
