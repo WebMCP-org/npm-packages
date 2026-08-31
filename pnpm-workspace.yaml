@@ -17,14 +17,14 @@ catalog:
   '@types/node': 22.20.1
   '@types/react': ^19.2.18
   '@types/react-dom': ^19.2.5
-  '@vitest/coverage-v8': 4.1.8
+  '@vitest/coverage-v8': 4.1.11
   chrome-types: 0.1.440
   playwright: ^1.62.1
   react: ^19.2.8
   react-dom: ^19.2.8
   typescript: ^5.8.3
   vite: npm:@voidzero-dev/vite-plus-core@0.1.24
-  vite-plus: 0.1.24
+  vite-plus: 0.3.0
   vitest: npm:@voidzero-dev/vite-plus-test@0.1.24
   zod: 4.4.3
 
