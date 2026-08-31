@@ -171,7 +171,7 @@ export class DOMTraversal {
     depth = 0
   ): ExtractedElement | null {
     // Check depth limit
-    if (options.maxDepth && depth > options.maxDepth) {
+    if (options.maxDepth !== undefined && depth > options.maxDepth) {
       return null;
     }
 
@@ -231,14 +231,7 @@ export class DOMTraversal {
     depth: number
   ): ExtractedElement[] {
     const children: ExtractedElement[] = [];
-    const elements = container.querySelectorAll('*');
-
-    for (const child of Array.from(elements)) {
-      // Skip if element is nested inside another extracted element
-      if (DOMTraversal.hasExtractedAncestor(child, elements)) {
-        continue;
-      }
-
+    for (const child of Array.from(container.children)) {
       const extracted = DOMTraversal.extractElement(child, options, depth);
       if (extracted) {
         children.push(extracted);
@@ -246,23 +239,6 @@ export class DOMTraversal {
     }
 
     return children;
-  }
-
-  /**
-   * Check if element has an ancestor that was already extracted
-   */
-  private static hasExtractedAncestor(
-    element: Element,
-    extractedElements: NodeListOf<Element>
-  ): boolean {
-    let parent = element.parentElement;
-    while (parent) {
-      if (Array.from(extractedElements).includes(parent)) {
-        return true;
-      }
-      parent = parent.parentElement;
-    }
-    return false;
   }
 
   /**

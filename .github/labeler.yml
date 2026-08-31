@@ -31,11 +31,24 @@ packages/webmcp-extension:
   - changed-files:
       - any-glob-to-any-file: 'packages/webmcp-extension/**'
 
+packages/webmcp-local-relay:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/webmcp-local-relay/**'
+
+packages/webmcp-polyfill:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/webmcp-polyfill/**'
+
+packages/webmcp-types:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/webmcp-types/**'
+
 # Category labels
 documentation:
   - changed-files:
       - any-glob-to-any-file:
           - '**/*.md'
+          - '**/*.mdx'
           - 'docs/**'
 
 testing:
@@ -63,4 +76,5 @@ dependencies:
   - changed-files:
       - any-glob-to-any-file:
           - 'pnpm-lock.yaml'
+          - 'pnpm-workspace.yaml'
           - '**/package.json'

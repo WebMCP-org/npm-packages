@@ -71,7 +71,7 @@
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
     "test:watch": "vp test",
-    "typecheck": "tsc --noEmit && vp test run --typecheck --silent"
+    "typecheck": "tsc --noEmit && vp test run --typecheck.only --silent"
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",

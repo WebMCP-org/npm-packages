@@ -30,7 +30,7 @@ export class SmartDOMReader {
   constructor(options: Partial<ExtractionOptions> = {}) {
     this.options = {
       mode: options.mode || 'interactive',
-      maxDepth: options.maxDepth || 5,
+      maxDepth: options.maxDepth ?? 5,
       includeHidden: options.includeHidden || false,
       includeShadowDOM: options.includeShadowDOM ?? true,
       includeIframes: options.includeIframes || false,
@@ -153,6 +153,10 @@ export class SmartDOMReader {
   ): Element[] {
     const matches = [...container.querySelectorAll(selector)];
     if (!includeShadowDOM) return matches;
+
+    if ('shadowRoot' in container && container.shadowRoot) {
+      matches.push(...this.querySelectorAll(container.shadowRoot, selector, true));
+    }
 
     for (const element of container.querySelectorAll('*')) {
       if (element.shadowRoot) {

@@ -76,13 +76,26 @@ function filterAdvisories(advisories, ignorePrefixes) {
   const kept = [];
   let ignoredAdvisoryCount = 0;
 
-  for (const advisory of Object.values(advisories ?? {})) {
+  for (const advisory of Object.values(advisories)) {
+    if (
+      !advisory ||
+      (!Object.hasOwn(severityRank, advisory.severity) && advisory.severity !== 'info') ||
+      !Array.isArray(advisory.findings) ||
+      advisory.findings.length === 0
+    ) {
+      throw new Error('pnpm audit returned an advisory without a valid severity or findings');
+    }
     const keptFindings = [];
 
-    for (const finding of advisory.findings ?? []) {
-      const keptPaths = (finding.paths ?? []).filter((path) =>
-        shouldKeepPath(path, ignorePrefixes)
-      );
+    for (const finding of advisory.findings) {
+      if (
+        !Array.isArray(finding?.paths) ||
+        finding.paths.length === 0 ||
+        finding.paths.some((path) => typeof path !== 'string' || path.length === 0)
+      ) {
+        throw new Error('pnpm audit returned a finding without dependency paths');
+      }
+      const keptPaths = finding.paths.filter((path) => shouldKeepPath(path, ignorePrefixes));
       if (keptPaths.length > 0) {
         keptFindings.push({ ...finding, paths: keptPaths });
       }
@@ -131,7 +144,7 @@ function summarizeBySeverity(advisories) {
  *
  * @param {'low' | 'moderate' | 'high' | 'critical'} level
  * @param {boolean} prod
- * @returns {{ advisories?: Record<string, unknown> }}
+ * @returns {{ advisories: Record<string, unknown> }}
  */
 function runAudit(level, prod) {
   const auditArgs = ['audit', '--audit-level', level, '--json'];
@@ -141,11 +154,14 @@ function runAudit(level, prod) {
 
   const result = spawnSync('pnpm', auditArgs, {
     encoding: 'utf8',
-    env: { ...process.env, NPM_TOKEN: process.env.NPM_TOKEN ?? 'local-ci' },
   });
 
   if (result.error) {
     throw result.error;
+  }
+
+  if (result.status !== 0 && result.status !== 1) {
+    throw new Error(`pnpm audit failed (${result.signal ?? result.status})`);
   }
 
   if (!result.stdout) {
@@ -160,8 +176,14 @@ function runAudit(level, prod) {
     throw new Error('Failed to parse pnpm audit JSON output');
   }
 
-  if (typeof parsed !== 'object' || parsed === null) {
-    throw new Error('pnpm audit JSON output was not an object');
+  if (
+    parsed?.error ||
+    !parsed?.advisories ||
+    typeof parsed.advisories !== 'object' ||
+    Array.isArray(parsed.advisories) ||
+    (result.status !== 0 && Object.keys(parsed.advisories).length === 0)
+  ) {
+    throw new Error('pnpm audit failed or returned an invalid advisory report');
   }
 
   return parsed;

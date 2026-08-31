@@ -62,13 +62,15 @@
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
     "test:conformance": "vp test run conformance/polyfill-runtime.e2e.test.ts --browser.headless",
-    "typecheck": "tsc --noEmit && vp test run --typecheck --silent"
+    "test:coverage": "vp test run --coverage",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@mcp-b/webmcp-types": "workspace:*",
     "@standard-schema/spec": "^1.1.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:",
