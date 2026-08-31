@@ -68,7 +68,7 @@
     "overrides": {
       "ajv@8": "^8.18.0",
       "basic-ftp": "^5.2.0",
-      "brace-expansion@5.0.3": "^5.0.9",
+      "brace-expansion@5": "^5.0.9",
       "diff": "^8.0.3",
       "fast-uri@3.1.0": "^3.1.5",
       "hono": "^4.12.2",

@@ -71,7 +71,7 @@
     "typescript": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:",
-    "vitest-browser-react": "^2.0.4",
+    "vitest-browser-react": "^2.2.0",
     "zod": "catalog:"
   },
   "peerDependencies": {

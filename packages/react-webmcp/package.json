@@ -93,7 +93,7 @@
     "typescript": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:",
-    "vitest-browser-react": "^2.0.4"
+    "vitest-browser-react": "^2.2.0"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0"
