@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-ts-sdk",
-  "version": "5.0.2",
+  "version": "5.0.3",
   "description": "Thin WebMCP-to-MCP v2 browser adapter with native Chrome tool mirroring",
   "keywords": [
     "adapter",

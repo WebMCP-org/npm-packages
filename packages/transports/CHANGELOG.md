@@ -1,5 +1,11 @@
 # @mcp-b/transports
 
+## 5.0.3
+
+### Patch Changes
+
+- 4dec56a: Prevent unhandled readiness promise rejections when closing a tab or iframe client before anyone waits for the server. Readiness consumers still receive the original close error.
+
 ## 5.0.2
 
 ### Patch Changes
