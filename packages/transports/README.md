@@ -37,6 +37,10 @@
 npm install @mcp-b/transports @modelcontextprotocol/client @modelcontextprotocol/server zod
 ```
 
+The package does not install Chrome extension globals. Extension applications
+should add either `@types/chrome` or `chrome-types` as a development dependency.
+The exported `ExtensionPort` type accepts ports from either declaration package.
+
 ## Transport Types
 
 ### Tab Transports (In-Page Communication)

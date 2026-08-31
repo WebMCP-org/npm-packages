@@ -11,7 +11,6 @@ const mainConfig: PackUserConfig = {
   entry: ['src/index.ts'],
   dts: true,
   format: ['esm'],
-  banner: { dts: '/// <reference types="chrome" />' },
   sourcemap: true,
   clean: true,
   treeshake: true,

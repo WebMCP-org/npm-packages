@@ -28,6 +28,10 @@ pnpm add @mcp-b/transports @modelcontextprotocol/server
 
 Install `@modelcontextprotocol/client` when you use a client transport.
 
+The package does not install Chrome extension globals. Extension applications
+must declare their own types with either `@types/chrome` or `chrome-types` as a
+development dependency. Page and iframe transports need neither.
+
 ## Minimal example
 
 <Snippet file="snippets/packages/transports-quickstart.ts" />
@@ -221,8 +225,13 @@ sender passes your allowlist.
 #### Constructor
 
 ```typescript title="Extension server transport constructor"
-new ExtensionServerTransport(port: chrome.runtime.Port, options?: ExtensionServerTransportOptions)
+new ExtensionServerTransport(port: ExtensionPort, options?: ExtensionServerTransportOptions)
 ```
+
+`ExtensionPort` is exported by `@mcp-b/transports`. It contains `postMessage`,
+`disconnect`, and the `addListener`/`removeListener` methods on `onMessage` and
+`onDisconnect`. Chrome `runtime.Port` objects from either declaration package
+satisfy this interface.
 
 #### ExtensionServerTransportOptions
 
