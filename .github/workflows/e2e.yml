@@ -104,7 +104,7 @@ jobs:
     permissions:
       contents: read
     container:
-      image: mcr.microsoft.com/playwright:v1.60.0-noble
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
     timeout-minutes: 15
 
     steps:
