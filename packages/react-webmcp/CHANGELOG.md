@@ -1,5 +1,16 @@
 # @mcp-b/react-webmcp
 
+## 5.0.3
+
+### Patch Changes
+
+- 4dec56a: Clear the previous server's tools, resources, and capabilities when the client or transport changes, including when the replacement connection fails.
+- Updated dependencies [4dec56a]
+  - @mcp-b/webmcp-ts-sdk@5.0.3
+  - usewebmcp@5.0.3
+  - @mcp-b/webmcp-types@5.0.3
+  - @mcp-b/webmcp-polyfill@5.0.3
+
 ## 5.0.2
 
 ### Patch Changes
