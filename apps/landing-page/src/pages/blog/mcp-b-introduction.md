@@ -1,11 +1,13 @@
 ---
 layout: ../../layouts/BlogPost.astro
-title: 'MCP-B: The right place to build your MCP server is in your website'
-description: 'With all the major security issues and data leakages the MCP ecosystem has been facing recently, the pre-authorized, user-scoped sandbox of the browser feels like more of the promised land than ever.'
+title: 'MCP-B: Build MCP servers into websites'
+description: 'Why MCP-B exposes website actions as structured WebMCP tools, avoiding brittle browser automation while preserving browser state, authorization, and user control.'
 pubDate: '2025-01-15'
 author:
   name: 'Alex Nahas'
 ---
+
+> **2026 update:** MCP-B now implements and extends WebMCP, the W3C Community Group proposal for browser-native agent tools. For current guidance, read [What is WebMCP?](https://docs.mcp-b.ai/explanation/what-is-webmcp), [choose a runtime](https://docs.mcp-b.ai/how-to/choose-runtime), or [build your first tool](https://docs.mcp-b.ai/tutorials/first-tool). This post preserves the project's original design history.
 
 With all the major security issues and data leakages the MCP ecosystem has been facing recently, the pre-authorized, user-scoped sandbox of the browser feels like more of the promised land than ever.
 
@@ -45,13 +47,13 @@ Right now there are two officially supported transports:
 
 MCP-B extends MCP with transports for intra-browser communication. The two transports are Extension Transports (for communication within and between browser extensions) and Tab Transports (for communication between scripts in the same tab).
 
-![MCP-B Demo](https://sigvelo.com/images/blog/smaller.gif)
+<img src="https://sigvelo.com/images/blog/smaller.gif" alt="MCP-B demo showing browser tools" width="1896" height="1080" loading="lazy" decoding="async" />
 
 This means your website can be an MCP server and/or client and so can your browser extension.
 
 ## How MCP-B Works
 
-![MCP-B Full Architecture](https://sigvelo.com/images/blog/full-arch.png)
+<img src="https://sigvelo.com/images/blog/full-arch.png" alt="MCP-B browser architecture" width="1770" height="1272" loading="lazy" decoding="async" />
 
 MCP-B really only needs 1 transport to work (The TabTransports), but the current extension makes use of both. You can think of the MCP-B extension server as an MCP server which collects all the tools from other Tab MCP servers then routes requests to the proper URL and tab when one of it's tools are called. The extension layer also does some things like tool caching and opening a tab with the properly URL of the tool if one does not already exist.
 
@@ -160,7 +162,7 @@ Here's what happens when the model wants to compare prices for items in the cart
 
 The key is that `fetch('/api/products/search')` uses whatever authentication the user already has with `pricewatch.com` - session cookies, auth headers, whatever. The MCP tool is just a thin wrapper around the site's existing API endpoints. The extension manages the tab navigation and maintains the conversation context across sites, while each site's tools operate with their own authentication context.
 
-![Multi-Site Workflow Diagram](https://sigvelo.com/images/blog/multi-site-workflow.svg)
+<img src="https://sigvelo.com/images/blog/multi-site-workflow.svg" alt="Multi-site WebMCP workflow" width="1773" height="700" loading="lazy" decoding="async" />
 
 ## Good websites are Context Engineering
 
@@ -349,7 +351,7 @@ In the example above, each React component manages its own tool lifecycle. Mount
 
 Most tools for a website are included in the MCP-B context window so long as they are on the active tab. This is another way to limit the amount of tools the model can see at any given time. However, websites can tell the MCP-B client to cache their tools and it will navigate back to the website which owns them on cached tool call. This is so the model can know, "Hey x website has tools and it will have more tools when I navigate to it."
 
-![Tool Caching Demo](https://sigvelo.com/images/blog/dynamic-tool-caching.gif)
+<img src="https://sigvelo.com/images/blog/dynamic-tool-caching.gif" alt="MCP-B dynamic tool caching demo" width="1668" height="1080" loading="lazy" decoding="async" />
 
 ```javascript
 // Mark a tool as cacheable

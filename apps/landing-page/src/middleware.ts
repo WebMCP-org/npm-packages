@@ -6,7 +6,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // Redirect www to apex domain for SEO canonicalization
   if (url.hostname === 'www.mcp-b.ai') {
     url.hostname = 'mcp-b.ai';
-    return Response.redirect(url.toString(), 301);
+    return Response.redirect(url.toString(), 308);
   }
 
   const response = await next();

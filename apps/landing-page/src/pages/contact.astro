@@ -18,6 +18,37 @@ import CalendarEmbed from '../components/calendar-embed.astro';
       </p>
     </header>
 
+    <section class="contact-page__services" aria-labelledby="consulting-help">
+      <h2 id="consulting-help">What we can work through</h2>
+      <div class="contact-page__service-grid">
+        <article>
+          <h3>WebMCP adoption</h3>
+          <p>
+            Choose between native WebMCP, the MCP-B polyfill, and the full runtime for your
+            product and browser-support requirements.
+          </p>
+        </article>
+        <article>
+          <h3>Agent-ready workflows</h3>
+          <p>
+            Turn existing product actions into focused tools with useful names, schemas,
+            permission checks, and human confirmation boundaries.
+          </p>
+        </article>
+        <article>
+          <h3>Browser and MCP integrations</h3>
+          <p>
+            Connect page tools to browser agents or desktop MCP clients through the extension,
+            local relay, iframe bridge, or transport that fits the workflow.
+          </p>
+        </article>
+      </div>
+      <p class="contact-page__prompt">
+        Bring a workflow, prototype, or architecture question. We will use the call to identify a
+        concrete next step.
+      </p>
+    </section>
+
     <div class="contact-page__content">
       <CalendarEmbed />
     </div>
@@ -31,6 +62,7 @@ import CalendarEmbed from '../components/calendar-embed.astro';
   }
 
   .contact-page__header,
+  .contact-page__services,
   .contact-page__content {
     width: 100%;
     max-width: 71rem;
@@ -57,6 +89,49 @@ import CalendarEmbed from '../components/calendar-embed.astro';
     color: var(--muted-foreground);
     font-size: clamp(1.05rem, 1.5vw, 1.25rem);
     line-height: 1.5;
+  }
+
+  .contact-page__services {
+    margin-bottom: clamp(2rem, 4vw, 3rem);
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+  }
+
+  .contact-page__services h2 {
+    margin: 0;
+    font-size: clamp(1.5rem, 2.5vw, 2rem);
+  }
+
+  .contact-page__service-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .contact-page__service-grid h3 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+
+  .contact-page__service-grid p,
+  .contact-page__prompt {
+    margin: 0.65rem 0 0;
+    color: var(--muted-foreground);
+    line-height: 1.6;
+  }
+
+  .contact-page__prompt {
+    max-width: 52rem;
+    margin-top: 1.5rem;
+  }
+
+  @media (max-width: 48rem) {
+    .contact-page__service-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   @media (max-width: 40rem) {

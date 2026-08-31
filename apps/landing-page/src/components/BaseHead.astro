@@ -16,6 +16,42 @@ interface Props {
 const canonicalURL = new URL(Astro.url.pathname, Astro.site ?? SITE_URL);
 const { title, description, image = '/og-default.png', article } = Astro.props;
 const imageUrl = new URL(image, Astro.site ?? SITE_URL).toString();
+const organizationId = `${SITE_URL}/#organization`;
+const organization = {
+  '@type': 'Organization',
+  '@id': organizationId,
+  name: 'MCP-B',
+  alternateName: ['MCPB', 'MCP B'],
+  url: SITE_URL,
+  description:
+    'Open-source WebMCP packages and browser tooling for publishing and calling structured website tools.',
+  sameAs: ['https://github.com/WebMCP-org', 'https://docs.mcp-b.ai'],
+};
+const structuredData = article
+  ? {
+      '@context': 'https://schema.org',
+      '@graph': [
+        organization,
+        {
+          '@type': 'BlogPosting',
+          '@id': `${canonicalURL.toString()}#article`,
+          headline: title.replace(/\s*\|\s*MCP-B$/, ''),
+          description,
+          image: [imageUrl],
+          datePublished: article.publishedTime,
+          dateModified: article.modifiedTime ?? article.publishedTime,
+          author: article.authors?.map((author) =>
+            author.startsWith('http')
+              ? { '@type': 'Person', url: author }
+              : { '@type': 'Person', name: author }
+          ),
+          publisher: { '@id': organizationId },
+          mainEntityOfPage: canonicalURL.toString(),
+          keywords: article.tags,
+        },
+      ],
+    }
+  : { '@context': 'https://schema.org', ...organization };
 ---
 
 <meta charset="utf-8" />
@@ -57,15 +93,4 @@ const imageUrl = new URL(image, Astro.site ?? SITE_URL).toString();
 <meta name="generator" content={Astro.generator} />
 
 <!-- Structured Data -->
-<script is:inline type="application/ld+json" set:html={JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  "name": "MCP-B",
-  "alternateName": "MCPB",
-  "url": "https://mcp-b.ai",
-  "description": "Open-source WebMCP packages and browser tooling for publishing and calling structured website tools.",
-  "sameAs": [
-    "https://github.com/WebMCP-org",
-    "https://docs.mcp-b.ai"
-  ]
-})} />
+<script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)} />

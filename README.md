@@ -1,8 +1,8 @@
 <div align="center">
 
-# @mcp-b
+# MCP-B WebMCP packages
 
-**Polyfill and MCP bridge for the [Web Model Context API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`)**
+**MCP-B (`@mcp-b`) is a polyfill and MCP bridge for the [Web Model Context API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`).**
 
 <p>
   <a href="https://webmachinelearning.github.io/webmcp/"><img src="https://img.shields.io/badge/W3C-WebMCP%20Spec-005A9C?style=flat-square" alt="W3C WebMCP Spec"></a>
@@ -35,9 +35,9 @@ Chrome preview extension
 └── .executeTool(tool, inputJson)    Execute a discovered tool
 ```
 
-MCP-b **polyfills** that API for all browsers today, and **bridges** it to the full [Model Context Protocol](https://modelcontextprotocol.io/) — turning that tool source into a complete MCP server with prompts, resources, and browser transports.
+MCP-B **polyfills** that API for all browsers today, and **bridges** it to the full [Model Context Protocol](https://modelcontextprotocol.io/) — turning that tool source into a complete MCP server with prompts, resources, and browser transports.
 
-> Built by [MCP-b](https://docs.mcp-b.ai). Not an official W3C or MCP project.
+> Built by [MCP-B](https://mcp-b.ai/) with [implementation guides and package documentation](https://docs.mcp-b.ai/). Not an official W3C or MCP project.
 
 ## Getting Started
 
