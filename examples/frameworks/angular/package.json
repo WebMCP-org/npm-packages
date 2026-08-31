@@ -19,8 +19,8 @@
     "@angular/build": "^21.2.22",
     "@angular/cli": "^21.2.22",
     "@angular/compiler-cli": "^21.2.22",
-    "@typescript-eslint/parser": "^8.53.1",
-    "baseline-browser-mapping": "^2.9.19",
+    "@typescript-eslint/parser": "^8.68.0",
+    "baseline-browser-mapping": "^2.11.20",
     "typescript": "~5.9.3"
   }
 }

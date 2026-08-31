@@ -20,7 +20,7 @@
   "devDependencies": {
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@vitejs/plugin-react": "^6.0.1",
+    "@vitejs/plugin-react": "^6.1.1",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
