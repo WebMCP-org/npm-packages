@@ -9,13 +9,13 @@ on:
     # Run weekly on Monday at midnight UTC
     - cron: '0 0 * * 1'
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       security-events: write
       contents: read
@@ -23,16 +23,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@5c3b9c403c9a72fb5fa559496012b60fa351d4b8 # v4
         with:
           languages: javascript-typescript
+          build-mode: none
           # Use extended security queries for better coverage
           queries: security-extended
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@5c3b9c403c9a72fb5fa559496012b60fa351d4b8 # v4
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@5c3b9c403c9a72fb5fa559496012b60fa351d4b8 # v4

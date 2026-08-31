@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-local-relay",
-  "version": "5.0.1",
+  "version": "5.1.0",
   "description": "Local MCP relay for browser WebMCP tools via embed iframe and localhost WebSocket",
   "keywords": [
     "ai-agents",
@@ -52,6 +52,7 @@
     "lint": "vp lint --fix",
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "test": "vp test run",
+    "test:coverage": "vp test run --coverage",
     "test:e2e": "pnpm --filter @mcp-b/webmcp-polyfill build && pnpm --filter @mcp-b/global build && pnpm run build && vp test run --config vitest.e2e.config.ts",
     "test:watch": "vp test",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.browser.json"
@@ -59,7 +60,7 @@
   "dependencies": {
     "@modelcontextprotocol/core": "catalog:",
     "@modelcontextprotocol/server": "catalog:",
-    "ws": "^8.21.1",
+    "ws": "^8.21.3",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -69,6 +70,7 @@
     "@modelcontextprotocol/client": "catalog:",
     "@types/node": "catalog:",
     "@types/ws": "^8.5.14",
+    "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:",

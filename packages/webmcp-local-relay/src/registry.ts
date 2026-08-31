@@ -101,6 +101,13 @@ export class RelayRegistry {
       connectedAt: existing?.connectedAt ?? now,
       lastSeenAt: now,
     });
+
+    if (existing && existing.tabId !== hello.tabId) {
+      for (const provider of this.toolsByConnectionId.get(connectionId) ?? []) {
+        provider.tabId = hello.tabId;
+      }
+      this.rebuildPublicNames();
+    }
   }
 
   /**

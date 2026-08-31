@@ -12,8 +12,7 @@ const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'));
 
 // Check if we're running from pnpm or npm
 const userAgent = process.env.npm_config_user_agent || '';
-const isPnpm = userAgent.includes('pnpm');
-const isNpm = userAgent.includes('npm') && !isPnpm;
+const isPnpm = userAgent.startsWith('pnpm/');
 
 // Collect all unresolved protocols
 const unresolvedProtocols = [];
@@ -32,9 +31,9 @@ for (const depType of depTypes) {
 
 const hasUnresolvedProtocols = unresolvedProtocols.length > 0;
 
-// If running from npm and there are unresolved protocols, fail
-if (isNpm && hasUnresolvedProtocols) {
-  console.error('ERROR: Cannot publish with npm when package.json contains pnpm protocols!\n');
+// Only pnpm can resolve these protocols while packing; other publishers must fail.
+if (!isPnpm && hasUnresolvedProtocols) {
+  console.error('ERROR: Publish with pnpm when package.json contains pnpm protocols!\n');
   console.error('Found unresolved protocols:');
   for (const { depType, pkg, version } of unresolvedProtocols) {
     console.error(`  - ${depType}.${pkg}: "${version}"`);
@@ -57,8 +56,3 @@ if (!hasUnresolvedProtocols) {
   console.log(`✓ ${packageJson.name} ready to publish (no protocols to resolve)`);
   process.exit(0);
 }
-
-// Unknown package manager with unresolved protocols - warn but allow (for CI flexibility)
-console.warn(`⚠ ${packageJson.name} - unknown package manager, proceeding with caution`);
-console.warn(`  Found ${unresolvedProtocols.length} unresolved protocol(s)`);
-process.exit(0);

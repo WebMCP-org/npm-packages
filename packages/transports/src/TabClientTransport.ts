@@ -38,6 +38,8 @@ export class TabClientTransport implements Transport {
       this._serverReadyResolve = resolve;
       this._serverReadyReject = reject;
     });
+    // Closing an unused transport is valid; late consumers still observe the rejection.
+    void this.serverReadyPromise.catch(() => {});
   }
 
   async start(): Promise<void> {

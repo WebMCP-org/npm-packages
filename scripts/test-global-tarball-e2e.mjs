@@ -10,10 +10,12 @@ import { fileURLToPath } from 'node:url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '..');
+const skipBuild = process.argv.includes('--skip-build');
 const filesToRestore = [
   path.join(repoRoot, 'package.json'),
   path.join(repoRoot, 'e2e/test-app/package.json'),
   path.join(repoRoot, 'pnpm-lock.yaml'),
+  path.join(repoRoot, 'pnpm-workspace.yaml'),
 ];
 
 function runCommand(command, args) {
@@ -90,17 +92,17 @@ async function main() {
       .filter(([, version]) => version.startsWith('workspace:'))
       .map(([name]) => name);
 
-    // Build and pack every workspace dependency plus @mcp-b/global itself.
+    // CI already built the workspace; local runs build before packing by default.
     const tarballMap = new Map(); // @mcp-b/<name> -> absolute tarball path
 
     for (const depName of workspaceDeps) {
       const shortName = depName.replace('@mcp-b/', '');
       const depDir = `packages/${shortName}`;
-      runCommand('pnpm', ['-C', depDir, 'build']);
+      if (!skipBuild) runCommand('pnpm', ['-C', depDir, 'build']);
       runCommand('pnpm', ['-C', depDir, 'pack', '--pack-destination', tempDir]);
     }
 
-    runCommand('pnpm', ['-C', 'packages/global', 'build']);
+    if (!skipBuild) runCommand('pnpm', ['-C', 'packages/global', 'build']);
     runCommand('pnpm', ['-C', 'packages/global', 'pack', '--pack-destination', tempDir]);
 
     // Map each tarball back to its package name.
@@ -158,8 +160,6 @@ async function main() {
       runCommand('pnpm', [
         'install',
         '--frozen-lockfile',
-        '--filter',
-        'mcp-tab-transport-test-app',
         '--ignore-scripts',
         '--store-dir',
         pnpmStoreDir,

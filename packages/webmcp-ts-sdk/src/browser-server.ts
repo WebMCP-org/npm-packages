@@ -163,6 +163,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   private readonly ownerDocument: Document | null;
   private readonly tools = new Map<string, RegisteredWebMcpTool>();
   private peerOrigin: string | undefined;
+  private stopObservingPeerOrigin: (() => void) | undefined;
   private readonly registrations = new Set<McpRegistration>();
   private readonly nativeToolAbortControllers = new Map<string, AbortController>();
   private readonly nativeBackfilledTools = new Map<string, NativeBackfilledTool>();
@@ -370,7 +371,11 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     toolValue: unknown,
     optionsValue: ModelContextRegisterToolOptions | null = {}
   ): Promise<void> => {
-    const options = optionsValue ?? {};
+    const { signal, exposedTo } = optionsValue ?? {};
+    const options = {
+      ...(signal ? { signal } : {}),
+      ...(exposedTo ? { exposedTo: [...exposedTo] } : {}),
+    };
     validateWebMcpAccess(this.ownerDocument);
     if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
     if (!isPlainObject(toolValue)) {
@@ -406,7 +411,16 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       await this.registerNativeToolMirror(tool, normalized, options, execute, controller);
       if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
       options.signal?.throwIfAborted();
-      registered = this.registerToolInMcp(tool, normalized, execute, options.exposedTo);
+      registered = this.registerToolInMcp(
+        tool,
+        normalized,
+        execute,
+        options.exposedTo?.map((origin) => {
+          const parsedOrigin = new URL(origin).origin;
+          // Keep exact extension identifiers when this browser cannot parse their origin.
+          return parsedOrigin === 'null' ? origin : parsedOrigin;
+        })
+      );
       this.tools.set(tool.name, registered);
       this.applyToolExposure();
       if (options.signal?.aborted) {
@@ -728,7 +742,11 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   private applyToolExposure(): void {
     for (const { exposedTo, mcpHandle } of this.tools.values()) {
       if (!exposedTo?.length || !mcpHandle) continue;
-      const visible = this.peerOrigin !== undefined && exposedTo.includes(this.peerOrigin);
+      // Opaque origins serialize identically and cannot identify an allowed peer.
+      const visible =
+        this.peerOrigin !== undefined &&
+        this.peerOrigin !== 'null' &&
+        exposedTo.includes(this.peerOrigin);
       if (visible === mcpHandle.enabled) continue;
       if (visible) mcpHandle.enable();
       else mcpHandle.disable();
@@ -742,30 +760,58 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
    * leave every restricted tool disabled.
    */
   private observePeerOrigin(transport: Transport): void {
+    this.stopObservingPeerOrigin?.();
+    this.stopObservingPeerOrigin = undefined;
+    this.peerOrigin = undefined;
+    this.applyToolExposure();
     if (!('clientOrigin' in transport)) return;
     const peered = transport as Transport & {
       clientOrigin?: string;
-      onclientorigin?: (origin: string) => void;
+      onclientorigin?: ((origin: string) => void) | undefined;
     };
     this.peerOrigin = peered.clientOrigin;
     this.applyToolExposure();
     const previous = peered.onclientorigin;
-    peered.onclientorigin = (origin) => {
+    let observing = true;
+    const onclientorigin = (origin: string) => {
       previous?.(origin);
+      if (!observing) return;
       this.peerOrigin = origin;
       this.applyToolExposure();
     };
+    peered.onclientorigin = onclientorigin;
+    this.stopObservingPeerOrigin = () => {
+      observing = false;
+      if (peered.onclientorigin === onclientorigin) peered.onclientorigin = previous;
+    };
   }
 
-  connect(transport: Transport): Promise<void> {
-    if (this.closed) return Promise.reject(createInvalidStateError('BrowserMcpServer is closed'));
+  async connect(transport: Transport): Promise<void> {
+    if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
+    if (this.mcpServer.server.transport) {
+      throw createInvalidStateError('BrowserMcpServer is already connected');
+    }
     this.observePeerOrigin(transport);
-    return this.mcpServer.connect(transport);
+    const stopObserving = this.stopObservingPeerOrigin;
+    try {
+      await this.mcpServer.connect(transport);
+    } catch (error) {
+      if (this.stopObservingPeerOrigin === stopObserving) {
+        stopObserving?.();
+        this.stopObservingPeerOrigin = undefined;
+        this.peerOrigin = undefined;
+        this.applyToolExposure();
+      }
+      if (this.mcpServer.server.transport === transport) await this.mcpServer.close();
+      throw error;
+    }
   }
 
   close(): Promise<void> {
     if (this.closePromise) return this.closePromise;
     this.closed = true;
+    this.stopObservingPeerOrigin?.();
+    this.stopObservingPeerOrigin = undefined;
     this.closePromise = (async () => {
       if (this.native && this.nativeToolChangeListener) {
         this.native.removeEventListener('toolchange', this.nativeToolChangeListener);

@@ -148,12 +148,21 @@ If a one-shot transport closes, construct a new transport and pass it to
 
 ### Provider Hooks
 
-| Hook                                            | Description                                               |
-| ----------------------------------------------- | --------------------------------------------------------- |
-| `useWebMCP(config, deps?)`                      | Register a tool with full control over behavior and state |
-| `useWebMCPContext(name, description, getValue)` | Simplified hook for read-only context exposure            |
-| `useWebMCPPrompt(config)`                       | Register a reusable MCP prompt                            |
-| `useWebMCPResource(config)`                     | Register an MCP resource                                  |
+| Hook                                                      | Description                                               |
+| --------------------------------------------------------- | --------------------------------------------------------- |
+| `useWebMCP(config, deps?)`                                | Register a tool with full control over behavior and state |
+| `useWebMCPContext(name, description, getValue, options?)` | Simplified hook for read-only context exposure            |
+| `useWebMCPPrompt(config)`                                 | Register a reusable MCP prompt                            |
+| `useWebMCPResource(config)`                               | Register an MCP resource                                  |
+
+All registration hooks support `enabled`, defaulting to `true`. Pass it in the config for
+tools, prompts, and resources, or as the fourth argument (`{ enabled: false }`) to
+`useWebMCPContext`. Disabling unregisters the item; re-enabling registers the latest committed
+configuration. Keep the hook call unconditional.
+
+Disabled prompt and resource hooks report `isRegistered: false`. Tool and context hooks retain
+their execution state and local `execute`/`reset` controls. Disabling does not cancel the handler's
+work, though the runtime may reject an in-flight MCP request when its registration is removed.
 
 ### Client Hooks
 

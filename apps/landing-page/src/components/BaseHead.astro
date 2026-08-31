@@ -8,7 +8,7 @@ interface Props {
   article?: {
     publishedTime?: string;
     modifiedTime?: string;
-    authors?: string[];
+    authors?: { name: string; url?: string }[];
     tags?: string[];
   };
 }
@@ -39,12 +39,8 @@ const structuredData = article
           description,
           image: [imageUrl],
           datePublished: article.publishedTime,
-          dateModified: article.modifiedTime ?? article.publishedTime,
-          author: article.authors?.map((author) =>
-            author.startsWith('http')
-              ? { '@type': 'Person', url: author }
-              : { '@type': 'Person', name: author }
-          ),
+          dateModified: article.modifiedTime,
+          author: article.authors?.map((author) => ({ '@type': 'Person', ...author })),
           publisher: { '@id': organizationId },
           mainEntityOfPage: canonicalURL.toString(),
           keywords: article.tags,
@@ -70,7 +66,7 @@ const structuredData = article
 <meta property="og:site_name" content={SITE_TITLE} />
 {article?.publishedTime && <meta property="article:published_time" content={article.publishedTime} />}
 {article?.modifiedTime && <meta property="article:modified_time" content={article.modifiedTime} />}
-{article?.authors?.map((author) => <meta property="article:author" content={author} />)}
+{article?.authors?.map((author) => author.url && <meta property="article:author" content={author.url} />)}
 {article?.tags?.map((tag) => <meta property="article:tag" content={tag} />)}
 
 <!-- Twitter -->
@@ -93,4 +89,4 @@ const structuredData = article
 <meta name="generator" content={Astro.generator} />
 
 <!-- Structured Data -->
-<script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+<script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData).replace(/</g, '\\u003c')} />

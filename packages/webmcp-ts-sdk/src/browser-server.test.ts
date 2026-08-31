@@ -1491,6 +1491,180 @@ describe('BrowserMcpServer exposedTo', () => {
     }
   });
 
+  it('snapshots the exposure allowlist before registration yields', async () => {
+    const { server, client, peered } = await connectPair('https://other.example');
+    try {
+      const exposedTo = ['https://parent.example'];
+      const registration = server.registerTool(restricted, { exposedTo });
+      exposedTo[0] = 'https://other.example';
+      await registration;
+      peered.onclientorigin?.('https://other.example');
+      expect((await client.listTools()).tools).toEqual([]);
+      await expect(client.callTool({ name: restricted.name })).rejects.toThrow('disabled');
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it('matches exposure URLs by their parsed origin', async () => {
+    const { server, client } = await connectPair('https://parent.example');
+    try {
+      await server.registerTool(restricted, { exposedTo: ['https://PARENT.example:443/path'] });
+      expect((await client.listTools()).tools.map(({ name }) => name)).toContain(restricted.name);
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it.each(['file:///trusted/tool.html', 'moz-extension://abcdefghijklmnop'])(
+    'never treats an opaque peer as the allowed origin %s',
+    async (origin) => {
+      const { server, client, peered } = await connectPair('null');
+      try {
+        await server.registerTool(restricted, { exposedTo: [origin] });
+        peered.onclientorigin?.('null');
+        expect((await client.listTools()).tools).toEqual([]);
+        await expect(client.callTool({ name: restricted.name })).rejects.toThrow('disabled');
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    }
+  );
+
+  it.each(['chrome-extension://abcdefghijklmnop', 'moz-extension://abcdefghijklmnop'])(
+    'preserves exact extension-origin exposure for %s',
+    async (origin) => {
+      const { server, client } = await connectPair(origin);
+      try {
+        await server.registerTool(restricted, { exposedTo: [origin] });
+        expect((await client.listTools()).tools.map(({ name }) => name)).toContain(restricted.name);
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    }
+  );
+
+  it('forgets the previous peer when reconnecting to an unidentified transport', async () => {
+    const { server, client, peered } = await connectPair('https://parent.example');
+    const nextClient = new Client(
+      { name: 'next-client', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    );
+    try {
+      await server.registerTool(restricted, { exposedTo: ['https://parent.example'] });
+      expect((await client.listTools()).tools.map(({ name }) => name)).toContain(restricted.name);
+      const previousOriginCallback = peered.onclientorigin;
+      await client.close();
+      await server.mcpServer.close();
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverTransport);
+      await nextClient.connect(clientTransport);
+      previousOriginCallback?.('https://parent.example');
+      expect((await nextClient.listTools()).tools).toEqual([]);
+      await expect(nextClient.callTool({ name: restricted.name })).rejects.toThrow('disabled');
+    } finally {
+      await client.close();
+      await nextClient.close();
+      await server.close();
+    }
+  });
+
+  it.each([false, true])(
+    'rejects a second connection before changing the existing peer (start fails: %s)',
+    async (failStart) => {
+      const { server, client } = await connectPair('https://other.example');
+      const [unusedClientTransport, replacementTransport] = InMemoryTransport.createLinkedPair();
+      const replacement = withPeerOrigin(replacementTransport, 'https://parent.example');
+      const start = vi.spyOn(replacement, 'start');
+      if (failStart) start.mockRejectedValue(new Error('replacement failed'));
+      try {
+        await server.registerTool(restricted, { exposedTo: ['https://parent.example'] });
+        await expect(server.connect(replacement)).rejects.toMatchObject({
+          name: 'InvalidStateError',
+        });
+        expect(start).not.toHaveBeenCalled();
+        expect((await client.listTools()).tools).toEqual([]);
+        await expect(client.callTool({ name: restricted.name })).rejects.toThrow('disabled');
+      } finally {
+        await client.close();
+        await server.close();
+        await unusedClientTransport.close();
+        await replacement.close();
+      }
+    }
+  );
+
+  it('cleans up a failed connection before retrying with another peer', async () => {
+    const server = new BrowserMcpServer({ name: 'failed-exposure-test', version: '1.0.0' });
+    const client = new Client(
+      { name: 'retry-client', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    );
+    const [unusedClientTransport, failedTransport] = InMemoryTransport.createLinkedPair();
+    const failed = withPeerOrigin(failedTransport, 'https://parent.example');
+    let lateOrigin: typeof failed.onclientorigin;
+    failed.start = async () => {
+      lateOrigin = failed.onclientorigin;
+      throw new Error('transport failed');
+    };
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    try {
+      await server.registerTool(restricted, { exposedTo: ['https://parent.example'] });
+      await expect(server.connect(failed)).rejects.toThrow('transport failed');
+      expect(server.mcpServer.server.transport).toBeUndefined();
+      expect(failed.onclientorigin).toBeUndefined();
+
+      await server.connect(withPeerOrigin(serverTransport, 'https://other.example'));
+      await client.connect(clientTransport);
+      lateOrigin?.('https://parent.example');
+      expect((await client.listTools()).tools).toEqual([]);
+      await expect(client.callTool({ name: restricted.name })).rejects.toThrow('disabled');
+    } finally {
+      await client.close();
+      await server.close();
+      await unusedClientTransport.close();
+      await failed.close();
+    }
+  });
+
+  it('does not tear down a new connection when a closed transport rejects late', async () => {
+    const server = new BrowserMcpServer({ name: 'late-failure-test', version: '1.0.0' });
+    const client = new Client(
+      { name: 'replacement-client', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    );
+    const [unusedClientTransport, failedTransport] = InMemoryTransport.createLinkedPair();
+    const failed = withPeerOrigin(failedTransport, 'https://other.example');
+    let rejectStart!: (reason: Error) => void;
+    failed.start = () =>
+      new Promise<void>((_, reject) => {
+        rejectStart = reject;
+      });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    try {
+      await server.registerTool(restricted, { exposedTo: ['https://parent.example'] });
+      const connecting = server.connect(failed);
+      await failed.close();
+      await server.connect(withPeerOrigin(serverTransport, 'https://parent.example'));
+      await client.connect(clientTransport);
+      rejectStart(new Error('late start failure'));
+      await expect(connecting).rejects.toThrow('late start failure');
+      expect((await client.listTools()).tools.map(({ name }) => name)).toContain(restricted.name);
+      expect(await client.callTool({ name: restricted.name })).toMatchObject({
+        content: [{ type: 'text', text: 'ok' }],
+      });
+    } finally {
+      await client.close();
+      await server.close();
+      await unusedClientTransport.close();
+      await failed.close();
+    }
+  });
+
   it('fails closed when the transport never names a peer', async () => {
     const server = new BrowserMcpServer({ name: 'exposure-test', version: '1.0.0' });
     const client = new Client(

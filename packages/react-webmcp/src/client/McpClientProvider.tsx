@@ -385,6 +385,9 @@ export function McpClientProvider({
     client.onclose = handleClientClose;
     connectionStateRef.current = 'disconnected';
     setConnectionState('disconnected');
+    setCapabilities(null);
+    setResources([]);
+    setTools([]);
 
     // Initial connection - reconnect() has its own guard to prevent concurrent connections
     reconnect().catch((err) => {

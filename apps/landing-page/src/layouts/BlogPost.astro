@@ -6,6 +6,7 @@ interface Props {
     title: string;
     description: string;
     pubDate: string;
+    updatedDate?: string;
     author?: { name: string; url?: string };
   };
 }
@@ -19,7 +20,8 @@ const published = new Date(frontmatter.pubDate);
   description={frontmatter.description}
   article={{
     publishedTime: published.toISOString(),
-    authors: frontmatter.author ? [frontmatter.author.url ?? frontmatter.author.name] : undefined,
+    modifiedTime: frontmatter.updatedDate ? new Date(frontmatter.updatedDate).toISOString() : undefined,
+    authors: frontmatter.author ? [frontmatter.author] : undefined,
   }}
 >
   <article class="blog-post">

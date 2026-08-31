@@ -1,5 +1,19 @@
 # @mcp-b/webmcp-local-relay
 
+## 5.1.0
+
+### Patch Changes
+
+- 0bdad43: Update the ws dependency to include upstream WebSocket fixes.
+
+## 5.0.3
+
+### Patch Changes
+
+- 4dec56a: Remove disconnected sources and tools from the registry when the relay stops, so restarting cannot advertise stale tools. Keep tool names and invocation routing synchronized when a connected source updates its tab identity.
+
+## 5.0.2
+
 ## 5.0.1
 
 ## 5.0.0

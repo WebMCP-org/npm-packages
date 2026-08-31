@@ -12,6 +12,6 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/server": "catalog:",
-    "mintlify": "^4.2.415"
+    "mintlify": "^4.2.837"
   }
 }

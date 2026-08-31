@@ -3,11 +3,12 @@ layout: ../../layouts/BlogPost.astro
 title: 'MCP-B: Build MCP servers into websites'
 description: 'Why MCP-B exposes website actions as structured WebMCP tools, avoiding brittle browser automation while preserving browser state, authorization, and user control.'
 pubDate: '2025-01-15'
+updatedDate: '2026-08-30'
 author:
   name: 'Alex Nahas'
 ---
 
-> **2026 update:** MCP-B now implements and extends WebMCP, the W3C Community Group proposal for browser-native agent tools. For current guidance, read [What is WebMCP?](https://docs.mcp-b.ai/explanation/what-is-webmcp), [choose a runtime](https://docs.mcp-b.ai/how-to/choose-runtime), or [build your first tool](https://docs.mcp-b.ai/tutorials/first-tool). This post preserves the project's original design history.
+> **Updated August 30, 2026:** MCP-B now implements and extends WebMCP, the W3C Community Group proposal for browser-native agent tools. For current guidance, read [What is WebMCP?](https://docs.mcp-b.ai/explanation/what-is-webmcp), [choose a runtime](https://docs.mcp-b.ai/how-to/choose-runtime), or [build your first tool](https://docs.mcp-b.ai/tutorials/first-tool). This post preserves the project's original design history.
 
 With all the major security issues and data leakages the MCP ecosystem has been facing recently, the pre-authorized, user-scoped sandbox of the browser feels like more of the promised land than ever.
 

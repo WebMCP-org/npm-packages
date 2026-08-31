@@ -27,6 +27,24 @@ function tool(definition: { name: string; description?: string }): RelayTool {
 }
 
 describe('RelayRegistry', () => {
+  it('updates tool routing and collision names when hello changes the tab identity', () => {
+    const registry = new RelayRegistry();
+    registry.upsertSource('conn-1', hello('aaaa-tab', 'https://example.com'));
+    registry.upsertSource('conn-2', hello('bbbb-tab', 'https://example.com'));
+    registry.registerTools('conn-1', [tool({ name: 'search' })]);
+    registry.registerTools('conn-2', [tool({ name: 'search' })]);
+
+    registry.upsertSource('conn-1', hello('cccc-tab', 'https://example.com'));
+
+    expect(registry.listTools().map(({ name }) => name)).toEqual(['search_bbbb', 'search_cccc']);
+    expect(
+      registry.resolveInvocation({ toolName: 'search_cccc', requestTabId: 'cccc-tab' })
+    ).toMatchObject({ connectionId: 'conn-1' });
+    expect(
+      registry.resolveInvocation({ toolName: 'search_cccc', requestTabId: 'aaaa-tab' })
+    ).toBeNull();
+  });
+
   it('uses just the original tool name when there are no collisions', () => {
     const registry = new RelayRegistry();
 
