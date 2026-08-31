@@ -1,5 +1,16 @@
 # @mcp-b/global
 
+## 5.0.3
+
+### Patch Changes
+
+- Updated dependencies [4dec56a]
+- Updated dependencies [4dec56a]
+  - @mcp-b/webmcp-ts-sdk@5.0.3
+  - @mcp-b/transports@5.0.3
+  - @mcp-b/webmcp-types@5.0.3
+  - @mcp-b/webmcp-polyfill@5.0.3
+
 ## 5.0.2
 
 ### Patch Changes
