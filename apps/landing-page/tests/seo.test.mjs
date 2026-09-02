@@ -4,6 +4,21 @@ import test from 'node:test';
 
 const origin = process.env.SEO_TEST_ORIGIN ?? 'http://127.0.0.1:4329';
 
+test('legacy and non-canonical paths permanently redirect in one hop', async () => {
+  const redirects = new Map([
+    ['/about', '/about/'],
+    ['/blog', '/blog/'],
+    ['/blogs', '/blog/'],
+    ['/blogs/mcp-b-introduction?from=legacy', '/blog/mcp-b-introduction/?from=legacy'],
+  ]);
+
+  for (const [source, destination] of redirects) {
+    const response = await fetch(`${origin}${source}`, { redirect: 'manual' });
+    assert.equal(response.status, 308, source);
+    assert.equal(response.headers.get('location'), `${origin}${destination}`, source);
+  }
+});
+
 test('rendered pages expose canonical URLs and matching article metadata', async () => {
   for (const path of [
     '/',
