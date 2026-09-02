@@ -195,6 +195,7 @@ class SmartDomReaderServer {
   private readonly server: McpServer;
   private browser: Browser | null = null;
   private page: Page | null = null;
+  private browserOperation: Promise<unknown> = Promise.resolve();
   private cachedLibrary: LibraryCache | null = null;
 
   constructor() {
@@ -208,6 +209,16 @@ class SmartDomReaderServer {
 
   async run(): Promise<void> {
     const transport = new StdioServerTransport();
+    this.server.server.onclose = () => {
+      void this.queueBrowserOperation(() => this.closeBrowser()).catch((error) => {
+        console.error('Failed to close browser during shutdown', error);
+      });
+    };
+    process.stdin.once('end', () => {
+      void this.server.close().catch((error) => {
+        console.error('Failed to close MCP server after stdin ended', error);
+      });
+    });
     await this.server.connect(transport);
     console.error('Smart DOM Reader MCP server running on stdio');
   }
@@ -236,7 +247,7 @@ class SmartDomReaderServer {
             ),
         }),
       },
-      async (args) => this.connectBrowser(args)
+      async (args) => this.queueBrowserOperation(() => this.connectBrowser(args))
     );
 
     this.server.registerTool(
@@ -431,8 +442,14 @@ class SmartDomReaderServer {
           'Shut down the launched browser instance and release resources. Safe to call multiple times.',
         inputSchema: z.object({}),
       },
-      async () => this.closeBrowser()
+      async () => this.queueBrowserOperation(() => this.closeBrowser())
     );
+  }
+
+  private queueBrowserOperation(operation: () => Promise<CallToolResult>): Promise<CallToolResult> {
+    const result = this.browserOperation.then(operation);
+    this.browserOperation = result.catch(() => undefined);
+    return result;
   }
 
   private async connectBrowser(args: ConnectBrowserArgs): Promise<CallToolResult> {
@@ -671,7 +688,8 @@ class SmartDomReaderServer {
               }
 
               const { selector } = args as StructureOperationArgs;
-              const target = selector ? (document.querySelector(selector) ?? document) : document;
+              const target = selector ? document.querySelector(selector) : document;
+              if (!target) throw new Error(`No matching element for selector ${selector}`);
               const overview = ProgressiveExtractor.extractStructure(target);
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
               return MarkdownFormatter.structure(overview, fmt, meta) as TResult;
@@ -712,7 +730,8 @@ class SmartDomReaderServer {
               }
 
               const { selector, options } = args as InteractiveOperationArgs;
-              const target = selector ? (document.querySelector(selector) ?? document) : document;
+              const target = selector ? document.querySelector(selector) : document;
+              if (!target) throw new Error(`No matching element for selector ${selector}`);
 
               if (typeof SmartDOMReader.extractInteractive === 'function') {
                 const result = SmartDOMReader.extractInteractive(target, options ?? {});

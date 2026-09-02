@@ -1,24 +1,3 @@
-# CODEOWNERS - Define code owners for automatic review requests
-# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
-
-# Default owners for everything in the repo
+# All source, manifests, lockfiles, release config, and workflows share one owner.
+# Branch rules must require Code Owner review to enforce approval.
 * @WebMCP-org/core-devs
-
-# Package-specific owners
-/packages/global/ @WebMCP-org/core-devs
-/packages/mcp-iframe/ @WebMCP-org/core-devs
-/packages/react-webmcp/ @WebMCP-org/core-devs
-/packages/smart-dom-reader/ @WebMCP-org/core-devs
-/packages/transports/ @WebMCP-org/core-devs
-/packages/usewebmcp/ @WebMCP-org/core-devs
-/packages/webmcp-extension/ @WebMCP-org/core-devs
-/packages/webmcp-ts-sdk/ @WebMCP-org/core-devs
-
-# CI/CD and infrastructure
-/.github/ @WebMCP-org/core-devs
-/pnpm-workspace.yaml @WebMCP-org/core-devs
-
-# Security-sensitive files require maintainer review
-/SECURITY.md @WebMCP-org/core-devs
-/.github/workflows/ @WebMCP-org/core-devs
-/.github/CODEOWNERS @WebMCP-org/core-devs

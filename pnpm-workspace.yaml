@@ -13,19 +13,19 @@ catalog:
   '@modelcontextprotocol/client': 2.0.0
   '@modelcontextprotocol/core': 2.0.0
   '@modelcontextprotocol/server': 2.0.0
-  '@types/chrome': ^0.0.326
-  '@types/node': 22.17.2
-  '@types/react': ^19.2.9
-  '@types/react-dom': ^19.1.2
-  '@vitest/coverage-v8': ^4.1.7
-  chrome-types: 0.1.438
-  playwright: ^1.60.0
-  react: ^19.1.0
-  react-dom: ^19.1.0
+  '@types/chrome': ^0.2.7
+  '@types/node': 22.20.1
+  '@types/react': ^19.2.18
+  '@types/react-dom': ^19.2.5
+  '@vitest/coverage-v8': 4.1.8
+  chrome-types: 0.1.440
+  playwright: ^1.62.1
+  react: ^19.2.8
+  react-dom: ^19.2.8
   typescript: ^5.8.3
-  vite: npm:@voidzero-dev/vite-plus-core@latest
-  vite-plus: ^0.1.22
-  vitest: npm:@voidzero-dev/vite-plus-test@latest
+  vite: npm:@voidzero-dev/vite-plus-core@0.1.24
+  vite-plus: 0.1.24
+  vitest: npm:@voidzero-dev/vite-plus-test@0.1.24
   zod: 4.4.3
 
 onlyBuiltDependencies:
@@ -41,10 +41,6 @@ onlyBuiltDependencies:
   - spawn-sync
   - unrs-resolver
   - workerd
-
-overrides:
-  vite: npm:@voidzero-dev/vite-plus-core@latest
-  vitest: npm:@voidzero-dev/vite-plus-test@latest
 
 peerDependencyRules:
   allowAny:

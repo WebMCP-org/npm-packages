@@ -1,6 +1,6 @@
 {
   "name": "usewebmcp",
-  "version": "5.0.1",
+  "version": "5.1.0",
   "description": "Standalone React hooks for strict core WebMCP tool registration with document.modelContext",
   "keywords": [
     "ai",
@@ -54,7 +54,7 @@
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
     "test:watch": "vp test",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit && vp test run --typecheck --silent"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit"
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",
@@ -71,7 +71,7 @@
     "typescript": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:",
-    "vitest-browser-react": "^2.0.4",
+    "vitest-browser-react": "^2.2.0",
     "zod": "catalog:"
   },
   "peerDependencies": {

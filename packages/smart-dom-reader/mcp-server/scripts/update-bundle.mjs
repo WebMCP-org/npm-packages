@@ -3,7 +3,7 @@
 // Source: ../../dist/index.mjs (ESM, single file, no chunks)
 // Dest:   ../lib/smart-dom-reader.bundle.js
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,11 +20,8 @@ try {
     console.error('Run "pnpm --filter @mcp-b/smart-dom-reader build" first.');
     process.exit(1);
   }
-  if (!existsSync(destDir)) {
-    mkdirSync(destDir, { recursive: true });
-  }
-  const code = readFileSync(src, 'utf8');
-  writeFileSync(dest, code, 'utf8');
+  mkdirSync(destDir, { recursive: true });
+  copyFileSync(src, dest);
   console.log('✅ Copied bundle to', dest);
 } catch (err) {
   console.error('❌ Failed to update bundle:', err.message);

@@ -15,17 +15,25 @@ on:
         required: false
         default: 'beta'
         type: string
+      recover_signatures_version:
+        description: 'Sign an existing stable version only (e.g. 5.0.3); skips all publishing'
+        required: false
+        type: string
 
 env:
   CI: true
 
-permissions:
-  contents: read
+permissions: {}
+
+# Serialize stable and snapshot publishes; never cancel a partially published train.
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
 
 jobs:
   release:
     name: Release
-    if: github.event_name == 'push' && github.repository == 'WebMCP-org/npm-packages'
+    if: github.repository == 'WebMCP-org/npm-packages' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.recover_signatures_version != ''))
     timeout-minutes: 15
     runs-on: ubuntu-latest
     environment:
@@ -36,44 +44,77 @@ jobs:
       contents: write
       pull-requests: write
       id-token: write # Required for npm provenance/OIDC
-      attestations: write # Required for SBOM attestations
 
     steps:
+      - name: Validate signature recovery version
+        if: inputs.recover_signatures_version != ''
+        env:
+          RECOVER_VERSION: ${{ inputs.recover_signatures_version }}
+        run: |
+          if [[ ! "$RECOVER_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo '::error::Signature recovery requires a stable version such as 5.0.3.'
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.recover_signatures_version && format('refs/tags/usewebmcp@{0}', inputs.recover_signatures_version) || github.sha }}
           # Fetch all history for proper changelog generation
           fetch-depth: 0
 
+      - name: Validate existing releases for signature recovery
+        if: inputs.recover_signatures_version != ''
+        id: recovery
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RECOVER_VERSION: ${{ inputs.recover_signatures_version }}
+        run: |
+          # Read the fixed release train from its tag, never from newer main manifests.
+          shopt -s nullglob
+          PACKAGES=$(jq -sc '[.[] | select(.private != true) | {name, version}]' packages/*/package.json packages/*/*/package.json)
+          echo "$PACKAGES" | jq -e --arg version "$RECOVER_VERSION" 'length > 0 and all(.[]; .version == $version)'
+          RELEASE_SHA=$(git rev-parse HEAD)
+          # Validate the whole train before uploading any signatures.
+          echo "$PACKAGES" | jq -r '.[] | "\(.name)@\(.version)"' | while read -r tag; do
+            test "$(git rev-parse --verify "refs/tags/${tag}^{commit}")" = "$RELEASE_SHA"
+            gh release view "$tag" --json isDraft,isPrerelease | jq -e '.isDraft == false and .isPrerelease == false'
+          done
+          echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
+
       - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        if: inputs.recover_signatures_version == ''
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1
+        if: inputs.recover_signatures_version == ''
+        uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
         with:
           node-version: '24'
-          cache: true
-
-      - name: Setup Node.js (for npm registry)
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          registry-url: 'https://registry.npmjs.org'
+          cache: false
+          run-install: false
 
       - name: Use npm with trusted publishing support
+        if: inputs.recover_signatures_version == ''
         run: npm install --global npm@11.14.1
 
       - name: Install dependencies
-        run: vp install
+        if: inputs.recover_signatures_version == ''
+        run: vp install --frozen-lockfile
 
       - name: Build packages
+        if: inputs.recover_signatures_version == ''
         run: pnpm build
 
       - name: Check release metadata
+        if: inputs.recover_signatures_version == ''
         run: pnpm release:check
 
       - name: Create Release PR or Publish
+        if: inputs.recover_signatures_version == ''
         id: changesets
-        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
+        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
           # Follow conventional commit format for version commits
           commit: 'chore(release): version packages'
@@ -88,27 +129,18 @@ jobs:
 
       - name: Generate SBOM
         if: steps.changesets.outputs.published == 'true'
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.18.0
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         with:
           artifact-name: sbom-${{ github.sha }}.spdx.json
-          output-file: ./sbom.spdx.json
-
-      - name: Upload SBOM as release artifact
-        if: steps.changesets.outputs.published == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
-        with:
-          name: sbom
-          path: ./sbom.spdx.json
-          retention-days: 90
+          upload-artifact-retention: 90
 
       - name: Build and upload MCPB bundles
         if: steps.changesets.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PACKAGES: ${{ steps.changesets.outputs.publishedPackages }}
         run: |
-          PACKAGES='${{ steps.changesets.outputs.publishedPackages }}'
-
           # List of packages that produce .mcpb bundles
           MCPB_PACKAGES=("@mcp-b/webmcp-local-relay")
 
@@ -157,68 +189,49 @@ jobs:
           done
 
       - name: Install cosign
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.changesets.outputs.published == 'true' || steps.recovery.outputs.packages != ''
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v3.8.0
 
       - name: Sign release artifacts with sigstore
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.changesets.outputs.published == 'true' || steps.recovery.outputs.packages != ''
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGES: ${{ steps.recovery.outputs.packages || steps.changesets.outputs.publishedPackages }}
         run: |
-          # Get published packages from changesets output
-          PACKAGES='${{ steps.changesets.outputs.publishedPackages }}'
-
           # Process each published package
           echo "$PACKAGES" | jq -c '.[]' | while read -r pkg; do
             PKG_NAME=$(echo "$pkg" | jq -r '.name')
             PKG_VERSION=$(echo "$pkg" | jq -r '.version')
 
-            # Convert scoped package name to GitHub release tag format
-            # @mcp-b/transports@1.0.0 -> @mcp-b/transports@1.0.0
             TAG="${PKG_NAME}@${PKG_VERSION}"
 
             echo "Signing release: $TAG"
 
             # Download the source tarball from the release
-            TARBALL_URL=$(gh release view "$TAG" --json tarballUrl -q '.tarballUrl' 2>/dev/null || echo "")
+            TARBALL_URL=$(gh release view "$TAG" --json tarballUrl -q '.tarballUrl')
+            TARBALL_FILE="${PKG_NAME//\//-}-${PKG_VERSION}.tar.gz"
+            curl -sSfL "$TARBALL_URL" -o "/tmp/$TARBALL_FILE"
 
-            if [ -n "$TARBALL_URL" ]; then
-              TARBALL_FILE="${PKG_NAME//\//-}-${PKG_VERSION}.tar.gz"
-              curl -sSfL "$TARBALL_URL" -o "/tmp/$TARBALL_FILE"
+            # The bundle contains the signature, certificate and transparency proof.
+            cosign sign-blob "/tmp/$TARBALL_FILE" \
+              --yes \
+              --bundle "/tmp/${TARBALL_FILE}.sigstore"
 
-              # Sign with cosign (keyless via OIDC)
-              cosign sign-blob "/tmp/$TARBALL_FILE" \
-                --yes \
-                --output-signature "/tmp/${TARBALL_FILE}.sig" \
-                --output-certificate "/tmp/${TARBALL_FILE}.pem"
-
-              # Also create bundle for full verification
-              cosign sign-blob "/tmp/$TARBALL_FILE" \
-                --yes \
-                --bundle "/tmp/${TARBALL_FILE}.sigstore"
-
-              # Upload signatures to the release
-              gh release upload "$TAG" \
-                "/tmp/${TARBALL_FILE}.sig" \
-                "/tmp/${TARBALL_FILE}.pem" \
-                "/tmp/${TARBALL_FILE}.sigstore" \
-                --clobber
-
-              echo "✓ Signed and uploaded signatures for $TAG"
-            else
-              echo "⚠ No release found for $TAG, skipping"
-            fi
+            gh release upload "$TAG" "/tmp/${TARBALL_FILE}.sigstore" --clobber
+            echo "✓ Signed and uploaded signature bundle for $TAG"
           done
 
   prerelease:
     name: Publish Prerelease
-    if: github.event_name == 'workflow_dispatch' && github.repository == 'WebMCP-org/npm-packages'
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'WebMCP-org/npm-packages' && github.ref == 'refs/heads/main' && inputs.recover_signatures_version == ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
       name: npm-publish
     env:
       NPM_CONFIG_PROVENANCE: 'true'
+      TAG_SUFFIX: ${{ inputs.tag || 'beta' }}
     permissions:
       contents: write # For creating GitHub releases
       id-token: write # For npm trusted publishing and sigstore signing
@@ -230,32 +243,32 @@ jobs:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1
+        uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
         with:
           node-version: '24'
-          cache: true
-
-      - name: Setup Node.js (for npm registry)
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          registry-url: 'https://registry.npmjs.org'
+          cache: false
+          run-install: false
 
       - name: Use npm with trusted publishing support
         run: npm install --global npm@11.14.1
 
       - name: Install dependencies
-        run: vp install
-
-      - name: Build packages
-        run: pnpm build
+        run: vp install --frozen-lockfile
 
       - name: Create prerelease versions
         id: versions
         run: |
-          TAG_SUFFIX="${{ inputs.tag || 'beta' }}"
+          if [[ ! "$TAG_SUFFIX" =~ ^[a-z][a-z0-9-]*$ || "$TAG_SUFFIX" == latest ]]; then
+            echo '::error::Use a lowercase prerelease tag such as beta or canary, never latest.'
+            exit 1
+          fi
+          if [ -f .changeset/pre.json ]; then
+            echo '::error::Exit Changesets pre mode before creating a snapshot.'
+            exit 1
+          fi
 
           pnpm exec changeset version \
             --snapshot "$TAG_SUFFIX" \
@@ -266,20 +279,29 @@ jobs:
             if [ -f "$pkg/package.json" ]; then
               name=$(jq -r '.name' "$pkg/package.json")
               version=$(jq -r '.version' "$pkg/package.json")
-              if [[ "$name" != "null" && "$version" == *"-${TAG_SUFFIX}."* ]]; then
+              if [[ "$name" != "null" && "$version" == *"-${TAG_SUFFIX}."* ]] && [ "$(jq -r '.private // false' "$pkg/package.json")" = false ]; then
                 echo "Prepared $name@$version"
                 PACKAGES_JSON=$(echo "$PACKAGES_JSON" | jq -c --arg n "$name" --arg v "$version" --arg d "${pkg%/}" '. + [{"name": $n, "version": $v, "dir": $d}]')
               fi
             fi
           done
+          if [ "$(echo "$PACKAGES_JSON" | jq length)" = 0 ]; then
+            echo '::error::No snapshot versions were created. Add a changeset before dispatching.'
+            exit 1
+          fi
           echo "packages=$PACKAGES_JSON" >> "$GITHUB_OUTPUT"
 
       - name: Build prerelease packages
         run: pnpm build
 
       - name: Publish prerelease packages
+        env:
+          PACKAGES: ${{ steps.versions.outputs.packages }}
         run: |
-          pnpm -r --filter './packages/**' publish --access public --tag "${{ inputs.tag || 'beta' }}" --no-git-checks
+          mapfile -t PACKAGE_NAMES < <(echo "$PACKAGES" | jq -r '.[].name')
+          FILTERS=()
+          for name in "${PACKAGE_NAMES[@]}"; do FILTERS+=(--filter "$name"); done
+          pnpm -r "${FILTERS[@]}" publish --access public --tag "$TAG_SUFFIX" --no-git-checks
 
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v3.8.0
@@ -308,7 +330,9 @@ jobs:
               exit 1
             fi
 
-            tar -czf "/tmp/${SAFE_NAME}.tar.gz" -C "$(dirname "$PKG_DIR")" "$(basename "$PKG_DIR")"
+            # Sign the artifact consumers install, not a directory containing dev files.
+            TARBALL_URL=$(npm view "${PKG_NAME}@${PKG_VERSION}" dist.tarball)
+            curl --fail --silent --show-error --location --retry 3 "$TARBALL_URL" -o "/tmp/${SAFE_NAME}.tar.gz"
 
             cosign sign-blob "/tmp/${SAFE_NAME}.tar.gz" \
               --yes \

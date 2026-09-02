@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/smart-dom-reader-server",
-  "version": "5.0.1",
+  "version": "5.1.0",
   "description": "MCP server for smart-dom-reader backed by Playwright",
   "license": "MIT",
   "repository": {
@@ -18,21 +18,24 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
+    "build": "pnpm bundle",
     "bundle": "node ./scripts/update-bundle.mjs && vp fmt lib/smart-dom-reader.bundle.js --write",
     "dev": "tsx watch --clear-screen=false src/index.ts",
     "prepublishOnly": "node ../../../scripts/validate-publish.js",
     "start": "tsx src/index.ts",
+    "test:e2e": "node --test test/*.test.mjs",
     "typecheck": "NODE_OPTIONS='--max-old-space-size=16384' tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "catalog:",
-    "playwright": "^1.54.2",
-    "tsx": "^4.21.0",
+    "playwright": "catalog:",
+    "tsx": "^4.23.12",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "^22.19.7",
-    "typescript": "^5.8.0"
+    "@mcp-b/smart-dom-reader": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
   },
   "engines": {
     "node": ">=20"

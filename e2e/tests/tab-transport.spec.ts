@@ -6,12 +6,14 @@ const listRegisteredToolNames = (page: Page): Promise<string[]> =>
     (document.modelContext as BrowserMcpServer).listTools().map((tool) => tool.name)
   );
 
-test.describe('Web Model Context API E2E Tests', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
-  });
+test.beforeEach(async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
+  // The static page and API exist before the sequential tool registrations finish.
+  await expect(page.locator('#log')).toContainText('Base tools registered successfully (Bucket A)');
+});
 
+test.describe('Web Model Context API E2E Tests', () => {
   test('should load the test application', async ({ page }) => {
     // Verify page loaded correctly
     await expect(page.locator('#api-status')).toContainText('API: Ready');
@@ -53,9 +55,6 @@ test.describe('Web Model Context API E2E Tests', () => {
     // Click list all tools button
     await page.click('#list-all-tools');
 
-    // Wait for tools to be listed
-    await page.waitForTimeout(500);
-
     const toolNames = await listRegisteredToolNames(page);
     expect(toolNames).toHaveLength(4);
     expect(toolNames).toContain('incrementCounter');
@@ -67,9 +66,6 @@ test.describe('Web Model Context API E2E Tests', () => {
   test('should register dynamic tool (Bucket B)', async ({ page }) => {
     // Register dynamic tool
     await page.click('#register-dynamic');
-
-    // Wait for registration
-    await page.waitForTimeout(500);
 
     // Verify status updated
     await expect(page.locator('#dynamic-status')).toContainText('Registered');
@@ -89,11 +85,9 @@ test.describe('Web Model Context API E2E Tests', () => {
   test('should unregister dynamic tool', async ({ page }) => {
     // First register
     await page.click('#register-dynamic');
-    await page.waitForTimeout(500);
 
     // Then unregister
     await page.click('#unregister-dynamic');
-    await page.waitForTimeout(500);
 
     // Verify status updated
     await expect(page.locator('#dynamic-status')).toContainText('Not registered');
@@ -113,7 +107,8 @@ test.describe('Web Model Context API E2E Tests', () => {
   test('should replace base tools without removing dynamic tools', async ({ page }) => {
     // Register dynamic tool
     await page.click('#register-dynamic');
-    await page.waitForTimeout(500);
+
+    await expect(page.locator('#dynamic-status')).toContainText('Registered');
 
     // Verify 5 tools total (4 base + 1 dynamic)
     let toolNames = await listRegisteredToolNames(page);
@@ -122,7 +117,7 @@ test.describe('Web Model Context API E2E Tests', () => {
 
     // Replace the locally tracked base tool group without touching dynamic tools.
     await page.click('#replace-base-tools');
-    await page.waitForTimeout(500);
+    await expect(page.locator('#log')).toContainText('Base tools replaced!');
 
     toolNames = await listRegisteredToolNames(page);
     expect(toolNames).toHaveLength(3);
@@ -155,7 +150,6 @@ test.describe('Web Model Context API E2E Tests', () => {
   test('should clear event log', async ({ page }) => {
     // Add some log entries first
     await page.click('#list-all-tools');
-    await page.waitForTimeout(500);
 
     // Verify log has entries
     let logEntries = await page.locator('#log .log-entry').allTextContents();
@@ -163,7 +157,6 @@ test.describe('Web Model Context API E2E Tests', () => {
 
     // Clear log
     await page.click('#clear-log');
-    await page.waitForTimeout(500);
 
     // Verify log only has "Log cleared" entry
     logEntries = await page.locator('#log .log-entry').allTextContents();
@@ -173,14 +166,8 @@ test.describe('Web Model Context API E2E Tests', () => {
 });
 
 test.describe('Resources API Tests', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
-  });
-
   test('should register base resources via registerResource (Bucket A)', async ({ page }) => {
     await page.click('#register-base-resources');
-    await page.waitForTimeout(500);
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
     expect(
@@ -195,7 +182,6 @@ test.describe('Resources API Tests', () => {
 
   test('should register dynamic resource via registerResource (Bucket B)', async ({ page }) => {
     await page.click('#register-dynamic-resource');
-    await page.waitForTimeout(500);
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
     expect(
@@ -213,10 +199,8 @@ test.describe('Resources API Tests', () => {
 
   test('should unregister dynamic resource', async ({ page }) => {
     await page.click('#register-dynamic-resource');
-    await page.waitForTimeout(500);
 
     await page.click('#unregister-dynamic-resource');
-    await page.waitForTimeout(500);
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
     expect(
@@ -232,14 +216,8 @@ test.describe('Resources API Tests', () => {
 });
 
 test.describe('Prompts API Tests', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
-  });
-
   test('should register base prompts via registerPrompt (Bucket A)', async ({ page }) => {
     await page.click('#register-base-prompts');
-    await page.waitForTimeout(500);
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
     expect(
@@ -252,7 +230,6 @@ test.describe('Prompts API Tests', () => {
 
   test('should register dynamic prompt via registerPrompt (Bucket B)', async ({ page }) => {
     await page.click('#register-dynamic-prompt');
-    await page.waitForTimeout(500);
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
     expect(
@@ -270,10 +247,8 @@ test.describe('Prompts API Tests', () => {
 
   test('should unregister dynamic prompt', async ({ page }) => {
     await page.click('#register-dynamic-prompt');
-    await page.waitForTimeout(500);
 
     await page.click('#unregister-dynamic-prompt');
-    await page.waitForTimeout(500);
 
     const logEntries = await page.locator('#log .log-entry').allTextContents();
     expect(
@@ -289,11 +264,6 @@ test.describe('Prompts API Tests', () => {
 });
 
 test.describe('Model Context Testing API Tests', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-    await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
-  });
-
   test('should have navigator.modelContextTesting API available', async ({ page }) => {
     const hasTestingAPI = await page.evaluate(() => 'modelContextTesting' in navigator);
     expect(hasTestingAPI).toBe(true);
@@ -301,7 +271,6 @@ test.describe('Model Context Testing API Tests', () => {
 
   test('should detect testing API implementation type', async ({ page }) => {
     await page.click('#check-testing-api');
-    await page.waitForTimeout(500);
 
     const status = page.locator('#testing-api-status');
     await expect(status).toHaveAttribute('data-testing-api', 'available');
@@ -363,13 +332,20 @@ test.describe('Model Context Testing API Tests', () => {
       if (!testingAPI) return { count: 0, toolName: null };
 
       let count = 0;
-      testingAPI.addEventListener('toolchange', () => {
-        count++;
+      const toolChanged = new Promise<void>((resolve) => {
+        testingAPI.addEventListener(
+          'toolchange',
+          () => {
+            count++;
+            resolve();
+          },
+          { once: true }
+        );
       });
 
       const toolName = `testingCallbackTool_${Date.now()}`;
       const controller = new AbortController();
-      modelContext.registerTool(
+      await modelContext.registerTool(
         {
           name: toolName,
           description: 'Callback test tool',
@@ -381,7 +357,7 @@ test.describe('Model Context Testing API Tests', () => {
         { signal: controller.signal }
       );
 
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await toolChanged;
       controller.abort();
 
       return { count, toolName };

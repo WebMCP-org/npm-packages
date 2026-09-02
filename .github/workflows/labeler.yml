@@ -4,14 +4,16 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
-permissions:
-  contents: read
-  pull-requests: write
+permissions: {}
 
 jobs:
   label:
     name: Add Labels
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
     if: github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0

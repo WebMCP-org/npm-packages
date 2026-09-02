@@ -81,8 +81,8 @@ export function useWebMCPPrompt(config: WebMCPPromptConfig): WebMCPPromptReturn 
     }
 
     // ponytail: read at registration time so an inline `argsSchema` literal cannot re-register
-    // every render. Ceiling: a changed schema is picked up only when `name` or `description`
-    // changes; add a caller-supplied deps list, as `useWebMCP` has, if that is ever needed.
+    // every render. Ceiling: a changed schema is picked up only on re-registration;
+    // add a caller-supplied deps list, as `useWebMCP` has, if that is ever needed.
     const { argsSchema } = configRef.current;
     const resolvedArgsSchema = argsSchema
       ? normalizeInputSchema(argsSchema).inputSchema
@@ -96,5 +96,5 @@ export function useWebMCPPrompt(config: WebMCPPromptConfig): WebMCPPromptReturn 
     });
   }, [name, description, configRef]);
 
-  return { isRegistered: useMcpRegistration(register) };
+  return { isRegistered: useMcpRegistration(register, config.enabled) };
 }

@@ -1,5 +1,46 @@
 # @mcp-b/react-webmcp
 
+## 5.1.0
+
+### Minor Changes
+
+- 4836fd6: Add an optional `enabled` flag, defaulting to `true`, to tool, prompt, and resource hook configs.
+  `useWebMCPContext` accepts it in an optional fourth options argument. Disabling unregisters the
+  item, and re-enabling registers the latest committed configuration. Tool execution state and
+  local `execute`/`reset` controls remain available while disabled.
+
+  Avoid allocating new execution state for no-op resets and overlapping starts with no state
+  change. Add Chromium browser regression suites using React Profiler to cover render budgets,
+  registration changes, stable callbacks, and client consumers in normal and StrictMode renders.
+
+### Patch Changes
+
+- Updated dependencies [4836fd6]
+  - usewebmcp@5.1.0
+  - @mcp-b/webmcp-types@5.1.0
+  - @mcp-b/webmcp-polyfill@5.1.0
+  - @mcp-b/webmcp-ts-sdk@5.1.0
+
+## 5.0.3
+
+### Patch Changes
+
+- 4dec56a: Clear the previous server's tools, resources, and capabilities when the client or transport changes, including when the replacement connection fails.
+- Updated dependencies [4dec56a]
+  - @mcp-b/webmcp-ts-sdk@5.0.3
+  - usewebmcp@5.0.3
+  - @mcp-b/webmcp-types@5.0.3
+  - @mcp-b/webmcp-polyfill@5.0.3
+
+## 5.0.2
+
+### Patch Changes
+
+- usewebmcp@5.0.2
+- @mcp-b/webmcp-types@5.0.2
+- @mcp-b/webmcp-polyfill@5.0.2
+- @mcp-b/webmcp-ts-sdk@5.0.2
+
 ## 5.0.1
 
 ### Patch Changes

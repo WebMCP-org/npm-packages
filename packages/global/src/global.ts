@@ -6,7 +6,6 @@ import type { Transport } from '@modelcontextprotocol/server';
 import type { WebModelContextInitOptions } from './types.js';
 
 interface RuntimeState {
-  native: ModelContext;
   server: BrowserMcpServer;
   transport: Transport;
   previousDocumentModelContextDescriptor: PropertyDescriptor | undefined;
@@ -168,7 +167,6 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
       previousNavigatorModelContextDescriptor
     );
     runtime = {
-      native,
       server,
       transport,
       previousDocumentModelContextDescriptor,

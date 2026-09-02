@@ -17,40 +17,13 @@
 //   node test/local-playwright-runner.mjs --url=https://example.com --mode=interactive --screenshot=example.png
 
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-let chromium;
-async function loadPlaywright() {
-  try {
-    const mod = await import('playwright');
-    chromium = mod.chromium;
-    return;
-  } catch {
-    // Fallback: resolve from mcp-server's node_modules symlink target
-    const { readlinkSync, lstatSync } = await import('node:fs');
-    const { resolve: pathResolve, dirname: pathDirname } = await import('node:path');
-    const linkPath = pathResolve(
-      pathDirname(fileURLToPath(import.meta.url)),
-      '../mcp-server/node_modules/playwright'
-    );
-    let target;
-    try {
-      const stat = lstatSync(linkPath);
-      if (stat.isSymbolicLink()) {
-        const link = readlinkSync(linkPath);
-        target = pathResolve(pathDirname(linkPath), link);
-      } else {
-        target = linkPath;
-      }
-    } catch {
-      target = linkPath;
-    }
-    const entry = new URL(pathResolve(target, 'index.js'), 'file:').href;
-    const mod = await import(entry);
-    chromium = mod.chromium || mod.default?.chromium;
-  }
-}
+const { chromium } = createRequire(new URL('../mcp-server/package.json', import.meta.url))(
+  'playwright'
+);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -235,11 +208,16 @@ async function runBasicInteractiveTest(page) {
 async function runSemanticTest(page) {
   const results = await page.evaluate(() => {
     const res = window.SmartDOMReader.extractFull(document, {});
+    const shallow = window.SmartDOMReader.extractFull(document, { maxDepth: 0 });
     return {
       hasHeadings: (res.semantic?.headings?.length || 0) > 0,
       hasImages: (res.semantic?.images?.length || 0) > 0,
       hasTables: (res.semantic?.tables?.length || 0) > 0,
       hasLists: (res.semantic?.lists?.length || 0) > 0,
+      hasDirectChildren:
+        res.semantic.articles[0].children.map((child) => child.tag).join(',') ===
+        'header,section,section',
+      respectsZeroDepth: shallow.semantic.articles.every((article) => !article.children),
     };
   });
   return [
@@ -247,7 +225,57 @@ async function runSemanticTest(page) {
     { name: 'Semantic images', ok: results.hasImages, got: JSON.stringify(results) },
     { name: 'Semantic tables', ok: results.hasTables, got: JSON.stringify(results) },
     { name: 'Semantic lists', ok: results.hasLists, got: JSON.stringify(results) },
+    {
+      name: 'Semantic direct children',
+      ok: results.hasDirectChildren,
+      got: JSON.stringify(results),
+    },
+    { name: 'Zero traversal depth', ok: results.respectsZeroDepth, got: JSON.stringify(results) },
   ];
+}
+
+async function runSelectorEdgeCases(page) {
+  return page.evaluate(() => {
+    const fixture = document.createElement('section');
+    fixture.id = 'selector-fixture';
+    fixture.innerHTML = `
+      <button data-test-id="alternate">Alternate test ID</button>
+      <button data-test="short">Short test ID</button>
+      <button data-cy="cypress">Cypress test ID</button>
+      <button data-testid="repeated">First test ID</button>
+      <button data-testid="repeated">Second test ID</button>
+      <button role="button" aria-label="Repeated">First role</button>
+      <button role="button" aria-label="Repeated">Second role</button>
+      <input name="repeated" value="First name">
+      <input name="repeated" value="Second name">
+      <button id="quoted&quot;id">Quoted ID</button>`;
+    document.body.append(fixture);
+
+    try {
+      return Array.from(fixture.children).flatMap((element, index) => {
+        const selector = window.SelectorGenerator.generateSelectors(element);
+        const matches = document.querySelectorAll(selector.css);
+        let xpathMatches = false;
+        try {
+          xpathMatches =
+            document.evaluate(selector.xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE)
+              .singleNodeValue === element;
+        } catch {
+          // Invalid XPath is a failed selector, just like a selector for the wrong element.
+        }
+        return [
+          {
+            name: `Unique CSS selector ${index + 1}`,
+            ok: matches.length === 1 && matches[0] === element,
+            got: selector.css,
+          },
+          { name: `XPath selector ${index + 1}`, ok: xpathMatches, got: selector.xpath },
+        ];
+      });
+    } finally {
+      fixture.remove();
+    }
+  });
 }
 
 async function runShadowTest(page) {
@@ -255,15 +283,24 @@ async function runShadowTest(page) {
     const res = window.SmartDOMReader.extractInteractive(document, {});
     const shadowBtn = res.interactive.buttons.find((b) => (b.text || '').includes('Shadow Button'));
     const regBtn = res.interactive.buttons.find((b) => (b.text || '').includes('Regular Button'));
+    const host = document.querySelector('#shadow-host-1');
+    const scoped = window.SmartDOMReader.extractFromElement(host);
+    const withoutShadow = window.SmartDOMReader.extractFromElement(host, 'interactive', {
+      includeShadowDOM: false,
+    });
     return {
       shadowBtn: !!shadowBtn,
       regBtn: !!regBtn,
       buttons: res.interactive.buttons.map((button) => button.text),
+      scopedShadow: scoped.interactive.buttons.some((button) => button.text === 'Shadow Button'),
+      withoutShadow: withoutShadow.interactive.buttons.length === 0,
     };
   });
   return [
     { name: 'Shadow button detected', ok: results.shadowBtn, got: JSON.stringify(results) },
     { name: 'Regular button detected', ok: results.regBtn, got: JSON.stringify(results) },
+    { name: 'Scoped shadow host', ok: results.scopedShadow, got: JSON.stringify(results) },
+    { name: 'Shadow traversal disabled', ok: results.withoutShadow, got: JSON.stringify(results) },
   ];
 }
 
@@ -283,6 +320,9 @@ async function runFrameSelectorTest(page) {
       structure: run('extractStructure'),
       interactive: run('extractInteractive'),
       full: run('extractFull'),
+      missingScope: window.SmartDOMReaderBundle.executeExtraction('extractStructure', {
+        selector: '#missing-scope',
+      }),
     };
   });
 
@@ -306,11 +346,15 @@ async function runFrameSelectorTest(page) {
       ok: readFrame(results.full),
       got: describe(results.full),
     },
+    {
+      name: 'Missing structure scope fails without extracting the document',
+      ok: results.missingScope?.error === 'No element found matching selector: #missing-scope',
+      got: describe(results.missingScope),
+    },
   ];
 }
 
 async function main() {
-  await loadPlaywright();
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
     console.log(
@@ -328,7 +372,10 @@ async function main() {
   }
 
   // If a URL was provided, run "any website" mode; otherwise run local fixture tests
-  const browser = await chromium.launch({ headless: args.headless });
+  const browser = await chromium.launch({
+    headless: args.headless,
+    executablePath: process.env.CHROME_BIN,
+  });
   const page = await browser.newPage();
 
   if (args.url) {
@@ -431,7 +478,10 @@ async function main() {
   try {
     await page.setContent(PAGES.basicInteractive, { waitUntil: 'domcontentloaded' });
     await injectLibrary(page);
-    const checks = await runBasicInteractiveTest(page);
+    const checks = [
+      ...(await runBasicInteractiveTest(page)),
+      ...(await runSelectorEdgeCases(page)),
+    ];
     for (const c of checks) {
       if (c.ok) report.passed++;
       else report.failed++;

@@ -21,7 +21,8 @@ function resolveDistTag() {
   let raw;
   try {
     raw = readFileSync(preJsonPath, 'utf8');
-  } catch {
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
     return 'latest';
   }
 
@@ -33,9 +34,16 @@ function resolveDistTag() {
   }
 
   // `changeset pre exit` leaves the file behind with mode "exit"; only "pre" is active.
-  if (pre.mode !== 'pre') return 'latest';
-  if (typeof pre.tag !== 'string' || !pre.tag) {
-    throw new Error('.changeset/pre.json is in pre mode but declares no tag.');
+  if (pre?.mode === 'exit') return 'latest';
+  if (
+    pre?.mode !== 'pre' ||
+    typeof pre.tag !== 'string' ||
+    !/^[a-z][a-z0-9-]*$/.test(pre.tag) ||
+    pre.tag === 'latest'
+  ) {
+    throw new Error(
+      '.changeset/pre.json must declare pre mode and a safe prerelease tag (not latest).'
+    );
   }
   return pre.tag;
 }

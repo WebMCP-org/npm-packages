@@ -404,6 +404,16 @@ describe('RelayBridgeServer', () => {
 
     await bridge.stop();
     await rejected;
+    expect(bridge.registry.listSources()).toEqual([]);
+    expect(bridge.registry.listTools()).toEqual([]);
+
+    await bridge.start();
+    try {
+      expect(bridge.registry.listTools()).toEqual([]);
+      await expect(bridge.invokeTool(toolName, {})).rejects.toThrow('No active browser source');
+    } finally {
+      await bridge.stop();
+    }
     ws.close();
   });
 

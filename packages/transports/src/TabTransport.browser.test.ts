@@ -64,6 +64,24 @@ async function startPair() {
 }
 
 describe('Tab transports (browser)', () => {
+  it.each(['tab', 'iframe'] as const)(
+    'can close an unused %s client without an unhandled readiness rejection',
+    async (kind) => {
+      const options = { targetOrigin: window.location.origin };
+      const transport =
+        kind === 'tab'
+          ? new TabClientTransport(options)
+          : new IframeParentTransport({ ...options, iframe: document.createElement('iframe') });
+
+      await transport.close();
+      // Let the browser report unhandled rejections before attaching a late readiness consumer.
+      await delay();
+      await expect(transport.serverReadyPromise).rejects.toThrow(
+        'Transport closed before server ready'
+      );
+    }
+  );
+
   describe('IframeParentTransport', () => {
     it('requires an explicit target origin', () => {
       expect(() => {

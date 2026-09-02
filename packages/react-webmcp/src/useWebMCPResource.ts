@@ -86,5 +86,5 @@ export function useWebMCPResource(config: WebMCPResourceConfig): WebMCPResourceR
     });
   }, [uri, name, description, mimeType, readRef]);
 
-  return { isRegistered: useMcpRegistration(register) };
+  return { isRegistered: useMcpRegistration(register, config.enabled) };
 }

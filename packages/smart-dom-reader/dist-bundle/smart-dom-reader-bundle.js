@@ -179,11 +179,11 @@ var SmartDOMReaderBundle = (function (exports) {
         });
       const testId = SelectorGenerator.getDataTestId(element);
       if (testId) {
-        const v = `[data-testid="${CSS.escape(testId)}"]`;
+        const v = `[${testId.name}="${CSS.escape(testId.value)}"]`;
         candidates.push({
           type: 'data-testid',
           value: v,
-          score: 90 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+          score: 90 + (SelectorGenerator.isUniqueSelector(v, doc) ? 5 : 0),
         });
       }
       const role = element.getAttribute('role');
@@ -193,7 +193,7 @@ var SmartDOMReaderBundle = (function (exports) {
         candidates.push({
           type: 'role-aria',
           value: v,
-          score: 85 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+          score: 85 + (SelectorGenerator.isUniqueSelector(v, doc) ? 5 : 0),
         });
       }
       const nameAttr = element.getAttribute('name');
@@ -202,7 +202,7 @@ var SmartDOMReaderBundle = (function (exports) {
         candidates.push({
           type: 'name',
           value: v,
-          score: 78 + (SelectorGenerator.isUniqueSelectorSafe(v, doc) ? 5 : 0),
+          score: 78 + (SelectorGenerator.isUniqueSelector(v, doc) ? 5 : 0),
         });
       }
       const pathCss = SelectorGenerator.generateCSSSelector(element, doc);
@@ -229,12 +229,18 @@ var SmartDOMReaderBundle = (function (exports) {
         });
       candidates.sort((a, b) => b.score - a.score);
       const selector = {
-        css: candidates.find((c) => c.type !== 'xpath' && c.type !== 'text')?.value || pathCss,
+        css:
+          candidates.find(
+            (c) =>
+              c.type !== 'xpath' &&
+              c.type !== 'text' &&
+              SelectorGenerator.isUniqueSelector(c.value, doc, element)
+          )?.value || pathCss,
         xpath,
         candidates,
       };
       if (textBased) selector.textBased = textBased;
-      if (testId) selector.dataTestId = testId;
+      if (testId) selector.dataTestId = testId.value;
       if (aria) selector.ariaLabel = aria;
       return selector;
     }
@@ -245,7 +251,10 @@ var SmartDOMReaderBundle = (function (exports) {
       if (element.id && SelectorGenerator.isUniqueId(element.id, doc))
         return `#${CSS.escape(element.id)}`;
       const testId = SelectorGenerator.getDataTestId(element);
-      if (testId) return `[data-testid="${CSS.escape(testId)}"]`;
+      if (testId) {
+        const selector = `[${testId.name}="${CSS.escape(testId.value)}"]`;
+        if (SelectorGenerator.isUniqueSelector(selector, doc, element)) return selector;
+      }
       const path = [];
       let current = element;
       while (current && current.nodeType === Node.ELEMENT_NODE) {
@@ -272,14 +281,16 @@ var SmartDOMReaderBundle = (function (exports) {
      * Generate XPath for an element
      */
     static generateXPath(element, doc) {
-      if (element.id && SelectorGenerator.isUniqueId(element.id, doc))
-        return `//*[@id="${element.id}"]`;
       const path = [];
       let current = element;
       while (current && current.nodeType === Node.ELEMENT_NODE) {
         const tagName = current.nodeName.toLowerCase();
-        if (current.id && SelectorGenerator.isUniqueId(current.id, doc)) {
-          path.unshift(`//*[@id="${current.id}"]`);
+        if (
+          current.id &&
+          !current.id.includes('"') &&
+          SelectorGenerator.isUniqueId(current.id, doc)
+        ) {
+          path.unshift(`*[@id="${current.id}"]`);
           break;
         }
         let xpath = tagName;
@@ -312,13 +323,10 @@ var SmartDOMReaderBundle = (function (exports) {
      * Get data-testid or similar attributes
      */
     static getDataTestId(element) {
-      return (
-        element.getAttribute('data-testid') ||
-        element.getAttribute('data-test-id') ||
-        element.getAttribute('data-test') ||
-        element.getAttribute('data-cy') ||
-        void 0
-      );
+      for (const name of ['data-testid', 'data-test-id', 'data-test', 'data-cy']) {
+        const attribute = element.getAttributeNode(name);
+        if (attribute?.value) return attribute;
+      }
     }
     /**
      * Check if an ID is unique in the document
@@ -329,16 +337,10 @@ var SmartDOMReaderBundle = (function (exports) {
     /**
      * Check if a selector is unique within a container
      */
-    static isUniqueSelector(selector, container) {
+    static isUniqueSelector(selector, container, element) {
       try {
-        return container.querySelectorAll(selector).length === 1;
-      } catch {
-        return false;
-      }
-    }
-    static isUniqueSelectorSafe(selector, doc) {
-      try {
-        return doc.querySelectorAll(selector).length === 1;
+        const matches = container.querySelectorAll(selector);
+        return matches.length === 1 && (element === void 0 || matches[0] === element);
       } catch {
         return false;
       }
@@ -367,7 +369,7 @@ var SmartDOMReaderBundle = (function (exports) {
      * Optimize the selector path by removing unnecessary parts
      */
     static optimizePath(path, element, doc) {
-      for (let i = 0; i < path.length - 1; i++) {
+      for (let i = path.length - 1; i >= 0; i--) {
         const shortPath = path.slice(i).join(' > ');
         try {
           const matches = doc.querySelectorAll(shortPath);
@@ -520,7 +522,7 @@ var SmartDOMReaderBundle = (function (exports) {
      * Extract element information
      */
     static extractElement(element, options, depth = 0) {
-      if (options.maxDepth && depth > options.maxDepth) return null;
+      if (options.maxDepth !== void 0 && depth > options.maxDepth) return null;
       if (!options.includeHidden && !DOMTraversal.isVisible(element)) return null;
       if (options.viewportOnly && !DOMTraversal.isInViewport(element)) return null;
       if (!DOMTraversal.passesFilter(element, options.filter)) return null;
@@ -553,24 +555,11 @@ var SmartDOMReaderBundle = (function (exports) {
      */
     static extractChildren(container, options, depth) {
       const children = [];
-      const elements = container.querySelectorAll('*');
-      for (const child of Array.from(elements)) {
-        if (DOMTraversal.hasExtractedAncestor(child, elements)) continue;
+      for (const child of Array.from(container.children)) {
         const extracted = DOMTraversal.extractElement(child, options, depth);
         if (extracted) children.push(extracted);
       }
       return children;
-    }
-    /**
-     * Check if element has an ancestor that was already extracted
-     */
-    static hasExtractedAncestor(element, extractedElements) {
-      let parent = element.parentElement;
-      while (parent) {
-        if (Array.from(extractedElements).includes(parent)) return true;
-        parent = parent.parentElement;
-      }
-      return false;
     }
     /**
      * Get relevant attributes for an element
@@ -713,7 +702,7 @@ var SmartDOMReaderBundle = (function (exports) {
     constructor(options = {}) {
       this.options = {
         mode: options.mode || 'interactive',
-        maxDepth: options.maxDepth || 5,
+        maxDepth: options.maxDepth ?? 5,
         includeHidden: options.includeHidden || false,
         includeShadowDOM: options.includeShadowDOM ?? true,
         includeIframes: options.includeIframes || false,
@@ -807,6 +796,8 @@ var SmartDOMReaderBundle = (function (exports) {
     querySelectorAll(container, selector, includeShadowDOM) {
       const matches = [...container.querySelectorAll(selector)];
       if (!includeShadowDOM) return matches;
+      if ('shadowRoot' in container && container.shadowRoot)
+        matches.push(...this.querySelectorAll(container.shadowRoot, selector, true));
       for (const element of container.querySelectorAll('*'))
         if (element.shadowRoot)
           matches.push(...this.querySelectorAll(element.shadowRoot, selector, true));
@@ -1564,7 +1555,8 @@ var SmartDOMReaderBundle = (function (exports) {
         case 'extractStructure': {
           const { selector, frameSelector, formatOptions } = args;
           const doc = resolveDocument(frameSelector);
-          const target = selector ? (doc.querySelector(selector) ?? doc) : doc;
+          const target = selector ? doc.querySelector(selector) : doc;
+          if (!target) return { error: `No element found matching selector: ${selector}` };
           const overview = ProgressiveExtractor.extractStructure(target);
           const meta = {
             title: document.title,
