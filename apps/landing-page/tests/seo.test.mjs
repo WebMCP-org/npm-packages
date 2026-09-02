@@ -7,6 +7,7 @@ const origin = process.env.SEO_TEST_ORIGIN ?? 'http://127.0.0.1:4329';
 test('rendered pages expose canonical URLs and matching article metadata', async () => {
   for (const path of [
     '/',
+    '/about/',
     '/contact/',
     '/blog/',
     '/blog/webmcp-challenge/',

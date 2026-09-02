@@ -1,6 +1,7 @@
 import { defineMiddleware } from 'astro:middleware';
 
 const canonicalPathRedirects = new Map([
+  ['/about', '/about/'],
   ['/blog', '/blog/'],
   ['/contact', '/contact/'],
   ['/privacy', '/privacy/'],
