@@ -19,7 +19,9 @@ test('agent-facing docs use the current proposal and omit component source', asy
 
 test('documentation aliases redirect to canonical URLs', async () => {
   const config = JSON.parse(await readFile(new URL('docs.json', appRoot), 'utf8'));
-  const redirects = new Map(config.redirects.map(({ source, destination }) => [source, destination]));
+  const redirects = new Map(
+    config.redirects.map(({ source, destination }) => [source, destination])
+  );
 
   assert.equal(redirects.get('/index'), '/');
   assert.equal(redirects.get('/packages/index'), '/packages');
