@@ -17,6 +17,18 @@ test('agent-facing docs use the current proposal and omit component source', asy
   assert.doesNotMatch(llms, /navigator\.modelContext|WebMCP is a W3C standard/i);
 });
 
+test('documentation aliases redirect to canonical URLs', async () => {
+  const config = JSON.parse(await readFile(new URL('docs.json', appRoot), 'utf8'));
+  const redirects = new Map(config.redirects.map(({ source, destination }) => [source, destination]));
+
+  assert.equal(redirects.get('/index'), '/');
+  assert.equal(redirects.get('/packages/index'), '/packages');
+  assert.equal(redirects.get('/tutorials/index'), '/tutorials');
+  assert.equal(redirects.get('/how-to/index'), '/how-to');
+  assert.equal(redirects.get('/explanation/index'), '/explanation');
+  assert.equal(redirects.get('/skill'), '/start-here/choose-your-path');
+});
+
 test('documentation link hubs point to canonical section URLs', async () => {
   const linkHubs = [
     'index.mdx',
