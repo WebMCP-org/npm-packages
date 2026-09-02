@@ -6,12 +6,12 @@ import CalendarEmbed from '../components/calendar-embed.astro';
 ---
 
 <Base
-  title="Book a call"
-  description="Book a 15-minute call about making your website or product agent-ready with WebMCP."
+  title="WebMCP consulting and implementation"
+  description="Work with MCP-B on WebMCP adoption, agent-ready workflows, browser tools, and MCP integrations for your website or product."
 >
   <section class="contact-page">
     <header class="contact-page__header">
-      <h1>Make your product agent-ready.</h1>
+      <h1>Make your product agent-ready with WebMCP.</h1>
       <p>
         Book a 15-minute call to talk through WebMCP, browser agents, or the fastest path from
         prototype to production.
@@ -80,7 +80,7 @@ import CalendarEmbed from '../components/calendar-embed.astro';
     font-weight: 460;
     letter-spacing: -0.055em;
     line-height: 0.94;
-    white-space: nowrap;
+    text-wrap: balance;
   }
 
   .contact-page__header p {
@@ -131,12 +131,6 @@ import CalendarEmbed from '../components/calendar-embed.astro';
   @media (max-width: 48rem) {
     .contact-page__service-grid {
       grid-template-columns: 1fr;
-    }
-  }
-
-  @media (max-width: 40rem) {
-    .contact-page__header h1 {
-      white-space: normal;
     }
   }
 </style>
