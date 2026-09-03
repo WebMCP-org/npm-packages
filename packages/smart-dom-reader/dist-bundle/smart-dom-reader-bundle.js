@@ -164,26 +164,27 @@ var SmartDOMReaderBundle = (function (exports) {
   };
   //#endregion
   //#region src/selectors.ts
+  var TEST_ID_ATTRIBUTES = ['data-testid', 'data-test-id', 'data-test', 'data-cy'];
   var SelectorGenerator = class SelectorGenerator {
     /**
      * Generate multiple selector strategies for an element
      */
     static generateSelectors(element) {
-      const doc = element.ownerDocument || document;
+      const root = SelectorGenerator.getSelectorRoot(element);
       const candidates = [];
-      if (element.id && SelectorGenerator.isUniqueId(element.id, doc))
+      if (element.id && SelectorGenerator.isUniqueId(element.id, element, root))
         candidates.push({
           type: 'id',
           value: `#${CSS.escape(element.id)}`,
           score: 100,
         });
-      const testId = SelectorGenerator.getDataTestId(element);
+      const testId = SelectorGenerator.getDataTestAttribute(element);
       if (testId) {
-        const v = `[${testId.name}="${CSS.escape(testId.value)}"]`;
+        const v = `[${testId.attribute}="${CSS.escape(testId.value)}"]`;
         candidates.push({
           type: 'data-testid',
           value: v,
-          score: 90 + (SelectorGenerator.isUniqueSelector(v, doc) ? 5 : 0),
+          score: 90 + (SelectorGenerator.isUniqueSelectorForElement(v, element, root) ? 5 : 0),
         });
       }
       const role = element.getAttribute('role');
@@ -193,7 +194,7 @@ var SmartDOMReaderBundle = (function (exports) {
         candidates.push({
           type: 'role-aria',
           value: v,
-          score: 85 + (SelectorGenerator.isUniqueSelector(v, doc) ? 5 : 0),
+          score: 85 + (SelectorGenerator.isUniqueSelectorForElement(v, element, root) ? 5 : 0),
         });
       }
       const nameAttr = element.getAttribute('name');
@@ -202,10 +203,10 @@ var SmartDOMReaderBundle = (function (exports) {
         candidates.push({
           type: 'name',
           value: v,
-          score: 78 + (SelectorGenerator.isUniqueSelector(v, doc) ? 5 : 0),
+          score: 78 + (SelectorGenerator.isUniqueSelectorForElement(v, element, root) ? 5 : 0),
         });
       }
-      const pathCss = SelectorGenerator.generateCSSSelector(element, doc);
+      const pathCss = SelectorGenerator.generateCSSSelector(element, root);
       const structuralPenalty = (pathCss.match(/:nth-child\(/g) || []).length * 10;
       const classBonus = pathCss.includes('.') ? 8 : 0;
       const pathScore = Math.max(0, 70 + classBonus - structuralPenalty);
@@ -214,7 +215,7 @@ var SmartDOMReaderBundle = (function (exports) {
         value: pathCss,
         score: pathScore,
       });
-      const xpath = SelectorGenerator.generateXPath(element, doc);
+      const xpath = SelectorGenerator.generateXPath(element, root);
       candidates.push({
         type: 'xpath',
         value: xpath,
@@ -231,11 +232,11 @@ var SmartDOMReaderBundle = (function (exports) {
       const selector = {
         css:
           candidates.find(
-            (c) =>
-              c.type !== 'xpath' &&
-              c.type !== 'text' &&
-              SelectorGenerator.isUniqueSelector(c.value, doc, element)
-          )?.value || pathCss,
+            (candidate) =>
+              candidate.type !== 'xpath' &&
+              candidate.type !== 'text' &&
+              SelectorGenerator.isUniqueSelectorForElement(candidate.value, element, root)
+          )?.value ?? pathCss,
         xpath,
         candidates,
       };
@@ -247,40 +248,46 @@ var SmartDOMReaderBundle = (function (exports) {
     /**
      * Generate a unique CSS selector for an element
      */
-    static generateCSSSelector(element, doc) {
-      if (element.id && SelectorGenerator.isUniqueId(element.id, doc))
+    static generateCSSSelector(element, root) {
+      if (element.id && SelectorGenerator.isUniqueId(element.id, element, root))
         return `#${CSS.escape(element.id)}`;
-      const testId = SelectorGenerator.getDataTestId(element);
+      const testId = SelectorGenerator.getDataTestAttribute(element);
       if (testId) {
-        const selector = `[${testId.name}="${CSS.escape(testId.value)}"]`;
-        if (SelectorGenerator.isUniqueSelector(selector, doc, element)) return selector;
+        const selector = `[${testId.attribute}="${CSS.escape(testId.value)}"]`;
+        if (SelectorGenerator.isUniqueSelectorForElement(selector, element, root)) return selector;
       }
       const path = [];
       let current = element;
       while (current && current.nodeType === Node.ELEMENT_NODE) {
         let selector = current.nodeName.toLowerCase();
-        if (current.id && SelectorGenerator.isUniqueId(current.id, doc)) {
+        if (current.id && SelectorGenerator.isUniqueId(current.id, current, root)) {
           selector = `#${CSS.escape(current.id)}`;
           path.unshift(selector);
           break;
         }
         const classes = SelectorGenerator.getMeaningfulClasses(current);
         if (classes.length > 0) selector += `.${classes.map((c) => CSS.escape(c)).join('.')}`;
-        const siblings = current.parentElement?.children;
-        if (siblings && siblings.length > 1) {
-          const index = Array.from(siblings).indexOf(current);
-          if (index > 0 || !SelectorGenerator.isUniqueSelector(selector, current.parentElement))
-            selector += `:nth-child(${index + 1})`;
+        const parent = SelectorGenerator.getSelectorParent(current);
+        const siblings = SelectorGenerator.getElementChildren(parent);
+        if (siblings.length > 1) {
+          const index = siblings.indexOf(current);
+          if (index >= 0) selector += `:nth-child(${index + 1})`;
         }
         path.unshift(selector);
         current = current.parentElement;
       }
-      return SelectorGenerator.optimizePath(path, element, doc);
+      return SelectorGenerator.optimizePath(path, element, root);
     }
     /**
      * Generate XPath for an element
      */
-    static generateXPath(element, doc) {
+    static generateXPath(element, root) {
+      if (
+        element.id &&
+        !element.id.includes('"') &&
+        SelectorGenerator.isUniqueId(element.id, element, root)
+      )
+        return `//*[@id="${element.id}"]`;
       const path = [];
       let current = element;
       while (current && current.nodeType === Node.ELEMENT_NODE) {
@@ -288,17 +295,17 @@ var SmartDOMReaderBundle = (function (exports) {
         if (
           current.id &&
           !current.id.includes('"') &&
-          SelectorGenerator.isUniqueId(current.id, doc)
+          SelectorGenerator.isUniqueId(current.id, current, root)
         ) {
           path.unshift(`*[@id="${current.id}"]`);
           break;
         }
         let xpath = tagName;
-        const siblings = current.parentElement?.children;
-        if (siblings) {
-          const sameTagSiblings = Array.from(siblings).filter(
-            (s) => s.nodeName.toLowerCase() === tagName
-          );
+        const siblings = SelectorGenerator.getElementChildren(
+          SelectorGenerator.getSelectorParent(current)
+        );
+        if (siblings.length > 0) {
+          const sameTagSiblings = siblings.filter((s) => s.nodeName.toLowerCase() === tagName);
           if (sameTagSiblings.length > 1) {
             const index = sameTagSiblings.indexOf(current) + 1;
             xpath += `[${index}]`;
@@ -322,25 +329,51 @@ var SmartDOMReaderBundle = (function (exports) {
     /**
      * Get data-testid or similar attributes
      */
-    static getDataTestId(element) {
-      for (const name of ['data-testid', 'data-test-id', 'data-test', 'data-cy']) {
-        const attribute = element.getAttributeNode(name);
-        if (attribute?.value) return attribute;
+    static getDataTestAttribute(element) {
+      for (const attribute of TEST_ID_ATTRIBUTES) {
+        const value = element.getAttribute(attribute);
+        if (value)
+          return {
+            attribute,
+            value,
+          };
       }
     }
     /**
-     * Check if an ID is unique in the document
+     * Get the document or shadow root that owns the element's selector scope
      */
-    static isUniqueId(id, doc) {
-      return doc.querySelectorAll(`#${CSS.escape(id)}`).length === 1;
+    static getSelectorRoot(element) {
+      const root = element.getRootNode();
+      if (root.nodeType === Node.DOCUMENT_NODE || root.nodeType === Node.DOCUMENT_FRAGMENT_NODE)
+        return root;
+      return element.ownerDocument || document;
     }
     /**
-     * Check if a selector is unique within a container
+     * Check if an ID uniquely identifies the element in its selector scope
      */
-    static isUniqueSelector(selector, container, element) {
+    static isUniqueId(id, element, root) {
+      return SelectorGenerator.isUniqueSelectorForElement(`#${CSS.escape(id)}`, element, root);
+    }
+    /**
+     * Parent used for sibling position: Element, Document, or ShadowRoot.
+     * parentElement is null when the parent is a ShadowRoot.
+     */
+    static getSelectorParent(element) {
+      const parent = element.parentNode;
+      if (!parent) return null;
+      if (parent.nodeType === Node.ELEMENT_NODE) return parent;
+      if (parent.nodeType === Node.DOCUMENT_NODE || parent.nodeType === Node.DOCUMENT_FRAGMENT_NODE)
+        return parent;
+      return null;
+    }
+    static getElementChildren(parent) {
+      if (!parent) return [];
+      return Array.from(parent.children);
+    }
+    static isUniqueSelectorForElement(selector, element, root) {
       try {
-        const matches = container.querySelectorAll(selector);
-        return matches.length === 1 && (element === void 0 || matches[0] === element);
+        const matches = root.querySelectorAll(selector);
+        return matches.length === 1 && matches[0] === element;
       } catch {
         return false;
       }
@@ -366,16 +399,23 @@ var SmartDOMReaderBundle = (function (exports) {
         .slice(0, 2);
     }
     /**
-     * Optimize the selector path by removing unnecessary parts
+     * Optimize the selector path by removing unnecessary parts.
+     * If a descendant-only path collides (direct child vs nested same tag),
+     * fall back to `:host >` (shadow) or `:scope >` (document) so the match
+     * is a child of the selector root. `:scope >` is empty inside ShadowRoot.
      */
-    static optimizePath(path, element, doc) {
-      for (let i = path.length - 1; i >= 0; i--) {
-        const shortPath = path.slice(i).join(' > ');
-        try {
-          const matches = doc.querySelectorAll(shortPath);
-          if (matches.length === 1 && matches[0] === element) return shortPath;
-        } catch {}
-      }
+    static optimizePath(path, element, root) {
+      const joined = path.join(' > ');
+      const childPrefix = root.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? ':host > ' : ':scope > ';
+      const attempts = [];
+      if (SelectorGenerator.getSelectorParent(element) === root)
+        attempts.push(`${childPrefix}${joined}`);
+      for (let i = 0; i < path.length; i++) attempts.push(path.slice(i).join(' > '));
+      for (let i = 0; i < path.length; i++)
+        attempts.push(`${childPrefix}${path.slice(i).join(' > ')}`);
+      for (const candidate of attempts)
+        if (SelectorGenerator.isUniqueSelectorForElement(candidate, element, root))
+          return candidate;
       return path.join(' > ');
     }
     /**

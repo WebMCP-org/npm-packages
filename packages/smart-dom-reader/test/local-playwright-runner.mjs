@@ -137,6 +137,28 @@ const PAGES = {
     </script>
   </body></html>`,
 
+  directShadowChildren: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Direct Shadow Children</title></head><body>
+    <div id="shadow-host-direct"></div>
+    <script>
+      const host = document.getElementById('shadow-host-direct');
+      const shadow = host.attachShadow({ mode: 'open' });
+      shadow.innerHTML = '<button>One</button><button>Two</button>';
+    </script>
+  </body></html>`,
+
+  shadowSelectorCases: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Shadow Selector Cases</title></head><body>
+    <div id="shadow-host-mixed"></div>
+    <div id="shadow-host-nested"></div>
+    <script>
+      const mixedHost = document.getElementById('shadow-host-mixed');
+      const mixed = mixedHost.attachShadow({ mode: 'open' });
+      mixed.innerHTML = '<button>One</button>text<span></span><button>Two</button>';
+      const nestedHost = document.getElementById('shadow-host-nested');
+      const nested = nestedHost.attachShadow({ mode: 'open' });
+      nested.innerHTML = '<button>A</button><div><button>B</button></div>';
+    </script>
+  </body></html>`,
+
   // Same-origin iframe so extraction can cross into a second realm. Nothing in
   // the host document says "Widget", so any output mentioning it came from the frame.
   frameHost: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Host Page Test</title></head><body>
@@ -301,6 +323,102 @@ async function runShadowTest(page) {
     { name: 'Regular button detected', ok: results.regBtn, got: JSON.stringify(results) },
     { name: 'Scoped shadow host', ok: results.scopedShadow, got: JSON.stringify(results) },
     { name: 'Shadow traversal disabled', ok: results.withoutShadow, got: JSON.stringify(results) },
+  ];
+}
+
+async function runDirectShadowChildTest(page) {
+  const results = await page.evaluate(() => {
+    const match = (root, sel) => {
+      if (!root || !sel) return { count: 0, text: null };
+      const nodes = Array.from(root.querySelectorAll(sel));
+      return { count: nodes.length, text: nodes[0]?.textContent ?? null };
+    };
+    const res = window.SmartDOMReader.extractInteractive(document, {});
+    const one = res.interactive.buttons.find((b) => (b.text || '').trim() === 'One');
+    const two = res.interactive.buttons.find((b) => (b.text || '').trim() === 'Two');
+    const shadow = document.querySelector('#shadow-host-direct')?.shadowRoot;
+    const oneCss = match(shadow, one?.selector?.css);
+    const twoCss = match(shadow, two?.selector?.css);
+    return {
+      oneSel: one?.selector?.css,
+      twoSel: two?.selector?.css,
+      twoXpath: two?.selector?.xpath,
+      unique:
+        oneCss.count === 1 &&
+        twoCss.count === 1 &&
+        oneCss.text === 'One' &&
+        twoCss.text === 'Two' &&
+        one?.selector?.css !== two?.selector?.css,
+      xpathIndexed: /button\[2\]/.test(two?.selector?.xpath || ''),
+    };
+  });
+  return [
+    {
+      name: 'Direct shadow-child selectors unique',
+      ok: results.unique,
+      got: JSON.stringify(results),
+    },
+    {
+      name: 'Direct shadow-child xpath indexed',
+      ok: results.xpathIndexed,
+      got: results.twoXpath,
+    },
+  ];
+}
+
+async function runShadowSelectorCaseTest(page) {
+  const results = await page.evaluate(() => {
+    const match = (root, sel) => {
+      if (!root || !sel) return [];
+      return Array.from(root.querySelectorAll(sel)).map((n) => n.textContent);
+    };
+    const res = window.SmartDOMReader.extractInteractive(document, {});
+    const mixedRoot = document.querySelector('#shadow-host-mixed')?.shadowRoot;
+    const nestedRoot = document.querySelector('#shadow-host-nested')?.shadowRoot;
+    const one = res.interactive.buttons.find((b) => (b.text || '').trim() === 'One');
+    const two = res.interactive.buttons.find((b) => (b.text || '').trim() === 'Two');
+    const a = res.interactive.buttons.find((b) => (b.text || '').trim() === 'A');
+    const b = res.interactive.buttons.find((b) => (b.text || '').trim() === 'B');
+    const mixedOne = match(mixedRoot, one?.selector?.css);
+    const mixedTwo = match(mixedRoot, two?.selector?.css);
+    const nestedA = match(nestedRoot, a?.selector?.css);
+    const nestedB = match(nestedRoot, b?.selector?.css);
+    return {
+      mixedTwoXpath: two?.selector?.xpath,
+      mixed:
+        mixedOne.length === 1 &&
+        mixedOne[0] === 'One' &&
+        mixedTwo.length === 1 &&
+        mixedTwo[0] === 'Two' &&
+        /nth-child\(3\)/.test(two?.selector?.css || ''),
+      mixedXpath: /button\[2\]/.test(two?.selector?.xpath || ''),
+      nested:
+        nestedA.length === 1 &&
+        nestedA[0] === 'A' &&
+        nestedB.length === 1 &&
+        nestedB[0] === 'B' &&
+        a?.selector?.css !== b?.selector?.css &&
+        String(a?.selector?.css || '').includes(':host >'),
+      nestedASel: a?.selector?.css,
+      nestedBSel: b?.selector?.css,
+    };
+  });
+  return [
+    {
+      name: 'Mixed sibling nth-child unique',
+      ok: results.mixed,
+      got: JSON.stringify(results),
+    },
+    {
+      name: 'Mixed sibling xpath indexed',
+      ok: results.mixedXpath,
+      got: results.mixedTwoXpath,
+    },
+    {
+      name: 'Nested vs direct shadow-child unique',
+      ok: results.nested,
+      got: JSON.stringify(results),
+    },
   ];
 }
 
@@ -501,6 +619,24 @@ async function main() {
     await injectLibrary(page);
     const checks3 = await runShadowTest(page);
     for (const c of checks3) {
+      if (c.ok) report.passed++;
+      else report.failed++;
+      report.checks.push(c);
+    }
+
+    await page.setContent(PAGES.directShadowChildren, { waitUntil: 'domcontentloaded' });
+    await injectLibrary(page);
+    const checksShadowDirect = await runDirectShadowChildTest(page);
+    for (const c of checksShadowDirect) {
+      if (c.ok) report.passed++;
+      else report.failed++;
+      report.checks.push(c);
+    }
+
+    await page.setContent(PAGES.shadowSelectorCases, { waitUntil: 'domcontentloaded' });
+    await injectLibrary(page);
+    const checksShadowCases = await runShadowSelectorCaseTest(page);
+    for (const c of checksShadowCases) {
       if (c.ok) report.passed++;
       else report.failed++;
       report.checks.push(c);
