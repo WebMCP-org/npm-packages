@@ -267,11 +267,11 @@ var SmartDOMReaderBundle = (function (exports) {
         }
         const classes = SelectorGenerator.getMeaningfulClasses(current);
         if (classes.length > 0) selector += `.${classes.map((c) => CSS.escape(c)).join('.')}`;
-        const siblings = current.parentElement?.children;
-        if (siblings && siblings.length > 1) {
-          const index = Array.from(siblings).indexOf(current);
-          if (index > 0 || !SelectorGenerator.isUniqueSelector(selector, current.parentElement))
-            selector += `:nth-child(${index + 1})`;
+        const parent = SelectorGenerator.getSelectorParent(current);
+        const siblings = SelectorGenerator.getElementChildren(parent);
+        if (siblings.length > 1) {
+          const index = siblings.indexOf(current);
+          if (index >= 0) selector += `:nth-child(${index + 1})`;
         }
         path.unshift(selector);
         current = current.parentElement;
@@ -293,11 +293,11 @@ var SmartDOMReaderBundle = (function (exports) {
           break;
         }
         let xpath = tagName;
-        const siblings = current.parentElement?.children;
-        if (siblings) {
-          const sameTagSiblings = Array.from(siblings).filter(
-            (s) => s.nodeName.toLowerCase() === tagName
-          );
+        const siblings = SelectorGenerator.getElementChildren(
+          SelectorGenerator.getSelectorParent(current)
+        );
+        if (siblings.length > 0) {
+          const sameTagSiblings = siblings.filter((s) => s.nodeName.toLowerCase() === tagName);
           if (sameTagSiblings.length > 1) {
             const index = sameTagSiblings.indexOf(current) + 1;
             xpath += `[${index}]`;
@@ -347,14 +347,20 @@ var SmartDOMReaderBundle = (function (exports) {
       return SelectorGenerator.isUniqueSelectorForElement(`#${CSS.escape(id)}`, element, root);
     }
     /**
-     * Check if a selector is unique within a container
+     * Parent used for sibling position: Element, Document, or ShadowRoot.
+     * parentElement is null when the parent is a ShadowRoot.
      */
-    static isUniqueSelector(selector, container) {
-      try {
-        return container.querySelectorAll(selector).length === 1;
-      } catch {
-        return false;
-      }
+    static getSelectorParent(element) {
+      const parent = element.parentNode;
+      if (!parent) return null;
+      if (parent.nodeType === Node.ELEMENT_NODE) return parent;
+      if (parent.nodeType === Node.DOCUMENT_NODE || parent.nodeType === Node.DOCUMENT_FRAGMENT_NODE)
+        return parent;
+      return null;
+    }
+    static getElementChildren(parent) {
+      if (!parent) return [];
+      return Array.from(parent.children);
     }
     static isUniqueSelectorForElement(selector, element, root) {
       try {
@@ -385,16 +391,23 @@ var SmartDOMReaderBundle = (function (exports) {
         .slice(0, 2);
     }
     /**
-     * Optimize the selector path by removing unnecessary parts
+     * Optimize the selector path by removing unnecessary parts.
+     * If a descendant-only path collides (direct child vs nested same tag),
+     * fall back to `:host >` (shadow) or `:scope >` (document) so the match
+     * is a child of the selector root. `:scope >` is empty inside ShadowRoot.
      */
     static optimizePath(path, element, root) {
-      for (let i = 0; i < path.length - 1; i++) {
-        const shortPath = path.slice(i).join(' > ');
-        try {
-          const matches = root.querySelectorAll(shortPath);
-          if (matches.length === 1 && matches[0] === element) return shortPath;
-        } catch {}
-      }
+      const joined = path.join(' > ');
+      const childPrefix = root.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? ':host > ' : ':scope > ';
+      const attempts = [];
+      if (SelectorGenerator.getSelectorParent(element) === root)
+        attempts.push(`${childPrefix}${joined}`);
+      for (let i = 0; i < path.length; i++) attempts.push(path.slice(i).join(' > '));
+      for (let i = 0; i < path.length; i++)
+        attempts.push(`${childPrefix}${path.slice(i).join(' > ')}`);
+      for (const candidate of attempts)
+        if (SelectorGenerator.isUniqueSelectorForElement(candidate, element, root))
+          return candidate;
       return path.join(' > ');
     }
     /**

@@ -132,11 +132,14 @@ export class SelectorGenerator {
         selector += `.${classes.map((c) => CSS.escape(c)).join('.')}`;
       }
 
-      // Add position if needed for uniqueness
-      const siblings = current.parentElement?.children;
-      if (siblings && siblings.length > 1) {
-        const index = Array.from(siblings).indexOf(current);
-        if (index > 0 || !SelectorGenerator.isUniqueSelector(selector, current.parentElement!)) {
+      // Sibling index uses parentNode so ShadowRoot children are counted.
+      // Always pin nth-child when there are element siblings: uniqueness in
+      // the parent is not enough (a nested same-tag node can share the leaf).
+      const parent = SelectorGenerator.getSelectorParent(current);
+      const siblings = SelectorGenerator.getElementChildren(parent);
+      if (siblings.length > 1) {
+        const index = siblings.indexOf(current);
+        if (index >= 0) {
           selector += `:nth-child(${index + 1})`;
         }
       }
@@ -170,12 +173,12 @@ export class SelectorGenerator {
 
       let xpath = tagName;
 
-      // Add index if there are siblings with same tag
-      const siblings = current.parentElement?.children;
-      if (siblings) {
-        const sameTagSiblings = Array.from(siblings).filter(
-          (s) => s.nodeName.toLowerCase() === tagName
-        );
+      // Add index if there are siblings with same tag (including ShadowRoot children)
+      const siblings = SelectorGenerator.getElementChildren(
+        SelectorGenerator.getSelectorParent(current)
+      );
+      if (siblings.length > 0) {
+        const sameTagSiblings = siblings.filter((s) => s.nodeName.toLowerCase() === tagName);
         if (sameTagSiblings.length > 1) {
           const index = sameTagSiblings.indexOf(current) + 1;
           xpath += `[${index}]`;
@@ -236,14 +239,22 @@ export class SelectorGenerator {
   }
 
   /**
-   * Check if a selector is unique within a container
+   * Parent used for sibling position: Element, Document, or ShadowRoot.
+   * parentElement is null when the parent is a ShadowRoot.
    */
-  private static isUniqueSelector(selector: string, container: Element): boolean {
-    try {
-      return container.querySelectorAll(selector).length === 1;
-    } catch {
-      return false;
+  private static getSelectorParent(element: Element): SelectorRoot | Element | null {
+    const parent = element.parentNode;
+    if (!parent) return null;
+    if (parent.nodeType === Node.ELEMENT_NODE) return parent as Element;
+    if (parent.nodeType === Node.DOCUMENT_NODE || parent.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+      return parent as SelectorRoot;
     }
+    return null;
+  }
+
+  private static getElementChildren(parent: SelectorRoot | Element | null): Element[] {
+    if (!parent) return [];
+    return Array.from(parent.children);
   }
 
   private static isUniqueSelectorForElement(
@@ -285,19 +296,28 @@ export class SelectorGenerator {
   }
 
   /**
-   * Optimize the selector path by removing unnecessary parts
+   * Optimize the selector path by removing unnecessary parts.
+   * If a descendant-only path collides (direct child vs nested same tag),
+   * fall back to `:host >` (shadow) or `:scope >` (document) so the match
+   * is a child of the selector root. `:scope >` is empty inside ShadowRoot.
    */
   private static optimizePath(path: string[], element: Element, root: SelectorRoot): string {
-    // Try progressively shorter paths
-    for (let i = 0; i < path.length - 1; i++) {
-      const shortPath = path.slice(i).join(' > ');
-      try {
-        const matches = root.querySelectorAll(shortPath);
-        if (matches.length === 1 && matches[0] === element) {
-          return shortPath;
-        }
-      } catch {
-        // Invalid selector, continue
+    const joined = path.join(' > ');
+    const childPrefix = root.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? ':host > ' : ':scope > ';
+    const attempts: string[] = [];
+    if (SelectorGenerator.getSelectorParent(element) === root) {
+      attempts.push(`${childPrefix}${joined}`);
+    }
+    for (let i = 0; i < path.length; i++) {
+      attempts.push(path.slice(i).join(' > '));
+    }
+    for (let i = 0; i < path.length; i++) {
+      attempts.push(`${childPrefix}${path.slice(i).join(' > ')}`);
+    }
+
+    for (const candidate of attempts) {
+      if (SelectorGenerator.isUniqueSelectorForElement(candidate, element, root)) {
+        return candidate;
       }
     }
 
