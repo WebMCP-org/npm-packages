@@ -35,6 +35,25 @@ export { useWebMCPContext } from './useWebMCPContext.js';
 export { useWebMCPPrompt } from './useWebMCPPrompt.js';
 export { useWebMCPResource } from './useWebMCPResource.js';
 
+// Consent layer — types, annotation mapping, broker, hook, and provider
+export type {
+  ConsentDecision,
+  ConsentMetadata,
+  PendingConsentRequest,
+  RiskLevel,
+} from './consent-types.js';
+export type { McpToolAnnotations } from './consent-annotations.js';
+export { toMcpAnnotations } from './consent-annotations.js';
+export type { ConsentDecisionEvent } from './consent-broker.js';
+export { ConsentBroker } from './consent-broker.js';
+export type { GuardedToolDef } from './useGuardedWebMCP.js';
+export { useGuardedWebMCP } from './useGuardedWebMCP.js';
+export {
+  ConsentBrokerProvider,
+  useConsentBroker,
+  usePendingConsentRequests,
+} from './ConsentBrokerProvider.js';
+
 declare module 'react' {
   interface FormHTMLAttributes<T> {
     toolname?: string;
