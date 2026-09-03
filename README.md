@@ -183,7 +183,7 @@ Three ways for AI agents to discover and call your tools:
     browser             built-in agent       Cursor, VS Code
 ```
 
-**MCP-B Extension** — [Install it from the Chrome Web Store](https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa). It discovers tools exposed by pages and connects them to extension-side agent experiences.
+**Rook** — [Install it from the Chrome Web Store](https://chromewebstore.google.com/detail/opojeelojlkcinlhkbahpcekdolfjmhi). It discovers tools exposed by pages and connects them to extension-side agent experiences.
 
 **Chrome Native** — Enable at `chrome://flags` → _Experimental Web Platform features_, or:
 
@@ -383,7 +383,7 @@ Contributions welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md) for guideline
 
 - [What is WebMCP?](https://docs.mcp-b.ai/explanation/what-is-webmcp)
 - [MCP-b Documentation](https://docs.mcp-b.ai)
-- [MCP-B Browser Extension](https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa)
+- [Rook browser extension](https://chromewebstore.google.com/detail/opojeelojlkcinlhkbahpcekdolfjmhi)
 - [W3C WebMCP Spec](https://webmachinelearning.github.io/webmcp/)
 - [W3C Web Machine Learning Community Group](https://www.w3.org/community/webmachinelearning/)
 - [Model Context Protocol Specification](https://modelcontextprotocol.io/)
