@@ -1,12 +1,36 @@
 import { defineMiddleware } from 'astro:middleware';
 
+const canonicalPathRedirects = new Map([
+  ['/about', '/about/'],
+  ['/blog', '/blog/'],
+  ['/contact', '/contact/'],
+  ['/privacy', '/privacy/'],
+  ['/terms', '/terms/'],
+  ['/blog/mcp-b-introduction', '/blog/mcp-b-introduction/'],
+  ['/blog/webmcp-challenge', '/blog/webmcp-challenge/'],
+  ['/blogs', '/blog/'],
+  ['/blogs/', '/blog/'],
+  ['/blogs/mcp-b-introduction', '/blog/mcp-b-introduction/'],
+  ['/blogs/mcp-b-introduction/', '/blog/mcp-b-introduction/'],
+]);
+
 export const onRequest = defineMiddleware(async (context, next) => {
   const url = new URL(context.request.url);
+  let shouldRedirect = false;
 
-  // Redirect www to apex domain for SEO canonicalization
   if (url.hostname === 'www.mcp-b.ai') {
     url.hostname = 'mcp-b.ai';
-    return Response.redirect(url.toString(), 301);
+    shouldRedirect = true;
+  }
+
+  const canonicalPath = canonicalPathRedirects.get(url.pathname);
+  if (canonicalPath) {
+    url.pathname = canonicalPath;
+    shouldRedirect = true;
+  }
+
+  if (shouldRedirect) {
+    return Response.redirect(url.toString(), 308);
   }
 
   const response = await next();

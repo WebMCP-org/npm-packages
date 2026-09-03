@@ -1,8 +1,8 @@
 <div align="center">
 
-# @mcp-b
+# MCP-B WebMCP packages
 
-**Polyfill and MCP bridge for the [Web Model Context API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`)**
+**MCP-B (`@mcp-b`) is a polyfill and MCP bridge for the [Web Model Context API](https://webmachinelearning.github.io/webmcp/) (`document.modelContext`).**
 
 <p>
   <a href="https://webmachinelearning.github.io/webmcp/"><img src="https://img.shields.io/badge/W3C-WebMCP%20Spec-005A9C?style=flat-square" alt="W3C WebMCP Spec"></a>
@@ -35,9 +35,9 @@ Chrome preview extension
 └── .executeTool(tool, inputJson)    Execute a discovered tool
 ```
 
-MCP-b **polyfills** that API for all browsers today, and **bridges** it to the full [Model Context Protocol](https://modelcontextprotocol.io/) — turning that tool source into a complete MCP server with prompts, resources, and browser transports.
+MCP-B **polyfills** that API for all browsers today, and **bridges** it to the full [Model Context Protocol](https://modelcontextprotocol.io/) — turning that tool source into a complete MCP server with prompts, resources, and browser transports.
 
-> Built by [MCP-b](https://docs.mcp-b.ai). Not an official W3C or MCP project.
+> Built by [MCP-B](https://mcp-b.ai/) with [implementation guides and package documentation](https://docs.mcp-b.ai/). Not an official W3C or MCP project.
 
 ## Getting Started
 
@@ -183,7 +183,7 @@ Three ways for AI agents to discover and call your tools:
     browser             built-in agent       Cursor, VS Code
 ```
 
-**MCP-B Extension** — [Install it from the Chrome Web Store](https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa). It discovers tools exposed by pages and connects them to extension-side agent experiences.
+**Rook** — [Install it from the Chrome Web Store](https://chromewebstore.google.com/detail/opojeelojlkcinlhkbahpcekdolfjmhi). It discovers tools exposed by pages and connects them to extension-side agent experiences.
 
 **Chrome Native** — Enable at `chrome://flags` → _Experimental Web Platform features_, or:
 
@@ -383,7 +383,7 @@ Contributions welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md) for guideline
 
 - [What is WebMCP?](https://docs.mcp-b.ai/explanation/what-is-webmcp)
 - [MCP-b Documentation](https://docs.mcp-b.ai)
-- [MCP-B Browser Extension](https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa)
+- [Rook browser extension](https://chromewebstore.google.com/detail/opojeelojlkcinlhkbahpcekdolfjmhi)
 - [W3C WebMCP Spec](https://webmachinelearning.github.io/webmcp/)
 - [W3C Web Machine Learning Community Group](https://www.w3.org/community/webmachinelearning/)
 - [Model Context Protocol Specification](https://modelcontextprotocol.io/)

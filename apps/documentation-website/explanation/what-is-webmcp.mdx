@@ -2,7 +2,16 @@
 title: 'What is WebMCP? Browser tools for AI agents'
 description: 'Learn how WebMCP lets websites expose structured tools to AI agents through browser APIs, authenticated sessions, and visible user interfaces.'
 keywords:
-  ['WebMCP', 'WebMCP API', 'WebMCP proposal', 'document.modelContext', 'AI agents', 'browser tools']
+  [
+    'WebMCP',
+    'WebMCP API',
+    'WebMCP proposal',
+    'WebMCP vs MCP',
+    'MCPB',
+    'document.modelContext',
+    'AI agents',
+    'browser tools',
+  ]
 icon: 'circle-question'
 ---
 
@@ -39,9 +48,22 @@ MCP comparison](https://developer.chrome.com/docs/ai/webmcp/compare-mcp).
 
 The [WebMCP API sources](/reference/webmcp/standard-api) and
 [declarative API sources](/reference/webmcp/declarative-api) route
-implementation questions to their upstream owners. [WebMCP resources and
-status](/explanation/design/spec-status-and-limitations) collects status,
-security, inspection, and testing resources.
+implementation questions to their upstream owners. [WebMCP spec status and
+limitations](/explanation/design/spec-status-and-limitations) collects W3C
+draft status, security, inspection, and testing resources.
+
+## WebMCP vs MCP
+
+The [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) connects AI
+applications to external tools, data sources, and workflows through local or
+remote MCP servers. WebMCP solves a narrower browser problem: it lets the
+currently loaded page describe actions that an agent can discover and invoke.
+
+The two approaches complement each other. A bridge can publish WebMCP page
+tools to an MCP client while keeping execution, authorization checks, and user
+review in the browser. Chrome's [WebMCP and MCP
+comparison](https://developer.chrome.com/docs/ai/webmcp/compare-mcp) is the
+upstream reference for the distinction.
 
 ## Where MCP-B fits
 
