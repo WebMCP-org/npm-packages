@@ -1,0 +1,456 @@
+---
+import { siteConfig } from '@/lib/config';
+
+const { socialProof } = siteConfig;
+const split = Math.ceil(socialProof.items.length / 2);
+const shiftedItems = [
+  ...socialProof.items.slice(split),
+  ...socialProof.items.slice(0, split),
+];
+const rows = [
+  [...socialProof.items, ...socialProof.items],
+  [...shiftedItems, ...shiftedItems],
+];
+---
+
+<section id="social-proof" class="social-proof" aria-label="WebMCP in the wild">
+  <div
+    class="social-proof__wall"
+    data-social-proof-wall
+    aria-label="Selected WebMCP coverage and conversations"
+  >
+    {
+      rows.map((row, rowIndex) => (
+        <div
+          class="social-proof__track"
+          data-social-proof-track={rowIndex + 1}
+          data-count={socialProof.items.length}
+        >
+          {row.map((item, itemIndex) => {
+            const isDuplicate = rowIndex > 0 || itemIndex >= socialProof.items.length;
+
+            return (
+              <a
+                class="social-proof__tile"
+                href={item.href}
+                target="_blank"
+                rel="noreferrer"
+                aria-hidden={isDuplicate ? 'true' : undefined}
+                tabindex={isDuplicate ? -1 : undefined}
+                style={`--proof-image: url("${item.image}"); --proof-image-size: ${item.backgroundSize ?? 'cover'};`}
+              >
+                <span class="social-proof__tile-inner">
+                  <span class="social-proof__work">{item.work}</span>
+                  <span class="social-proof__meta">
+                    <b>{item.client}</b>&nbsp;&middot;&nbsp;{item.sector}
+                  </span>
+                </span>
+              </a>
+            );
+          })}
+        </div>
+      ))
+    }
+  </div>
+</section>
+
+<script>
+  const socialProofCleanups = new WeakMap<HTMLElement, () => void>();
+
+  const initSocialProofWalls = () => {
+    for (const wall of document.querySelectorAll<HTMLElement>('[data-social-proof-wall]')) {
+      socialProofCleanups.get(wall)?.();
+
+      const firstTrack = wall.querySelector<HTMLElement>('[data-social-proof-track="1"]');
+      const secondTrack = wall.querySelector<HTMLElement>('[data-social-proof-track="2"]');
+
+      if (!firstTrack || !secondTrack) continue;
+      const tracks = [firstTrack, secondTrack] as const;
+
+      const itemCount = Number(tracks[0].dataset.count) || tracks[0].children.length / 2;
+      const speed = 26;
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const finePointer = window.matchMedia('(pointer: fine)').matches;
+
+      let period = 384;
+      let half = itemCount * period;
+      let firstOffset = 0;
+      let secondOffset = 0;
+      let measured = false;
+      let dragging = false;
+      let hovered = false;
+      let inertia = 0;
+      let startX = 0;
+      let firstStartOffset = 0;
+      let secondStartOffset = 0;
+      let lastX = 0;
+      let lastTime = performance.now();
+      let lastFrame = performance.now();
+      let animationFrame = 0;
+      let running = false;
+
+      const wrap = (value: number) => {
+        if (half <= 0) return value;
+        let next = value;
+        while (next <= -half) next += half;
+        while (next > 0) next -= half;
+        return next;
+      };
+
+      const apply = () => {
+        tracks[0].style.transform = `translateX(${firstOffset}px)`;
+        tracks[1].style.transform = `translateX(${secondOffset}px)`;
+      };
+
+      const fillTrack = (track: HTMLElement) => {
+        if (getComputedStyle(track).display === 'none') return;
+        const originals = [...track.children].slice(0, itemCount);
+        if (originals.length === 0 || period <= 0) return;
+
+        const minWidth = wall.getBoundingClientRect().width * 2 + period;
+        while (track.scrollWidth < minWidth) {
+          const before = track.scrollWidth;
+          for (const node of originals) {
+            const clone = node.cloneNode(true);
+            if (!(clone instanceof HTMLElement)) continue;
+            clone.setAttribute('aria-hidden', 'true');
+            clone.tabIndex = -1;
+            track.appendChild(clone);
+          }
+          if (track.scrollWidth <= before) break;
+        }
+      };
+
+      const measure = () => {
+        const firstTile = tracks[0].firstElementChild;
+        const tileWidth = firstTile?.getBoundingClientRect().width ?? 384;
+        const gap = Number.parseFloat(getComputedStyle(tracks[0]).columnGap) || 0;
+        period = tileWidth + gap;
+        half = itemCount * period;
+        fillTrack(tracks[0]);
+        fillTrack(tracks[1]);
+
+        if (!measured) {
+          firstOffset = wrap(-Math.round(period * 0.28));
+          secondOffset = wrap(-Math.round(period * 0.78));
+          measured = true;
+        }
+
+        firstOffset = wrap(firstOffset);
+        secondOffset = wrap(secondOffset);
+        apply();
+      };
+
+      const tick = (now: number) => {
+        const deltaTime = Math.min(64, now - lastFrame);
+        lastFrame = now;
+
+        if (!dragging && Math.abs(inertia) > 0.05) {
+          firstOffset += inertia;
+          secondOffset += inertia;
+          inertia *= 0.92;
+        } else if (!dragging && !hovered && !reduceMotion) {
+          const step = (speed * deltaTime) / 1000;
+          firstOffset -= step;
+          secondOffset += step;
+        }
+
+        firstOffset = wrap(firstOffset);
+        secondOffset = wrap(secondOffset);
+        apply();
+        if (running) animationFrame = requestAnimationFrame(tick);
+      };
+
+      const start = () => {
+        if (running) return;
+        running = true;
+        lastFrame = performance.now();
+        animationFrame = requestAnimationFrame(tick);
+      };
+
+      const stop = () => {
+        running = false;
+        cancelAnimationFrame(animationFrame);
+      };
+
+      const onPointerEnter = () => {
+        if (finePointer) hovered = true;
+      };
+      const onPointerLeave = () => {
+        hovered = false;
+      };
+      const onPointerDown = (event: PointerEvent) => {
+        dragging = true;
+        inertia = 0;
+        startX = event.clientX;
+        firstStartOffset = firstOffset;
+        secondStartOffset = secondOffset;
+        lastX = event.clientX;
+        lastTime = performance.now();
+        wall.classList.add('is-dragging');
+        wall.setPointerCapture(event.pointerId);
+      };
+      const onPointerMove = (event: PointerEvent) => {
+        if (!dragging) return;
+        const delta = event.clientX - startX;
+        firstOffset = firstStartOffset + delta;
+        secondOffset = secondStartOffset + delta;
+
+        const now = performance.now();
+        const deltaTime = now - lastTime;
+        if (deltaTime > 0) inertia = ((event.clientX - lastX) / deltaTime) * 16;
+        lastX = event.clientX;
+        lastTime = now;
+        apply();
+      };
+      const onPointerEnd = () => {
+        if (!dragging) return;
+        dragging = false;
+        wall.classList.remove('is-dragging');
+      };
+
+      wall.addEventListener('pointerenter', onPointerEnter);
+      wall.addEventListener('pointerleave', onPointerLeave);
+      wall.addEventListener('pointerdown', onPointerDown);
+      wall.addEventListener('pointermove', onPointerMove);
+      wall.addEventListener('pointerup', onPointerEnd);
+      wall.addEventListener('pointercancel', onPointerEnd);
+      window.addEventListener('resize', measure);
+
+      measure();
+      const visibility = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) start();
+        else stop();
+      });
+      visibility.observe(wall);
+
+      socialProofCleanups.set(wall, () => {
+        visibility.disconnect();
+        stop();
+        wall.removeEventListener('pointerenter', onPointerEnter);
+        wall.removeEventListener('pointerleave', onPointerLeave);
+        wall.removeEventListener('pointerdown', onPointerDown);
+        wall.removeEventListener('pointermove', onPointerMove);
+        wall.removeEventListener('pointerup', onPointerEnd);
+        wall.removeEventListener('pointercancel', onPointerEnd);
+        window.removeEventListener('resize', measure);
+        wall.classList.remove('is-dragging');
+        socialProofCleanups.delete(wall);
+      });
+    }
+  };
+
+  initSocialProofWalls();
+  document.addEventListener('astro:page-load', initSocialProofWalls);
+  document.addEventListener('astro:before-swap', () => {
+    for (const wall of document.querySelectorAll<HTMLElement>('[data-social-proof-wall]')) {
+      socialProofCleanups.get(wall)?.();
+    }
+  });
+</script>
+
+<style>
+  .social-proof {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    background: var(--background);
+    color: var(--foreground);
+    padding-block: var(--sigvelo-spacing-4) var(--sigvelo-spacing-8);
+  }
+
+  .social-proof__wall {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    row-gap: clamp(var(--sigvelo-spacing-3), 1.5vw, var(--sigvelo-spacing-5));
+    overflow: hidden;
+    touch-action: pan-y;
+    cursor: grab;
+    padding-block: clamp(var(--sigvelo-spacing-3), 1.5vw, var(--sigvelo-spacing-5));
+    padding-inline: 0;
+    perspective: 1100px;
+  }
+
+  .social-proof__wall.is-dragging {
+    cursor: grabbing;
+  }
+
+  .social-proof__track {
+    display: flex;
+    column-gap: clamp(var(--sigvelo-spacing-3), 1.5vw, var(--sigvelo-spacing-5));
+    width: max-content;
+    will-change: transform;
+  }
+
+  .social-proof__tile {
+    position: relative;
+    display: block;
+    flex: 0 0 auto;
+    width: 24rem;
+    height: 13.125rem;
+    margin: 0;
+    overflow: hidden;
+    border: var(--sigvelo-border-width) solid var(--sigvelo-public-rule);
+    border-radius: var(--sigvelo-radius-sm);
+    background: var(--sigvelo-public-blue);
+    box-shadow: var(--sigvelo-elevation-raised);
+    color: #fff;
+    text-decoration: none;
+    transform: skewX(-9deg);
+    transform-style: preserve-3d;
+    isolation: isolate;
+    transition:
+      border-color var(--sigvelo-motion-duration-interaction) var(--sigvelo-motion-ease-change),
+      transform var(--sigvelo-motion-duration-disclosure) var(--sigvelo-motion-ease-enter);
+    will-change: transform;
+  }
+
+  .social-proof__tile::before,
+  .social-proof__tile::after {
+    content: '';
+    position: absolute;
+    inset: -0.875rem -1.5rem;
+    transform: skewX(9deg);
+  }
+
+  .social-proof__tile::before {
+    z-index: 0;
+    background-image: var(--proof-image);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: var(--proof-image-size, cover);
+    transition:
+      filter var(--sigvelo-motion-duration-disclosure) var(--sigvelo-motion-ease-change),
+      transform var(--sigvelo-motion-duration-disclosure) var(--sigvelo-motion-ease-enter);
+  }
+
+  .social-proof__tile::after {
+    z-index: 1;
+    background:
+      linear-gradient(180deg, rgb(6 13 32 / 0.14), rgb(6 13 32 / 0.82)),
+      linear-gradient(90deg, rgb(6 13 32 / 0.7), rgb(6 13 32 / 0.18));
+  }
+
+  .social-proof__tile-inner {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    padding: 1.875rem 2.75rem;
+    transform: skewX(9deg);
+    transform-style: preserve-3d;
+  }
+
+  .social-proof__work {
+    max-width: 24ch;
+    color: #fff;
+    font-size: var(--sigvelo-text-lg);
+    font-weight: var(--sigvelo-font-weight-semibold);
+    line-height: var(--sigvelo-leading-compact);
+    text-wrap: balance;
+  }
+
+  .social-proof__meta {
+    color: rgb(255 255 255 / 0.82);
+    font-size: var(--sigvelo-text-compact);
+    line-height: var(--sigvelo-leading-snug);
+  }
+
+  .social-proof__meta b {
+    color: #fff;
+  }
+
+  .social-proof__tile:focus-visible {
+    outline: var(--sigvelo-focus-width) solid var(--sigvelo-color-focus);
+    outline-offset: var(--sigvelo-focus-offset);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .social-proof__tile:hover {
+      z-index: 2;
+      border-color: var(--sigvelo-public-rule-strong);
+      text-decoration: none;
+      transform: translate3d(0, -0.625rem, 1.75rem) rotateX(4deg) rotateY(-6deg)
+        skewX(-9deg) scale(1.035);
+    }
+
+    .social-proof__tile:hover::before {
+      filter: saturate(1.08) contrast(1.05);
+      transform: skewX(9deg) scale(1.045);
+    }
+  }
+
+  @media (max-width: 700px) {
+    .social-proof {
+      padding-block: var(--sigvelo-spacing-4) var(--sigvelo-spacing-8);
+    }
+
+    .social-proof__wall {
+      row-gap: 0;
+      padding-block: var(--sigvelo-spacing-1-5);
+      padding-inline: 0;
+    }
+
+    .social-proof__track {
+      column-gap: var(--sigvelo-spacing-3);
+    }
+
+    .social-proof__track:nth-child(2) {
+      display: none;
+    }
+
+    .social-proof__tile {
+      width: min(21rem, 80vw);
+      height: 13.5rem;
+      transform: skewX(-4deg);
+    }
+
+    .social-proof__tile::before,
+    .social-proof__tile::after {
+      inset: -0.75rem -1rem;
+      transform: skewX(4deg);
+    }
+
+    .social-proof__tile-inner {
+      padding: 1.45rem clamp(1.5rem, 7vw, 2rem);
+      transform: skewX(4deg);
+    }
+
+    .social-proof__work {
+      font-size: var(--sigvelo-text-fluid-lg);
+      line-height: var(--sigvelo-leading-tight);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .social-proof__wall {
+      overflow-x: auto;
+    }
+
+    .social-proof__track {
+      will-change: auto;
+    }
+
+    .social-proof__track:nth-child(2),
+    .social-proof__tile[aria-hidden='true'] {
+      display: none;
+    }
+
+    .social-proof__tile,
+    .social-proof__tile::before {
+      transition: none;
+    }
+
+    .social-proof__tile:hover {
+      transform: skewX(-9deg);
+    }
+
+    .social-proof__tile:hover::before {
+      filter: none;
+      transform: skewX(9deg);
+    }
+  }
+</style>

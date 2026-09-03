@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codex WebMCP result probe</title>
+  </head>
+  <body>
+    <h1>Codex WebMCP result probe</h1>
+    <p>This page does not load a WebMCP polyfill.</p>
+    <pre id="results">Registering…</pre>
+
+    <script>
+      const results = document.querySelector('#results');
+      const circular = { value: 'circular' };
+      circular.self = circular;
+
+      const values = {
+        object: () => ({ ok: true, nested: { count: 1 } }),
+        array: () => ['alpha', 2, false],
+        string: () => 'plain string',
+        number: () => 42,
+        boolean: () => true,
+        null: () => null,
+        undefined: () => undefined,
+        bigint: () => 1n,
+        circular: () => circular,
+        throw: () => {
+          throw new Error('probe throw');
+        },
+        reject_string: () => Promise.reject('probe rejection'),
+      };
+
+      document.modelContext
+        .registerTool({
+          name: 'codex_probe_result_shape',
+          description: 'Returns the selected JavaScript value or error for compatibility testing.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              mode: { type: 'string', enum: Object.keys(values) },
+            },
+            required: ['mode'],
+            additionalProperties: false,
+          },
+          execute: async ({ mode }) => values[mode](),
+        })
+        .then(() => {
+          results.textContent = 'Registered';
+        })
+        .catch((error) => {
+          results.textContent = `${error?.name ?? 'Error'}: ${error?.message ?? String(error)}`;
+        });
+    </script>
+  </body>
+</html>

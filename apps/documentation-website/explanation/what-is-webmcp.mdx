@@ -1,29 +1,57 @@
 ---
-title: 'What is WebMCP?'
-description: 'Why WebMCP exists, what the browser standard defines, and where MCP-B adds tooling.'
-keywords: ['webmcp', 'document.modelContext', 'web standard', 'mcp-b']
+title: 'What is WebMCP? Browser tools for AI agents'
+description: 'Learn how WebMCP lets websites expose structured tools to AI agents through browser APIs, authenticated sessions, and visible user interfaces.'
+keywords:
+  ['WebMCP', 'WebMCP API', 'WebMCP proposal', 'document.modelContext', 'AI agents', 'browser tools']
 icon: 'circle-question'
 ---
 
-WebMCP proposes browser APIs for publishing structured tools. JavaScript uses
-`document.modelContext`, while the declarative proposal lets HTML forms describe
-tools without replacing their visible controls or validation.
+WebMCP is a Community Group proposal that lets a web application publish
+structured actions as tools for AI agents. The site defines the actions and
+their inputs. The agent uses that contract instead of inferring behavior from
+screenshots, DOM structure, or click sequences.
 
-These tools run inside the document's origin, authenticated session,
-application state, and event loop. Unlike a remote MCP server, a WebMCP tool can
-operate on the page the user is currently viewing and remain tied to that
-document's lifecycle.
+The browser is a useful home for these tools because the page already has the
+application's state, authorization checks, and visible interface. A tool can
+reuse that context without moving browser-only logic into a separate service.
+The application still validates inputs, enforces permissions, and asks for
+confirmation when the consequence warrants it.
 
-That location is the point of the design. Agents get an explicit capability
-contract from the site instead of inferring intent from screenshots, DOM shape,
-or brittle automation scripts.
+```mermaid
+sequenceDiagram
+  participant Site as Web application
+  participant Context as Browser WebMCP context
+  participant Agent as AI agent
+  Site->>Context: Register structured tools
+  Agent->>Context: Discover and invoke a tool
+  Context->>Site: Run the registered handler
+  Site-->>Context: Return a structured result
+  Context-->>Agent: Return the result
+```
 
-The [WebMCP Community Group draft](https://webmachinelearning.github.io/webmcp/)
-is authoritative for the proposed standard surface. Chrome currently exposes
-an experimental implementation. MCP-B supplies implementation and integration
-tooling, including the strict polyfill, React bindings, browser transports,
-iframe bridges, and local relays. MCP-B capabilities beyond the standard tool
-surface are extensions.
+## Learn about the proposal
 
-For implementation, follow [Build your first tool](/tutorials/first-tool) and
-[Choose a runtime](/how-to/choose-runtime).
+The [Community Group draft](https://webmachinelearning.github.io/webmcp/) owns
+the proposed JavaScript API. Chrome maintains the current [developer
+overview](https://developer.chrome.com/docs/ai/webmcp), [user journey
+guide](https://developer.chrome.com/docs/ai/webmcp/use-cases), and [WebMCP and
+MCP comparison](https://developer.chrome.com/docs/ai/webmcp/compare-mcp).
+
+The [WebMCP API sources](/reference/webmcp/standard-api) and
+[declarative API sources](/reference/webmcp/declarative-api) route
+implementation questions to their upstream owners. [WebMCP resources and
+status](/explanation/design/spec-status-and-limitations) collects status,
+security, inspection, and testing resources.
+
+## Where MCP-B fits
+
+MCP-B provides packages around the proposal, including a polyfill, React
+bindings, transports, iframe bridges, and a local relay. Bridges can make page
+tools available to MCP clients, but the browser document remains the execution
+environment. MCP-B does not define the WebMCP proposal.
+
+[WebMCP and MCP-B
+extensions](/explanation/strict-core-vs-mcp-b-extensions) explains which
+behavior belongs to this project. [Transports and
+bridges](/explanation/architecture/transports-and-bridges) explains how those
+packages cross browser boundaries.

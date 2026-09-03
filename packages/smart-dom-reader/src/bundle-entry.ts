@@ -1,9 +1,6 @@
 /**
- * Bundle Entry Point for Smart DOM Reader
- *
- * This creates a self-contained bundle that can be injected and executed
- * in a stateless manner. The bundle exports a single execute function
- * that processes extraction requests and ALWAYS returns markdown-formatted results.
+ * Bundle entry point for Smart DOM Reader: a self-contained bundle exposing one
+ * stateless extraction function that always returns markdown-formatted results.
  */
 
 import type { ExtractionArgs, ExtractionMethod, ExtractionResult } from './bundle-types';
@@ -31,16 +28,20 @@ export function executeExtraction<M extends ExtractionMethod>(
   try {
     let result: string;
 
+    // TS cannot narrow the indexed type `ExtractionArgs[M]` from a switch on `method`,
+    // so each arm restates the arg type it already knows it has.
     switch (method) {
       case 'extractStructure': {
         const structureArgs = args as ExtractionArgs['extractStructure'];
         const { selector, frameSelector, formatOptions } = structureArgs;
         const doc = resolveDocument(frameSelector);
 
-        const target = selector ? (doc.querySelector(selector) ?? doc) : doc;
+        const target = selector ? doc.querySelector(selector) : doc;
+        if (!target) {
+          return { error: `No element found matching selector: ${selector}` };
+        }
         const overview = ProgressiveExtractor.extractStructure(target);
 
-        // Always return markdown formatted result
         const meta = { title: document.title, url: location.href };
         result = MarkdownFormatter.structure(
           overview,
@@ -65,7 +66,6 @@ export function executeExtraction<M extends ExtractionMethod>(
           return { error: `No element found matching selector: ${selector}` };
         }
 
-        // Always return markdown formatted result
         const meta = { title: document.title, url: location.href };
         result = MarkdownFormatter.region(
           extractResult,
@@ -87,7 +87,6 @@ export function executeExtraction<M extends ExtractionMethod>(
           return { error: `No element found matching selector: ${selector}` };
         }
 
-        // Always return markdown formatted result
         const meta = { title: document.title, url: location.href };
         result = MarkdownFormatter.content(
           extractResult,
@@ -102,15 +101,15 @@ export function executeExtraction<M extends ExtractionMethod>(
         const { selector, frameSelector, options, formatOptions } = interactiveArgs;
         const doc = resolveDocument(frameSelector);
 
-        const extractResult = selector
-          ? SmartDOMReader.extractFromElement(
-              doc.querySelector(selector)!,
-              'interactive',
-              options || {}
-            )
+        const target = selector ? doc.querySelector(selector) : null;
+        if (selector && !target) {
+          return { error: `No element found matching selector: ${selector}` };
+        }
+
+        const extractResult = target
+          ? SmartDOMReader.extractFromElement(target, 'interactive', options || {})
           : SmartDOMReader.extractInteractive(doc, options || {});
 
-        // Always return markdown formatted result
         const meta = { title: document.title, url: location.href };
         result = MarkdownFormatter.region(
           extractResult,
@@ -125,11 +124,15 @@ export function executeExtraction<M extends ExtractionMethod>(
         const { selector, frameSelector, options, formatOptions } = fullArgs;
         const doc = resolveDocument(frameSelector);
 
-        const extractResult = selector
-          ? SmartDOMReader.extractFromElement(doc.querySelector(selector)!, 'full', options || {})
+        const target = selector ? doc.querySelector(selector) : null;
+        if (selector && !target) {
+          return { error: `No element found matching selector: ${selector}` };
+        }
+
+        const extractResult = target
+          ? SmartDOMReader.extractFromElement(target, 'full', options || {})
           : SmartDOMReader.extractFull(doc, options || {});
 
-        // Always return markdown formatted result
         const meta = { title: document.title, url: location.href };
         result = MarkdownFormatter.region(extractResult, formatOptions ?? { detail: 'deep' }, meta);
         break;

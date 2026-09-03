@@ -5,7 +5,7 @@ keywords: ['@mcp-b/global', 'overview', 'BrowserMcpServer', 'transport', 'MCP-B 
 icon: 'globe'
 ---
 
-`@mcp-b/global` is the full runtime entry point for browser applications. It installs or adopts the strict WebMCP surface, creates a `BrowserMcpServer`, and connects transport behind `document.modelContext`.
+`@mcp-b/global` is the full MCP-B runtime entry point for browser applications. It installs or adopts the package-supported WebMCP surface, creates a `BrowserMcpServer`, and connects transport behind `document.modelContext`.
 
 ## When to use this package
 
@@ -15,12 +15,12 @@ icon: 'globe'
 
 ## When not to use this package
 
-- You only need strict-core `registerTool` behavior. Use [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview).
+- You only need browser tool registration and discovery. Use [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview).
 - You are building a lower-level runtime integration. Use [`@mcp-b/webmcp-ts-sdk`](/packages/webmcp-ts-sdk/overview) directly.
 
 ## Where it sits in the package graph
 
-`@mcp-b/global` is the top of the runtime stack. It wraps the strict-core layer from [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview), uses [`@mcp-b/webmcp-ts-sdk`](/packages/webmcp-ts-sdk/overview) internally, and starts transports from [`@mcp-b/transports`](/packages/transports/overview).
+`@mcp-b/global` is the top of the runtime stack. It wraps [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview), uses [`@mcp-b/webmcp-ts-sdk`](/packages/webmcp-ts-sdk/overview) internally, and starts transports from [`@mcp-b/transports`](/packages/transports/overview).
 
 ## First step
 

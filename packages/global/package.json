@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/global",
-  "version": "4.0.0",
+  "version": "5.1.0",
   "description": "W3C Web Model Context Protocol (WebMCP) API polyfill. Let AI agents like Claude, ChatGPT, and Gemini interact with your website via document.modelContext.",
   "keywords": [
     "ai-agents",
@@ -48,7 +48,7 @@
   "sideEffects": true,
   "main": "./dist/index.js",
   "module": "./dist/index.js",
-  "browser": "./dist/index.iife.js",
+  "browser": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -79,13 +79,10 @@
     "test:conformance:matrix": "pnpm run test:conformance:polyfill && pnpm run test:conformance:global && pnpm run test:conformance:native",
     "test:conformance:native": "vp test run --config vitest.conformance.native.config.ts --browser.headless",
     "test:conformance:polyfill": "pnpm --filter @mcp-b/webmcp-polyfill run test:conformance",
-    "test:node": "vp test run --config vitest.node.config.ts",
+    "test:coverage": "vp test run --coverage",
     "test:watch": "vp test",
-    "typecheck": "tsc --noEmit && vp test run --typecheck --silent",
-    "typecheck:consumer": "tsc --noEmit --strict --skipLibCheck --module preserve --moduleResolution bundler --lib ES2022,DOM type-tests/consumer.ts",
-    "version:major": "pnpm version major --no-git-tag-version",
-    "version:minor": "pnpm version minor --no-git-tag-version",
-    "version:patch": "pnpm version patch --no-git-tag-version"
+    "typecheck": "tsc --noEmit",
+    "typecheck:consumer": "tsc --noEmit --strict --skipLibCheck --module preserve --moduleResolution bundler --lib ES2022,DOM type-tests/consumer.ts"
   },
   "dependencies": {
     "@mcp-b/transports": "workspace:*",

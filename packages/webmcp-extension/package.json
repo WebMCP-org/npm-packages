@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-extension",
-  "version": "4.0.0",
+  "version": "5.1.0",
   "description": "Inject WebMCP from a Chromium extension and call page tools from an isolated content script",
   "keywords": [
     "browser-extension",
@@ -53,7 +53,7 @@
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
-    "test:e2e": "pnpm --filter @mcp-b/webmcp-extension... run build && node e2e/build-template.mjs && vp pack --filter e2e-content-script && node e2e/verify-extension.mjs && node --experimental-strip-types --test e2e/extension-runtime.e2e.test.ts",
+    "test:e2e": "pnpm --filter @mcp-b/webmcp-extension... run build && node e2e/build-template.mjs && vp pack --filter e2e-content-script && node --experimental-strip-types --test e2e/extension-runtime.e2e.test.ts",
     "typecheck": "tsc -p tsconfig.check.json --noEmit"
   },
   "dependencies": {

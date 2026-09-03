@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-polyfill",
-  "version": "4.0.0",
+  "version": "5.1.0",
   "description": "Strict WebMCP core runtime polyfill for document.modelContext (with deprecated navigator.modelContext alias)",
   "keywords": [
     "browser",
@@ -61,16 +61,16 @@
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
-    "test:browser": "vp test run --browser.headless",
-    "test:browser:ui": "vp test --browser",
     "test:conformance": "vp test run conformance/polyfill-runtime.e2e.test.ts --browser.headless",
-    "typecheck": "tsc --noEmit && vp test run --typecheck --silent"
+    "test:coverage": "vp test run --coverage",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@mcp-b/webmcp-types": "workspace:*",
     "@standard-schema/spec": "^1.1.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:",

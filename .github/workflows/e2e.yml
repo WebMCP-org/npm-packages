@@ -8,9 +8,7 @@ on:
     branches:
       - main
 
-# Restrict permissions to minimum required
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -23,36 +21,46 @@ jobs:
   e2e-tests:
     name: E2E Tests (Playwright)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 20
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1
+        uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
         with:
           node-version: '24'
           cache: true
+          run-install: false
 
       - name: Install dependencies
-        run: vp install
+        run: vp install --frozen-lockfile
 
       - name: Build packages
         run: pnpm build
 
       - name: Setup Chrome
         id: chrome
-        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
         with:
           chrome-version: stable
-          install-dependencies: true
+          install-dependencies: false
 
       - name: Print Chrome version
         run: '"${{ steps.chrome.outputs.chrome-path }}" --version'
+
+      - name: Run DOM reader browser tests
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: pnpm --filter @mcp-b/smart-dom-reader test:local && pnpm --filter @mcp-b/smart-dom-reader-server test:e2e
 
       - name: Run runtime contract E2E tests
         env:
@@ -72,7 +80,7 @@ jobs:
       - name: Run tarball E2E validation (@mcp-b/global)
         env:
           PLAYWRIGHT_CHROMIUM_CHANNEL: chrome
-        run: pnpm test:e2e:tarball:global
+        run: pnpm test:e2e:tarball:global --skip-build
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -93,25 +101,30 @@ jobs:
   extension-e2e:
     name: Extension E2E (Playwright Chromium)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     container:
-      image: mcr.microsoft.com/playwright:v1.60.0-noble
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
     timeout-minutes: 15
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1
+        uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
         with:
           node-version: '24'
           cache: true
+          run-install: false
 
       - name: Install dependencies
-        run: vp install
+        run: vp install --frozen-lockfile
 
       - name: Run extension E2E tests
         env:
@@ -121,54 +134,63 @@ jobs:
   native-parity:
     name: Native API Parity (chrome-canary)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 15
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Checkout Web Platform Tests
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           repository: web-platform-tests/wpt
-          ref: c7fdee80f3f17b4e9813964916afdfd57ace863f
+          ref: 9ef2de86389e3f388578fe5fc599c979078c6667
           path: .reference/wpt
+          # "interfaces" carries the .idl files that webmcp/idlharness.https.window.js
+          # fetches at runtime (webmcp.idl plus its html/dom dependencies). ~1.8 MB.
           sparse-checkout: |
             common
             docs
+            interfaces
             resources
             tools
             webmcp
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1
+        uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
         with:
           node-version: '24'
           cache: true
+          run-install: false
 
       - name: Install dependencies
-        run: vp install
+        run: vp install --frozen-lockfile
 
       - name: Build packages
         run: pnpm build
 
       - name: Setup Chrome Canary
         id: chrome_canary
-        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
         with:
           chrome-version: canary
-          install-dependencies: true
+          install-dependencies: false
 
       # Branded Chrome blocks --load-extension; native extension E2E needs unbranded Chromium.
       - name: Setup Chromium Snapshot
         id: chromium_snapshot
-        uses: browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
         with:
           chrome-version: latest
-          install-dependencies: true
+          install-dependencies: false
 
       - name: Print Chrome Canary version
         run: '"${{ steps.chrome_canary.outputs.chrome-path }}" --version'
@@ -180,6 +202,14 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
         run: pnpm test:wpt
+
+      # Passes 20/20 today; non-blocking because hard-gating API shape is a pending
+      # decision, not because it fails. See docs/TESTING.md.
+      - name: Report WebMCP IDL conformance (non-blocking)
+        continue-on-error: true
+        env:
+          CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
+        run: pnpm test:wpt:idl
 
       - name: Run Native Runtime Contract (Chrome Canary)
         env:

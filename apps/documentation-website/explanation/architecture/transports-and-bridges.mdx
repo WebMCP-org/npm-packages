@@ -11,6 +11,22 @@ a native mechanism for document-tree discovery. MCP-B transports solve a
 different problem: carrying MCP protocol messages between an explicit client
 and server.
 
+<Columns cols={2}>
+  <Card title="Native document discovery" icon="window-restore">
+    **Child:** registers and executes the tool. **Parent:** discovers its descriptor through the
+    browser.
+
+    Execution remains in the child document.
+
+  </Card>
+  <Card title="MCP-B iframe bridge" icon="bridge">
+    **Parent:** MCP client. **Child:** MCP server and tool handler.
+
+    A transport carries MCP messages across the frame boundary; execution remains in the child.
+
+  </Card>
+</Columns>
+
 ## Native cross-document discovery
 
 Native WebMCP stays within the browser's document model:
@@ -38,16 +54,23 @@ element-specific prefix. Resources receive `mcp-iframe:` wrapper URIs. A strict
 parent context can accept tools; prompts and resources require MCP-B extension
 methods.
 
-| Control          | Native document discovery | MCP-B iframe bridge           |
-| ---------------- | ------------------------- | ----------------------------- |
-| Browser policy   | `allow="tools"`           | Independent of MCP connection |
-| Child exposure   | `exposedTo`               | `allowedOrigins`              |
-| Parent selection | `fromOrigins`             | `target-origin`               |
-| Payload          | Strict WebMCP tools       | MCP protocol items            |
+| Control          | Native document discovery | MCP-B iframe bridge                  |
+| ---------------- | ------------------------- | ------------------------------------ |
+| Browser policy   | `allow="tools"`           | Independent of MCP connection        |
+| Who may connect  | Document tree             | `allowedOrigins`                     |
+| Child exposure   | `exposedTo`               | `exposedTo`, within `allowedOrigins` |
+| Parent selection | `fromOrigins`             | `target-origin`                      |
+| Payload          | WebMCP tools              | MCP protocol items                   |
 
 These controls are complementary, not interchangeable. `allow="tools"` does
 not create an MCP server, and `allowedOrigins` does not grant the native browser
-feature.
+feature. On the bridge the two exposure controls stack: `allowedOrigins` decides
+which parents may connect, and `exposedTo` narrows one tool to a subset of them.
+A tool cannot reach an origin `allowedOrigins` already excludes.
+
+The browser enforces `exposedTo` on the native path. The bridge enforces it in
+the child's own JavaScript, so only the native path holds against a compromised
+child.
 
 ## Other MCP-B bridges
 
@@ -79,5 +102,5 @@ in the child page even after the parent republishes its descriptor.
 - [Bridge tools across iframes](/how-to/bridge-tools-across-iframes) for the MCP-B setup
 - [mcp-iframe reference](/packages/mcp-iframe/reference) for element behavior and namespacing
 - [Transports reference](/packages/transports/reference) for low-level class contracts
-- [WebMCP standard API](/reference/webmcp/standard-api) for `exposedTo` and `fromOrigins`
+- [WebMCP API sources](/reference/webmcp/standard-api) for `exposedTo` and `fromOrigins`
 - [Connect desktop agents with local relay](/how-to/connect-desktop-agents-with-local-relay) for the localhost bridge

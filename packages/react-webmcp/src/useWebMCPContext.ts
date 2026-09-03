@@ -1,4 +1,4 @@
-import { useWebMCP, type WebMCPReturn } from 'usewebmcp';
+import { useWebMCP, type WebMCPConfig, type WebMCPReturn } from 'usewebmcp';
 
 /**
  * Convenience hook for exposing read-only context data to AI assistants.
@@ -15,6 +15,7 @@ import { useWebMCP, type WebMCPReturn } from 'usewebmcp';
  * @param name - Unique identifier for the context tool (e.g., 'context_current_post')
  * @param description - Human-readable description of the context for AI assistants
  * @param getValue - Function that returns the current context value
+ * @param options - Registration options; enabled defaults to true
  * @returns Tool execution state and control methods
  *
  * @public
@@ -66,9 +67,11 @@ import { useWebMCP, type WebMCPReturn } from 'usewebmcp';
 export function useWebMCPContext<T>(
   name: string,
   description: string,
-  getValue: () => T
+  getValue: () => T,
+  options: Pick<WebMCPConfig, 'enabled'> = {}
 ): WebMCPReturn {
   return useWebMCP({
+    ...options,
     name,
     description,
     annotations: {

@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-ts-sdk",
-  "version": "4.0.0",
+  "version": "5.1.0",
   "description": "Thin WebMCP-to-MCP v2 browser adapter with native Chrome tool mirroring",
   "keywords": [
     "adapter",
@@ -67,10 +67,8 @@
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
-    "typecheck": "tsc --noEmit",
-    "version:major": "pnpm version major --no-git-tag-version",
-    "version:minor": "pnpm version minor --no-git-tag-version",
-    "version:patch": "pnpm version patch --no-git-tag-version"
+    "test:coverage": "vp test run --coverage",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",
@@ -79,6 +77,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:",

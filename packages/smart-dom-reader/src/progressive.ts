@@ -32,7 +32,7 @@ export class ProgressiveExtractor {
     }
 
     // Find main content
-    if (root instanceof Document) {
+    if (DOMTraversal.isDocument(root)) {
       const main = ContentDetection.findMainContent(root);
       if (main) {
         regions.main = ProgressiveExtractor.analyzeRegion(main);

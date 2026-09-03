@@ -2,6 +2,7 @@
 
 import { constants as fsConstants } from 'node:fs';
 import { access, open } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -18,6 +19,8 @@ const { F_OK } = fsConstants;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const packageVersion = (createRequire(import.meta.url)('../package.json') as { version: string })
+  .version;
 
 const EMBEDDED_LIBRARY_RELATIVE_PATH = join('..', 'lib', 'smart-dom-reader.bundle.js');
 const DEFAULT_LAUNCH_ARGS = ['--no-sandbox', '--disable-setuid-sandbox'] as const;
@@ -100,7 +103,7 @@ const DEFAULT_CHROME_LOCATIONS: Partial<Record<NodeJS.Platform, readonly string[
       ? [join(process.env.PROGRAMFILES, 'Google/Chrome/Application/chrome.exe')]
       : []),
     ...(process.env['ProgramFiles(x86)']
-      ? [join(process.env['ProgramFiles(x86)']!, 'Google/Chrome/Application/chrome.exe')]
+      ? [join(process.env['ProgramFiles(x86)'], 'Google/Chrome/Application/chrome.exe')]
       : []),
     ...(process.env.LOCALAPPDATA
       ? [join(process.env.LOCALAPPDATA, 'Google/Chrome/Application/chrome.exe')]
@@ -132,7 +135,7 @@ interface FormatOptions {
   maxElements?: number | undefined;
 }
 
-const COMMON_TRAVERSAL_OPTIONS_SHAPE = {
+const COMMON_TOOL_OPTIONS_SHAPE = {
   maxDepth: z
     .number()
     .int()
@@ -192,12 +195,13 @@ class SmartDomReaderServer {
   private readonly server: McpServer;
   private browser: Browser | null = null;
   private page: Page | null = null;
+  private browserOperation: Promise<unknown> = Promise.resolve();
   private cachedLibrary: LibraryCache | null = null;
 
   constructor() {
     this.server = new McpServer({
       name: 'smart-dom-reader-server',
-      version: '0.2.0',
+      version: packageVersion,
     });
 
     this.registerTools();
@@ -205,6 +209,16 @@ class SmartDomReaderServer {
 
   async run(): Promise<void> {
     const transport = new StdioServerTransport();
+    this.server.server.onclose = () => {
+      void this.queueBrowserOperation(() => this.closeBrowser()).catch((error) => {
+        console.error('Failed to close browser during shutdown', error);
+      });
+    };
+    process.stdin.once('end', () => {
+      void this.server.close().catch((error) => {
+        console.error('Failed to close MCP server after stdin ended', error);
+      });
+    });
     await this.server.connect(transport);
     console.error('Smart DOM Reader MCP server running on stdio');
   }
@@ -233,7 +247,7 @@ class SmartDomReaderServer {
             ),
         }),
       },
-      async (args) => this.connectBrowser(args)
+      async (args) => this.queueBrowserOperation(() => this.connectBrowser(args))
     );
 
     this.server.registerTool(
@@ -311,7 +325,7 @@ class SmartDomReaderServer {
                 .boolean()
                 .describe('Include elements that are hidden/offscreen. Default: false.')
                 .optional(),
-              ...COMMON_TRAVERSAL_OPTIONS_SHAPE,
+              ...COMMON_TOOL_OPTIONS_SHAPE,
             })
             .optional(),
         }),
@@ -388,7 +402,7 @@ class SmartDomReaderServer {
                 .boolean()
                 .default(false)
                 .describe('Only include elements currently within the viewport. Default: false.'),
-              ...COMMON_TRAVERSAL_OPTIONS_SHAPE,
+              ...COMMON_TOOL_OPTIONS_SHAPE,
             })
             .optional(),
         }),
@@ -428,8 +442,14 @@ class SmartDomReaderServer {
           'Shut down the launched browser instance and release resources. Safe to call multiple times.',
         inputSchema: z.object({}),
       },
-      async () => this.closeBrowser()
+      async () => this.queueBrowserOperation(() => this.closeBrowser())
     );
+  }
+
+  private queueBrowserOperation(operation: () => Promise<CallToolResult>): Promise<CallToolResult> {
+    const result = this.browserOperation.then(operation);
+    this.browserOperation = result.catch(() => undefined);
+    return result;
   }
 
   private async connectBrowser(args: ConnectBrowserArgs): Promise<CallToolResult> {
@@ -637,12 +657,16 @@ class SmartDomReaderServer {
     return createTextResult('Browser closed');
   }
 
-  private async runLibraryOperation<TResult, TArgs extends Record<string, unknown>>(
-    operation: LibraryOperation,
-    args: TArgs
-  ): Promise<TResult> {
+  /**
+   * All formatting happens in-page via the bundled library; the server never
+   * imports it, so there are no server-side dynamic imports.
+   */
+  private async runLibraryOperation<
+    TResult,
+    TArgs extends Record<string, unknown> & { format: FormatOptions },
+  >(operation: LibraryOperation, args: TArgs): Promise<TResult> {
     const page = this.getActivePage();
-    const code = await this.loadLibraryCode();
+    const code = await this.readLibraryFile(resolve(__dirname, EMBEDDED_LIBRARY_RELATIVE_PATH));
 
     return page.evaluate<TResult, { code: string; operation: LibraryOperation; args: TArgs }>(
       async ({ code, operation, args }) => {
@@ -654,6 +678,9 @@ class SmartDomReaderServer {
           const { ProgressiveExtractor, MarkdownFormatter } = moduleExports;
           const SmartDOMReader = moduleExports.SmartDOMReader ?? moduleExports.default;
 
+          const fmt = args.format;
+          const meta = { title: document.title, url: location.href };
+
           switch (operation) {
             case 'structure': {
               if (!ProgressiveExtractor) {
@@ -661,14 +688,10 @@ class SmartDomReaderServer {
               }
 
               const { selector } = args as StructureOperationArgs;
-              const target = selector ? (document.querySelector(selector) ?? document) : document;
+              const target = selector ? document.querySelector(selector) : document;
+              if (!target) throw new Error(`No matching element for selector ${selector}`);
               const overview = ProgressiveExtractor.extractStructure(target);
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              const argsWithFormat = args as Record<string, unknown> & {
-                format?: Record<string, unknown>;
-              };
-              const fmt = argsWithFormat.format ?? {};
-              const meta = { title: document.title, url: location.href };
               return MarkdownFormatter.structure(overview, fmt, meta) as TResult;
             }
 
@@ -682,11 +705,6 @@ class SmartDomReaderServer {
               if (!result)
                 return `No matching region for selector ${selector}` as unknown as TResult;
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              const argsWithFormat = args as Record<string, unknown> & {
-                format?: Record<string, unknown>;
-              };
-              const fmt = argsWithFormat.format ?? {};
-              const meta = { title: document.title, url: location.href };
               return MarkdownFormatter.region(result, fmt, meta) as TResult;
             }
 
@@ -703,11 +721,6 @@ class SmartDomReaderServer {
               );
               if (!content) return `No content for selector ${selector}` as unknown as TResult;
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              const argsWithFormat = args as Record<string, unknown> & {
-                format?: Record<string, unknown>;
-              };
-              const fmt = argsWithFormat.format ?? {};
-              const meta = { title: document.title, url: location.href };
               return MarkdownFormatter.content(content, fmt, meta) as TResult;
             }
 
@@ -717,27 +730,18 @@ class SmartDomReaderServer {
               }
 
               const { selector, options } = args as InteractiveOperationArgs;
-              const target = selector ? (document.querySelector(selector) ?? document) : document;
+              const target = selector ? document.querySelector(selector) : document;
+              if (!target) throw new Error(`No matching element for selector ${selector}`);
 
               if (typeof SmartDOMReader.extractInteractive === 'function') {
                 const result = SmartDOMReader.extractInteractive(target, options ?? {});
                 if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-                const argsWithFormat = args as Record<string, unknown> & {
-                  format?: Record<string, unknown>;
-                };
-                const fmt = argsWithFormat.format ?? {};
-                const meta = { title: document.title, url: location.href };
                 return MarkdownFormatter.region(result, fmt, meta) as TResult;
               }
 
               const reader = new SmartDOMReader({ ...options, mode: 'interactive' });
               const result = reader.extract(target, options ?? {});
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              const argsWithFormat = args as Record<string, unknown> & {
-                format?: Record<string, unknown>;
-              };
-              const fmt = argsWithFormat.format ?? {};
-              const meta = { title: document.title, url: location.href };
               return MarkdownFormatter.region(result, fmt, meta) as TResult;
             }
 
@@ -762,13 +766,6 @@ class SmartDomReaderServer {
     }
 
     return this.page;
-  }
-
-  // All formatting happens in-page via the bundled library; no server-side dynamic imports.
-
-  private async loadLibraryCode(): Promise<string> {
-    const embeddedPath = resolve(__dirname, EMBEDDED_LIBRARY_RELATIVE_PATH);
-    return this.readLibraryFile(embeddedPath);
   }
 
   private async readLibraryFile(resolvedPath: string): Promise<string> {

@@ -2,6 +2,7 @@ import { expectTypeOf, test } from 'vitest';
 import type {
   ChromeModelContext,
   ChromeModelContextExecuteToolOptions,
+  InputSchema,
   ModelContext,
   ModelContextExtensions,
   ModelContextGetToolOptions,
@@ -11,6 +12,11 @@ import type {
   RegisteredTool,
   ToolListItem,
 } from './index.js';
+
+test('RegisteredTool.inputSchema spans both schema generations', () => {
+  // webmcp#241: an object from Chrome >=154.0.8013, a serialized string before.
+  expectTypeOf<RegisteredTool['inputSchema']>().toEqualTypeOf<InputSchema | string | undefined>();
+});
 
 test('ModelContext exposes only the standard producer API', () => {
   expectTypeOf<ModelContext['registerTool']>().returns.toEqualTypeOf<Promise<void>>();
@@ -59,14 +65,17 @@ test('the Chromium testing shim retains its observable contract', () => {
 });
 
 test('global declarations use the document-first API', () => {
-  expectTypeOf<Document['modelContext']>().toEqualTypeOf<ModelContext>();
+  expectTypeOf<Document['modelContext']>().toEqualTypeOf<ModelContext | undefined>();
   expectTypeOf<Navigator['modelContext']>().toEqualTypeOf<ModelContext | undefined>();
   expectTypeOf<Navigator['modelContextTesting']>().toEqualTypeOf<ModelContextTesting | undefined>();
 });
 
 test('the ModelContext interface object brands values but is not constructible', () => {
-  expectTypeOf(ModelContext).toMatchTypeOf<Function>();
-  const hasModelContextBrand = (value: unknown) => value instanceof ModelContext;
+  // The interface object only exists where the realm implements WebMCP, so the
+  // global is declared possibly-undefined and `instanceof` needs a guard.
+  expectTypeOf<NonNullable<typeof ModelContext>>().toMatchTypeOf<Function>();
+  const hasModelContextBrand = (value: unknown) =>
+    typeof ModelContext !== 'undefined' && value instanceof ModelContext;
   expectTypeOf(hasModelContextBrand).returns.toBeBoolean();
 
   const constructModelContext = () => {

@@ -1,17 +1,48 @@
 ---
-import { Feature } from "@/components/animations/feature-slide";
+import { WebMCPPackagesContent } from "@/components/animations/feature-slide";
 import { siteConfig } from "@/lib/config";
 
-const { items } = siteConfig.demoSection;
+const { title, description } = siteConfig.demoSection;
 ---
 
-<section id="demo" class="relative w-full">
-  <Feature
-    client:visible
-    collapseDelay={5000}
-    linePosition="bottom"
-    featureItems={items}
-    lineColor="bg-[#006d9f]"
-    sectionId="demo"
-  />
+<section id="demo" class="demo-packages">
+  <div class="demo-packages__copy">
+    <h2>{title}</h2>
+    <p>{description}</p>
+  </div>
+  <div class="demo-packages__panel">
+    <WebMCPPackagesContent client:visible />
+  </div>
 </section>
+
+<style>
+  .demo-packages {
+    width: 100%;
+    scroll-margin-top: 5.5rem;
+  }
+
+  .demo-packages__copy {
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 1.25rem;
+    text-align: center;
+  }
+
+  .demo-packages__copy h2 {
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
+  }
+
+  .demo-packages__copy p {
+    margin: 0.75rem auto 0;
+    color: var(--muted-foreground);
+    font-size: 1.05rem;
+    line-height: 1.5;
+  }
+
+  .demo-packages__panel {
+    padding: 0 1rem 2.5rem;
+  }
+</style>

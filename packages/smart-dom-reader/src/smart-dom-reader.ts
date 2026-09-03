@@ -30,7 +30,7 @@ export class SmartDOMReader {
   constructor(options: Partial<ExtractionOptions> = {}) {
     this.options = {
       mode: options.mode || 'interactive',
-      maxDepth: options.maxDepth || 5,
+      maxDepth: options.maxDepth ?? 5,
       includeHidden: options.includeHidden || false,
       includeShadowDOM: options.includeShadowDOM ?? true,
       includeIframes: options.includeIframes || false,
@@ -60,7 +60,8 @@ export class SmartDOMReader {
     runtimeOptions?: Partial<ExtractionOptions>
   ): SmartDOMResult {
     const startTime = Date.now();
-    const doc = rootElement instanceof Document ? rootElement : rootElement.ownerDocument!;
+    const rootIsDocument = DOMTraversal.isDocument(rootElement);
+    const doc = rootIsDocument ? rootElement : rootElement.ownerDocument!;
 
     // Merge runtime options with constructor options
     const options: ExtractionOptions = { ...this.options, ...runtimeOptions };
@@ -69,10 +70,9 @@ export class SmartDOMReader {
     // IMPORTANT: Respect the provided rootElement when it's an Element.
     // Previous behavior incorrectly defaulted to the whole document, causing
     // region-scoped extractions to include page-wide data.
-    let container: Element | Document =
-      rootElement instanceof Document ? doc : (rootElement as Element);
+    let container: Element | Document = rootIsDocument ? doc : rootElement;
     // Only override container with detected main content when starting from the document.
-    if (options.mainContentOnly && rootElement instanceof Document) {
+    if (options.mainContentOnly && rootIsDocument) {
       container = ContentDetection.findMainContent(doc);
     }
 
@@ -102,7 +102,7 @@ export class SmartDOMReader {
         ...result,
         semantic,
         metadata,
-      } as SmartDOMResult;
+      };
     }
 
     return result;
@@ -154,6 +154,10 @@ export class SmartDOMReader {
     const matches = [...container.querySelectorAll(selector)];
     if (!includeShadowDOM) return matches;
 
+    if ('shadowRoot' in container && container.shadowRoot) {
+      matches.push(...this.querySelectorAll(container.shadowRoot, selector, true));
+    }
+
     for (const element of container.querySelectorAll('*')) {
       if (element.shadowRoot) {
         matches.push(...this.querySelectorAll(element.shadowRoot, selector, true));
@@ -163,73 +167,50 @@ export class SmartDOMReader {
   }
 
   /**
+   * Extract every element matching a selector.
+   *
+   * DOMTraversal.extractElement already applies the visibility, viewport and
+   * filter guards, so pre-filtering here would just repeat its
+   * getBoundingClientRect/getComputedStyle work for every element.
+   */
+  private extractAll(
+    container: Element | Document,
+    selector: string,
+    options: ExtractionOptions
+  ): ExtractedElement[] {
+    const extracted: ExtractedElement[] = [];
+    for (const el of this.querySelectorAll(container, selector, options.includeShadowDOM)) {
+      const element = DOMTraversal.extractElement(el, options);
+      if (element) extracted.push(element);
+    }
+    return extracted;
+  }
+
+  /**
    * Extract interactive elements
    */
   private extractInteractiveElements(
     container: Element | Document,
     options: ExtractionOptions
   ): SmartDOMResult['interactive'] {
-    const buttons: ExtractedElement[] = [];
-    const links: ExtractedElement[] = [];
-    const inputs: ExtractedElement[] = [];
     const clickable: ExtractedElement[] = [];
-
-    // Extract buttons
-    const buttonElements = this.querySelectorAll(
-      container,
-      'button, [role="button"], input[type="button"], input[type="submit"]',
-      options.includeShadowDOM
-    );
-    buttonElements.forEach((el) => {
-      if (this.shouldIncludeElement(el, options)) {
-        const extracted = DOMTraversal.extractElement(el, options);
-        if (extracted) buttons.push(extracted);
-      }
-    });
-
-    // Extract links
-    const linkElements = this.querySelectorAll(container, 'a[href]', options.includeShadowDOM);
-    linkElements.forEach((el) => {
-      if (this.shouldIncludeElement(el, options)) {
-        const extracted = DOMTraversal.extractElement(el, options);
-        if (extracted) links.push(extracted);
-      }
-    });
-
-    // Extract form inputs
-    const inputElements = this.querySelectorAll(
-      container,
-      'input:not([type="button"]):not([type="submit"]), textarea, select',
-      options.includeShadowDOM
-    );
-    inputElements.forEach((el) => {
-      if (this.shouldIncludeElement(el, options)) {
-        const extracted = DOMTraversal.extractElement(el, options);
-        if (extracted) inputs.push(extracted);
-      }
-    });
-
-    // Extract custom selectors
-    if (options.customSelectors) {
-      options.customSelectors.forEach((selector) => {
-        const elements = this.querySelectorAll(container, selector, options.includeShadowDOM);
-        elements.forEach((el) => {
-          if (this.shouldIncludeElement(el, options)) {
-            const extracted = DOMTraversal.extractElement(el, options);
-            if (extracted) clickable.push(extracted);
-          }
-        });
-      });
+    for (const selector of options.customSelectors ?? []) {
+      clickable.push(...this.extractAll(container, selector, options));
     }
 
-    // Extract forms
-    const forms = this.extractForms(container, options);
-
     return {
-      buttons,
-      links,
-      inputs,
-      forms,
+      buttons: this.extractAll(
+        container,
+        'button, [role="button"], input[type="button"], input[type="submit"]',
+        options
+      ),
+      links: this.extractAll(container, 'a[href]', options),
+      inputs: this.extractAll(
+        container,
+        'input:not([type="button"]):not([type="submit"]), textarea, select',
+        options
+      ),
+      forms: this.extractForms(container, options),
       clickable,
     };
   }
@@ -242,39 +223,23 @@ export class SmartDOMReader {
     const formElements = this.querySelectorAll(container, 'form', options.includeShadowDOM);
 
     formElements.forEach((form) => {
+      // The form itself never reaches extractElement, so it needs the guard here.
       if (!this.shouldIncludeElement(form, options)) return;
-
-      const formInputs: ExtractedElement[] = [];
-      const formButtons: ExtractedElement[] = [];
-
-      // Extract form inputs
-      const inputs = this.querySelectorAll(
-        form,
-        'input:not([type="button"]):not([type="submit"]), textarea, select',
-        options.includeShadowDOM
-      );
-      inputs.forEach((input) => {
-        const extracted = DOMTraversal.extractElement(input, options);
-        if (extracted) formInputs.push(extracted);
-      });
-
-      // Extract form buttons
-      const buttons = this.querySelectorAll(
-        form,
-        'button, input[type="button"], input[type="submit"]',
-        options.includeShadowDOM
-      );
-      buttons.forEach((button) => {
-        const extracted = DOMTraversal.extractElement(button, options);
-        if (extracted) formButtons.push(extracted);
-      });
 
       const action = form.getAttribute('action');
       const method = form.getAttribute('method');
       const formInfo: FormInfo = {
         selector: SelectorGenerator.generateSelectors(form).css,
-        inputs: formInputs,
-        buttons: formButtons,
+        inputs: this.extractAll(
+          form,
+          'input:not([type="button"]):not([type="submit"]), textarea, select',
+          options
+        ),
+        buttons: this.extractAll(
+          form,
+          'button, input[type="button"], input[type="submit"]',
+          options
+        ),
       };
       if (action) formInfo.action = action;
       if (method) formInfo.method = method;
@@ -290,63 +255,13 @@ export class SmartDOMReader {
   private extractSemanticElements(
     container: Element | Document,
     options: ExtractionOptions
-  ): SmartDOMResult['semantic'] {
-    const headings: ExtractedElement[] = [];
-    const images: ExtractedElement[] = [];
-    const tables: ExtractedElement[] = [];
-    const lists: ExtractedElement[] = [];
-    const articles: ExtractedElement[] = [];
-
-    // Extract headings
-    this.querySelectorAll(container, 'h1, h2, h3, h4, h5, h6', options.includeShadowDOM).forEach(
-      (el) => {
-        if (this.shouldIncludeElement(el, options)) {
-          const extracted = DOMTraversal.extractElement(el, options);
-          if (extracted) headings.push(extracted);
-        }
-      }
-    );
-
-    // Extract images
-    this.querySelectorAll(container, 'img', options.includeShadowDOM).forEach((el) => {
-      if (this.shouldIncludeElement(el, options)) {
-        const extracted = DOMTraversal.extractElement(el, options);
-        if (extracted) images.push(extracted);
-      }
-    });
-
-    // Extract tables
-    this.querySelectorAll(container, 'table', options.includeShadowDOM).forEach((el) => {
-      if (this.shouldIncludeElement(el, options)) {
-        const extracted = DOMTraversal.extractElement(el, options);
-        if (extracted) tables.push(extracted);
-      }
-    });
-
-    // Extract lists
-    this.querySelectorAll(container, 'ul, ol', options.includeShadowDOM).forEach((el) => {
-      if (this.shouldIncludeElement(el, options)) {
-        const extracted = DOMTraversal.extractElement(el, options);
-        if (extracted) lists.push(extracted);
-      }
-    });
-
-    // Extract articles
-    this.querySelectorAll(container, 'article, [role="article"]', options.includeShadowDOM).forEach(
-      (el) => {
-        if (this.shouldIncludeElement(el, options)) {
-          const extracted = DOMTraversal.extractElement(el, options);
-          if (extracted) articles.push(extracted);
-        }
-      }
-    );
-
+  ): NonNullable<SmartDOMResult['semantic']> {
     return {
-      headings,
-      images,
-      tables,
-      lists,
-      articles,
+      headings: this.extractAll(container, 'h1, h2, h3, h4, h5, h6', options),
+      images: this.extractAll(container, 'img', options),
+      tables: this.extractAll(container, 'table', options),
+      lists: this.extractAll(container, 'ul, ol', options),
+      articles: this.extractAll(container, 'article, [role="article"]', options),
     };
   }
 
@@ -357,7 +272,7 @@ export class SmartDOMReader {
     doc: Document,
     container: Element | Document,
     options: ExtractionOptions
-  ): SmartDOMResult['metadata'] {
+  ): NonNullable<SmartDOMResult['metadata']> {
     const allElements = this.querySelectorAll(container, '*', options.includeShadowDOM);
     const extractedElements = this.querySelectorAll(
       container,
@@ -365,12 +280,12 @@ export class SmartDOMReader {
       options.includeShadowDOM
     ).length;
 
-    const metadata: SmartDOMResult['metadata'] = {
+    const metadata: NonNullable<SmartDOMResult['metadata']> = {
       totalElements: allElements.length,
       extractedElements,
     };
 
-    if (options.mainContentOnly && container instanceof Element) {
+    if (options.mainContentOnly && !DOMTraversal.isDocument(container)) {
       metadata.mainContent = SelectorGenerator.generateSelectors(container).css;
     }
 
@@ -457,7 +372,7 @@ export class SmartDOMReader {
    */
   static extractInteractive(
     doc: Document,
-    options: Partial<ExtractionOptions> = {}
+    options: Omit<ExtractionOptions, 'mode'> = {}
   ): SmartDOMResult {
     const reader = new SmartDOMReader({
       ...options,
@@ -471,7 +386,7 @@ export class SmartDOMReader {
    * @param doc The document to extract from
    * @param options Extraction options
    */
-  static extractFull(doc: Document, options: Partial<ExtractionOptions> = {}): SmartDOMResult {
+  static extractFull(doc: Document, options: Omit<ExtractionOptions, 'mode'> = {}): SmartDOMResult {
     const reader = new SmartDOMReader({
       ...options,
       mode: 'full',
@@ -488,7 +403,7 @@ export class SmartDOMReader {
   static extractFromElement(
     element: Element,
     mode: ExtractionMode = 'interactive',
-    options: Partial<ExtractionOptions> = {}
+    options: Omit<ExtractionOptions, 'mode'> = {}
   ): SmartDOMResult {
     const reader = new SmartDOMReader({
       ...options,

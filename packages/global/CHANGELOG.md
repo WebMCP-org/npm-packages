@@ -1,5 +1,110 @@
 # @mcp-b/global
 
+## 5.1.0
+
+### Patch Changes
+
+- @mcp-b/webmcp-types@5.1.0
+- @mcp-b/webmcp-polyfill@5.1.0
+- @mcp-b/webmcp-ts-sdk@5.1.0
+- @mcp-b/transports@5.1.0
+
+## 5.0.3
+
+### Patch Changes
+
+- Updated dependencies [4dec56a]
+- Updated dependencies [4dec56a]
+  - @mcp-b/webmcp-ts-sdk@5.0.3
+  - @mcp-b/transports@5.0.3
+  - @mcp-b/webmcp-types@5.0.3
+  - @mcp-b/webmcp-polyfill@5.0.3
+
+## 5.0.2
+
+### Patch Changes
+
+- Updated dependencies [8fa4f02]
+  - @mcp-b/transports@5.0.2
+  - @mcp-b/webmcp-types@5.0.2
+  - @mcp-b/webmcp-polyfill@5.0.2
+  - @mcp-b/webmcp-ts-sdk@5.0.2
+
+## 5.0.1
+
+### Patch Changes
+
+- 2056346: Handle legacy native WebMCP contexts that omit EventTarget methods or expose immutable modelContext properties.
+- Updated dependencies [2056346]
+  - @mcp-b/webmcp-ts-sdk@5.0.1
+  - @mcp-b/transports@5.0.1
+  - @mcp-b/webmcp-types@5.0.1
+  - @mcp-b/webmcp-polyfill@5.0.1
+
+## 5.0.0
+
+### Major Changes
+
+- de0b41c: Move protocol behavior to the official MCP TypeScript SDK v2. The browser
+  adapter exposes its composed `McpServer`, removes legacy helper APIs, and keeps
+  global initialization side-effect-only through `document.modelContext`.
+- de0b41c: Require `allowedOrigins` when you configure a transport. `TransportConfiguration`
+  wrapped both transport option types in `Partial<>`, which made the required
+  `allowedOrigins` omissible; `initializeWebModelContext` then filled it with
+  `['*']`. Configuring a transport at all — to set `channelId`, say — silently
+  disabled origin validation, the one thing the option exists to enforce.
+
+  Zero-configuration is unchanged: `initializeWebModelContext()` with no
+  `transport` still defaults to `['*']`. Only an explicit partial object breaks,
+  and it breaks at compile time with the origins named:
+
+  ```ts
+  initializeWebModelContext({
+    transport: { tabServer: { allowedOrigins: ['https://app.example.com'] } },
+  });
+  ```
+
+### Patch Changes
+
+- de0b41c: Retire `@mcp-b/codemode` and `@mcp-b/extension-tools`. Both were published and
+  neither ships from this release. `@mcp-b/extension-tools` is replaced by
+  `@mcp-b/webmcp-extension`, which covers the same MV3 ground with the official MCP
+  client; `@mcp-b/codemode` users should move to `@cloudflare/codemode/browser`.
+  The vendored chrome-devtools-mcp fork is also gone — use upstream
+  `chrome-devtools-mcp` directly.
+- de0b41c: Point the `browser` export condition at the ESM build instead of the IIFE. The
+  IIFE bundle has no named exports, so bundlers that honor the `browser` field
+  (webpack 4, browserify, parcel 1, metro) resolved every named import to
+  `undefined` and inlined a second copy of the transports, polyfill and SDK. The
+  IIFE is still reachable through the `./iife` export and by direct path.
+- de0b41c: Require Node 20 or newer. `@mcp-b/global`, `@mcp-b/mcp-iframe`,
+  `@mcp-b/webmcp-polyfill` and `@mcp-b/webmcp-ts-sdk` previously allowed Node 18;
+  the rest declared no `engines` range at all and now state the same floor. Node 18
+  reached end of life in April 2025. Browser builds are unaffected — this governs
+  build tooling and the relay CLI.
+- de0b41c: Stop emitting declaration source maps, and ship the MIT `LICENSE` text these
+  packages already declared. Each package shipped `dist` without `src`, so every
+  published `.d.ts.map` pointed at a file that was not in the tarball; editors
+  already fall back to the `.d.ts` itself. `@mcp-b/webmcp-types` keeps its maps —
+  it is the one package that ships `src`, so its maps resolve.
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [f1dbaa0]
+- Updated dependencies [f80daeb]
+  - @mcp-b/webmcp-types@5.0.0
+  - @mcp-b/webmcp-ts-sdk@5.0.0
+  - @mcp-b/transports@5.0.0
+  - @mcp-b/webmcp-polyfill@5.0.0
+
 ## 4.0.0
 
 ### Major Changes

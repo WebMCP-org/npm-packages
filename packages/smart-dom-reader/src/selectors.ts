@@ -156,7 +156,11 @@ export class SelectorGenerator {
    * Generate XPath for an element
    */
   private static generateXPath(element: Element, root: SelectorRoot): string {
-    if (element.id && SelectorGenerator.isUniqueId(element.id, element, root)) {
+    if (
+      element.id &&
+      !element.id.includes('"') &&
+      SelectorGenerator.isUniqueId(element.id, element, root)
+    ) {
       return `//*[@id="${element.id}"]`;
     }
 
@@ -166,8 +170,12 @@ export class SelectorGenerator {
     while (current && current.nodeType === Node.ELEMENT_NODE) {
       const tagName = current.nodeName.toLowerCase();
 
-      if (current.id && SelectorGenerator.isUniqueId(current.id, current, root)) {
-        path.unshift(`//*[@id="${current.id}"]`);
+      if (
+        current.id &&
+        !current.id.includes('"') &&
+        SelectorGenerator.isUniqueId(current.id, current, root)
+      ) {
+        path.unshift(`*[@id="${current.id}"]`);
         break;
       }
 

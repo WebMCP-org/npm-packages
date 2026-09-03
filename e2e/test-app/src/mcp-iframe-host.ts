@@ -68,9 +68,16 @@ async function stopChildRuntime(): Promise<void> {
   await child.stopRuntime();
 }
 
+function addCollidingChildResources(): void {
+  const child = mcpIframe.iframe?.contentWindow?.iframeChild;
+  if (!child) throw new Error('Iframe child API is unavailable');
+  child.addCollidingResources();
+}
+
 declare global {
   interface Window {
     mcpIframeHost: {
+      addCollidingChildResources: typeof addCollidingChildResources;
       getMcpIframe: () => MCPIframeElement;
       callTool: typeof callTool;
       readResource: typeof readResource;
@@ -83,7 +90,9 @@ declare global {
   }
 }
 
+window.mcpClient = mcpClient;
 window.mcpIframeHost = {
+  addCollidingChildResources,
   getMcpIframe: () => mcpIframe,
   callTool,
   readResource,

@@ -1,55 +1,357 @@
 ---
-title: 'Spec status and limitations'
-description: 'What the WebMCP proposal offers today and where implementations have room to grow.'
-keywords: ['webmcp spec', 'w3c', 'preview', 'limitations']
+title: 'WebMCP resources and status'
+description: 'Canonical sources for the WebMCP proposal, browser support, Chrome guidance, debugging, and testing.'
+keywords: ['webmcp spec', 'w3c', 'browser support', 'chrome', 'developer tools']
 icon: 'flag'
 ---
 
-WebMCP is a Draft Community Group Report, not a completed W3C standard. It
-defines the direction of the browser API, but several details remain a work in
-progress.
+WebMCP is a Draft Community Group Report. It is not a W3C Standard or a
+Standards Track document. The proposal, browser implementations, and MCP-B
+packages can change on separate schedules.
 
-The imperative draft now defines cross-document exposure, discovery, and the
-`tools` Permissions Policy. Declarative attributes, testing surfaces,
-browser-agent mediation, cancellation, and output-schema behavior may continue
-to change.
+Use this page as a directory. Each linked source owns the details on its card.
 
-Chrome offers WebMCP through an origin trial beginning in Chrome 149. Local
-development uses the dedicated `chrome://flags/#enable-webmcp-testing` flag.
-Track the [Chrome WebMCP overview](https://developer.chrome.com/docs/ai/webmcp)
-for current availability.
+## Proposal and implementation status
 
-Implementations should track the current [Community Group draft](https://webmachinelearning.github.io/webmcp/),
-keep domain operations separate from the browser registration adapter, use
-feature detection, and test both native and polyfill paths. MCP-B extensions
-must remain clearly distinguished from the standard surface.
+<CardGroup cols={2}>
+  <Card
+    title="WebMCP Community Group draft"
+    icon="users"
+    href="https://webmachinelearning.github.io/webmcp/"
+    horizontal
+  >
+    Proposed API, algorithms, and security considerations.
+  </Card>
+  <Card
+    title="WebMCP repository"
+    icon="github"
+    iconType="brands"
+    href="https://github.com/webmachinelearning/webmcp"
+    horizontal
+  >
+    Explainers, issues, and proposal development.
+  </Card>
+  <Card
+    title="Implementation status"
+    icon="github"
+    iconType="brands"
+    href="https://github.com/webmachinelearning/webmcp/blob/main/implementation-status.md"
+    horizontal
+  >
+    Browser and agent implementation links.
+  </Card>
+  <Card
+    title="Web Platform Status"
+    icon="globe"
+    href="https://webstatus.dev/features/document-modelcontext"
+    horizontal
+  >
+    Aggregated implementation and test status.
+  </Card>
+  <Card
+    title="Chrome Status"
+    icon="chrome"
+    iconType="brands"
+    href="https://chromestatus.com/feature/5117755740913664"
+    horizontal
+  >
+    Chrome rollout and experiment status.
+  </Card>
+  <Card title="Web Platform Tests" icon="flask" href="https://wpt.fyi/results/webmcp" horizontal>
+    Cross-browser conformance results.
+  </Card>
+</CardGroup>
 
-The current proposal defines `document.modelContext`. Navigator-based model
-context APIs are not part of that surface; MCP-B retains them only as
-compatibility shims. Adapter boundaries reduce migration cost.
+Do not infer compatibility from a cached browser version or copied API table.
+Check the implementation source when making a release decision.
 
-See [Try the native Chrome preview](/tutorials/first-native-preview) and
-[Test native and polyfill](/how-to/test-native-and-polyfill).
+## Chrome developer documentation
 
-## Upstream sources to track
+<CardGroup cols={2}>
+  <Card
+    title="WebMCP and AI agents"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/ai/agents"
+    horizontal
+  >
+    Chrome's WebMCP and agent resource hub.
+  </Card>
+  <Card
+    title="WebMCP overview"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/ai/webmcp"
+    horizontal
+  >
+    Chrome setup, availability, and limitations.
+  </Card>
+  <Card
+    title="Imperative API"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/ai/webmcp/imperative-api"
+    horizontal
+  >
+    JavaScript registration, discovery, and execution.
+  </Card>
+  <Card
+    title="Declarative API"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/ai/webmcp/declarative-api"
+    horizontal
+  >
+    Form attributes, submission, events, and focus states.
+  </Card>
+  <Card
+    title="User journeys"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/ai/webmcp/use-cases"
+    horizontal
+  >
+    Candidate tasks and tool boundaries.
+  </Card>
+  <Card
+    title="Best practices"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/ai/webmcp/best-practices"
+    horizontal
+  >
+    Tool names, schemas, outputs, and lifecycle design.
+  </Card>
+  <Card
+    title="Build tools around user workflows"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/ai/webmcp/build-tools"
+    horizontal
+  >
+    User goals, initial state, recovery, and evaluation.
+  </Card>
+  <Card
+    title="Tool security"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/ai/webmcp/secure-tools"
+    horizontal
+  >
+    Guidance for sites that expose tools.
+  </Card>
+  <Card
+    title="Agent security"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/agents/security"
+    horizontal
+  >
+    Guidance for agents that consume tools.
+  </Card>
+  <Card
+    title="WebMCP and MCP"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/ai/webmcp/compare-mcp"
+    horizontal
+  >
+    Browser API and client-server protocol differences.
+  </Card>
+</CardGroup>
 
-Use first-party sources for compatibility decisions:
+## Codex and ChatGPT
 
-| Source                                                                                                   | Owns                                                                                    |
-| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| [WebMCP Community Group draft](https://webmachinelearning.github.io/webmcp/)                             | Standard API shape, `document.modelContext`, permissions policy, and security model     |
-| [Chrome WebMCP overview](https://developer.chrome.com/docs/ai/webmcp)                                    | Current Chrome availability, testing flag, origin isolation, and permissions policy     |
-| [Chrome WebMCP imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api)               | Chrome behavior for registration, discovery, `executeTool()`, and `AbortSignal` cleanup |
-| [Chrome WebMCP declarative API](https://developer.chrome.com/docs/ai/webmcp/declarative-api)             | Form annotation behavior and declarative schema synthesis                               |
-| [Chrome secure tools guidance](https://developer.chrome.com/docs/ai/webmcp/secure-tools)                 | Browser-facing tool security guidance                                                   |
-| [Current MCP tools specification](https://modelcontextprotocol.io/specification/2026-07-28/server/tools) | MCP tool schemas, output schemas, and `structuredContent`                               |
+<CardGroup cols={2}>
+  <Card
+    title="OpenAI site tools documentation"
+    icon="openai"
+    iconType="brands"
+    href="https://learn.chatgpt.com/docs/webmcp"
+    horizontal
+  >
+    Current Codex and ChatGPT Work support in the built-in browser.
+  </Card>
+  <Card
+    title="Codex site tools compatibility"
+    icon="robot"
+    href="/reference/webmcp/codex-site-tools"
+    horizontal
+  >
+    Dated observations compared with the Community Group draft.
+  </Card>
+  <Card
+    title="OpenAI WebMCP case study"
+    icon="openai"
+    iconType="brands"
+    href="https://developers.openai.com/blog/automating-repetitive-work-at-openai-with-codex"
+    horizontal
+  >
+    Runme's browser-side tools in a Codex workflow.
+  </Card>
+</CardGroup>
 
-MCP-B follows those boundaries by making `document.modelContext` the primary
-surface, using `getTools()` for discovery, feature-detecting Chrome's optional
-`executeTool()` extension, using `AbortSignal` for cleanup, and keeping legacy
-helpers as compatibility APIs.
+## Inspection and testing tools
 
-`outputSchema` is not part of the current W3C/Chrome WebMCP tool dictionary.
-MCP-B keeps it as helper metadata for TypeScript inference, structured MCP
-responses, and package/runtime adapters. Do not rely on native browser WebMCP
-to validate tool output against it.
+<CardGroup cols={2}>
+  <Card
+    title="Chrome DevTools WebMCP panel"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/devtools/application/webmcp"
+    horizontal
+  >
+    Manual inspection and invocation.
+  </Card>
+  <Card
+    title="Model Context Tool Inspector"
+    icon="chrome"
+    iconType="brands"
+    href="https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd"
+    horizontal
+  >
+    Manual and model-assisted tool inspection.
+  </Card>
+  <Card
+    title="Chrome DevTools MCP WebMCP tools"
+    icon="github"
+    iconType="brands"
+    href="https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/tool-reference.md#webmcp"
+    horizontal
+  >
+    Let a coding agent inspect and invoke page tools.
+  </Card>
+  <Card
+    title="Lighthouse registered tools audit"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/lighthouse/agentic-browsing/registered-webmcp-tools"
+    horizontal
+  >
+    List tools discovered on a page.
+  </Card>
+  <Card
+    title="Lighthouse schema validity audit"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/lighthouse/agentic-browsing/webmcp-schema-validity"
+    horizontal
+  >
+    Find declarative schema problems.
+  </Card>
+  <Card
+    title="Lighthouse agentic browsing requirements"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/lighthouse/agentic-browsing/scoring"
+    horizontal
+  >
+    Category availability, prerequisites, and scoring model.
+  </Card>
+  <Card
+    title="WebMCP eval guidance"
+    icon="chrome"
+    iconType="brands"
+    href="https://developer.chrome.com/docs/ai/webmcp/evals"
+    horizontal
+  >
+    Design deterministic tests and model evaluations.
+  </Card>
+  <Card
+    title="WebMCP Evals"
+    icon="github"
+    iconType="brands"
+    href="https://github.com/GoogleChromeLabs/webmcp-tools/blob/main/webmcp-evals/README.md"
+    horizontal
+  >
+    Deterministic smoke tests and experimental model evaluations.
+  </Card>
+  <Card
+    title="GoogleChromeLabs WebMCP tools"
+    icon="github"
+    iconType="brands"
+    href="https://github.com/GoogleChromeLabs/webmcp-tools"
+    horizontal
+  >
+    Experimental utilities, eval tooling, and demos.
+  </Card>
+</CardGroup>
+
+<Note>
+  GoogleChromeLabs projects are experimental and are not officially supported Google products. Use
+  the Chrome developer documentation above for supported Chrome guidance.
+</Note>
+
+## Frameworks, demos, and community
+
+<CardGroup cols={2}>
+  <Card
+    title="Angular WebMCP"
+    icon="angular"
+    iconType="brands"
+    href="https://angular.dev/ai/webmcp"
+    horizontal
+  >
+    Angular lifecycle, forms, and testing guidance.
+  </Card>
+  <Card title="Puppeteer WebMCP" icon="browser" href="https://pptr.dev/guides/webmcp" horizontal>
+    Programmatic discovery and browser testing.
+  </Card>
+  <Card
+    title="GoogleChromeLabs explainer"
+    icon="google"
+    iconType="brands"
+    href="https://googlechromelabs.github.io/webmcp-tools/demos/explainer/"
+    horizontal
+  >
+    Runnable comparison and WebMCP examples.
+  </Card>
+  <Card
+    title="WebMCP Page Agent"
+    icon="google"
+    iconType="brands"
+    href="https://googlechromelabs.github.io/webmcp-tools/demos/page-agent/"
+    horizontal
+  >
+    Gemini-powered, polyfill-backed consumer demo.
+  </Card>
+  <Card
+    title="WebMCP Studio"
+    icon="github"
+    iconType="brands"
+    href="https://github.com/GoogleChromeLabs/webmcp-tools/tree/main/webmcp-studio"
+    horizontal
+  >
+    Experimental workflow for generating WebMCP code and evaluations.
+  </Card>
+  <Card
+    title="Awesome WebMCP community directory"
+    icon="github"
+    iconType="brands"
+    href="https://github.com/webmachinelearning/awesome-webmcp"
+    horizontal
+  >
+    Community-maintained ecosystem directory.
+  </Card>
+  <Card
+    title="GoogleChromeLabs WebMCP catalog"
+    icon="github"
+    iconType="brands"
+    href="https://github.com/GoogleChromeLabs/webmcp-tools/blob/main/AWESOME_WEBMCP.md"
+    horizontal
+  >
+    Experimental demos, libraries, and tools.
+  </Card>
+</CardGroup>
+
+Angular and Puppeteer label their WebMCP APIs experimental. Follow their own
+documentation for compatibility and release requirements.
+
+## MCP-B documentation
+
+The [WebMCP API sources](/reference/webmcp/standard-api) and
+[declarative API sources](/reference/webmcp/declarative-api) route
+proposal questions upstream. [WebMCP and MCP-B
+extensions](/explanation/strict-core-vs-mcp-b-extensions) defines this
+project's boundary, while [Choose a runtime](/how-to/choose-runtime) and the
+[package index](/packages/index) document MCP-B behavior.

@@ -127,14 +127,31 @@ function toInvokeArgs(value: unknown): JsonObject {
   return {};
 }
 
-function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor {
+function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor | null {
+  let inputSchema: unknown;
+  if (tool.inputSchema !== undefined) {
+    // An object since webmcp#241 -- no copy needed, postMessage structured-clones
+    // it out of the page world. A serialized string from older Chrome.
+    if (typeof tool.inputSchema === 'string') {
+      try {
+        inputSchema = JSON.parse(tool.inputSchema) as unknown;
+      } catch {
+        // Unconditional: dropping a tool is a functional loss, not debug noise,
+        // and one bad schema must not take down the page's whole relay list.
+        console.warn(
+          `[webmcp-relay-embed] Tool "${tool.name}" was not relayed because its input schema is malformed.`
+        );
+        return null;
+      }
+    } else {
+      inputSchema = tool.inputSchema;
+    }
+  }
   return {
     name: tool.name,
     ...(tool.title === undefined ? {} : { title: tool.title }),
     description: tool.description,
-    ...(tool.inputSchema === undefined
-      ? {}
-      : { inputSchema: JSON.parse(tool.inputSchema) as unknown }),
+    ...(inputSchema === undefined ? {} : { inputSchema }),
     ...(tool.annotations === undefined ? {} : { annotations: tool.annotations }),
   };
 }
@@ -184,7 +201,9 @@ async function listRelayTools(): Promise<RelayToolDescriptor[]> {
     return [];
   }
 
-  return (await descriptorContext.getTools()).map(mapRegisteredTool);
+  return (await descriptorContext.getTools())
+    .map(mapRegisteredTool)
+    .filter((tool): tool is RelayToolDescriptor => tool !== null);
 }
 
 async function invokeRelayTool(name: string, args: JsonObject): Promise<CallToolResult> {
@@ -256,9 +275,15 @@ function startToolSyncPolling(): void {
   toolSyncPollTimer = setInterval(scheduleToolSync, TOOL_SYNC_POLL_INTERVAL_MS);
 }
 
+/**
+ * WebMCP may not be installed yet (or at all); the caller retries with
+ * backoff and falls back to polling.
+ */
 function trySubscribe(): boolean {
   try {
-    document.modelContext.addEventListener('toolchange', scheduleToolSync);
+    const modelContext = document.modelContext;
+    if (!modelContext) return false;
+    modelContext.addEventListener('toolchange', scheduleToolSync);
     return true;
   } catch (error) {
     debugWarn('addEventListener on modelContext threw:', error);
@@ -312,6 +337,8 @@ function respondToSource(
     return;
   }
 
+  // MessageEventSource unions Window/MessagePort/ServiceWorker, whose postMessage
+  // overloads disagree; only Window accepts a target origin.
   (source as Window).postMessage(payload, origin);
 }
 
@@ -353,15 +380,6 @@ function handleListRequest(request: WidgetRequestMessage, event: MessageEvent): 
 }
 
 function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent): void {
-  if (!getDocumentDescriptorContext()) {
-    respondToSource(event.source, event.origin, {
-      type: 'webmcp.tools.invoke.error',
-      requestId: request.requestId,
-      error: 'No executable WebMCP runtime found on this page',
-    });
-    return;
-  }
-
   invokeRelayTool(String(request.toolName ?? ''), toInvokeArgs(request.args))
     .then((result) => {
       respondToSource(event.source, event.origin, {

@@ -40,15 +40,30 @@ export type {
 } from './tool.js';
 
 declare global {
-  /** Web IDL interface object used for branding and `instanceof`. */
-  var ModelContext: Function & {
-    readonly prototype: ModelContext;
-    [Symbol.hasInstance](value: unknown): value is ModelContext;
-  };
+  /**
+   * Web IDL interface object used for branding and `instanceof`.
+   *
+   * Absent unless the document's realm implements WebMCP, so guard with
+   * `typeof ModelContext !== 'undefined'` before referencing it. A bare
+   * reference to an undeclared global throws `ReferenceError`.
+   */
+  var ModelContext:
+    | (Function & {
+        readonly prototype: ModelContext;
+        [Symbol.hasInstance](value: unknown): value is ModelContext;
+      })
+    | undefined;
 
   interface Document {
-    /** Canonical WebMCP API for this document. */
-    readonly modelContext: ModelContext;
+    /**
+     * Canonical WebMCP API for this document.
+     *
+     * Optional because no browser ships WebMCP unflagged: Chromium exposes it
+     * only under `--enable-features=WebMCP`, and elsewhere the property is
+     * genuinely absent (`'modelContext' in document === false`). Feature-detect
+     * it, or install `@mcp-b/webmcp-polyfill`.
+     */
+    readonly modelContext?: ModelContext;
   }
 
   interface Navigator {
@@ -60,10 +75,20 @@ declare global {
   }
 
   interface SubmitEvent {
-    /** True when a declarative WebMCP tool initiated this submission. */
-    readonly agentInvoked: boolean;
+    /**
+     * True when a declarative WebMCP tool initiated this submission.
+     *
+     * Optional because declarative forms are explainer-only: this attribute is
+     * in neither the WebMCP specification nor WPT's `webmcp.idl`, and no
+     * browser implements it. `@mcp-b/webmcp-polyfill` installs it.
+     */
+    readonly agentInvoked?: boolean;
 
-    /** Associates an intercepted form submission result with the invoking agent. */
-    respondWith(agentResponse: Promise<unknown>): void;
+    /**
+     * Associates an intercepted form submission result with the invoking agent.
+     *
+     * Optional for the same reason as {@link SubmitEvent.agentInvoked}.
+     */
+    respondWith?(agentResponse: Promise<unknown>): void;
   }
 }

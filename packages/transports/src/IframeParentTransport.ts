@@ -1,6 +1,6 @@
 import { JSONRPCMessageSchema } from '@modelcontextprotocol/core';
 import type { JSONRPCMessage, Transport, TransportSendOptions } from '@modelcontextprotocol/server';
-import { isMcpMessage, postMcpMessage } from './post-message.js';
+import { DEFAULT_IFRAME_CHANNEL_ID, isMcpMessage, postMcpMessage } from './post-message.js';
 
 export interface IframeParentTransportOptions {
   iframe: HTMLIFrameElement;
@@ -40,12 +40,14 @@ export class IframeParentTransport implements Transport {
 
     this._iframe = options.iframe;
     this._targetOrigin = options.targetOrigin;
-    this._channelId = options.channelId ?? 'mcp-iframe';
+    this._channelId = options.channelId ?? DEFAULT_IFRAME_CHANNEL_ID;
     this._checkReadyRetryMs = options.checkReadyRetryMs ?? 250;
     this.serverReadyPromise = new Promise<void>((resolve, reject) => {
       this._serverReadyResolve = resolve;
       this._serverReadyReject = reject;
     });
+    // Closing an unused transport is valid; late consumers still observe the rejection.
+    void this.serverReadyPromise.catch(() => {});
   }
 
   async start(): Promise<void> {

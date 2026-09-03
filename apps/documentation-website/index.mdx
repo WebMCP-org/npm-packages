@@ -1,27 +1,24 @@
 ---
-title: 'WebMCP Documentation'
-description: 'Start with the WebMCP proposal draft for browser tools, then move to MCP-B when you need runtime extensions, tooling, and transport.'
+title: 'WebMCP documentation and developer tools'
+description: 'Build with WebMCP using browser API guides, working tutorials, polyfills, React packages, extensions, and debugging tools.'
+keywords: ['WebMCP documentation', 'WebMCP tools', 'polyfills', 'React', 'browser API']
 icon: 'house'
 mode: 'custom'
 ---
 
-import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
-
 <div className="docs-landing">
   <section className="docs-landing-hero">
     <div className="docs-landing-inner">
-      <div className="docs-landing-hero-grid">
+      <div>
         <div className="docs-landing-copy">
-          <p className="docs-landing-kicker">
-            Browser tools, protocol, and runtime
-          </p>
-
-          <h1 className="docs-landing-title">
-            WebMCP + MCP = MCP-B
-          </h1>
+          <h1 className="docs-landing-title">WebMCP documentation and developer tools</h1>
 
           <p className="docs-landing-lead">
-            MCP-B combines the WebMCP page API with MCP-style transport and extensions in one browser runtime. Use WebMCP for page-level tool registration. Use MCP-B for resources, prompts, relay, React hooks, and browser tooling. You can start with WebMCP and add MCP-B later.
+            Browser API guides, working tutorials, polyfills, React packages, extensions, and debugging tools.
+          </p>
+
+          <p className="docs-landing-note docs-landing-note-tight">
+            <strong>New:</strong> The OpenAI WebMCP Challenge is live. <a href="https://webmcp.devpost.com/">Enter the challenge.</a>
           </p>
 
           <div className="docs-landing-links">
@@ -41,18 +38,6 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
           </p>
         </div>
 
-        <div className="docs-landing-hero-diagram" aria-hidden="true">
-          <img
-            className="docs-landing-hero-diagram-svg docs-landing-hero-diagram-light"
-            src="/logo/mcp-b-architecture-light.svg"
-            alt="MCP-B runtime architecture"
-          />
-          <img
-            className="docs-landing-hero-diagram-svg docs-landing-hero-diagram-dark"
-            src="/logo/mcp-b-architecture-dark.svg"
-            alt="MCP-B runtime architecture"
-          />
-        </div>
       </div>
     </div>
 
@@ -64,11 +49,37 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
         <p className="docs-landing-kicker">Live on this page</p>
         <h2 className="docs-landing-heading">This page has a real WebMCP tool. Try calling it.</h2>
         <p className="docs-landing-section-copy">
-          The tool below is registered right now using <code>document.modelContext.registerTool()</code>. Use the <a href="https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa">MCP-B extension</a> or Chrome's native WebMCP support to call it from an AI agent.
+          The tool below is registered right now using <code>document.modelContext.registerTool()</code>. Use the <a href="https://chromewebstore.google.com/detail/opojeelojlkcinlhkbahpcekdolfjmhi">Rook extension</a> or Chrome's native WebMCP support to call it from an AI agent.
         </p>
       </div>
 
-      <LiveLandingTool />
+      <span
+        id="live-landing-tool"
+        className="not-prose"
+        aria-live="polite"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          fontSize: '0.8rem',
+        }}
+      >
+        <span
+          data-status-dot
+          aria-hidden="true"
+          style={{
+            width: '0.5rem',
+            height: '0.5rem',
+            borderRadius: '50%',
+            backgroundColor: '#eab308',
+            display: 'inline-block',
+            animation: 'pulse 1.5s infinite',
+          }}
+        />
+        <span data-status-label style={{ opacity: 0.7 }}>
+          Loading...
+        </span>
+      </span>
 
       <div className="docs-landing-code">
         <div className="docs-landing-code-grid">
@@ -353,18 +364,50 @@ import { LiveLandingTool } from '/snippets-jsx/live-landing-tool.jsx';
 
   </section>
 
+<section className="docs-landing-section">
+  <div className="docs-landing-inner">
+    <div className="docs-landing-footer">
+      <p className="docs-landing-kicker">Source of truth</p>
+      <p className="docs-landing-footer-copy">
+        This site documents libraries, polyfills, extensions, and tooling for WebMCP, with
+        quick-look pages for the proposal draft. For proposal details and browser behavior, use:
+        <a href="https://webmachinelearning.github.io/webmcp/"> Community Group draft</a>,
+        <a href="https://developer.chrome.com/docs/ai/webmcp"> Chrome WebMCP documentation</a>,
+        <a href="https://developer.chrome.com/docs/devtools/application/webmcp">
+          {' '}
+          Chrome DevTools WebMCP panel
+        </a>
+        ,<a href="https://modelcontextprotocol.io/specification/latest"> Model Context Protocol</a>,
+        and
+        <a href="https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd">
+          {' '}
+          Model Context Tool Inspector
+        </a>
+        .
+      </p>
+    </div>
+  </div>
+</section>
+
   <section className="docs-landing-section docs-landing-section-end">
     <div className="docs-landing-inner">
-      <div className="docs-landing-footer">
-        <p className="docs-landing-kicker">Source of truth</p>
-        <p className="docs-landing-footer-copy">
-          This site documents MCP-B and keeps quick-look pages for the WebMCP proposal draft. For proposal details and browser behavior, use:
-          <a href="https://webmachinelearning.github.io/webmcp/"> Community Group draft</a>,
-          <a href="https://developer.chrome.com/docs/ai/webmcp"> Chrome WebMCP documentation</a>,
-          <a href="https://developer.chrome.com/docs/devtools/application/webmcp"> Chrome DevTools WebMCP panel</a>,
-          <a href="https://modelcontextprotocol.io/specification/latest"> Model Context Protocol</a>, and
-          <a href="https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd"> Model Context Tool Inspector</a>.
-        </p>
+      <div className="docs-landing-hero-diagram docs-landing-bottom-visual">
+        <img
+          className="docs-landing-hero-diagram-svg docs-landing-hero-diagram-light"
+          src="/logo/mcp-b-architecture-light.svg"
+          alt="WebMCP runtime architecture"
+          width="800"
+          height="420"
+          noZoom
+        />
+        <img
+          className="docs-landing-hero-diagram-svg docs-landing-hero-diagram-dark"
+          src="/logo/mcp-b-architecture-dark.svg"
+          alt="WebMCP runtime architecture"
+          width="800"
+          height="420"
+          noZoom
+        />
       </div>
     </div>
   </section>

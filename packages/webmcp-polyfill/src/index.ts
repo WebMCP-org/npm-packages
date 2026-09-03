@@ -14,6 +14,7 @@ import {
   createInvalidStateError,
   createToolInvocationFailedError,
   createUnknownError,
+  isPlainObject,
   parseChromeToolInput,
   serializeChromeToolResult,
   serializeInputSchema,
@@ -73,94 +74,127 @@ export interface WebMCPPolyfillInitOptions {
   /**
    * Controls installation of navigator.modelContextTesting when this polyfill provides modelContext.
    * The shim is testing-only and never replaces an existing implementation.
+   *
+   * Off by default so the polyfill stays spec-pure; modelContextTesting is a removed
+   * Chromium preview API. `@mcp-b/global` deliberately opts in (its own default is true).
    * @default false
    */
   installTestingShim?: boolean;
 }
 
 class StrictWebMCPContext extends EventTarget implements ModelContext {
-  readonly [POLYFILL_MARKER_PROPERTY] = true;
-  private readonly tools = new Map<string, PolyfillToolDescriptor>();
-  private testingShim: PolyfillTestingShim | null = null;
-  private _ontoolchange: ((this: ModelContext, ev: Event) => unknown) | null = null;
-  private readonly ontoolchangeListener: EventListener = (event) => {
-    this._ontoolchange?.call(this, event);
+  // ECMAScript #private, not TypeScript `private`: TypeScript's modifier is
+  // erased at build time and leaves ordinary own enumerable properties, which
+  // leak through Object.keys/for..in/spread and make JSON.stringify throw on
+  // the ownerDocument cycle. Chrome's ModelContext instance has no own keys.
+  readonly #tools = new Map<string, PolyfillToolDescriptor>();
+  #testingShim: PolyfillTestingShim | null = null;
+  #ontoolchangeHandler: ((this: ModelContext, ev: Event) => unknown) | null = null;
+  readonly #ontoolchangeListener: EventListener = (event) => {
+    this.#ontoolchangeHandler?.call(this, event);
   };
-  private readonly DOMExceptionConstructor: typeof DOMException;
+  readonly #domException: typeof DOMException;
+  readonly #ownerDocument: Document | null;
 
-  constructor(private readonly ownerDocument: Document | null) {
+  constructor(ownerDocument: Document | null) {
     super();
-    this.DOMExceptionConstructor = ownerDocument?.defaultView?.DOMException ?? DOMException;
+    this.#ownerDocument = ownerDocument;
+    this.#domException = ownerDocument?.defaultView?.DOMException ?? DOMException;
+    // The sole deliberate exception to "Chrome's ModelContext has no own keys":
+    // this is the documented polyfill-vs-native check, read by
+    // e2e/web-standards-showcase/src/api/detection.ts and the e2e specs. Keeping
+    // it non-enumerable means the instance still spreads, enumerates, and
+    // JSON.stringify()s exactly like Chrome's.
+    Object.defineProperty(this, POLYFILL_MARKER_PROPERTY, {
+      value: true,
+      enumerable: false,
+      writable: false,
+      configurable: false,
+    });
   }
 
   get ontoolchange(): ((this: ModelContext, ev: Event) => unknown) | null {
-    return this._ontoolchange;
+    return this.#ontoolchangeHandler;
   }
 
   set ontoolchange(handler: ((this: ModelContext, ev: Event) => unknown) | null) {
     const listener = typeof handler === 'function' ? handler : null;
     if (listener === null) {
-      this._ontoolchange = null;
-      super.removeEventListener('toolchange', this.ontoolchangeListener);
+      this.#ontoolchangeHandler = null;
+      super.removeEventListener('toolchange', this.#ontoolchangeListener);
       return;
     }
 
-    if (this._ontoolchange === null) {
-      super.addEventListener('toolchange', this.ontoolchangeListener);
+    if (this.#ontoolchangeHandler === null) {
+      super.addEventListener('toolchange', this.#ontoolchangeListener);
     }
-    this._ontoolchange = listener;
+    this.#ontoolchangeHandler = listener;
   }
 
+  // The `= {}` defaults on `options` here and in getTools/executeTool are
+  // load-bearing: a defaulted parameter is excluded from Function.length, which
+  // is what gives these three the arity WebIDL requires and idlharness checks
+  // (1, 0, 2). The `options?.` reads stay too — a default only fills in
+  // `undefined`, so an explicitly passed `null` still reaches the body.
   async registerTool<TArgs extends WebMcpToolInput>(
     tool: ModelContextTool<TArgs>,
-    options?: ModelContextRegisterToolOptions
+    options: ModelContextRegisterToolOptions = {}
   ): Promise<void> {
-    validateWebMcpAccess(this.ownerDocument);
+    validateWebMcpAccess(this.#ownerDocument);
     const signal = options?.signal;
-    const normalized = normalizeToolDescriptor(tool, this.tools);
+    const normalized = normalizeToolDescriptor(tool, this.#tools);
     signal?.throwIfAborted();
     validatePotentiallyTrustworthyOrigins(options?.exposedTo);
     signal?.throwIfAborted();
     if (options?.exposedTo?.length) {
-      throw new this.DOMExceptionConstructor(
+      throw new this.#domException(
         'Cross-document tool exposure requires native WebMCP',
         'NotSupportedError'
       );
     }
-    this.tools.set(normalized.name, normalized);
+    this.#tools.set(normalized.name, normalized);
 
     if (signal) {
       const abort = () => {
-        if (this.removeTool(normalized.name, normalized)) void this.notifyToolsChanged();
+        if (this.#removeTool(normalized.name, normalized)) void this.#notifyToolsChanged();
       };
       normalized[REGISTRATION_SIGNAL_SYMBOL] = signal;
       normalized[REGISTRATION_ABORT_SYMBOL] = abort;
       signal.addEventListener('abort', abort, { once: true });
     }
 
-    await this.notifyToolsChanged();
+    await this.#notifyToolsChanged();
     if (signal?.aborted) throw signal.reason;
   }
 
-  private removeTool(name: string, expected?: PolyfillToolDescriptor): boolean {
-    const registered = this.tools.get(name);
-    if (!registered || (expected && registered !== expected)) return false;
-    const signal = registered[REGISTRATION_SIGNAL_SYMBOL];
-    const abort = registered[REGISTRATION_ABORT_SYMBOL];
-    if (signal && abort) signal.removeEventListener('abort', abort);
-    return this.tools.delete(name);
-  }
-
-  async getTools(options?: ModelContextGetToolOptions): Promise<RegisteredTool[]> {
-    validateWebMcpAccess(this.ownerDocument);
+  async getTools(options: ModelContextGetToolOptions = {}): Promise<RegisteredTool[]> {
+    validateWebMcpAccess(this.#ownerDocument);
     validatePotentiallyTrustworthyOrigins(options?.fromOrigins);
     if (options?.fromOrigins?.length) {
-      throw new this.DOMExceptionConstructor(
+      throw new this.#domException(
         'Cross-document tool discovery requires native WebMCP',
         'NotSupportedError'
       );
     }
-    const tools = this.getRegisteredToolInfos();
+    const tools = [...this.#tools.values()]
+      .map((tool) => {
+        // A fresh object per call, like Blink parsing its serialized copy
+        // (webmcp#241). A custom toJSON can serialize to non-object JSON; omit
+        // those rather than emit a value consumers would mistake for a pre-154
+        // serialized string.
+        const serialized = tool[REGISTERED_INPUT_SCHEMA_SYMBOL];
+        const parsed: unknown = serialized === undefined ? undefined : JSON.parse(serialized);
+        return {
+          name: tool.name,
+          title: tool.title ?? '',
+          description: tool.description,
+          ...(isPlainObject(parsed) ? { inputSchema: parsed } : {}),
+          origin: currentOrigin(),
+          window: globalThis.window,
+          ...(tool.annotations ? { annotations: toWebMcpAnnotations(tool.annotations) } : {}),
+        };
+      })
+      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     await new Promise((resolve) => setTimeout(resolve, 0));
     return tools;
   }
@@ -168,9 +202,9 @@ class StrictWebMCPContext extends EventTarget implements ModelContext {
   async executeTool(
     tool: RegisteredTool,
     inputArgsJson: string,
-    options?: ChromeModelContextExecuteToolOptions
+    options: ChromeModelContextExecuteToolOptions = {}
   ): Promise<string | null> {
-    validateWebMcpAccess(this.ownerDocument);
+    validateWebMcpAccess(this.#ownerDocument);
     if (tool === null || typeof tool !== 'object') {
       throw new TypeError('RegisteredTool must be an object');
     }
@@ -183,62 +217,69 @@ class StrictWebMCPContext extends EventTarget implements ModelContext {
     if (tool.window !== globalThis.window || tool.origin !== currentOrigin()) {
       throw createUnknownError(`Tool not found: ${tool.name}`);
     }
-    return this.invokeToolByName(tool.name, inputArgsJson, options);
+    return this.#invokeToolByName(tool.name, inputArgsJson, options);
   }
 
-  getTestingShim(): PolyfillTestingShim {
-    if (!this.testingShim) {
-      this.testingShim = new PolyfillTestingShim(this);
-    }
-    return this.testingShim;
+  // Everything below is non-standard. `ModelContext.prototype` must expose only
+  // the WebIDL members above, so the polyfill's own plumbing is either #private
+  // (which gets no prototype slot at all) or static. The statics hang off this
+  // module-private class binding, not off the exposed `ModelContext` interface
+  // object, so no page script can reach them.
+
+  /** @internal Used by initializeWebMCPPolyfill */
+  static getTestingShim(context: StrictWebMCPContext): PolyfillTestingShim {
+    context.#testingShim ??= new PolyfillTestingShim(context);
+    return context.#testingShim;
   }
 
   /** @internal Used by PolyfillTestingShim */
-  getToolInfos(): ModelContextTestingToolInfo[] {
-    return [...this.tools.values()].map((tool) => ({
+  static getToolInfos(context: StrictWebMCPContext): ModelContextTestingToolInfo[] {
+    return [...context.#tools.values()].map((tool) => ({
       name: tool.name,
       description: tool.description,
+      // Pinned to the string: the removed modelContextTesting surface predates
+      // webmcp#241.
       ...(tool[REGISTERED_INPUT_SCHEMA_SYMBOL] === undefined
         ? {}
         : { inputSchema: tool[REGISTERED_INPUT_SCHEMA_SYMBOL] }),
     }));
   }
 
-  /** @internal Used by getTools() */
-  getRegisteredToolInfos(): RegisteredTool[] {
-    return [...this.tools.values()]
-      .map((tool) => ({
-        name: tool.name,
-        title: tool.title ?? '',
-        description: tool.description,
-        ...(tool[REGISTERED_INPUT_SCHEMA_SYMBOL] !== undefined
-          ? { inputSchema: tool[REGISTERED_INPUT_SCHEMA_SYMBOL] }
-          : {}),
-        origin: currentOrigin(),
-        window: globalThis.window,
-        ...(tool.annotations ? { annotations: toWebMcpAnnotations(tool.annotations) } : {}),
-      }))
-      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  }
-
   /** @internal Used by PolyfillTestingShim */
-  async executeToolForTesting(
+  static executeToolForTesting(
+    context: StrictWebMCPContext,
     toolName: string,
     inputArgsJson: string,
     options?: ChromeModelContextExecuteToolOptions
   ): Promise<string | null> {
-    validateWebMcpAccess(this.ownerDocument);
-    return this.invokeToolByName(toolName, inputArgsJson, options);
+    validateWebMcpAccess(context.#ownerDocument);
+    return context.#invokeToolByName(toolName, inputArgsJson, options);
   }
 
-  private async invokeToolByName(
+  /** @internal Used by cleanupWebMCPPolyfill */
+  static dispose(context: StrictWebMCPContext): void {
+    for (const name of context.#tools.keys()) context.#removeTool(name);
+    context.ontoolchange = null;
+    context.#testingShim?.dispose();
+  }
+
+  #removeTool(name: string, expected?: PolyfillToolDescriptor): boolean {
+    const registered = this.#tools.get(name);
+    if (!registered || (expected && registered !== expected)) return false;
+    const signal = registered[REGISTRATION_SIGNAL_SYMBOL];
+    const abort = registered[REGISTRATION_ABORT_SYMBOL];
+    if (signal && abort) signal.removeEventListener('abort', abort);
+    return this.#tools.delete(name);
+  }
+
+  async #invokeToolByName(
     toolName: string,
     inputArgsJson: string,
     options: ChromeModelContextExecuteToolOptions | undefined
   ): Promise<string | null> {
     options?.signal?.throwIfAborted();
 
-    const tool = this.tools.get(toolName);
+    const tool = this.#tools.get(toolName);
     if (!tool) {
       throw createUnknownError(`Tool not found: ${toolName}`);
     }
@@ -265,30 +306,32 @@ class StrictWebMCPContext extends EventTarget implements ModelContext {
     return serializeChromeToolResult(rawResult);
   }
 
-  private async notifyToolsChanged(): Promise<void> {
+  async #notifyToolsChanged(): Promise<void> {
     // ponytail: the platform does not expose its WebMCP task source; a timer
     // preserves task (rather than microtask) ordering for local registrations.
     await new Promise((resolve) => setTimeout(resolve, 0));
     this.dispatchEvent(new Event('toolchange'));
-    this.testingShim?.dispatchToolChange();
-  }
-
-  dispose(): void {
-    for (const name of this.tools.keys()) this.removeTool(name);
-    this.ontoolchange = null;
-    this.testingShim?.dispose();
+    this.#testingShim?.dispatchToolChange();
   }
 }
 
-const modelContextConstructor = {
-  ModelContext(): never {
-    throw new TypeError('Illegal constructor');
-  },
-}.ModelContext;
+// A function *expression*, not a method shorthand: WebIDL interface objects must
+// pass the IsConstructor check, and method shorthands have no [[Construct]].
+const modelContextConstructor = function ModelContext(): never {
+  throw new TypeError('Illegal constructor');
+};
 
+// Pinned explicitly: minifiers rename function expressions, and WebIDL requires
+// the interface object's `name` to be the interface identifier.
+Object.defineProperty(modelContextConstructor, 'name', { value: 'ModelContext' });
 Object.defineProperty(modelContextConstructor, 'prototype', {
   value: StrictWebMCPContext.prototype,
+  writable: false,
 });
+// WebIDL: an interface object's [[Prototype]] is the inherited interface's
+// interface object. `interface ModelContext : EventTarget` therefore requires
+// Object.getPrototypeOf(ModelContext) === EventTarget, not Function.prototype.
+Object.setPrototypeOf(modelContextConstructor, EventTarget);
 Object.defineProperty(StrictWebMCPContext.prototype, 'constructor', {
   configurable: true,
   writable: true,
@@ -298,6 +341,18 @@ Object.defineProperty(StrictWebMCPContext.prototype, Symbol.toStringTag, {
   configurable: true,
   value: 'ModelContext',
 });
+
+// WebIDL members are enumerable on the interface prototype object; ECMAScript
+// class members are not. `executeTool` is a Chrome extension, not spec IDL.
+for (const member of ['registerTool', 'getTools', 'executeTool', 'ontoolchange'] as const) {
+  const descriptor = Object.getOwnPropertyDescriptor(StrictWebMCPContext.prototype, member);
+  if (descriptor) {
+    Object.defineProperty(StrictWebMCPContext.prototype, member, {
+      ...descriptor,
+      enumerable: true,
+    });
+  }
+}
 
 /**
  * EventTarget-based testing shim matching the native Chromium ModelContextTesting surface.
@@ -310,12 +365,15 @@ class PolyfillTestingShim extends EventTarget implements ModelContextTesting {
     this._ontoolchange?.call(this, event);
   };
 
-  constructor(private readonly context: StrictWebMCPContext) {
+  readonly #context: StrictWebMCPContext;
+
+  constructor(context: StrictWebMCPContext) {
     super();
+    this.#context = context;
   }
 
   listTools(): ModelContextTestingToolInfo[] {
-    return this.context.getToolInfos();
+    return StrictWebMCPContext.getToolInfos(this.#context);
   }
 
   executeTool(
@@ -323,7 +381,12 @@ class PolyfillTestingShim extends EventTarget implements ModelContextTesting {
     inputArgsJson: string,
     options?: ChromeModelContextExecuteToolOptions
   ): Promise<string | null> {
-    return this.context.executeToolForTesting(toolName, inputArgsJson, options);
+    return StrictWebMCPContext.executeToolForTesting(
+      this.#context,
+      toolName,
+      inputArgsJson,
+      options
+    );
   }
 
   get ontoolchange(): ((this: ModelContextTesting, ev: Event) => unknown) | null {
@@ -388,6 +451,42 @@ function normalizeToolDescriptor<TArgs extends WebMcpToolInput>(
 
 let navigatorModelContextDeprecationWarned = false;
 
+/**
+ * Backing store for the `Document.prototype.modelContext` getter.
+ *
+ * WebIDL puts `[SameObject] readonly attribute ModelContext modelContext` on
+ * the Document *interface prototype object*, not on the document instance, and
+ * Chrome matches that. One shared accessor therefore needs somewhere to keep
+ * the per-document value, and keying it by document is what makes repeated
+ * reads return the identical object, as `[SameObject]` requires.
+ */
+const documentModelContexts = new WeakMap<Document, ModelContext>();
+
+// A method shorthand, so it has no `prototype` and is not constructable, like a
+// native getter. `name` is pinned because Chrome reports "get modelContext" and
+// minifiers rename otherwise.
+const { modelContext: documentModelContextGetter } = {
+  modelContext(this: Document): ModelContext | undefined {
+    // WebIDL brand check: the getter is only callable on a Document.
+    // Document.prototype is not one, so reading it throws, as Chrome does.
+    if (!(this instanceof Document)) {
+      throw new TypeError('Illegal invocation');
+    }
+    return documentModelContexts.get(this);
+  },
+};
+Object.defineProperty(documentModelContextGetter, 'name', { value: 'get modelContext' });
+
+function defineDocumentModelContext(target: Document, value: ModelContext): void {
+  documentModelContexts.set(target, value);
+  if (Object.hasOwn(Document.prototype, 'modelContext')) return;
+  installProperty(Document.prototype, 'modelContext', {
+    configurable: true,
+    enumerable: true,
+    get: documentModelContextGetter,
+  });
+}
+
 // Per webmachinelearning/webmcp#173 / PR #184, the modelContext getter moved
 // from Navigator to Document. We install on document.modelContext as the
 // primary surface and expose navigator.modelContext as a deprecated alias that
@@ -447,12 +546,7 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
   }
 
   if (navigatorModelContext) {
-    installProperty(doc, 'modelContext', {
-      configurable: true,
-      enumerable: true,
-      writable: false,
-      value: navigatorModelContext,
-    });
+    defineDocumentModelContext(doc, navigatorModelContext);
     return;
   }
 
@@ -472,18 +566,12 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
 
   const context = new StrictWebMCPContext(doc);
   installedContext = context;
-  const modelContext: ModelContext = context;
 
-  installProperty(doc, 'modelContext', {
-    configurable: true,
-    enumerable: true,
-    writable: false,
-    value: modelContext,
-  });
+  defineDocumentModelContext(doc, context);
 
   // Reset the one-shot warning flag so a fresh install warns again on first access.
   navigatorModelContextDeprecationWarned = false;
-  defineDeprecatedNavigatorModelContext(nav, modelContext);
+  defineDeprecatedNavigatorModelContext(nav, context);
   installSubmitEventPolyfill();
 
   if (options?.installTestingShim && !nav.modelContextTesting) {
@@ -491,7 +579,7 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
       configurable: true,
       enumerable: true,
       writable: false,
-      value: context.getTestingShim(),
+      value: StrictWebMCPContext.getTestingShim(context),
     });
   }
 
@@ -501,7 +589,7 @@ export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): v
 export function cleanupWebMCPPolyfill(): void {
   cleanupDeclarativeForms?.();
   cleanupDeclarativeForms = null;
-  installedContext?.dispose();
+  if (installedContext) StrictWebMCPContext.dispose(installedContext);
   installedContext = null;
   for (const { target, key, previous } of [...installedProperties].reverse()) {
     if (previous) Object.defineProperty(target, key, previous);

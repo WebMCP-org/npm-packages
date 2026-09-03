@@ -57,7 +57,7 @@ export function formatMcpResult(result: unknown): FormattedMcpResult {
   if (mcpResponse.content && Array.isArray(mcpResponse.content)) {
     const textContent = mcpResponse.content
       .filter((item) => item.type === 'text' && 'text' in item && item.text)
-      .map((item) => ('text' in item ? (item as { text: string }).text : ''))
+      .map((item) => ('text' in item ? item.text : ''))
       .join('\n');
 
     if (textContent) {
@@ -89,16 +89,4 @@ export function formatMcpResult(result: unknown): FormattedMcpResult {
     isError,
     rawResult: result,
   };
-}
-
-/**
- * Check if a result looks like an MCP tool response
- */
-export function isMcpToolResponse(result: unknown): result is CallToolResult {
-  if (typeof result !== 'object' || result === null) {
-    return false;
-  }
-
-  const obj = result as Record<string, unknown>;
-  return 'content' in obj && Array.isArray(obj.content);
 }

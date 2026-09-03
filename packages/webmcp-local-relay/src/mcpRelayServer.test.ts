@@ -1,9 +1,17 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 
 import { RelayBridgeServer } from './bridgeServer.js';
 import { LocalRelayMcpServer } from './mcpRelayServer.js';
+
+// The relay caches its chosen port in ~/.webmcp/relay-port.json by default;
+// tests must never touch the developer's real home directory. mkdtemp gives a
+// 0700 directory with an unpredictable name, so this is not a temp-file race.
+const persistPath = join(mkdtempSync(join(tmpdir(), 'webmcp-relay-test-')), 'relay-port.json');
 
 const execFileMock = vi.hoisted(() =>
   vi.fn((_command: string, _args: string[], callback: (error: Error | null) => void) => {
@@ -447,6 +455,7 @@ describe('LocalRelayMcpServer', () => {
         host: '127.0.0.1',
         port: serverBridge.port,
         allowedOrigins: ['*'],
+        persistPath,
       });
       await clientBridge.start();
       expect(clientBridge.mode).toBe('client');
@@ -826,6 +835,7 @@ describe('LocalRelayMcpServer', () => {
         host: '127.0.0.1',
         port: serverBridge.port,
         allowedOrigins: ['*'],
+        persistPath,
       });
       await clientBridge.start();
 
@@ -1418,8 +1428,8 @@ describe('LocalRelayMcpServer', () => {
       await cleanup();
     });
 
-    it('batches rapid stateChanged events into a single sync', async () => {
-      const { bridge, relay, cleanup } = await createConnectedRelay();
+    it('coalesces a burst of tool-list changes into a single sync', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
 
       const ws = await connectBrowser(bridge, {
         tabId: 'tab-batch',
@@ -1427,11 +1437,16 @@ describe('LocalRelayMcpServer', () => {
         tools: [{ name: 'batch_tool', description: 'Batch test' }],
       });
 
-      await waitFor(() => bridge.registry.listTools()[0]?.name);
+      const batchName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+      await waitForClientTool(client, batchName);
 
-      const syncCountBefore = relay.listDynamicToolNames().length;
-      expect(syncCountBefore).toBe(1);
+      let notifications = 0;
+      client.setNotificationHandler('notifications/tools/list_changed', () => {
+        notifications += 1;
+      });
 
+      // A reconnecting tab drops and re-publishes its tools in the same tick.
+      ws.send(JSON.stringify({ type: 'tools/changed', tools: [] }));
       ws.send(
         JSON.stringify({
           type: 'tools/changed',
@@ -1442,24 +1457,15 @@ describe('LocalRelayMcpServer', () => {
         })
       );
 
-      ws.send(
-        JSON.stringify({
-          type: 'tools/changed',
-          tools: [
-            { name: 'batch_tool', description: 'Batch test v2' },
-            { name: 'extra_tool', description: 'Extra v2' },
-          ],
-        })
+      const extraName = await waitFor(
+        () => bridge.registry.listTools().find((tool) => tool.originalName === 'extra_tool')?.name
       );
+      await waitForClientTool(client, extraName);
+      await new Promise((resolve) => setImmediate(resolve));
 
-      await waitFor(() => {
-        const names = relay.listDynamicToolNames();
-        return names.length === 2 ? true : undefined;
-      });
-
-      const names = relay.listDynamicToolNames();
-      expect(names).toContain('batch_tool');
-      expect(names).toContain('extra_tool');
+      // Only extra_tool is new. Without debouncing the empty list syncs first,
+      // unregistering and re-registering batch_tool for 3 notifications.
+      expect(notifications).toBe(1);
 
       ws.close();
       await cleanup();

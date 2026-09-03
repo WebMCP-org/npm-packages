@@ -1,0 +1,184 @@
+[
+  {
+    "name": "secureContext",
+    "value": true
+  },
+  {
+    "name": "document.modelContext",
+    "value": "object"
+  },
+  {
+    "name": "navigator.modelContext",
+    "value": "undefined"
+  },
+  {
+    "name": "sameDocumentObject",
+    "value": true
+  },
+  {
+    "name": "navigatorAlias",
+    "value": false
+  },
+  {
+    "name": "prototype",
+    "value": "Object"
+  },
+  {
+    "name": "prototypeProperties",
+    "value": [
+      "__defineGetter__",
+      "__defineSetter__",
+      "__lookupGetter__",
+      "__lookupSetter__",
+      "__proto__",
+      "constructor",
+      "hasOwnProperty",
+      "isPrototypeOf",
+      "propertyIsEnumerable",
+      "toLocaleString",
+      "toString",
+      "valueOf"
+    ]
+  },
+  {
+    "name": "ownProperties",
+    "value": ["codexExecuteTool", "codexGetTools", "executeTool", "getTools", "registerTool"]
+  },
+  {
+    "name": "methods",
+    "value": {
+      "registerTool": "function",
+      "getTools": "function",
+      "executeTool": "function",
+      "addEventListener": "undefined",
+      "ontoolchange": false
+    }
+  },
+  {
+    "name": "registerResult",
+    "value": {
+      "type": "undefined",
+      "value": null
+    }
+  },
+  {
+    "name": "getTools",
+    "value": [
+      {
+        "name": "codex_probe_echo",
+        "title": "Codex probe echo",
+        "description": "Returns the supplied message and records the execution callback shape.",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"message\":{\"type\":\"string\"},\"count\":{\"type\":\"integer\",\"minimum\":1}},\"required\":[\"message\"],\"additionalProperties\":false}",
+        "annotations": {
+          "readOnlyHint": true,
+          "untrustedContentHint": false
+        },
+        "origin": "http://127.0.0.1:41739",
+        "hasWindow": false
+      }
+    ]
+  },
+  {
+    "name": "executeTool.objectInput",
+    "value": {
+      "type": "string",
+      "value": "{\"input\":{\"message\":\"direct object\",\"count\":2},\"inputType\":\"object\",\"hasSignal\":false,\"signalAborted\":null}"
+    }
+  },
+  {
+    "name": "executeTool.stringInput",
+    "value": {
+      "type": "object",
+      "constructor": "Error",
+      "name": "Error",
+      "message": "WebMCP executeTool requires an object input.",
+      "string": "Error: WebMCP executeTool requires an object input.",
+      "keys": [],
+      "json": "{}"
+    }
+  },
+  {
+    "name": "duplicateRegistration",
+    "value": {
+      "type": "object",
+      "constructor": "Object",
+      "name": null,
+      "message": null,
+      "string": "[object Object]",
+      "keys": [],
+      "json": "{}"
+    }
+  },
+  {
+    "name": "emptyName",
+    "value": {
+      "type": "object",
+      "constructor": "Object",
+      "name": null,
+      "message": null,
+      "string": "[object Object]",
+      "keys": [],
+      "json": "{}"
+    }
+  },
+  {
+    "name": "invalidName",
+    "value": {
+      "type": "object",
+      "constructor": "Object",
+      "name": null,
+      "message": null,
+      "string": "[object Object]",
+      "keys": [],
+      "json": "{}"
+    }
+  },
+  {
+    "name": "emptyDescription",
+    "value": {
+      "type": "object",
+      "constructor": "Object",
+      "name": null,
+      "message": null,
+      "string": "[object Object]",
+      "keys": [],
+      "json": "{}"
+    }
+  },
+  {
+    "name": "circularSchema",
+    "value": {
+      "type": "object",
+      "constructor": "Error",
+      "name": "Error",
+      "message": "Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'self' closes the circle",
+      "string": "Error: Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'self' closes the circle",
+      "keys": [],
+      "json": "{}"
+    }
+  },
+  {
+    "name": "preAbortedRegistration",
+    "value": {
+      "type": "string",
+      "constructor": "String",
+      "name": null,
+      "message": null,
+      "string": "pre-aborted registration",
+      "keys": [],
+      "json": "\"pre-aborted registration\""
+    }
+  },
+  {
+    "name": "insecureExposedTo",
+    "value": "resolved"
+  },
+  {
+    "name": "insecureFromOrigins",
+    "value": "resolved"
+  },
+  {
+    "name": "abortUnregisters",
+    "value": true
+  }
+]

@@ -1,0 +1,155 @@
+{
+  "agentToolListing": {
+    "fixtureUrl": "http://127.0.0.1:41739/",
+    "tool": {
+      "name": "codex_probe_echo",
+      "title": "Codex probe echo",
+      "description": "Returns the supplied message and records the execution callback shape.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": ["message"],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "untrustedContentHint": false
+      },
+      "origin": "http://127.0.0.1:41739",
+      "pageUrl": "http://127.0.0.1:41739/"
+    }
+  },
+  "toolInputCalls": {
+    "valid": {
+      "ok": true,
+      "value": {
+        "hasSignal": false,
+        "input": {
+          "count": 2,
+          "message": "agent object"
+        },
+        "inputType": "object",
+        "signalAborted": null
+      }
+    },
+    "missingRequired": {
+      "ok": true,
+      "value": {
+        "hasSignal": false,
+        "input": {
+          "count": 2
+        },
+        "inputType": "object",
+        "signalAborted": null
+      }
+    },
+    "wrongType": {
+      "ok": true,
+      "value": {
+        "hasSignal": false,
+        "input": {
+          "count": "two",
+          "message": 7
+        },
+        "inputType": "object",
+        "signalAborted": null
+      }
+    },
+    "extraProperty": {
+      "ok": true,
+      "value": {
+        "hasSignal": false,
+        "input": {
+          "message": "extra",
+          "unexpected": true
+        },
+        "inputType": "object",
+        "signalAborted": null
+      }
+    },
+    "belowMinimum": {
+      "ok": true,
+      "value": {
+        "hasSignal": false,
+        "input": {
+          "count": 0,
+          "message": "minimum"
+        },
+        "inputType": "object",
+        "signalAborted": null
+      }
+    }
+  },
+  "toolResultCalls": {
+    "object": {
+      "ok": true,
+      "value": {
+        "nested": {
+          "count": 1
+        },
+        "ok": true
+      }
+    },
+    "array": {
+      "ok": true,
+      "value": ["alpha", 2, false]
+    },
+    "string": {
+      "ok": true,
+      "value": "plain string"
+    },
+    "number": {
+      "ok": true,
+      "value": 42
+    },
+    "boolean": {
+      "ok": true,
+      "value": true
+    },
+    "null": {
+      "ok": true,
+      "value": null
+    },
+    "undefined": {
+      "ok": true,
+      "value": null
+    },
+    "bigint": {
+      "ok": false,
+      "name": "Error",
+      "message": "Browser Use encountered an error interacting with this webpage: Error: WebMCP tool result is not JSON-serializable."
+    },
+    "circular": {
+      "ok": false,
+      "name": "Error",
+      "message": "Browser Use encountered an error interacting with this webpage: Error: WebMCP tool result is not JSON-serializable."
+    },
+    "throw": {
+      "ok": false,
+      "name": "Error",
+      "message": "Browser Use encountered an error interacting with this webpage: Error: probe throw"
+    },
+    "reject_string": {
+      "ok": false,
+      "name": "Error",
+      "message": "Browser Use encountered an error interacting with this webpage: probe rejection"
+    }
+  },
+  "manualObservations": {
+    "topLevelImperativeTool": "discovered and invoked",
+    "dynamicRegistration": "tool list refreshed after registration and abort-based removal",
+    "navigation": "tools from the previous page were removed",
+    "declarativeTool": "not discovered",
+    "sameOriginIframeTool": "not discovered; child document.modelContext was undefined",
+    "disabledToolsPolicy": "registration resolved and the agent discovered the tool",
+    "activeCallCancellation": "not tested"
+  }
+}

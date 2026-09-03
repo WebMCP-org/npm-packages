@@ -54,10 +54,9 @@ export type ToolDescriptor<
   TArgs extends WebMcpToolInput = Record<string, unknown>,
   TResult = unknown,
   TName extends string = string,
-> = Omit<ModelContextTool<TArgs, TResult, TName>, 'annotations' | 'execute'> & {
+> = Omit<ModelContextTool<TArgs, TResult, TName>, 'annotations'> & {
   outputSchema?: JsonSchemaForInference;
   annotations?: ToolAnnotations;
-  execute: (args: TArgs) => MaybePromise<TResult>;
 };
 
 /** MCP response with `structuredContent` inferred from an output schema. */
@@ -86,12 +85,9 @@ export type ToolDescriptorFromSchema<
   TName extends string = string,
 > = Omit<
   ToolDescriptor<InferArgsFromInputSchema<TInputSchema>, ExecuteResult<TOutputSchema>, TName>,
-  'execute' | 'inputSchema' | 'outputSchema'
+  'inputSchema' | 'outputSchema'
 > & {
   inputSchema: TInputSchema;
-  execute: (
-    args: InferArgsFromInputSchema<TInputSchema>
-  ) => MaybePromise<ExecuteResult<TOutputSchema>>;
 } & ([TOutputSchema] extends [undefined]
     ? { outputSchema?: undefined }
     : { outputSchema: TOutputSchema });

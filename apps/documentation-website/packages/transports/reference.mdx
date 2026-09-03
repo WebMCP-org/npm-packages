@@ -1,5 +1,5 @@
 ---
-title: '@mcp-b/transports'
+title: '@mcp-b/transports reference'
 description: 'Reference for browser transport classes, options, and transport-specific security boundaries.'
 keywords:
   [
@@ -27,6 +27,10 @@ pnpm add @mcp-b/transports @modelcontextprotocol/server
 ```
 
 Install `@modelcontextprotocol/client` when you use a client transport.
+
+The package does not install Chrome extension globals. Extension applications
+must declare their own types with either `@types/chrome` or `chrome-types` as a
+development dependency. Page and iframe transports need neither.
 
 ## Minimal example
 
@@ -161,6 +165,16 @@ await server.connect(transport);
 | `allowedOrigins` | `string[]` | Yes      | --             | Parent origins permitted to connect. Use `["*"]` to allow any origin. |
 | `channelId`      | `string`   | No       | `"mcp-iframe"` | Channel identifier for message routing.                               |
 
+#### Properties
+
+| Property         | Type                          | Description                                                                  |
+| ---------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| `clientOrigin`   | `string \| undefined`         | Origin of the connected parent, `undefined` until its first message arrives. |
+| `onclientorigin` | `((origin: string) => void)?` | Called when the parent origin is first established, and again on a takeover. |
+
+[`BrowserMcpServer`](/packages/webmcp-ts-sdk/reference) reads both to scope tools
+registered with `exposedTo` to the embedder actually connected.
+
 ---
 
 ## Extension transports
@@ -211,8 +225,13 @@ sender passes your allowlist.
 #### Constructor
 
 ```typescript title="Extension server transport constructor"
-new ExtensionServerTransport(port: chrome.runtime.Port, options?: ExtensionServerTransportOptions)
+new ExtensionServerTransport(port: ExtensionPort, options?: ExtensionServerTransportOptions)
 ```
+
+`ExtensionPort` is exported by `@mcp-b/transports`. It contains `postMessage`,
+`disconnect`, and the `addListener`/`removeListener` methods on `onMessage` and
+`onDisconnect`. Chrome `runtime.Port` objects from either declaration package
+satisfy this interface.
 
 #### ExtensionServerTransportOptions
 
@@ -293,5 +312,5 @@ Every transport class implements the MCP `Transport` interface:
 - [Bridge tools across iframes](/how-to/bridge-tools-across-iframes) for a step-by-step iframe bridging guide
 - [Connect desktop agents with local relay](/how-to/connect-desktop-agents-with-local-relay) for stdio-to-browser bridging
 - [@mcp-b/mcp-iframe](/packages/mcp-iframe/reference) for the high-level `<mcp-iframe>` custom element that wraps iframe transports
-- [WebMCP standard API](/reference/webmcp/standard-api) for native cross-document discovery without an MCP transport
+- [WebMCP API sources](/reference/webmcp/standard-api) for native cross-document discovery without an MCP transport
 - [Chrome extension message passing](https://developer.chrome.com/docs/extensions/develop/concepts/messaging) for runtime port ownership and external connections

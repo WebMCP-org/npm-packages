@@ -17,46 +17,24 @@
 //   node test/local-playwright-runner.mjs --url=https://example.com --mode=interactive --screenshot=example.png
 
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-let chromium;
-async function loadPlaywright() {
-  try {
-    const mod = await import('playwright');
-    chromium = mod.chromium;
-    return;
-  } catch {
-    // Fallback: resolve from mcp-server's node_modules symlink target
-    const { readlinkSync, lstatSync } = await import('node:fs');
-    const { resolve: pathResolve, dirname: pathDirname } = await import('node:path');
-    const linkPath = pathResolve(
-      pathDirname(fileURLToPath(import.meta.url)),
-      '../mcp-server/node_modules/playwright'
-    );
-    let target;
-    try {
-      const stat = lstatSync(linkPath);
-      if (stat.isSymbolicLink()) {
-        const link = readlinkSync(linkPath);
-        target = pathResolve(pathDirname(linkPath), link);
-      } else {
-        target = linkPath;
-      }
-    } catch {
-      target = linkPath;
-    }
-    const entry = new URL(pathResolve(target, 'index.js'), 'file:').href;
-    const mod = await import(entry);
-    chromium = mod.chromium || mod.default?.chromium;
-  }
-}
+const { chromium } = createRequire(new URL('../mcp-server/package.json', import.meta.url))(
+  'playwright'
+);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 function getBundleCode() {
   const bundlePath = resolve(__dirname, '../mcp-server/lib/smart-dom-reader.bundle.js');
+  return readFileSync(bundlePath, 'utf8');
+}
+
+function getEntryBundleCode() {
+  const bundlePath = resolve(__dirname, '../dist-bundle/smart-dom-reader-bundle.js');
   return readFileSync(bundlePath, 'utf8');
 }
 
@@ -85,10 +63,6 @@ const PAGES = {
     <section>
       <button id="primary-btn" class="btn btn-primary">Primary Action</button>
       <button data-testid="secondary-action">Secondary Action</button>
-      <button data-testid="save-action">Delete Draft</button>
-      <button data-cy="save-action">Save Changes</button>
-      <button data-test="cancel-action">Cancel Changes</button>
-      <button data-test-id="legacy-action">Legacy Action</button>
       <div role="button" aria-label="Delete Item" class="icon-btn">Delete</div>
       <input type="button" value="Input Button">
       <input type="submit" value="Submit Form">
@@ -101,8 +75,6 @@ const PAGES = {
       <form id="test-form" action="/submit" method="post">
         <input type="text" id="username" name="username" required placeholder="Enter username">
         <input type="email" id="email" name="email">
-        <input type="radio" name="plan" value="free">
-        <input type="radio" name="plan" value="pro">
         <button type="submit">Submit Form</button>
       </form>
     </section>
@@ -155,13 +127,13 @@ const PAGES = {
         <style>button{background:blue;color:#fff;padding:6px;border:0}</style>
         <div>
           <h3>Shadow DOM Content 1</h3>
-          <button data-testid="shadow-action">Shadow Button</button>
+          <button id="shadow-btn">Shadow Button</button>
           <input type="text" placeholder="Shadow Input">
         </div>
       \`;
       const host2 = document.getElementById('shadow-host-2');
       const shadow2 = host2.attachShadow({ mode: 'open' });
-      shadow2.innerHTML = '<form><input type="text" name="shadow-field"><button type="submit" data-testid="shadow-action">Shadow Submit</button></form>';
+      shadow2.innerHTML = '<form><input type="text" name="shadow-field"><button type="submit">Shadow Submit</button></form>';
     </script>
   </body></html>`,
 
@@ -186,6 +158,20 @@ const PAGES = {
       nested.innerHTML = '<button>A</button><div><button>B</button></div>';
     </script>
   </body></html>`,
+
+  // Same-origin iframe so extraction can cross into a second realm. Nothing in
+  // the host document says "Widget", so any output mentioning it came from the frame.
+  frameHost: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Host Page Test</title></head><body>
+    <main><h1>Host Document</h1><button id="host-btn">Host Button</button></main>
+    <iframe id="widget-frame" title="Widget frame" width="400" height="300" srcdoc='<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Widget Doc</title></head><body>
+      <header><h1>Widget Header</h1></header>
+      <main><section><h2>Widget Section</h2><p>Widget body copy for the outline.</p></section></main>
+      <form id="widget-form" action="/widget" method="post">
+        <input type="text" id="widget-input" name="widgetField" placeholder="Widget Input">
+        <button type="submit" id="widget-btn">Widget Button</button>
+      </form>
+    </body></html>'></iframe>
+  </body></html>`,
 };
 
 // Playwright inserts the module independently of the page's application scripts.
@@ -204,12 +190,6 @@ async function runBasicInteractiveTest(page) {
     const roleAriaSel = res.interactive.buttons.find(
       (button) => button.attributes?.['aria-label'] === 'Delete Item'
     )?.selector?.css;
-    const dataCySel = findButton('Save Changes')?.selector?.css;
-    const dataTestSel = findButton('Cancel Changes')?.selector?.css;
-    const dataTestIdVariantSel = findButton('Legacy Action')?.selector?.css;
-    const proPlanSel = res.interactive.inputs.find(
-      (input) => input.attributes?.name === 'plan' && input.attributes?.value === 'pro'
-    )?.selector?.css;
     return {
       idSel: findButton('Primary Action')?.selector?.css,
       testIdSel: findButton('Secondary Action')?.selector?.css,
@@ -219,26 +199,6 @@ async function runBasicInteractiveTest(page) {
         document.querySelector(roleAriaSel)?.getAttribute('aria-label') === 'Delete Item',
       usernameSel: res.interactive.inputs.find((i) => i.attributes?.name === 'username')?.selector
         ?.css,
-      dataCySel,
-      dataCyMatches:
-        dataCySel !== undefined &&
-        document.querySelectorAll(dataCySel).length === 1 &&
-        document.querySelector(dataCySel)?.textContent === 'Save Changes',
-      dataTestSel,
-      dataTestMatches:
-        dataTestSel !== undefined &&
-        document.querySelectorAll(dataTestSel).length === 1 &&
-        document.querySelector(dataTestSel)?.textContent === 'Cancel Changes',
-      dataTestIdVariantSel,
-      dataTestIdVariantMatches:
-        dataTestIdVariantSel !== undefined &&
-        document.querySelectorAll(dataTestIdVariantSel).length === 1 &&
-        document.querySelector(dataTestIdVariantSel)?.textContent === 'Legacy Action',
-      proPlanSel,
-      proPlanMatches:
-        proPlanSel !== undefined &&
-        document.querySelectorAll(proPlanSel).length === 1 &&
-        document.querySelector(proPlanSel)?.getAttribute('value') === 'pro',
     };
   });
 
@@ -263,26 +223,6 @@ async function runBasicInteractiveTest(page) {
     ok: results.usernameSel === '#username' || results.usernameSel === '[name="username"]',
     got: results.usernameSel,
   });
-  assertions.push({
-    name: 'data-cy selector',
-    ok: results.dataCyMatches,
-    got: results.dataCySel,
-  });
-  assertions.push({
-    name: 'data-test selector',
-    ok: results.dataTestMatches,
-    got: results.dataTestSel,
-  });
-  assertions.push({
-    name: 'data-test-id selector',
-    ok: results.dataTestIdVariantMatches,
-    got: results.dataTestIdVariantSel,
-  });
-  assertions.push({
-    name: 'shared name selector',
-    ok: results.proPlanMatches,
-    got: results.proPlanSel,
-  });
 
   return assertions;
 }
@@ -290,11 +230,16 @@ async function runBasicInteractiveTest(page) {
 async function runSemanticTest(page) {
   const results = await page.evaluate(() => {
     const res = window.SmartDOMReader.extractFull(document, {});
+    const shallow = window.SmartDOMReader.extractFull(document, { maxDepth: 0 });
     return {
       hasHeadings: (res.semantic?.headings?.length || 0) > 0,
       hasImages: (res.semantic?.images?.length || 0) > 0,
       hasTables: (res.semantic?.tables?.length || 0) > 0,
       hasLists: (res.semantic?.lists?.length || 0) > 0,
+      hasDirectChildren:
+        res.semantic.articles[0].children.map((child) => child.tag).join(',') ===
+        'header,section,section',
+      respectsZeroDepth: shallow.semantic.articles.every((article) => !article.children),
     };
   });
   return [
@@ -302,44 +247,82 @@ async function runSemanticTest(page) {
     { name: 'Semantic images', ok: results.hasImages, got: JSON.stringify(results) },
     { name: 'Semantic tables', ok: results.hasTables, got: JSON.stringify(results) },
     { name: 'Semantic lists', ok: results.hasLists, got: JSON.stringify(results) },
+    {
+      name: 'Semantic direct children',
+      ok: results.hasDirectChildren,
+      got: JSON.stringify(results),
+    },
+    { name: 'Zero traversal depth', ok: results.respectsZeroDepth, got: JSON.stringify(results) },
   ];
+}
+
+async function runSelectorEdgeCases(page) {
+  return page.evaluate(() => {
+    const fixture = document.createElement('section');
+    fixture.id = 'selector-fixture';
+    fixture.innerHTML = `
+      <button data-test-id="alternate">Alternate test ID</button>
+      <button data-test="short">Short test ID</button>
+      <button data-cy="cypress">Cypress test ID</button>
+      <button data-testid="repeated">First test ID</button>
+      <button data-testid="repeated">Second test ID</button>
+      <button role="button" aria-label="Repeated">First role</button>
+      <button role="button" aria-label="Repeated">Second role</button>
+      <input name="repeated" value="First name">
+      <input name="repeated" value="Second name">
+      <button id="quoted&quot;id">Quoted ID</button>`;
+    document.body.append(fixture);
+
+    try {
+      return Array.from(fixture.children).flatMap((element, index) => {
+        const selector = window.SelectorGenerator.generateSelectors(element);
+        const matches = document.querySelectorAll(selector.css);
+        let xpathMatches = false;
+        try {
+          xpathMatches =
+            document.evaluate(selector.xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE)
+              .singleNodeValue === element;
+        } catch {
+          // Invalid XPath is a failed selector, just like a selector for the wrong element.
+        }
+        return [
+          {
+            name: `Unique CSS selector ${index + 1}`,
+            ok: matches.length === 1 && matches[0] === element,
+            got: selector.css,
+          },
+          { name: `XPath selector ${index + 1}`, ok: xpathMatches, got: selector.xpath },
+        ];
+      });
+    } finally {
+      fixture.remove();
+    }
+  });
 }
 
 async function runShadowTest(page) {
   const results = await page.evaluate(() => {
     const res = window.SmartDOMReader.extractInteractive(document, {});
     const shadowBtn = res.interactive.buttons.find((b) => (b.text || '').includes('Shadow Button'));
-    const shadowSubmit = res.interactive.buttons.find((b) =>
-      (b.text || '').includes('Shadow Submit')
-    );
     const regBtn = res.interactive.buttons.find((b) => (b.text || '').includes('Regular Button'));
-    const shadow1 = document.querySelector('#shadow-host-1')?.shadowRoot;
-    const shadow2 = document.querySelector('#shadow-host-2')?.shadowRoot;
-    const shadowBtnSelector = shadowBtn?.selector?.css;
-    const shadowSubmitSelector = shadowSubmit?.selector?.css;
+    const host = document.querySelector('#shadow-host-1');
+    const scoped = window.SmartDOMReader.extractFromElement(host);
+    const withoutShadow = window.SmartDOMReader.extractFromElement(host, 'interactive', {
+      includeShadowDOM: false,
+    });
     return {
       shadowBtn: !!shadowBtn,
       regBtn: !!regBtn,
-      shadowBtnSelector,
-      shadowSubmitSelector,
-      shadowSelectorsMatch:
-        shadowBtnSelector === '[data-testid="shadow-action"]' &&
-        shadowSubmitSelector === '[data-testid="shadow-action"]' &&
-        shadow1?.querySelectorAll(shadowBtnSelector).length === 1 &&
-        shadow1.querySelector(shadowBtnSelector)?.textContent === 'Shadow Button' &&
-        shadow2?.querySelectorAll(shadowSubmitSelector).length === 1 &&
-        shadow2.querySelector(shadowSubmitSelector)?.textContent === 'Shadow Submit',
       buttons: res.interactive.buttons.map((button) => button.text),
+      scopedShadow: scoped.interactive.buttons.some((button) => button.text === 'Shadow Button'),
+      withoutShadow: withoutShadow.interactive.buttons.length === 0,
     };
   });
   return [
     { name: 'Shadow button detected', ok: results.shadowBtn, got: JSON.stringify(results) },
     { name: 'Regular button detected', ok: results.regBtn, got: JSON.stringify(results) },
-    {
-      name: 'Shadow selectors scoped',
-      ok: results.shadowSelectorsMatch,
-      got: JSON.stringify(results),
-    },
+    { name: 'Scoped shadow host', ok: results.scopedShadow, got: JSON.stringify(results) },
+    { name: 'Shadow traversal disabled', ok: results.withoutShadow, got: JSON.stringify(results) },
   ];
 }
 
@@ -354,12 +337,11 @@ async function runDirectShadowChildTest(page) {
     const one = res.interactive.buttons.find((b) => (b.text || '').trim() === 'One');
     const two = res.interactive.buttons.find((b) => (b.text || '').trim() === 'Two');
     const shadow = document.querySelector('#shadow-host-direct')?.shadowRoot;
-    const oneCss = match(shadow, one?.selector?.css, 'One');
-    const twoCss = match(shadow, two?.selector?.css, 'Two');
+    const oneCss = match(shadow, one?.selector?.css);
+    const twoCss = match(shadow, two?.selector?.css);
     return {
       oneSel: one?.selector?.css,
       twoSel: two?.selector?.css,
-      oneXpath: one?.selector?.xpath,
       twoXpath: two?.selector?.xpath,
       unique:
         oneCss.count === 1 &&
@@ -402,11 +384,7 @@ async function runShadowSelectorCaseTest(page) {
     const nestedA = match(nestedRoot, a?.selector?.css);
     const nestedB = match(nestedRoot, b?.selector?.css);
     return {
-      mixedOneSel: one?.selector?.css,
-      mixedTwoSel: two?.selector?.css,
       mixedTwoXpath: two?.selector?.xpath,
-      nestedASel: a?.selector?.css,
-      nestedBSel: b?.selector?.css,
       mixed:
         mixedOne.length === 1 &&
         mixedOne[0] === 'One' &&
@@ -421,6 +399,8 @@ async function runShadowSelectorCaseTest(page) {
         nestedB[0] === 'B' &&
         a?.selector?.css !== b?.selector?.css &&
         String(a?.selector?.css || '').includes(':host >'),
+      nestedASel: a?.selector?.css,
+      nestedBSel: b?.selector?.css,
     };
   });
   return [
@@ -442,8 +422,57 @@ async function runShadowSelectorCaseTest(page) {
   ];
 }
 
+// frameSelector lives in the IIFE entry bundle, not the ESM library, so it needs its own script tag.
+async function injectEntryBundle(page) {
+  await page.addScriptTag({ content: getEntryBundleCode() });
+  await page.waitForFunction(
+    () => typeof window.SmartDOMReaderBundle?.executeExtraction === 'function'
+  );
+}
+
+async function runFrameSelectorTest(page) {
+  const results = await page.evaluate(() => {
+    const run = (method) =>
+      window.SmartDOMReaderBundle.executeExtraction(method, { frameSelector: '#widget-frame' });
+    return {
+      structure: run('extractStructure'),
+      interactive: run('extractInteractive'),
+      full: run('extractFull'),
+      missingScope: window.SmartDOMReaderBundle.executeExtraction('extractStructure', {
+        selector: '#missing-scope',
+      }),
+    };
+  });
+
+  // A cross-realm failure surfaces as { error }; a wrong-realm success omits "Widget".
+  const readFrame = (out) => typeof out === 'string' && out.includes('Widget');
+  const describe = (out) => (typeof out === 'string' ? out.slice(0, 160) : JSON.stringify(out));
+
+  return [
+    {
+      name: 'frameSelector extractStructure',
+      ok: readFrame(results.structure),
+      got: describe(results.structure),
+    },
+    {
+      name: 'frameSelector extractInteractive',
+      ok: readFrame(results.interactive),
+      got: describe(results.interactive),
+    },
+    {
+      name: 'frameSelector extractFull',
+      ok: readFrame(results.full),
+      got: describe(results.full),
+    },
+    {
+      name: 'Missing structure scope fails without extracting the document',
+      ok: results.missingScope?.error === 'No element found matching selector: #missing-scope',
+      got: describe(results.missingScope),
+    },
+  ];
+}
+
 async function main() {
-  await loadPlaywright();
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
     console.log(
@@ -461,7 +490,10 @@ async function main() {
   }
 
   // If a URL was provided, run "any website" mode; otherwise run local fixture tests
-  const browser = await chromium.launch({ headless: args.headless });
+  const browser = await chromium.launch({
+    headless: args.headless,
+    executablePath: process.env.CHROME_BIN,
+  });
   const page = await browser.newPage();
 
   if (args.url) {
@@ -564,7 +596,10 @@ async function main() {
   try {
     await page.setContent(PAGES.basicInteractive, { waitUntil: 'domcontentloaded' });
     await injectLibrary(page);
-    const checks = await runBasicInteractiveTest(page);
+    const checks = [
+      ...(await runBasicInteractiveTest(page)),
+      ...(await runSelectorEdgeCases(page)),
+    ];
     for (const c of checks) {
       if (c.ok) report.passed++;
       else report.failed++;
@@ -591,8 +626,8 @@ async function main() {
 
     await page.setContent(PAGES.directShadowChildren, { waitUntil: 'domcontentloaded' });
     await injectLibrary(page);
-    const checks4 = await runDirectShadowChildTest(page);
-    for (const c of checks4) {
+    const checksShadowDirect = await runDirectShadowChildTest(page);
+    for (const c of checksShadowDirect) {
       if (c.ok) report.passed++;
       else report.failed++;
       report.checks.push(c);
@@ -600,8 +635,20 @@ async function main() {
 
     await page.setContent(PAGES.shadowSelectorCases, { waitUntil: 'domcontentloaded' });
     await injectLibrary(page);
-    const checks5 = await runShadowSelectorCaseTest(page);
-    for (const c of checks5) {
+    const checksShadowCases = await runShadowSelectorCaseTest(page);
+    for (const c of checksShadowCases) {
+      if (c.ok) report.passed++;
+      else report.failed++;
+      report.checks.push(c);
+    }
+
+    await page.setContent(PAGES.frameHost, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(
+      () => !!document.querySelector('#widget-frame')?.contentDocument?.querySelector('#widget-btn')
+    );
+    await injectEntryBundle(page);
+    const checks4 = await runFrameSelectorTest(page);
+    for (const c of checks4) {
       if (c.ok) report.passed++;
       else report.failed++;
       report.checks.push(c);

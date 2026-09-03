@@ -33,4 +33,4 @@ MCP-B is maintained in the WebMCP npm packages monorepo. The public landing page
 
 - [WebMCP Draft](https://webmachinelearning.github.io/webmcp/)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
-- [Chrome Extension](https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa)
+- [Rook](https://chromewebstore.google.com/detail/opojeelojlkcinlhkbahpcekdolfjmhi)

@@ -1,0 +1,10 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": false,
+    // MCP SDK v2 references Buffer, but no Chrome globals should be loaded.
+    "types": ["node"]
+  },
+  "include": ["browser.ts"]
+}

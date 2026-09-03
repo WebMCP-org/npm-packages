@@ -24,7 +24,7 @@ export interface ExtractStructureArgs extends BaseExtractionArgs {
 export interface ExtractRegionArgs extends BaseExtractionArgs {
   selector: string;
   mode?: 'interactive' | 'full';
-  options?: Partial<ExtractionOptions>;
+  options?: Omit<ExtractionOptions, 'mode'>;
 }
 
 export interface ExtractContentArgs extends BaseExtractionArgs {
@@ -34,12 +34,12 @@ export interface ExtractContentArgs extends BaseExtractionArgs {
 
 export interface ExtractInteractiveArgs extends BaseExtractionArgs {
   selector?: string;
-  options?: Partial<ExtractionOptions>;
+  options?: Omit<ExtractionOptions, 'mode'>;
 }
 
 export interface ExtractFullArgs extends BaseExtractionArgs {
   selector?: string;
-  options?: Partial<ExtractionOptions>;
+  options?: Omit<ExtractionOptions, 'mode'>;
 }
 
 export type ExtractionArgs = {

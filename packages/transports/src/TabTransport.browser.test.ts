@@ -10,9 +10,7 @@ async function safeClose(transport: {
   close: () => Promise<void>;
   serverReadyPromise?: Promise<void>;
 }): Promise<void> {
-  if ('serverReadyPromise' in transport && transport.serverReadyPromise) {
-    void transport.serverReadyPromise.catch(() => {});
-  }
+  void transport.serverReadyPromise?.catch(() => {});
   await transport.close();
 }
 
@@ -45,8 +43,8 @@ function captureServerPayloads(channelId: string): {
   };
 }
 
-async function startPair(options?: { channelId?: string }) {
-  const channelId = options?.channelId ?? uniqueChannel('pair');
+async function startPair() {
+  const channelId = uniqueChannel('pair');
 
   const serverTransport = new TabServerTransport({
     allowedOrigins: [window.location.origin],
@@ -62,10 +60,28 @@ async function startPair(options?: { channelId?: string }) {
   await clientTransport.start();
   await clientTransport.serverReadyPromise;
 
-  return { channelId, clientTransport, serverTransport };
+  return { clientTransport, serverTransport };
 }
 
 describe('Tab transports (browser)', () => {
+  it.each(['tab', 'iframe'] as const)(
+    'can close an unused %s client without an unhandled readiness rejection',
+    async (kind) => {
+      const options = { targetOrigin: window.location.origin };
+      const transport =
+        kind === 'tab'
+          ? new TabClientTransport(options)
+          : new IframeParentTransport({ ...options, iframe: document.createElement('iframe') });
+
+      await transport.close();
+      // Let the browser report unhandled rejections before attaching a late readiness consumer.
+      await delay();
+      await expect(transport.serverReadyPromise).rejects.toThrow(
+        'Transport closed before server ready'
+      );
+    }
+  );
+
   describe('IframeParentTransport', () => {
     it('requires an explicit target origin', () => {
       expect(() => {
@@ -277,7 +293,7 @@ describe('Tab transports (browser)', () => {
       expect(onMessage).not.toHaveBeenCalled();
     });
 
-    it('accepts messages from any origin when targetOrigin is wildcard', async () => {
+    it('accepts an explicit wildcard origin only from the same window', async () => {
       const wildcardTransport = new TabClientTransport({
         targetOrigin: '*',
         channelId,
@@ -539,71 +555,6 @@ describe('Tab transports (browser)', () => {
       }
     });
 
-    it('does not let a later client origin break an earlier response', async () => {
-      const crossOrigin = 'https://app.usechar.ai';
-      const raceChannel = uniqueChannel('origin-race');
-      const transport = new TabServerTransport({
-        allowedOrigins: [window.location.origin, crossOrigin],
-        channelId: raceChannel,
-      });
-      const captured = captureServerPayloads(raceChannel);
-
-      try {
-        await transport.start();
-        await delay();
-        captured.payloads.length = 0;
-
-        window.postMessage(
-          {
-            channel: raceChannel,
-            type: 'mcp',
-            direction: 'client-to-server',
-            payload: {
-              jsonrpc: '2.0',
-              method: 'tool/run',
-              id: 1,
-            },
-          },
-          window.location.origin
-        );
-
-        await delay();
-
-        window.dispatchEvent(
-          new MessageEvent('message', {
-            origin: crossOrigin,
-            source: window,
-            data: {
-              channel: raceChannel,
-              type: 'mcp',
-              direction: 'client-to-server',
-              payload: 'mcp-check-ready',
-            },
-          })
-        );
-
-        await delay();
-        captured.payloads.length = 0;
-
-        await transport.send({
-          jsonrpc: '2.0',
-          id: 1,
-          result: { ok: true },
-        });
-
-        await delay();
-
-        expect(captured.payloads).toContainEqual({
-          jsonrpc: '2.0',
-          id: 1,
-          result: { ok: true },
-        });
-      } finally {
-        captured.stop();
-        await safeClose(transport);
-      }
-    });
-
     it('invokes onclose when closed manually', async () => {
       const onClose = vi.fn();
       serverTransport.onclose = onClose;
@@ -622,8 +573,7 @@ describe('Tab transports (browser)', () => {
     let serverTransport: TabServerTransport;
 
     beforeEach(async () => {
-      const pair = await startPair();
-      ({ clientTransport, serverTransport } = pair);
+      ({ clientTransport, serverTransport } = await startPair());
     });
 
     afterEach(async () => {

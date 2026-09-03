@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codex WebMCP lifecycle probe</title>
+  </head>
+  <body>
+    <h1>Codex WebMCP lifecycle probe</h1>
+    <p>This page does not load a WebMCP polyfill.</p>
+    <button id="register" type="button">Register dynamic tool</button>
+    <button id="unregister" type="button">Abort registration</button>
+    <pre id="results">Waiting…</pre>
+
+    <script>
+      const results = document.querySelector('#results');
+      let controller;
+      let calls = 0;
+
+      const render = (message) => {
+        results.textContent = `${message}\nCalls: ${calls}`;
+        console.log('[codex-webmcp-probe]', message);
+      };
+
+      document.querySelector('#register').addEventListener('click', async () => {
+        controller?.abort();
+        controller = new AbortController();
+        try {
+          await document.modelContext.registerTool(
+            {
+              name: 'codex_probe_dynamic',
+              description: 'Returns the current call count after incrementing it.',
+              inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+              execute: async (_input, { signal } = {}) => {
+                calls += 1;
+                render(`Executed; signal present: ${signal instanceof AbortSignal}`);
+                return { calls };
+              },
+            },
+            { signal: controller.signal }
+          );
+          render('Registered');
+        } catch (error) {
+          render(`${error?.name ?? 'Error'}: ${error?.message ?? String(error)}`);
+        }
+      });
+
+      document.querySelector('#unregister').addEventListener('click', () => {
+        controller?.abort();
+        render('Registration aborted');
+      });
+
+      render(`document.modelContext: ${typeof document.modelContext}`);
+    </script>
+  </body>
+</html>

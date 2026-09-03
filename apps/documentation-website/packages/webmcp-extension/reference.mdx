@@ -1,5 +1,5 @@
 ---
-title: '@mcp-b/webmcp-extension'
+title: '@mcp-b/webmcp-extension reference'
 description: 'Reference for the Chromium MV3 extension template, imperative and declarative page tools, isolated client helper, and security boundary.'
 keywords:
   [
@@ -88,7 +88,7 @@ await document.modelContext.registerTool({
 });
 ```
 
-See the [WebMCP standard API](/reference/webmcp/standard-api) for a page-facing
+See the [WebMCP API sources](/reference/webmcp/standard-api) for a page-facing
 quick reference and a link to the authoritative Community Group draft.
 
 ## Declarative form tools
@@ -128,7 +128,7 @@ The polyfilled path discovers only the top document. Cross-origin imperative
 tools require `allow="tools"`, child registration with `exposedTo`, and a
 caller-supplied `fromOrigins` list. The extension client does not supply that
 list. Declarative forms currently have no equivalent cross-origin exposure
-attribute. See the [WebMCP standard API](/reference/webmcp/standard-api) and
+attribute. See the [WebMCP API sources](/reference/webmcp/standard-api) and
 Chrome's [cross-origin iframe guidance](https://developer.chrome.com/docs/ai/webmcp/imperative-api#cross-origin-iframes).
 
 MCP tool names are global within one client connection. Use unique names across
@@ -231,5 +231,5 @@ For the broader threat model, see [Security and human control](/explanation/desi
 - [@mcp-b/webmcp-extension overview](/packages/webmcp-extension/overview)
 - [@mcp-b/global reference](/packages/global/reference)
 - [@mcp-b/transports reference](/packages/transports/reference)
-- [WebMCP standard API](/reference/webmcp/standard-api)
+- [WebMCP API sources](/reference/webmcp/standard-api)
 - [WebMCP declarative API](/reference/webmcp/declarative-api)

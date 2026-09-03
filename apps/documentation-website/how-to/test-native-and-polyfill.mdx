@@ -1,6 +1,6 @@
 ---
 title: 'Test native and polyfill behavior'
-description: 'Choose the right testing path for native Chromium, polyfill, and framework integrations of WebMCP tools.'
+description: 'Run MCP-B conformance, transport, native browser, and Web Platform Test lanes.'
 keywords:
   [
     'testing',
@@ -8,165 +8,91 @@ keywords:
     'native api',
     'polyfill',
     'e2e',
-    'chrome flags',
-    'executeTool',
+    'web platform tests',
     'runtime contract',
   ]
 icon: 'flask-vial'
 ---
 
-This guide shows you how to test WebMCP tools against both the native Chromium implementation and the polyfill runtime, and when to use each testing lane.
+Run these commands from the repository root. Choose the smallest lane that covers your change,
+then run the broader suite before merging.
 
-## Understand the testing lanes
+## Choose a repository test lane
 
-The monorepo provides several testing lanes organized by runtime:
+| Change                             | Command                                                       |
+| ---------------------------------- | ------------------------------------------------------------- |
+| Package logic and React hooks      | `pnpm test:unit`                                              |
+| Polyfill browser behavior          | `pnpm --filter @mcp-b/webmcp-polyfill test:conformance`       |
+| Composed `@mcp-b/global` behavior  | `pnpm --filter @mcp-b/global test:conformance:global`         |
+| Tab and iframe transports          | `pnpm --filter mcp-e2e-tests test:runtime-contract:transport` |
+| `<mcp-iframe>` element             | `pnpm --filter mcp-e2e-tests test:mcp-iframe`                 |
+| Repository native browser contract | `pnpm --filter mcp-e2e-tests test:native-contract:default`    |
+| Local relay                        | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`            |
+| Extension template                 | `pnpm --filter @mcp-b/webmcp-extension test:e2e`              |
+| Full local E2E set                 | `pnpm test:e2e`                                               |
 
-| Runtime                | Canonical caller                                | Command                                                       |
-| ---------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
-| Strict polyfill        | `document.modelContext`                         | `pnpm --filter @mcp-b/webmcp-polyfill test:conformance`       |
-| Composed global        | `document.modelContext`                         | `pnpm --filter @mcp-b/global test:conformance:global`         |
-| Tab and iframe         | SDK `Client` over MCP-B transports              | `pnpm --filter mcp-e2e-tests test:runtime-contract:transport` |
-| `<mcp-iframe>` element | SDK `Client` + `IframeParentTransport`          | `pnpm --filter mcp-e2e-tests test:mcp-iframe`                 |
-| Native Chrome          | `getTools()` + feature-detected `executeTool()` | `pnpm --filter mcp-e2e-tests test:native-contract:default`    |
-| Local relay            | SDK `Client` over stdio                         | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`            |
-| Extension template     | SDK `Client` from an isolated content script    | `pnpm --filter @mcp-b/webmcp-extension test:e2e`              |
+The runtime contracts cover discovery, invocation, dynamic registration and removal, and handler
+errors through each real transport.
 
-Each runtime-contract E2E suite proves the same six assertions against the real runtime:
+## Run browser conformance
 
-1. Initial discovery returns the expected tools
-2. A successful call returns the expected payload
-3. The runtime records the invocation
-4. Dynamic registration becomes discoverable without restart
-5. Unregistration removes the tool and later calls fail
-6. Runtime-thrown tool errors propagate to the caller
+Run the polyfill and composed global contracts together when you change registration,
+discovery, lifecycle, or execution behavior:
 
-## Run the polyfill tests
-
-Run the shared browser conformance suite against the strict polyfill and the
-composed global runtime:
-
-```bash title="Run browser conformance"
+```bash title="Run MCP-B browser conformance"
 pnpm --filter @mcp-b/webmcp-polyfill test:conformance
 pnpm --filter @mcp-b/global test:conformance:global
 ```
 
-Then run the transport contract to exercise `@mcp-b/global` through an SDK
-`Client` and `TabClientTransport`:
+Run the pinned upstream Web Platform Tests when you change behavior covered by WebMCP WPT:
 
-```bash title="Run transport contracts"
-# Tab and iframe transport contracts only
-pnpm --filter mcp-e2e-tests test:runtime-contract:transport
-
-# Local E2E umbrella, including native Chrome, relay, and extension packages
-pnpm test:e2e
+```bash title="Run Web Platform Tests"
+pnpm test:wpt
+pnpm test:wpt:idl
 ```
 
-These tests use the shared fixture in `e2e/runtime-contract/` which registers a deterministic tool set: `echo`, `sum`, `dynamic_tool`, and `always_fail`.
+The WPT lane builds the standalone polyfill, disables the native implementation, injects the
+bundle, and runs the repository's supported test selection. Read the repository's [testing
+guide](https://github.com/WebMCP-org/npm-packages/blob/main/docs/TESTING.md) for browser and checkout
+prerequisites. Compare failures with the public [WebMCP WPT
+results](https://wpt.fyi/results/webmcp) and the [Community Group
+draft](https://webmachinelearning.github.io/webmcp/).
 
-CI also injects the built standalone polyfill into the upstream
-[declarative Web Platform Tests](https://github.com/web-platform-tests/wpt/tree/master/webmcp/declarative).
-The workflow pins a WPT revision so upstream behavior changes require review.
+## Run the native repository contract
 
-## Run the native Chromium tests
+Use the repository command instead of copying browser flags into another script:
 
-Native Chromium tests use the browser's built-in `document.modelContext` API directly. This is the one exception to the SDK-client pattern: the browser API itself is the public boundary.
-
-`navigator.modelContextTesting` is not part of current Chrome WebMCP. MCP-B can install a name-based compatibility shim for older tests, but native coverage should use `getTools()` and feature-detect Chrome's `executeTool()` extension.
-
-### Repository native contract
-
-The repository runner currently requires an installed Chrome 152 or newer. This
-is a test-configuration requirement, not a general WebMCP browser-support
-claim.
-
-<Steps>
-  <Step title="Install Chrome 152 or newer">
-    Use Chrome Canary, Dev, Beta, or Stable at major version 152 or newer. If Playwright cannot find it automatically, set `CHROME_BIN` to the executable path.
-  </Step>
-  <Step title="Run the flagged native contract lane">
-    ```bash
-    pnpm --filter mcp-e2e-tests test:native-contract:default
-    ```
-
-    This uses the Playwright config that passes:
-    - `--enable-experimental-web-platform-features`
-    - `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`
-
-  </Step>
-</Steps>
-
-## Assert the runtime in tests
-
-Application code should install the polyfill and use `document.modelContext`
-normally. Tests may inspect MCP-B's private marker when they must prove which
-implementation won initialization:
-
-```javascript title="runtime-assertion.js"
-const modelContext = document.modelContext;
-
-console.log('modelContext available:', !!modelContext);
-console.log('getTools available:', typeof modelContext?.getTools === 'function');
-console.log('Chrome executeTool available:', typeof modelContext?.executeTool === 'function');
-console.log('MCP-B polyfill:', modelContext?.__isWebMCPPolyfill === true);
+```bash title="Run the native contract"
+pnpm --filter mcp-e2e-tests test:native-contract:default
 ```
 
-Do not ship logic that depends on `__isWebMCPPolyfill`; it is not part of the
-public API. The repository's
-[Playwright configuration](https://github.com/WebMCP-org/npm-packages/blob/main/e2e/playwright-chrome-beta-webmcp.config.ts)
-is the source of truth for native automation flags.
+The checked-in [Playwright
+configuration](https://github.com/WebMCP-org/npm-packages/blob/main/e2e/playwright-chrome-beta-webmcp.config.ts)
+owns browser selection and feature arguments. If browser discovery fails, set `CHROME_BIN` to the
+installed executable and rerun the command.
 
-## Run integration and framework tests
+## Run integration coverage
 
-Beyond the canonical contract lanes, the monorepo has additional integration suites:
+Use the additional integration lanes when a change crosses package boundaries:
 
 ```bash title="Run integration suites"
-# Runtime API integration (direct page.evaluate and browser API probes)
 pnpm --filter mcp-e2e-tests test:integration:runtime-api
-
-# Framework integration (React hooks, validation matrices)
 pnpm --filter mcp-e2e-tests test:integration:frameworks
 ```
 
-These lanes provide broader compatibility checks outside the local `pnpm test:e2e` umbrella. CI
-also runs the framework lane.
-
-## Debug failing tests
+Use a headed or interactive run to inspect a failing browser test:
 
 ```bash title="Debug browser tests"
-# Headed mode (see the browser)
 pnpm test:e2e:headed
-
-# Playwright UI mode
 pnpm test:e2e:ui
-
-# Debug mode (step through)
 pnpm test:e2e:debug
-
-# Headed native Chrome run
-cd e2e && pnpm test:chrome-beta:webmcp:headed
 ```
 
-### Troubleshoot common issues
+## Test agent behavior separately
 
-| Problem                                | Fix                                                                                                                                                                          |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `document.modelContext` is `undefined` | For manual testing, enable `chrome://flags/#enable-webmcp-testing`. For automation, use the repository config and inspect `chrome://version`.                                |
-| Polyfill detected instead of native    | Verify native support and flags before initialization. `@mcp-b/global` adopts an existing native context; the marker means none was available or a test forced the polyfill. |
-| Port already in use                    | The tab/global lane defaults to port 4173. Kill the process: `lsof -ti:4173 \| xargs kill`                                                                                   |
-| Playwright browsers not installed      | Run `pnpm --filter mcp-e2e-tests exec playwright install chromium`                                                                                                           |
-
-## Choose the right testing approach
-
-| If you are...                             | Use this lane                                      |
-| ----------------------------------------- | -------------------------------------------------- |
-| Building tools with `@mcp-b/global`       | `test:runtime-contract:transport`                  |
-| Validating declarative polyfill behavior  | `@mcp-b/webmcp-polyfill test:conformance`          |
-| Validating against the native browser API | `test:native-contract:default`                     |
-| Testing the local relay end-to-end        | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e` |
-| Running the local zero-mock E2E umbrella  | `pnpm test:e2e`                                    |
-
-## Related pages
-
-- [Try the native Chrome preview](/tutorials/first-native-preview) for manual browser setup
-- [Choose a runtime](/how-to/choose-runtime) for why these runtimes differ
-- [Debug and Troubleshoot](/how-to/debug-and-troubleshoot) for general debugging strategies
+Repository contracts are deterministic. Use Chrome's [WebMCP evals
+guide](https://developer.chrome.com/docs/ai/webmcp/evals) and the experimental [WebMCP Evals
+tool](https://github.com/GoogleChromeLabs/webmcp-tools/tree/main/webmcp-evals) to measure tool
+selection and argument quality. Run the [Lighthouse WebMCP schema validity
+audit](https://developer.chrome.com/docs/lighthouse/agentic-browsing/webmcp-schema-validity) before
+debugging model behavior.

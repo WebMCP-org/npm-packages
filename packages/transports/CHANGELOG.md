@@ -1,5 +1,76 @@
 # @mcp-b/transports
 
+## 5.1.0
+
+## 5.0.3
+
+### Patch Changes
+
+- 4dec56a: Prevent unhandled readiness promise rejections when closing a tab or iframe client before anyone waits for the server. Readiness consumers still receive the original close error.
+
+## 5.0.2
+
+### Patch Changes
+
+- 8fa4f02: Stop installing and forcing `@types/chrome` into every transport consumer. The
+  extension server accepts an `ExtensionPort` with only the methods it uses, so
+  existing Chrome ports remain compatible with either `@types/chrome` or
+  Chromium's `chrome-types`. Page and iframe transport imports no longer add
+  Chrome extension globals. Extension applications should declare their chosen
+  Chrome types as their own development dependency.
+
+## 5.0.1
+
+## 5.0.0
+
+### Major Changes
+
+- de0b41c: Remove legacy native and userscript transports. Browser transports now require
+  an explicit target origin, use MCP request options for cancellation and
+  timeouts, and close stale extension sessions when their port disconnects.
+
+### Minor Changes
+
+- de0b41c: Honor `exposedTo` over the iframe bridge instead of rejecting it.
+
+  `registerTool(tool, { exposedTo })` previously threw `NotSupportedError` unless native
+  WebMCP was present, so spec-conformant child code crashed under the polyfill inside an
+  `<mcp-iframe>` — the one place a userland cross-document channel actually exists. The
+  composed server now stores the allowlist and only advertises a restricted tool once the
+  connected embedder's origin matches it.
+
+  `IframeChildTransport` gained `clientOrigin` and an `onclientorigin` callback that report
+  the connected parent. `BrowserMcpServer` reads them duck-typed, so transports that cannot
+  name a peer keep every restricted tool off the wire.
+
+  Restricted tools fail closed. The MCP handle is disabled in the same synchronous step that
+  creates it, so a tool is never listable between registration and its first audience check,
+  and it stays hidden when no peer origin is ever established. Tools registered without
+  `exposedTo` are untouched.
+
+  Two limits, stated because the spec's guarantee is stronger:
+  - `exposedTo` only narrows. `allowedOrigins` on the child transport still decides who may
+    connect, and no allowlist widens past it.
+  - Enforcement is the child's own JavaScript, not the user agent. Native WebMCP enforces
+    `exposedTo` in the browser; this does not, so treat it as scoping rather than a boundary
+    against a compromised child.
+
+  `getTools({ fromOrigins })` still throws `NotSupportedError`. Parent-side discovery stays
+  `@mcp-b/mcp-iframe`'s job rather than something the SDK reaches across documents to do.
+
+### Patch Changes
+
+- de0b41c: Require Node 20 or newer. `@mcp-b/global`, `@mcp-b/mcp-iframe`,
+  `@mcp-b/webmcp-polyfill` and `@mcp-b/webmcp-ts-sdk` previously allowed Node 18;
+  the rest declared no `engines` range at all and now state the same floor. Node 18
+  reached end of life in April 2025. Browser builds are unaffected — this governs
+  build tooling and the relay CLI.
+- de0b41c: Stop emitting declaration source maps, and ship the MIT `LICENSE` text these
+  packages already declared. Each package shipped `dist` without `src`, so every
+  published `.d.ts.map` pointed at a file that was not in the tarball; editors
+  already fall back to the `.d.ts` itself. `@mcp-b/webmcp-types` keeps its maps —
+  it is the one package that ships `src`, so its maps resolve.
+
 ## 4.0.0
 
 ### Patch Changes

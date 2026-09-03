@@ -1,0 +1,175 @@
+---
+import Codeforge from './Codeforge.astro';
+
+interface Props {
+  frontmatter: {
+    title: string;
+    description: string;
+    pubDate: string;
+    author?: { name: string; url?: string };
+  };
+}
+
+const { frontmatter } = Astro.props;
+const published = new Date(frontmatter.pubDate);
+---
+
+<Codeforge
+  title={frontmatter.title}
+  description={frontmatter.description}
+  article={{
+    publishedTime: published.toISOString(),
+    authors: frontmatter.author?.url ? [frontmatter.author.url] : undefined,
+  }}
+>
+  <article class="blog-post">
+    <header class="blog-post__header">
+      <a href="/blog" class="blog-post__back">MCP-B / Blog</a>
+      <p class="blog-post__meta">
+        {frontmatter.author?.name && <span>By {frontmatter.author.name}</span>}
+        <time datetime={frontmatter.pubDate}>
+          {published.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}
+        </time>
+      </p>
+      <h1>{frontmatter.title}</h1>
+      <p class="blog-post__description">{frontmatter.description}</p>
+    </header>
+
+    <div class="blog-post__content">
+      <slot />
+    </div>
+  </article>
+</Codeforge>
+
+<style is:global>
+  .blog-post {
+    width: 100%;
+    max-width: 60rem;
+    margin-inline: auto;
+    padding: clamp(3rem, 7vw, 6rem) clamp(1.5rem, 6vw, 4rem) clamp(5rem, 10vw, 8rem);
+  }
+
+  .blog-post__header {
+    padding-bottom: clamp(2.5rem, 5vw, 4rem);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .blog-post__back {
+    color: var(--primary);
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .blog-post__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    margin: 1.5rem 0 0;
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+  }
+
+  .blog-post__header h1 {
+    max-width: 18ch;
+    margin: 1rem 0 0;
+    color: var(--foreground);
+    font-size: clamp(2.5rem, 6vw, 5.5rem);
+    font-weight: 700;
+    line-height: 0.97;
+    letter-spacing: -0.055em;
+    text-wrap: balance;
+  }
+
+  .blog-post__description {
+    max-width: 48rem;
+    margin: 1.75rem 0 0;
+    padding-left: 1rem;
+    border-left: 3px solid var(--primary);
+    color: var(--muted-foreground);
+    font-size: clamp(1.1rem, 2vw, 1.3rem);
+    line-height: 1.6;
+  }
+
+  .blog-post__content {
+    max-width: 48rem;
+    margin: clamp(2.5rem, 5vw, 4rem) auto 0;
+    color: var(--foreground);
+    font-size: 1.05rem;
+    line-height: 1.8;
+  }
+
+  .blog-post__content > * + * {
+    margin-top: 1.5rem;
+  }
+
+  .blog-post__content h2,
+  .blog-post__content h3 {
+    color: var(--foreground);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+  }
+
+  .blog-post__content h2 {
+    margin-top: 3.5rem;
+    font-size: 2rem;
+  }
+
+  .blog-post__content h3 {
+    margin-top: 2.5rem;
+    font-size: 1.5rem;
+  }
+
+  .blog-post__content ul,
+  .blog-post__content ol {
+    padding-left: 1.5rem;
+  }
+
+  .blog-post__content li + li {
+    margin-top: 0.5rem;
+  }
+
+  .blog-post__content a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .blog-post__content img {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin-block: 2rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .blog-post__content code {
+    padding: 0.125em 0.375em;
+    border-radius: 0.25rem;
+    background: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+  }
+
+  .blog-post__content pre {
+    margin-block: 1.5rem;
+    padding: 1.25rem 1.5rem;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .blog-post__content pre code {
+    padding: 0;
+    background: none;
+  }
+
+  .blog-post__content blockquote {
+    margin-inline: 0;
+    padding-left: 1.25rem;
+    border-left: 3px solid var(--primary);
+    color: var(--muted-foreground);
+  }
+</style>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#004b69" />
+
+  <svg x="88" y="66" width="88" height="88" viewBox="390 289.5 420 420" aria-hidden="true">
+    <path fill="#d7f5ff" d="m746.99 482.75-145.57-84.52 60.02-34.87 71.05 41.28a29.03 29.03 0 0 1 14.47 25.13l.03 52.97Z" />
+    <path fill="#8edcf3" d="m602.51 601.74-60.02 34.87-29.12-16.94-45.85-26.63a29.03 29.03 0 0 1-14.48-25.14l-.03-53 59.5 34.57.79.46 89.21 51.8Z" />
+    <path fill="#bcecf8" d="m732.58 595.89-115.46 67.09a29.16 29.16 0 0 1-29.22 0l-45.41-26.38 60.02-34.87 84.29-48.96-.07-84.18 60.29 35.03.03 67.1a29.05 29.05 0 0 1-14.47 25.16Z" />
+    <path fill="#bcecf8" d="m661.44 363.37-60.02 34.87-88.19 51.21.07 79.61-60.32-35.03-.03-62.5a29.05 29.05 0 0 1 14.48-25.16l119.39-69.35a29.16 29.16 0 0 1 29.2 0l45.42 26.36Z" />
+  </svg>
+
+  <text x="202" y="121" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="700" letter-spacing="-2">MCP-B</text>
+
+  <text x="92" y="298" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="76" font-weight="700" letter-spacing="-3">Websites publish tools.</text>
+  <text x="92" y="386" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="76" font-weight="700" letter-spacing="-3">Agents call them.</text>
+  <text x="95" y="467" fill="#d7f5ff" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="400">Open-source WebMCP packages and browser tooling.</text>
+  <rect x="95" y="538" width="158" height="8" rx="4" fill="#8edcf3" />
+</svg>

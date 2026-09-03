@@ -1,0 +1,318 @@
+---
+export const prerender = true;
+
+import Base from '../../layouts/Codeforge.astro';
+
+const title = 'Build with WebMCP in the OpenAI WebMCP Challenge';
+const description =
+  'Build an agent-native web app, test it in ChatGPT, and submit it by September 3.';
+---
+
+<Base
+  {title}
+  {description}
+  article={{
+    publishedTime: '2026-08-25T11:00:00-07:00',
+    authors: ['Alex Nahas'],
+    tags: ['WebMCP', 'OpenAI', 'hackathon'],
+  }}
+>
+  <article class="challenge-post">
+    <header class="challenge-post__header">
+      <a href="/blog" class="challenge-post__back">MCP-B / Blog</a>
+      <h1>{title}</h1>
+      <p class="challenge-post__dek">{description}</p>
+      <div class="challenge-post__byline">
+        <span>Alex Nahas</span>
+        <time datetime="2026-08-25">August 25, 2026</time>
+        <span>3 min read</span>
+      </div>
+    </header>
+
+    <div class="challenge-post__body">
+      <p class="challenge-post__lead">
+        The OpenAI WebMCP Challenge is open. From August 25 through September 3, builders can
+        create a new agent-native web app or add WebMCP to an existing one, then use it with
+        ChatGPT's in-app browser.
+      </p>
+
+      <p>
+        WebMCP is an experimental open web proposal that lets a site publish structured tools for
+        an agent. The site defines the actions, inputs, and descriptions. The person and the agent
+        stay in the same live app, so the work remains visible and sensitive actions can still ask
+        for confirmation.
+      </p>
+
+      <div class="challenge-post__callout">
+        <p><strong>Submission window</strong></p>
+        <p>
+          Submissions close September 3 at 1 p.m. PT. Check the
+          <a href="https://webmcp.devpost.com/" target="_blank" rel="noreferrer"
+            >official competition page</a
+          > for current rules, eligibility, prizes, and deadlines.
+        </p>
+      </div>
+
+      <h2>What to build</h2>
+
+      <p>
+        Start with one workflow your app already understands. A good WebMCP tool should let an
+        agent complete a meaningful task with fewer steps while keeping the result easy for a
+        person to inspect and change.
+      </p>
+
+      <ol>
+        <li>
+          <strong>Pick a real task.</strong> Search, compare, create, update, or submit something
+          your app already owns.
+        </li>
+        <li>
+          <strong>Expose the smallest useful tool surface.</strong> Give each tool a clear name,
+          description, and input schema instead of mirroring every button on the page.
+        </li>
+        <li>
+          <strong>Test the human-agent handoff.</strong> Let the agent do the mechanical work, then
+          keep review, edits, and sensitive confirmations visible in the product UI.
+        </li>
+      </ol>
+
+      <p>
+        The judging rubric looks at WebMCP leverage, execution, potential impact, and creativity
+        and ambition. A focused workflow that feels finished will beat a wide tool surface with no
+        clear user benefit.
+      </p>
+
+      <h2>Use MCP-B or the browser API directly</h2>
+
+      <p>
+        You can build directly against the proposed <code>document.modelContext</code> API. MCP-B
+        adds open-source packages for typed tool registration, React integrations, polyfills,
+        transports, and browser tooling when your app needs them.
+      </p>
+
+      <ul>
+        <li>
+          New to the project? <a href="https://docs.mcp-b.ai/start-here/choose-your-path"
+            >Choose a path through the docs</a
+          >.
+        </li>
+        <li>
+          Adding tools to a live product? Follow
+          <a href="https://docs.mcp-b.ai/how-to/add-tools-to-an-existing-app"
+            >Add tools to an existing app</a
+          >.
+        </li>
+        <li>
+          Unsure which package layer fits? <a href="https://docs.mcp-b.ai/how-to/choose-runtime"
+            >Choose a runtime</a
+          >.
+        </li>
+      </ul>
+
+      <h2>Key dates</h2>
+
+      <dl class="challenge-post__dates">
+        <div>
+          <dt>Kickoff livestream</dt>
+          <dd><time datetime="2026-08-25T15:00:00-07:00">August 25 at 3 p.m. PT</time></dd>
+        </div>
+        <div>
+          <dt>Community office hours</dt>
+          <dd><time datetime="2026-08-31T11:00:00-07:00">August 31 at 11 a.m. PT</time></dd>
+        </div>
+        <div>
+          <dt>Submissions close</dt>
+          <dd><time datetime="2026-09-03T13:00:00-07:00">September 3 at 1 p.m. PT</time></dd>
+        </div>
+        <div>
+          <dt>Winners announced</dt>
+          <dd><time datetime="2026-09-23">September 23</time></dd>
+        </div>
+      </dl>
+
+      <h2>Build something only WebMCP makes practical</h2>
+
+      <p>
+        Focus on what people can do when an agent understands the app's real actions and works
+        through the same interface they use. Pick that moment, make it reliable, and submit it.
+      </p>
+
+      <div class="challenge-post__actions">
+        <a
+          class="challenge-post__primary-action"
+          href="https://webmcp.devpost.com/"
+          target="_blank"
+          rel="noreferrer">Enter the challenge <span aria-hidden="true">→</span></a
+        >
+        <a href="https://docs.mcp-b.ai">Open the MCP-B docs</a>
+      </div>
+    </div>
+  </article>
+</Base>
+
+<style>
+  .challenge-post {
+    width: 100%;
+  }
+
+  .challenge-post__header {
+    max-width: 64rem;
+    margin-inline: auto;
+    padding: clamp(4rem, 9vw, 8rem) clamp(1.5rem, 6vw, 5rem) clamp(3rem, 7vw, 5rem);
+  }
+
+  .challenge-post__back {
+    color: var(--primary);
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+
+  .challenge-post__header h1 {
+    max-width: 18ch;
+    margin: 1.25rem 0 0;
+    font-size: clamp(2.5rem, 6vw, 5.5rem);
+    font-weight: 700;
+    line-height: 0.97;
+    letter-spacing: -0.055em;
+    text-wrap: balance;
+  }
+
+  .challenge-post__dek {
+    max-width: 42rem;
+    margin: 1.75rem 0 0;
+    color: var(--muted-foreground);
+    font-size: clamp(1.15rem, 2vw, 1.4rem);
+    line-height: 1.55;
+  }
+
+  .challenge-post__byline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    margin-top: 2rem;
+    color: var(--muted-foreground);
+    font-size: 0.8rem;
+  }
+
+  .challenge-post__body {
+    max-width: 48rem;
+    margin-inline: auto;
+    padding: clamp(3rem, 7vw, 5rem) clamp(1.5rem, 6vw, 4rem) clamp(5rem, 10vw, 8rem);
+    border-top: 1px solid var(--border);
+  }
+
+  .challenge-post__body > * + * {
+    margin-top: 1.5rem;
+  }
+
+  .challenge-post__body p,
+  .challenge-post__body li,
+  .challenge-post__body dd {
+    color: var(--foreground);
+    font-size: 1.05rem;
+    line-height: 1.8;
+  }
+
+  .challenge-post__lead {
+    font-size: clamp(1.2rem, 2vw, 1.45rem) !important;
+    line-height: 1.6 !important;
+  }
+
+  .challenge-post__body h2 {
+    margin-top: 3.5rem;
+    font-size: clamp(1.75rem, 3.5vw, 2.6rem);
+    font-weight: 650;
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+  }
+
+  .challenge-post__body ol,
+  .challenge-post__body ul {
+    display: grid;
+    gap: 0.9rem;
+    padding-left: 1.4rem;
+  }
+
+  .challenge-post__body a {
+    color: var(--primary);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+
+  .challenge-post__body code {
+    border-radius: 0.2rem;
+    background: var(--muted);
+    padding: 0.15em 0.35em;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+
+  .challenge-post__callout {
+    margin-block: 2.5rem;
+    border-left: 0.25rem solid var(--primary);
+    background: var(--muted);
+    padding: 1.25rem 1.5rem;
+  }
+
+  .challenge-post__callout p {
+    margin: 0;
+  }
+
+  .challenge-post__callout p + p {
+    margin-top: 0.4rem;
+  }
+
+  .challenge-post__dates {
+    display: grid;
+    margin-top: 2rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .challenge-post__dates div {
+    display: grid;
+    grid-template-columns: minmax(11rem, 1fr) minmax(13rem, 1fr);
+    gap: 1rem;
+    padding-block: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .challenge-post__dates dt {
+    font-weight: 650;
+  }
+
+  .challenge-post__dates dd {
+    margin: 0;
+    color: var(--muted-foreground);
+  }
+
+  .challenge-post__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.5rem;
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .challenge-post__actions .challenge-post__primary-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    border-radius: 0.15rem;
+    background: var(--primary);
+    color: #fff;
+    padding: 0.7rem 1rem;
+    text-decoration: none;
+  }
+
+  @media (max-width: 560px) {
+    .challenge-post__dates div {
+      grid-template-columns: 1fr;
+      gap: 0.25rem;
+    }
+  }
+</style>

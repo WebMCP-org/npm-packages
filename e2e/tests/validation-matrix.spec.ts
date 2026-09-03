@@ -10,12 +10,11 @@ interface TestApp {
   name: string;
   port: number;
   type: 'json' | 'react';
-  isReact: boolean;
 }
 
 const apps: TestApp[] = [
-  { name: 'vanilla-iife-json', port: 3010, type: 'json', isReact: false },
-  { name: 'react-webmcp-test-app', port: 8888, type: 'react', isReact: true },
+  { name: 'vanilla-iife-json', port: 3010, type: 'json' },
+  { name: 'react-webmcp-test-app', port: 8888, type: 'react' },
 ];
 
 // Test each app in the matrix
@@ -27,7 +26,7 @@ for (const app of apps) {
       await page.waitForLoadState('networkidle');
     });
 
-    if (app.isReact) {
+    if (app.type === 'react') {
       // React apps have different UI structure
       test('should load and show ready status', async ({ page }) => {
         await page.waitForSelector('[data-testid="app-status"]', { timeout: 10000 });
@@ -49,29 +48,21 @@ for (const app of apps) {
         }) => {
           await expect
             .poll(async () => {
-              return page.evaluate(() => Boolean((window as { mcpClient?: unknown }).mcpClient));
+              return page.evaluate(() => Boolean(window.mcpClient));
             })
             .toBe(true);
 
           const validCall = await page.evaluate(async () => {
-            const client = (
-              window as Window & { mcpClient?: { callTool: (req: unknown) => Promise<unknown> } }
-            ).mcpClient;
+            const client = window.mcpClient;
             if (!client) {
               throw new Error('mcpClient missing');
             }
-            const response = (await client.callTool({
+            const response = await client.callTool({
               name: 'counter_increment',
               arguments: { amount: 2 },
-            })) as {
-              isError?: boolean;
-              content?: Array<{ type?: string; text?: string }>;
-            };
+            });
 
-            const text =
-              response.content?.find(
-                (item) => item.type === 'text' && typeof item.text === 'string'
-              )?.text ?? '';
+            const text = response.content.find((item) => item.type === 'text')?.text ?? '';
             return {
               isError: Boolean(response.isError),
               text,
@@ -83,9 +74,7 @@ for (const app of apps) {
           await expect(page.locator('[data-testid="counter-display"]')).toContainText('2');
 
           const invalidCall = await page.evaluate(async () => {
-            const client = (
-              window as Window & { mcpClient?: { callTool: (req: unknown) => Promise<unknown> } }
-            ).mcpClient;
+            const client = window.mcpClient;
             if (!client) {
               return {
                 threw: true,
@@ -95,21 +84,15 @@ for (const app of apps) {
             }
 
             try {
-              const response = (await client.callTool({
+              const response = await client.callTool({
                 name: 'counter_increment',
                 arguments: { amount: 'bad-input' },
-              })) as {
-                isError?: boolean;
-                content?: Array<{ type?: string; text?: string }>;
-              };
+              });
 
               return {
                 threw: false,
                 isError: Boolean(response.isError),
-                message:
-                  response.content?.find(
-                    (item) => item.type === 'text' && typeof item.text === 'string'
-                  )?.text ?? '',
+                message: response.content.find((item) => item.type === 'text')?.text ?? '',
               };
             } catch (error) {
               return {
@@ -138,7 +121,6 @@ for (const app of apps) {
         });
       }
     } else {
-      // Vanilla JS apps (IIFE and ESM)
       test('should show modelContext available', async ({ page }) => {
         await page.waitForSelector('#status', { timeout: 10000 });
         const status = page.locator('#status');
@@ -225,9 +207,8 @@ for (const app of apps) {
 
 // Cross-app validation consistency tests
 test.describe('Validation Consistency', () => {
-  test('all apps should reject invalid email format', async ({ page }) => {
-    // Test a subset of apps for email validation consistency
-    const emailTestApps = apps.filter((a) => !a.isReact);
+  test('the vanilla JSON Schema app rejects invalid email format', async ({ page }) => {
+    const emailTestApps = apps.filter((a) => a.type !== 'react');
 
     for (const app of emailTestApps) {
       await page.goto(`http://localhost:${app.port}`);

@@ -1,5 +1,4 @@
 import '@mcp-b/global'; // Initialize document.modelContext
-import type { McpClientProviderProps } from '@mcp-b/react-webmcp';
 import { McpClientProvider } from '@mcp-b/react-webmcp';
 import { TabClientTransport } from '@mcp-b/transports';
 import { Client } from '@modelcontextprotocol/client';
@@ -15,7 +14,7 @@ console.log('document.modelContext:', document.modelContext);
 // Extend Window interface for testing
 declare global {
   interface Window {
-    mcpClient?: unknown;
+    mcpClient?: Client;
   }
 }
 
@@ -38,8 +37,6 @@ const transport = new TabClientTransport({
   targetOrigin: '*',
   channelId: 'mcp-default',
 });
-const providerClient = wrappedClient as unknown as McpClientProviderProps['client'];
-const providerTransport = transport as unknown as McpClientProviderProps['transport'];
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -48,7 +45,7 @@ if (!rootElement) {
 
 ReactDOM.createRoot(rootElement).render(
   <StrictMode>
-    <McpClientProvider client={providerClient} transport={providerTransport}>
+    <McpClientProvider client={wrappedClient} transport={transport}>
       <App />
     </McpClientProvider>
   </StrictMode>

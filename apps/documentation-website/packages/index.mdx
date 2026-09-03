@@ -13,20 +13,20 @@ Cross-package concepts stay in [Explanation](/explanation/index). Task-oriented 
 
 <CardGroup cols={2}>
   <Card title="@mcp-b/webmcp-types" icon="boxes-stacked" href="/packages/webmcp-types/overview">
-    Zero-runtime TypeScript types for the WebMCP core surface, schema inference, Document
-    augmentation, and deprecated Navigator compatibility.
+    Zero-runtime TypeScript contracts for MCP-B packages, schema inference, Document augmentation,
+    and deprecated Navigator compatibility.
   </Card>
   <Card
     title="@mcp-b/webmcp-polyfill"
     icon="boxes-stacked"
     href="/packages/webmcp-polyfill/overview"
   >
-    Strict WebMCP runtime polyfill for document.modelContext in browsers that do not ship the API
-    yet.
+    Tool registration and discovery polyfill for browsers without a compatible
+    `document.modelContext` implementation.
   </Card>
   <Card title="@mcp-b/global" icon="boxes-stacked" href="/packages/global/overview">
-    Full MCP-B runtime entry point that layers transport and extension APIs on top of the strict
-    WebMCP surface.
+    Full MCP-B runtime entry point that layers transport and extension APIs on top of the WebMCP
+    surface.
   </Card>
   <Card title="@mcp-b/webmcp-ts-sdk" icon="boxes-stacked" href="/packages/webmcp-ts-sdk/overview">
     Browser-adapted MCP TypeScript SDK that provides BrowserMcpServer and supports dynamic tool
@@ -44,8 +44,7 @@ Cross-package concepts stay in [Explanation](/explanation/index). Task-oriented 
 
 <CardGroup cols={2}>
   <Card title="usewebmcp" icon="boxes-stacked" href="/packages/usewebmcp/overview">
-    Strict-core React hook for registering document.modelContext tools without the broader MCP-B
-    runtime layer.
+    React hook for registering document.modelContext tools without the broader MCP-B runtime layer.
   </Card>
   <Card title="@mcp-b/react-webmcp" icon="boxes-stacked" href="/packages/react-webmcp/overview">
     Full React integration for MCP-B, including tool hooks, prompts, resources, and client

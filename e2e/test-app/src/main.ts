@@ -1087,15 +1087,11 @@ function testChromiumCallbackClear() {
 
 /**
  * Tests for microtask-based notification batching.
- * These tests verify that rapid tool/resource/prompt registrations
+ * These tests verify that rapid tool registrations
  * are coalesced into a single notification.
  */
 
-// Notification tracking state
 let toolNotificationCount = 0;
-let resourceNotificationCount = 0;
-let promptNotificationCount = 0;
-let stopTrackingToolNotifications: (() => void) | undefined;
 
 function listenForToolChanges(listener: () => void): () => void {
   modelContext.addEventListener('toolchange', listener);
@@ -1116,40 +1112,6 @@ function registerTemporaryTool(name: string, text: string): AbortController {
     { signal: controller.signal }
   );
   return controller;
-}
-
-// Start tracking notifications
-function startNotificationTracking() {
-  stopTrackingToolNotifications?.();
-  toolNotificationCount = 0;
-  resourceNotificationCount = 0;
-  promptNotificationCount = 0;
-
-  stopTrackingToolNotifications = listenForToolChanges(() => {
-    toolNotificationCount++;
-    log(`[Notification Tracking] Tool notification #${toolNotificationCount}`, 'info');
-  });
-
-  log('Notification tracking started', 'success');
-}
-
-// Stop tracking and return counts
-function stopNotificationTracking(): {
-  tools: number;
-  resources: number;
-  prompts: number;
-} {
-  stopTrackingToolNotifications?.();
-  stopTrackingToolNotifications = undefined;
-  log(
-    `Notification tracking stopped. Counts: tools=${toolNotificationCount}, resources=${resourceNotificationCount}, prompts=${promptNotificationCount}`,
-    'success'
-  );
-  return {
-    tools: toolNotificationCount,
-    resources: resourceNotificationCount,
-    prompts: promptNotificationCount,
-  };
 }
 
 // Test: Register N tools rapidly (synchronously) and count notifications
@@ -1334,8 +1296,6 @@ declare global {
       registerDynamicPrompt: () => void;
       unregisterDynamicPrompt: () => void;
       // Notification batching tests
-      startNotificationTracking: () => void;
-      stopNotificationTracking: () => { tools: number; resources: number; prompts: number };
       testRapidToolRegistration: (count: number) => Promise<{
         registeredCount: number;
         notificationCount: number;
@@ -1382,8 +1342,6 @@ window.testApp = {
   registerDynamicPrompt,
   unregisterDynamicPrompt,
   // Notification batching tests
-  startNotificationTracking,
-  stopNotificationTracking,
   testRapidToolRegistration,
   testMultiTaskToolRegistration,
   testMixedRegistrationBatching,

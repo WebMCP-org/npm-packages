@@ -20,6 +20,14 @@ function asPolyfillInputSchema(schema: unknown): InputSchema {
   return schema as InputSchema;
 }
 
+function modelContext(): ModelContext {
+  const context = document.modelContext;
+  if (!context) {
+    throw new Error('Expected document.modelContext to be installed by the polyfill');
+  }
+  return context;
+}
+
 function getCompatModelContext(): CompatModelContext {
   return document.modelContext as unknown as CompatModelContext;
 }
@@ -75,19 +83,13 @@ describe('@mcp-b/webmcp-polyfill', () => {
   it('installs strict core methods on document.modelContext', () => {
     initializeTestPolyfill();
 
-    expect(
-      typeof (document.modelContext as unknown as { provideContext?: unknown }).provideContext
-    ).toBe('undefined');
-    expect(
-      typeof (document.modelContext as unknown as { clearContext?: unknown }).clearContext
-    ).toBe('undefined');
-    expect(typeof document.modelContext.registerTool).toBe('function');
-    expect(typeof document.modelContext.getTools).toBe('function');
-    expect(
-      (document.modelContext as unknown as { unregisterTool?: unknown }).unregisterTool
-    ).toBeUndefined();
-    expect(typeof document.modelContext.ontoolchange).toBe('object');
-    expect((document.modelContext as unknown as { callTool?: unknown }).callTool).toBeUndefined();
+    expect(typeof Reflect.get(modelContext(), 'provideContext')).toBe('undefined');
+    expect(typeof Reflect.get(modelContext(), 'clearContext')).toBe('undefined');
+    expect(typeof modelContext().registerTool).toBe('function');
+    expect(typeof modelContext().getTools).toBe('function');
+    expect(Reflect.get(modelContext(), 'unregisterTool')).toBeUndefined();
+    expect(typeof modelContext().ontoolchange).toBe('object');
+    expect(Reflect.get(modelContext(), 'callTool')).toBeUndefined();
   });
 
   it('installs the exposed ModelContext constructor and brands the context instance', () => {
@@ -101,7 +103,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     expect(document.modelContext).toBeInstanceOf(constructor);
     expect(Object.getPrototypeOf(document.modelContext)).toBe(constructor.prototype);
-    expect(document.modelContext.constructor).toBe(constructor);
+    expect(modelContext().constructor).toBe(constructor);
     expect(Object.prototype.toString.call(document.modelContext)).toBe('[object ModelContext]');
     expect(() => Reflect.construct(constructor, [])).toThrow(TypeError);
     expect(Object.getOwnPropertyDescriptor(globalThis, 'ModelContext')).toMatchObject({
@@ -115,15 +117,23 @@ describe('@mcp-b/webmcp-polyfill', () => {
   it('installs readonly document descriptor and deprecated navigator accessor', () => {
     initializeTestPolyfill();
 
-    const documentDescriptor = Object.getOwnPropertyDescriptor(document, 'modelContext');
+    // WebIDL puts `[SameObject] readonly attribute ModelContext modelContext`
+    // on Document's interface prototype object, never on the instance, and
+    // Chrome 152 matches that.
+    const documentDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'modelContext');
     const navigatorDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
 
-    expect(documentDescriptor).toMatchObject({
-      configurable: true,
-      enumerable: true,
-      writable: false,
-      value: document.modelContext,
-    });
+    expect(Object.getOwnPropertyDescriptor(document, 'modelContext')).toBeUndefined();
+    expect(documentDescriptor?.configurable).toBe(true);
+    expect(documentDescriptor?.enumerable).toBe(true);
+    expect(documentDescriptor?.set).toBeUndefined();
+    expect(documentDescriptor?.get?.name).toBe('get modelContext');
+    expect(documentDescriptor?.get?.length).toBe(0);
+    // SameObject: repeated reads return the identical instance.
+    expect(document.modelContext).toBe(document.modelContext);
+    // WebIDL brand check: the getter is not callable on Document.prototype.
+    expect(() => Reflect.get(Document.prototype, 'modelContext')).toThrow(TypeError);
+
     expect(navigatorDescriptor?.configurable).toBe(true);
     expect(navigatorDescriptor?.enumerable).toBe(true);
     expect(typeof navigatorDescriptor?.get).toBe('function');
@@ -154,7 +164,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     });
 
     await expect(
-      document.modelContext.registerTool({
+      modelContext().registerTool({
         name: 'shared_registry_tool',
         description: 'Conflicting registration via document.modelContext',
         inputSchema: { type: 'object', properties: {} },
@@ -186,10 +196,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('document.modelContext registerTool resolves undefined and throws on duplicates', async () => {
+  it('document.modelContext registerTool resolves undefined and rejects duplicates', async () => {
     initializeTestPolyfill();
 
-    const firstResult = document.modelContext.registerTool({
+    const firstResult = modelContext().registerTool({
       name: 'echo',
       description: 'Echo back input',
       inputSchema: { type: 'object', properties: { message: { type: 'string' } } },
@@ -198,7 +208,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     await expect(firstResult).resolves.toBeUndefined();
     await expect(
-      document.modelContext.registerTool({
+      modelContext().registerTool({
         name: 'echo',
         description: 'Echo back input again',
         inputSchema: { type: 'object', properties: {} },
@@ -211,7 +221,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     initializeTestPolyfill();
 
     await expect(
-      document.modelContext.registerTool({
+      modelContext().registerTool({
         name: 'schema_metadata_tool',
         description: 'Schema metadata',
         inputSchema: {
@@ -221,10 +231,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
       })
     ).resolves.toBeUndefined();
 
-    await expect(document.modelContext.getTools()).resolves.toMatchObject([
+    await expect(modelContext().getTools()).resolves.toMatchObject([
       {
         name: 'schema_metadata_tool',
-        inputSchema: '{"type":123}',
+        inputSchema: { type: 123 },
       },
     ]);
   });
@@ -233,7 +243,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     initializeTestPolyfill();
     let argumentCount = 0;
 
-    await document.modelContext.registerTool({
+    await modelContext().registerTool({
       name: 'standard_callback_shape',
       description: 'Checks the WebMCP callback shape',
       async execute() {
@@ -242,7 +252,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       },
     });
 
-    const [tool] = await document.modelContext.getTools();
+    const [tool] = await modelContext().getTools();
     if (!tool) throw new Error('Expected the registered tool');
     await getCompatModelContext().executeTool(tool, '{}');
     expect(argumentCount).toBe(1);
@@ -259,15 +269,15 @@ describe('@mcp-b/webmcp-polyfill', () => {
     };
 
     const ac = new AbortController();
-    await document.modelContext.registerTool(tool, { signal: ac.signal });
+    await modelContext().registerTool(tool, { signal: ac.signal });
 
-    await expect(document.modelContext.registerTool(tool)).rejects.toThrow(
+    await expect(modelContext().registerTool(tool)).rejects.toThrow(
       'Tool already registered: signal_tool'
     );
 
     ac.abort();
 
-    await expect(document.modelContext.registerTool(tool)).resolves.toBeUndefined();
+    await expect(modelContext().registerTool(tool)).resolves.toBeUndefined();
   });
 
   it('registerTool with a pre-aborted signal rejects and does not register the tool', async () => {
@@ -284,11 +294,9 @@ describe('@mcp-b/webmcp-polyfill', () => {
       execute: async () => ({ content: [{ type: 'text', text: 'never' }] }),
     };
 
-    await expect(document.modelContext.registerTool(tool, { signal: ac.signal })).rejects.toBe(
-      reason
-    );
+    await expect(modelContext().registerTool(tool, { signal: ac.signal })).rejects.toBe(reason);
 
-    await expect(document.modelContext.registerTool(tool)).resolves.toBeUndefined();
+    await expect(modelContext().registerTool(tool)).resolves.toBeUndefined();
   });
 
   it('does not register when the signal aborts during option conversion', async () => {
@@ -305,7 +313,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     });
 
     await expect(
-      document.modelContext.registerTool(
+      modelContext().registerTool(
         {
           name: 'aborted_during_options',
           description: 'Must not leak into the registry',
@@ -315,7 +323,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       )
     ).rejects.toBe(reason);
 
-    await expect(document.modelContext.getTools()).resolves.toEqual([]);
+    await expect(modelContext().getTools()).resolves.toEqual([]);
   });
 
   it('rejects registration, discovery, and execution from a detached document', async () => {
@@ -373,12 +381,12 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
   it('rejects registry access when Permissions Policy disables WebMCP', async () => {
     initializeTestPolyfill();
-    await document.modelContext.registerTool({
+    await modelContext().registerTool({
       name: 'policy_tool',
       description: 'Permissions Policy test tool',
       execute: async () => 'never',
     });
-    const [tool] = await document.modelContext.getTools();
+    const [tool] = await modelContext().getTools();
     if (!tool) throw new Error('Expected a registered tool');
 
     const previous = Object.getOwnPropertyDescriptor(document, 'featurePolicy');
@@ -393,13 +401,13 @@ describe('@mcp-b/webmcp-polyfill', () => {
     try {
       const expected = { name: 'NotAllowedError' };
       await expect(
-        document.modelContext.registerTool({
+        modelContext().registerTool({
           name: 'blocked_tool',
           description: 'Must not register',
           execute: async () => 'never',
         })
       ).rejects.toMatchObject(expected);
-      await expect(document.modelContext.getTools()).rejects.toMatchObject(expected);
+      await expect(modelContext().getTools()).rejects.toMatchObject(expected);
       await expect(getCompatModelContext().executeTool(tool, '{}')).rejects.toMatchObject(expected);
     } finally {
       if (previous) Object.defineProperty(document, 'featurePolicy', previous);
@@ -407,7 +415,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     }
   });
 
-  it('does not let an old registration signal remove a same-name replacement', async () => {
+  it('re-registers a tool name after its registration signal aborts', async () => {
     initializeTestPolyfill();
     const originalController = new AbortController();
     const original = {
@@ -415,15 +423,15 @@ describe('@mcp-b/webmcp-polyfill', () => {
       description: 'Original registration',
       execute: async () => ({ version: 'original' }),
     };
-    await document.modelContext.registerTool(original, { signal: originalController.signal });
+    await modelContext().registerTool(original, { signal: originalController.signal });
     originalController.abort();
 
-    await document.modelContext.registerTool({
+    await modelContext().registerTool({
       ...original,
       description: 'Replacement registration',
       execute: async () => ({ version: 'replacement' }),
     });
-    const [registered] = await document.modelContext.getTools();
+    const [registered] = await modelContext().getTools();
     expect(registered?.name).toBe('signal_replacement_tool');
     await expect(getCompatModelContext().executeTool(registered!, '{}')).resolves.toBe(
       '{"version":"replacement"}'
@@ -434,7 +442,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     initializeTestPolyfill();
 
     await expect(
-      document.modelContext.registerTool(
+      modelContext().registerTool(
         {
           name: 'untrustworthy_exposure',
           description: 'Must not register',
@@ -443,9 +451,9 @@ describe('@mcp-b/webmcp-polyfill', () => {
         { exposedTo: ['http://example.com'] }
       )
     ).rejects.toMatchObject({ name: 'SecurityError' });
-    await expect(
-      document.modelContext.getTools({ fromOrigins: ['not an origin'] })
-    ).rejects.toMatchObject({ name: 'SecurityError' });
+    await expect(modelContext().getTools({ fromOrigins: ['not an origin'] })).rejects.toMatchObject(
+      { name: 'SecurityError' }
+    );
   });
 
   it('fires toolchange event for registry mutations', async () => {
@@ -457,7 +465,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     });
 
     const controller = new AbortController();
-    await document.modelContext.registerTool(
+    await modelContext().registerTool(
       {
         name: 't1',
         description: 'tool 1',
@@ -477,7 +485,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
   it('exposes native-shaped getTools on document.modelContext', async () => {
     initializeTestPolyfill();
 
-    await document.modelContext.registerTool({
+    await modelContext().registerTool({
       name: 'native_get_tools_shape',
       title: 'Native Tool',
       description: 'Native getTools shape',
@@ -489,13 +497,17 @@ describe('@mcp-b/webmcp-polyfill', () => {
       execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
     });
 
-    await expect(document.modelContext.getTools()).resolves.toEqual([
+    await expect(modelContext().getTools()).resolves.toEqual([
       {
         name: 'native_get_tools_shape',
         title: 'Native Tool',
         description: 'Native getTools shape',
-        inputSchema:
-          '{"type":"object","properties":{"value":{"type":"number"}},"required":["value"]}',
+        // An object since webmcp#241, parsed fresh from the serialized copy.
+        inputSchema: {
+          type: 'object',
+          properties: { value: { type: 'number' } },
+          required: ['value'],
+        },
         origin: window.location.origin,
         window,
       },
@@ -511,7 +523,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       additionalProperties: false,
     };
 
-    await document.modelContext.registerTool({
+    await modelContext().registerTool({
       name: 'a_tool',
       description: 'No schema',
       execute: async () => ({ content: [] }),
@@ -528,23 +540,34 @@ describe('@mcp-b/webmcp-polyfill', () => {
       },
       execute: async () => ({ content: [] }),
     });
-    await document.modelContext.registerTool({
+    await modelContext().registerTool({
       name: '_tool',
       description: 'Sort sentinel',
       execute: async () => ({ content: [] }),
     });
 
-    const tools = await document.modelContext.getTools();
+    const tools = await modelContext().getTools();
 
     expect(tools.map(({ name }) => name)).toEqual(['Z_tool', '_tool', 'a_tool']);
     expect(tools[0]).toMatchObject({
       title: '',
-      inputSchema: JSON.stringify(exactSchema),
+      inputSchema: exactSchema,
       annotations: {
         readOnlyHint: true,
         untrustedContentHint: false,
       },
     });
+    // Exact: getTools reflects the registered schema verbatim, with no
+    // normalization-injected keys (toMatchObject alone would allow extras).
+    expect(tools[0]?.inputSchema).toEqual(exactSchema);
+    // A fresh, detached object per call: mutating one result must not leak
+    // into the registration or later calls.
+    const schema = tools[0]?.inputSchema;
+    if (typeof schema !== 'object' || schema === null) {
+      throw new Error('expected an object inputSchema');
+    }
+    Object.assign(schema, { mutated: true });
+    expect((await modelContext().getTools())[0]?.inputSchema).toEqual(exactSchema);
     expect(tools[0]?.annotations).toEqual({
       readOnlyHint: true,
       untrustedContentHint: false,
@@ -555,15 +578,15 @@ describe('@mcp-b/webmcp-polyfill', () => {
   it('rejects unsupported cross-document discovery', async () => {
     initializeTestPolyfill();
     await expect(
-      document.modelContext.getTools({ fromOrigins: ['https://example.com'] })
+      modelContext().getTools({ fromOrigins: ['https://example.com'] })
     ).rejects.toMatchObject({ name: 'NotSupportedError' });
-    await expect(document.modelContext.getTools({ fromOrigins: [] })).resolves.toEqual([]);
+    await expect(modelContext().getTools({ fromOrigins: [] })).resolves.toEqual([]);
   });
 
   it('executes registered tool objects from document.modelContext.getTools', async () => {
     initializeTestPolyfill();
 
-    await document.modelContext.registerTool({
+    await modelContext().registerTool({
       name: 'native_execute_tool_shape',
       title: 'Native Execute Tool',
       description: 'Native executeTool shape',
@@ -575,7 +598,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       execute: async (args) => ({ echoed: args.value }),
     });
 
-    const [tool] = await document.modelContext.getTools();
+    const [tool] = await modelContext().getTools();
     const result = await getCompatModelContext().executeTool(
       tool!,
       JSON.stringify({ value: 'ok' })
@@ -586,12 +609,12 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
   it('rejects opaque origins and disabled origin isolation during native-shaped execution', async () => {
     initializeTestPolyfill();
-    await document.modelContext.registerTool({
+    await modelContext().registerTool({
       name: 'secured_execute_tool',
       description: 'Checks execution security gates',
       execute: async () => 'ok',
     });
-    const [tool] = await document.modelContext.getTools();
+    const [tool] = await modelContext().getTools();
 
     await expect(
       getCompatModelContext().executeTool({ ...tool!, origin: 'data:text/html,test' }, '{}')
@@ -617,12 +640,12 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     let listenerCount = 0;
     let handlerCount = 0;
-    document.modelContext.addEventListener('toolchange', () => {
+    modelContext().addEventListener('toolchange', () => {
       listenerCount += 1;
     });
     let handlerTarget: EventTarget | null = null;
     let handlerThis: ModelContext | null = null;
-    document.modelContext.ontoolchange = function (event) {
+    modelContext().ontoolchange = function (event) {
       handlerCount += 1;
       handlerTarget = event.target;
       // oxlint-disable-next-line typescript/no-this-alias -- verifies EventHandler `this` binding.
@@ -630,7 +653,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     };
 
     const controller = new AbortController();
-    await document.modelContext.registerTool(
+    await modelContext().registerTool(
       {
         name: 'producer_event_tool',
         description: 'Producer event tool',
@@ -652,11 +675,11 @@ describe('@mcp-b/webmcp-polyfill', () => {
   it('keeps the ontoolchange listener position when its callback is replaced', async () => {
     initializeTestPolyfill();
     const order: string[] = [];
-    document.modelContext.ontoolchange = () => order.push('first');
-    document.modelContext.addEventListener('toolchange', () => order.push('listener'));
-    document.modelContext.ontoolchange = () => order.push('replacement');
+    modelContext().ontoolchange = () => order.push('first');
+    modelContext().addEventListener('toolchange', () => order.push('listener'));
+    modelContext().ontoolchange = () => order.push('replacement');
 
-    await document.modelContext.registerTool({
+    await modelContext().registerTool({
       name: 'handler_order_tool',
       description: 'Checks event handler ordering',
       execute: async () => null,
@@ -668,12 +691,12 @@ describe('@mcp-b/webmcp-polyfill', () => {
   it('re-adds ontoolchange after listeners when it was cleared', async () => {
     initializeTestPolyfill();
     const order: string[] = [];
-    document.modelContext.ontoolchange = () => order.push('first');
-    document.modelContext.addEventListener('toolchange', () => order.push('listener'));
-    document.modelContext.ontoolchange = null;
-    document.modelContext.ontoolchange = () => order.push('replacement');
+    modelContext().ontoolchange = () => order.push('first');
+    modelContext().addEventListener('toolchange', () => order.push('listener'));
+    modelContext().ontoolchange = null;
+    modelContext().ontoolchange = () => order.push('replacement');
 
-    await document.modelContext.registerTool({
+    await modelContext().registerTool({
       name: 'readded_handler_order_tool',
       description: 'Checks re-added event handler ordering',
       execute: async () => null,
@@ -765,7 +788,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       expect(navigator.modelContextTesting).toBeUndefined();
     });
 
-    it('does not override existing modelContextTesting by default', () => {
+    it('does not override existing modelContextTesting when installTestingShim is true', () => {
       const existingTesting = {
         existing: true,
       } as unknown as Navigator['modelContextTesting'];
@@ -787,10 +810,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('is idempotent when already installed', () => {
       initializeTestPolyfill();
-      const first = document.modelContext;
+      const first = modelContext();
 
       initializeTestPolyfill();
-      const second = document.modelContext;
+      const second = modelContext();
 
       expect(first).toBe(second);
       expect(typeof second.registerTool).toBe('function');
@@ -893,7 +916,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
         changes += 1;
       });
 
-      await document.modelContext.registerTool(
+      await modelContext().registerTool(
         {
           name: 'cleanup_signal_tool',
           description: 'Cleanup signal tool',
@@ -946,9 +969,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     it('throws when tool is not an object', async () => {
       initializeTestPolyfill();
       await expect(
-        document.modelContext.registerTool(
-          null as unknown as Parameters<typeof document.modelContext.registerTool>[0]
-        )
+        modelContext().registerTool(null as unknown as Parameters<ModelContext['registerTool']>[0])
       ).rejects.toThrow('registerTool(tool) requires a tool object');
     });
 
@@ -956,7 +977,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       initializeTestPolyfill();
       await expectInvalidStateError(
         () =>
-          document.modelContext.registerTool({
+          modelContext().registerTool({
             name: '',
             description: 'test',
             execute: async () => ({ content: [] }),
@@ -967,7 +988,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('applies WebIDL string coercion to tool metadata', async () => {
       initializeTestPolyfill();
-      await document.modelContext.registerTool({
+      await modelContext().registerTool({
         name: 42 as unknown as string,
         title: 7 as unknown as string,
         description: 123 as unknown as string,
@@ -978,7 +999,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
         execute: async () => ({ content: [] }),
       });
 
-      await expect(document.modelContext.getTools()).resolves.toMatchObject([
+      await expect(modelContext().getTools()).resolves.toMatchObject([
         {
           name: '42',
           title: '7',
@@ -995,7 +1016,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       initializeTestPolyfill();
       await expectInvalidStateError(
         () =>
-          document.modelContext.registerTool({
+          modelContext().registerTool({
             name: 'test',
             description: '',
             execute: async () => ({ content: [] }),
@@ -1007,7 +1028,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     it('rejects symbols during WebIDL string coercion', async () => {
       initializeTestPolyfill();
       await expect(
-        document.modelContext.registerTool({
+        modelContext().registerTool({
           name: Symbol('tool') as unknown as string,
           description: 'test',
           execute: async () => ({ content: [] }),
@@ -1028,7 +1049,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       initializeTestPolyfill();
       await expectInvalidStateError(
         () =>
-          document.modelContext.registerTool({
+          modelContext().registerTool({
             name,
             description: 'test',
             execute: async () => ({ content: [] }),
@@ -1040,7 +1061,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     it('accepts tool name with underscore, period, and hyphen', async () => {
       initializeTestPolyfill();
       await expect(
-        document.modelContext.registerTool({
+        modelContext().registerTool({
           name: 'a._-b',
           description: 'test',
           execute: async () => ({ content: [] }),
@@ -1051,7 +1072,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     it('accepts tool name with exactly 128 characters', async () => {
       initializeTestPolyfill();
       await expect(
-        document.modelContext.registerTool({
+        modelContext().registerTool({
           name: 'a'.repeat(128),
           description: 'test',
           execute: async () => ({ content: [] }),
@@ -1062,7 +1083,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     it('throws when tool execute is not a function', async () => {
       initializeTestPolyfill();
       await expect(
-        document.modelContext.registerTool({
+        modelContext().registerTool({
           name: 'test',
           description: 'test desc',
           execute: 'not-a-function' as unknown as () => Promise<{ content: never[] }>,
@@ -1073,7 +1094,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     it('throws when inputSchema is not an object', async () => {
       initializeTestPolyfill();
       await expect(
-        document.modelContext.registerTool({
+        modelContext().registerTool({
           name: 'test',
           description: 'test desc',
           inputSchema: 'not-object' as unknown as { type: string },
@@ -1084,7 +1105,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('omits inputSchema metadata when none is registered', async () => {
       initializeTestPolyfill();
-      await document.modelContext.registerTool({
+      await modelContext().registerTool({
         name: 'no_schema',
         description: 'No schema tool',
         execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
@@ -1097,7 +1118,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('preserves schemas that omit a root type', async () => {
       initializeTestPolyfill();
-      await document.modelContext.registerTool({
+      await modelContext().registerTool({
         name: 'implicit_object_schema',
         description: 'Implicit object schema tool',
         inputSchema: {
@@ -1157,7 +1178,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
       let error: unknown;
       try {
-        await document.modelContext.registerTool({
+        await modelContext().registerTool({
           name: 'circular_schema',
           description: 'Circular schema',
           inputSchema: circular as never,
@@ -1175,7 +1196,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       initializeTestPolyfill();
 
       await expect(
-        document.modelContext.registerTool({
+        modelContext().registerTool({
           name: 'undefined_schema',
           description: 'Undefined serialized schema',
           inputSchema: {
@@ -1191,7 +1212,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       const serializationError = new Error('schema serialization failed');
 
       await expect(
-        document.modelContext.registerTool({
+        modelContext().registerTool({
           name: 'throwing_schema',
           description: 'Throwing serialized schema',
           inputSchema: {
@@ -1204,10 +1225,10 @@ describe('@mcp-b/webmcp-polyfill', () => {
       ).rejects.toBe(serializationError);
     });
 
-    it('exposes the exact JSON string produced through inputSchema.toJSON', async () => {
+    it('omits inputSchema when toJSON serializes to a non-object', async () => {
       initializeTestPolyfill();
 
-      await document.modelContext.registerTool({
+      await modelContext().registerTool({
         name: 'custom_serialized_schema',
         description: 'Custom serialized schema',
         inputSchema: {
@@ -1216,12 +1237,11 @@ describe('@mcp-b/webmcp-polyfill', () => {
         execute: async () => ({ content: [] }),
       });
 
-      await expect(document.modelContext.getTools()).resolves.toMatchObject([
-        {
-          name: 'custom_serialized_schema',
-          inputSchema: '"serialized-schema"',
-        },
-      ]);
+      // A string here would collide with the pre-154 serialized-schema shape
+      // consumers JSON.parse, so the non-object parse result is dropped.
+      const tools = await modelContext().getTools();
+      expect(tools[0]?.name).toBe('custom_serialized_schema');
+      expect(tools[0]).not.toHaveProperty('inputSchema');
     });
   });
 
@@ -1238,7 +1258,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('listTools returns registered tools with serialized inputSchema', async () => {
       initializeTestPolyfill();
-      await document.modelContext.registerTool({
+      await modelContext().registerTool({
         name: 'test_tool',
         description: 'Test tool',
         inputSchema: { type: 'object', properties: { x: { type: 'number' } } },
@@ -1256,7 +1276,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('listTools preserves an empty inputSchema', async () => {
       initializeTestPolyfill();
-      await document.modelContext.registerTool({
+      await modelContext().registerTool({
         name: 'no_args_tool',
         description: 'Tool with no arguments',
         inputSchema: {},
@@ -1281,7 +1301,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       ['JSON null', 'null'],
     ])('executeTool rejects %s input', async (_case, input) => {
       initializeTestPolyfill();
-      await document.modelContext.registerTool({
+      await modelContext().registerTool({
         name: 'tool1',
         description: 'Tool 1',
         execute: async () => ({ content: [] }),
@@ -1295,7 +1315,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     it('executeTool accepts a JSON array and passes it to the handler', async () => {
       initializeTestPolyfill();
       let receivedInput: unknown;
-      await document.modelContext.registerTool({
+      await modelContext().registerTool({
         name: 'tool1',
         description: 'Tool 1',
         execute: async (input) => {
@@ -1312,7 +1332,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('executeTool preserves a pre-existing AbortSignal reason', async () => {
       initializeTestPolyfill();
-      await document.modelContext.registerTool({
+      await modelContext().registerTool({
         name: 'tool1',
         description: 'Tool 1',
         execute: async () => ({ content: [] }),
@@ -1329,7 +1349,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
 
     it('executeTool throws when tool execution throws', async () => {
       initializeTestPolyfill();
-      await document.modelContext.registerTool({
+      await modelContext().registerTool({
         name: 'throwing_tool',
         description: 'Throwing tool',
         execute: async () => {
@@ -1349,7 +1369,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
         metadata: { willNavigate: true },
         value: { count: 2 },
       };
-      await document.modelContext.registerTool({
+      await modelContext().registerTool({
         name: 'raw_result_tool',
         description: 'Raw result tool',
         execute: async () => expected,
@@ -1365,7 +1385,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       navigator.modelContextTesting!.ontoolchange = () => {
         called = true;
       };
-      await document.modelContext.registerTool({
+      await modelContext().registerTool({
         name: 'ontoolchange_test',
         description: 'test',
         execute: async () => 'ok',
@@ -1384,7 +1404,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       testing.ontoolchange = null;
       testing.ontoolchange = () => order.push('replacement');
 
-      await document.modelContext.registerTool({
+      await modelContext().registerTool({
         name: 'testing_readded_handler_order_tool',
         description: 'Checks re-added testing event handler ordering',
         execute: async () => null,
@@ -1399,7 +1419,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     const controller = new AbortController();
     let resolveExecution: ((value: unknown) => void) | null = null;
 
-    await document.modelContext.registerTool({
+    await modelContext().registerTool({
       name: 'pending_tool',
       description: 'Pending tool',
       execute: () =>
@@ -1426,9 +1446,76 @@ describe('@mcp-b/webmcp-polyfill', () => {
   describe('polyfill marker', () => {
     it('sets __isWebMCPPolyfill marker on modelContext', () => {
       initializeTestPolyfill();
-      expect(
-        (document.modelContext as unknown as { __isWebMCPPolyfill?: boolean }).__isWebMCPPolyfill
-      ).toBe(true);
+      expect(Reflect.get(modelContext(), '__isWebMCPPolyfill')).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // SubmitEvent agent attribution
+  // =========================================================================
+
+  describe('SubmitEvent agent attribution', () => {
+    it('leaves user submissions unattributed on forms without a running tool', () => {
+      initializeTestPolyfill();
+      const form = document.createElement('form');
+      form.innerHTML = '<input name="query"><button type="submit">Send</button>';
+      document.body.append(form);
+      const button = form.querySelector('button');
+      if (!button) throw new Error('Expected a submit button');
+
+      let agentInvoked: boolean | undefined;
+      let respondWithError: unknown;
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        agentInvoked = event.agentInvoked;
+        if (!event.respondWith) {
+          throw new Error('Expected SubmitEvent.respondWith from the polyfill');
+        }
+        try {
+          event.respondWith(Promise.resolve('user'));
+        } catch (error) {
+          respondWithError = error;
+        }
+      });
+
+      try {
+        button.click();
+      } finally {
+        form.remove();
+      }
+
+      expect(agentInvoked).toBe(false);
+      expect(respondWithError).toMatchObject({ name: 'InvalidStateError' });
+    });
+
+    it('attributes an agent submission and settles it from the observed root', async () => {
+      initializeTestPolyfill();
+      const name = `declarative_attribution_${String(Date.now())}`;
+      const form = document.createElement('form');
+      form.setAttribute('toolname', name);
+      form.setAttribute('tooldescription', 'Attribution fixture');
+      form.setAttribute('toolautosubmit', '');
+      document.body.append(form);
+
+      let agentInvoked: boolean | undefined;
+      form.addEventListener('submit', (event) => {
+        agentInvoked = event.agentInvoked;
+        event.preventDefault();
+      });
+
+      try {
+        for (let attempt = 0; attempt < 50; attempt += 1) {
+          if ((await modelContext().getTools()).some((tool) => tool.name === name)) break;
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        await expect(navigator.modelContextTesting?.executeTool(name, '{}')).rejects.toMatchObject({
+          name: 'UnknownError',
+        });
+      } finally {
+        form.remove();
+      }
+
+      expect(agentInvoked).toBe(true);
     });
   });
 

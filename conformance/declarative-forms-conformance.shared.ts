@@ -1,5 +1,21 @@
-import type { ChromeModelContext, RegisteredTool } from '@mcp-b/webmcp-types';
+import type { ChromeModelContext, InputSchema, RegisteredTool } from '@mcp-b/webmcp-types';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+
+/**
+ * An object since webmcp#241 (Chrome 154.0.8013); the native runner also spans
+ * Chrome 152-154 builds that still return the serialized string, so both
+ * generations resolve here.
+ */
+function requireObjectInputSchema(tool: RegisteredTool): InputSchema {
+  const raw: unknown =
+    typeof tool.inputSchema === 'string' ? JSON.parse(tool.inputSchema) : tool.inputSchema;
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new Error(
+      `Expected ${tool.name} to expose a JSON Schema inputSchema, got ${JSON.stringify(raw)}`
+    );
+  }
+  return raw as InputSchema;
+}
 
 interface DeclarativeFormConformanceOptions {
   suiteName: string;
@@ -9,12 +25,36 @@ interface DeclarativeFormConformanceOptions {
 
 const FIXTURE_ATTRIBUTE = 'data-webmcp-declarative-conformance';
 
+/**
+ * `@mcp-b/webmcp-types` declares `document.modelContext` optional because no
+ * browser ships WebMCP unflagged. This suite runs after `install()`, so absence
+ * is a harness failure rather than a supported state.
+ */
+function requireModelContext(): ChromeModelContext {
+  const modelContext = document.modelContext;
+  if (!modelContext) throw new Error('Expected document.modelContext to be installed');
+  return modelContext;
+}
+
+/**
+ * The declarative form surface is explainer-only, so `SubmitEvent.respondWith()`
+ * is declared optional. The runtime under test installs it, so absence is a
+ * harness failure rather than a supported state.
+ *
+ * There is deliberately no matching helper for `agentInvoked`: synthetic
+ * `Event('submit')` dispatches legitimately leave it `undefined`.
+ */
+function submitRespondWith(event: SubmitEvent, agentResponse: Promise<unknown>): void {
+  if (!event.respondWith) throw new Error('Expected SubmitEvent.respondWith to be installed');
+  event.respondWith(agentResponse);
+}
+
 async function waitForTool(
   name: string,
   predicate: (tool: RegisteredTool) => boolean = () => true
 ): Promise<RegisteredTool> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
-    const tool = (await document.modelContext.getTools()).find(
+    const tool = (await requireModelContext().getTools()).find(
       (candidate) => candidate.name === name
     );
     if (tool && predicate(tool)) return tool;
@@ -25,7 +65,7 @@ async function waitForTool(
 
 async function waitForToolRemoval(name: string): Promise<void> {
   await waitForCondition(
-    async () => !(await document.modelContext.getTools()).some((tool) => tool.name === name),
+    async () => !(await requireModelContext().getTools()).some((tool) => tool.name === name),
     `Timed out waiting for declarative tool ${name} to be removed`
   );
 }
@@ -42,7 +82,7 @@ async function waitForCondition(
 }
 
 function executeTool(tool: RegisteredTool, input: Record<string, unknown>): Promise<string | null> {
-  const modelContext: ChromeModelContext = document.modelContext;
+  const modelContext = requireModelContext();
   if (!modelContext.executeTool)
     throw new Error('Expected executeTool for declarative conformance');
   return modelContext.executeTool(tool, JSON.stringify(input));
@@ -88,7 +128,7 @@ export function runDeclarativeFormConformanceSuite(
         title: 'Search',
         description: 'Search the catalog',
       });
-      expect(JSON.parse(tool.inputSchema ?? '')).toEqual({
+      expect(requireObjectInputSchema(tool)).toEqual({
         type: 'object',
         properties: {
           query: { type: 'string', description: 'The search query' },
@@ -119,7 +159,7 @@ export function runDeclarativeFormConformanceSuite(
       const tool = await waitForTool(name);
 
       expect(tool.description).toBe('Search from a component');
-      expect(JSON.parse(tool.inputSchema ?? '')).toMatchObject({
+      expect(requireObjectInputSchema(tool)).toMatchObject({
         properties: { query: { type: 'string', description: 'Search query' } },
       });
     });
@@ -147,7 +187,7 @@ export function runDeclarativeFormConformanceSuite(
       );
 
       const tool = await waitForTool(name);
-      expect(JSON.parse(tool.inputSchema ?? '')).toEqual({
+      expect(requireObjectInputSchema(tool)).toEqual({
         type: 'object',
         properties: {
           invalid_pattern: { type: 'string' },
@@ -207,16 +247,16 @@ export function runDeclarativeFormConformanceSuite(
         (event: Event) => {
           if (!(event instanceof SubmitEvent)) return;
           event.preventDefault();
-          event.respondWith(Promise.resolve('clobber-ok'));
+          submitRespondWith(event, Promise.resolve('clobber-ok'));
         },
         { once: true },
       ]);
 
       const tool = await waitForTool(name);
-      const schema = JSON.parse(tool.inputSchema ?? '');
+      const properties = requireObjectInputSchema(tool).properties ?? {};
 
-      expect(Object.keys(schema.properties)).toEqual(parameterNames);
-      expect(Object.hasOwn(schema.properties, '__proto__')).toBe(true);
+      expect(Object.keys(properties)).toEqual(parameterNames);
+      expect(Object.hasOwn(properties, '__proto__')).toBe(true);
       await expect(
         executeTool(
           tool,
@@ -255,15 +295,15 @@ export function runDeclarativeFormConformanceSuite(
         control.addEventListener('input', () => changed.add(`${control.id}:input`));
         control.addEventListener('change', () => changed.add(`${control.id}:change`));
       });
-      let agentInvoked = false;
+      let agentInvoked: boolean | undefined;
       window.addEventListener(
         'submit',
         (event) => {
           if (event.target !== form) return;
           agentInvoked = event.agentInvoked;
           event.preventDefault();
-          event.respondWith(Promise.resolve({ accepted: false }));
-          event.respondWith(Promise.resolve({ accepted: true }));
+          submitRespondWith(event, Promise.resolve({ accepted: false }));
+          submitRespondWith(event, Promise.resolve({ accepted: true }));
           event.stopImmediatePropagation();
         },
         { capture: true, once: true }
@@ -308,6 +348,59 @@ export function runDeclarativeFormConformanceSuite(
       );
     });
 
+    it('reports agentInvoked for the running tool call but not for ordinary submissions', async () => {
+      const name = `declarative_attribution_${String(Date.now())}`;
+      const userFormId = `declarative-user-form-${String(Date.now())}`;
+      toolNames.add(name);
+      document.body.insertAdjacentHTML(
+        'beforeend',
+        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Agent attribution" toolautosubmit>
+          <input name="query">
+          <button type="submit">Search</button>
+        </form>
+        <form ${FIXTURE_ATTRIBUTE} id="${userFormId}">
+          <input name="query">
+          <button type="submit">Search</button>
+        </form>`
+      );
+      const toolForm = document.querySelector<HTMLFormElement>(
+        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
+      );
+      const userForm = document.querySelector<HTMLFormElement>(`#${userFormId}`);
+      const userButton = userForm?.querySelector<HTMLButtonElement>('button');
+      if (!toolForm || !userForm || !userButton) {
+        throw new Error('Expected agent-attribution declarative form fixtures');
+      }
+
+      let agentSubmitInvoked: boolean | undefined;
+      toolForm.addEventListener('submit', (event) => {
+        agentSubmitInvoked = event.agentInvoked;
+        event.preventDefault();
+        submitRespondWith(event, Promise.resolve('searched'));
+      });
+      let userSubmitInvoked: boolean | undefined;
+      let userRespondWithError: unknown;
+      userForm.addEventListener('submit', (event) => {
+        userSubmitInvoked = event.agentInvoked;
+        event.preventDefault();
+        try {
+          submitRespondWith(event, Promise.resolve('not the agent'));
+        } catch (error) {
+          userRespondWithError = error;
+        }
+      });
+
+      await expect(executeTool(await waitForTool(name), { query: 'agent' })).resolves.toBe(
+        'searched'
+      );
+      expect(agentSubmitInvoked).toBe(true);
+
+      userButton.click();
+
+      expect(userSubmitInvoked).toBe(false);
+      expect(userRespondWithError).toMatchObject({ name: 'InvalidStateError' });
+    });
+
     it('dispatches autosubmit before announcing tool activation', async () => {
       const name = `declarative_autosubmit_order_${String(Date.now())}`;
       toolNames.add(name);
@@ -323,7 +416,7 @@ export function runDeclarativeFormConformanceSuite(
       form.addEventListener('submit', (event) => {
         events.push('submit');
         event.preventDefault();
-        event.respondWith(Promise.resolve());
+        submitRespondWith(event, Promise.resolve());
       });
       window.addEventListener(
         'toolactivated',
@@ -359,7 +452,7 @@ export function runDeclarativeFormConformanceSuite(
         if (!form) throw new Error('Expected validation-bypass declarative form fixture');
         form.addEventListener('submit', (event) => {
           event.preventDefault();
-          event.respondWith(Promise.resolve(validationBypass));
+          submitRespondWith(event, Promise.resolve(validationBypass));
         });
 
         await expect(executeTool(await waitForTool(name), {})).resolves.toBe(validationBypass);
@@ -385,6 +478,32 @@ export function runDeclarativeFormConformanceSuite(
 
       await expect(executeTool(await waitForTool(name), {})).rejects.toBeDefined();
       expect(submitted).toBe(false);
+    });
+
+    it('resolves an autosubmit call from the submit event when no response is provided', async () => {
+      const name = `declarative_submit_settle_${String(Date.now())}`;
+      const frameName = `declarative-settle-frame-${String(Date.now())}`;
+      toolNames.add(name);
+      document.body.insertAdjacentHTML(
+        'beforeend',
+        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Submit without responding" toolautosubmit target="${frameName}" action="about:blank">
+          <input name="query">
+        </form>
+        <iframe ${FIXTURE_ATTRIBUTE} name="${frameName}"></iframe>`
+      );
+      const form = document.querySelector<HTMLFormElement>(
+        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
+      );
+      if (!form) throw new Error('Expected settle-on-submit declarative form fixture');
+
+      let submitted = false;
+      form.addEventListener('submit', () => {
+        submitted = true;
+      });
+
+      await executeTool(await waitForTool(name), { query: 'settle me' });
+
+      expect(submitted).toBe(true);
     });
 
     it('resolves when a submit handler performs a direct form submission', async () => {
@@ -488,7 +607,7 @@ export function runDeclarativeFormConformanceSuite(
           return;
         }
         event.preventDefault();
-        event.respondWith(Promise.resolve('sent'));
+        submitRespondWith(event, Promise.resolve('sent'));
       });
 
       let settled = false;
@@ -598,7 +717,7 @@ export function runDeclarativeFormConformanceSuite(
       form.addEventListener('reset', (event) => event.preventDefault());
       form.addEventListener('submit', (event) => {
         event.preventDefault();
-        event.respondWith(Promise.resolve('saved'));
+        submitRespondWith(event, Promise.resolve('saved'));
       });
 
       let settled = false;
@@ -639,7 +758,7 @@ export function runDeclarativeFormConformanceSuite(
 
       expect(await waitForTool(name)).toMatchObject({ description: 'First form' });
       expect(
-        (await document.modelContext.getTools()).filter((tool) => tool.name === name)
+        (await requireModelContext().getTools()).filter((tool) => tool.name === name)
       ).toHaveLength(1);
 
       second.setAttribute('tooldescription', 'Second form promoted');
@@ -656,7 +775,7 @@ export function runDeclarativeFormConformanceSuite(
 
       const updated = await waitForTool(name, (tool) => tool.description === 'Updated form');
       expect(updated.title).toBe('Updated title');
-      expect(JSON.parse(updated.inputSchema ?? '')).toEqual({
+      expect(requireObjectInputSchema(updated)).toEqual({
         type: 'object',
         properties: {
           limit: {
@@ -694,7 +813,7 @@ export function runDeclarativeFormConformanceSuite(
       if (!form) throw new Error('Expected autosubmit-change declarative form fixture');
       await waitForTool(name);
       const changed = new Promise((resolve) => {
-        document.modelContext.addEventListener('toolchange', resolve, { once: true });
+        requireModelContext().addEventListener('toolchange', resolve, { once: true });
       });
 
       form.setAttribute('toolautosubmit', '');
@@ -725,7 +844,7 @@ export function runDeclarativeFormConformanceSuite(
       }
       form.addEventListener('submit', (event) => {
         event.preventDefault();
-        event.respondWith(Promise.resolve('ok'));
+        submitRespondWith(event, Promise.resolve('ok'));
       });
       const tool = await waitForTool(name);
 
@@ -767,7 +886,7 @@ export function runDeclarativeFormConformanceSuite(
       });
       form.addEventListener('submit', (event) => {
         event.preventDefault();
-        event.respondWith(new Promise(() => {}));
+        submitRespondWith(event, new Promise(() => {}));
         submitted?.();
       });
 

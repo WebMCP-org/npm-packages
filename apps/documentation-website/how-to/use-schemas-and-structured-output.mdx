@@ -1,6 +1,6 @@
 ---
-title: 'Use Schemas and Structured Output'
-description: 'Define tool input schemas with JSON Schema or Standard JSON Schema, and add output schemas for typed agent responses.'
+title: 'Use WebMCP input schemas and structured output'
+description: 'Use MCP-B schema adapters, input inference, and output metadata in WebMCP tools.'
 keywords:
   [
     'inputSchema',
@@ -15,101 +15,52 @@ keywords:
 icon: 'brackets-curly'
 ---
 
-## Define input schemas
+Use JSON Schema for the browser-facing `inputSchema`. MCP-B can infer literal schemas, convert
+[Standard JSON Schema](https://standardschema.dev/json-schema) implementations, and attach
+`outputSchema` metadata for typed MCP results.
 
-Every tool can have an `inputSchema` that describes the arguments it accepts. MCP transport calls
-validate the schema before calling `execute`. Direct WebMCP and testing-shim calls do not guarantee
-validation, so handlers should validate untrusted input when required.
+The [WebMCP Community Group draft](https://webmachinelearning.github.io/webmcp/) remains the
+authority for the browser's tool dictionary.
 
-### Literal JSON Schema
+## Infer input from a JSON Schema literal
 
-Write the schema inline as a plain object. The const-generic `registerTool()`
-overload infers the callback input without a runtime dependency.
+Install the declaration package when you want TypeScript to infer the handler input:
 
-```ts title="json-schema-tool.ts"
-await document.modelContext.registerTool({
-  name: 'search',
-  description: 'Search indexed docs',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      query: { type: 'string' },
-      limit: { type: 'integer', minimum: 1, maximum: 50 },
-    },
-    required: ['query'],
-    additionalProperties: false,
-  },
-  async execute(args) {
-    // args is inferred as { query: string; limit?: number }
-    return {
-      content: [{ type: 'text', text: `Searching for ${args.query} (${args.limit ?? 10})` }],
-    };
-  },
-});
+```bash title="Install the type declarations"
+pnpm add -D @mcp-b/webmcp-types
 ```
 
-### Reusable JSON Schema constant
+Preserve literal information with `as const satisfies JsonSchemaForInference`:
 
-When a schema is declared separately, use `as const satisfies
-JsonSchemaForInference` to preserve its literal type and check the schema shape.
+<Snippet file="snippets/packages/webmcp-types-quickstart.ts" />
 
-```bash
-npm install --save-dev @mcp-b/webmcp-types
+If a schema is loaded or widened at runtime, narrow the handler input yourself. MCP-B cannot infer
+specific fields from a broad runtime type. See the [`@mcp-b/webmcp-types`
+reference](/packages/webmcp-types/reference) for supported inference keywords.
+
+## Convert a Standard JSON Schema implementation
+
+MCP-B hooks accept Standard JSON Schema v1 objects directly. Pass a Zod 4.2 schema as the
+`inputSchema` in [`usewebmcp`](/packages/usewebmcp/reference) or
+[`@mcp-b/react-webmcp`](/packages/react-webmcp/reference).
+
+For direct `registerTool()` calls, convert the schema through the MCP-B adapter and validate inside
+the handler:
+
+```bash title="Install the adapter and Zod"
+pnpm add @mcp-b/webmcp-polyfill zod@^4.2
 ```
 
-```ts title="reusable-schema-tool.ts"
-import type { JsonSchemaForInference } from '@mcp-b/webmcp-types';
-
-const inputSchema = {
-  type: 'object',
-  properties: {
-    query: { type: 'string' },
-    limit: { type: 'integer', minimum: 1, maximum: 50 },
-  },
-  required: ['query'],
-  additionalProperties: false,
-} as const satisfies JsonSchemaForInference;
-
-await document.modelContext.registerTool({
-  name: 'search',
-  description: 'Search indexed docs',
-  inputSchema,
-  async execute(args) {
-    // args is inferred as: { query: string; limit?: number }
-    return {
-      content: [{ type: 'text', text: `Searching for ${args.query} (${args.limit ?? 10})` }],
-    };
-  },
-});
-```
-
-<Note>
-  Inference works only with literal schemas. If the schema type is widened (for example, loaded from
-  an API at runtime), `args` falls back to an object-or-array WebMCP input.
-</Note>
-
-### Standard JSON Schema with Zod
-
-MCP-B runtimes accept [Standard JSON Schema v1](https://standardschema.dev/json-schema) objects
-that expose `~standard.jsonSchema.input()`. This guide uses the Zod 4.2 path
-covered by the repository's compatibility tests. The emitted JSON Schema is
-used for browser discovery. MCP transport calls use `~standard.validate()` when
-present. Direct WebMCP and testing-shim calls pass input to the handler, so
-validate inside `execute` when those routes matter.
-
-With Zod 4.2 or newer:
-
-```bash title="Install schema dependencies"
-npm install @mcp-b/webmcp-polyfill zod@^4.2
-```
-
-```ts title="zod-tool.ts"
+```ts title="search-tool.ts"
+import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
 import { z } from 'zod';
 
+initializeWebMCPPolyfill();
+
 const searchInput = z.object({
   query: z.string(),
-  limit: z.int().min(1).max(50).optional(),
+  limit: z.number().int().min(1).max(50).optional(),
 });
 
 await document.modelContext.registerTool({
@@ -125,213 +76,64 @@ await document.modelContext.registerTool({
 });
 ```
 
-**Use this when** you already use Zod and want to advertise its JSON Schema
-while validating native calls inside the handler.
-
-<Note>
-  The MCP-B schema adapter rejects validation-only Standard Schema objects because WebMCP callers
-  need advertised JSON Schema. It attempts Standard JSON Schema conversion with `draft-2020-12`
-  first, then falls back to `draft-07`.
-</Note>
-
 <Warning>
-  Native Chrome receives the emitted JSON Schema metadata; it does not execute your schema library's
-  refinements before invoking the page handler. Parse inside `execute` when native calls must
-  enforce schema-library-specific rules.
+  Convert refinements into JSON Schema where possible, but still parse untrusted input inside the
+  handler. Browser execution does not run your schema library before calling the handler.
 </Warning>
 
-### Standard JSON Schema with `@mcp-b/react-webmcp`
+## Add MCP-B output metadata
 
-The React hooks in `@mcp-b/react-webmcp` accept the same Standard JSON Schema objects for input
-schemas. Pass the schema object itself, not a raw Zod shape map:
+Add `outputSchema` when an MCP client needs typed structured data. Declare the descriptor
+separately so `ToolDescriptorFromSchema` checks the returned value:
 
-```tsx title="SearchTool.tsx"
-import '@mcp-b/global';
-import { useWebMCP } from '@mcp-b/react-webmcp';
-import { z } from 'zod';
-
-const searchInput = z.object({
-  query: z.string().describe('Search terms'),
-  limit: z.int().min(1).max(50).optional(),
-});
-
-function SearchTool() {
-  const tool = useWebMCP({
-    name: 'search',
-    description: 'Search indexed docs',
-    inputSchema: searchInput,
-    execute: async (input) => {
-      const parsed = searchInput.parse(input);
-      return { query: parsed.query, limit: parsed.limit ?? 10 };
-    },
-  });
-
-  return <div>Executions: {tool.state.executionCount}</div>;
-}
-```
-
-### Choosing a schema style
-
-| Style                | Dependencies                | Runtime validation | Type inference | Best for                                         |
-| -------------------- | --------------------------- | ------------------ | -------------- | ------------------------------------------------ |
-| Inline JSON Schema   | None                        | No                 | Yes            | Zero-dependency tool definitions                 |
-| Reusable JSON Schema | `@mcp-b/webmcp-types` (dev) | No                 | Yes            | Shared schema constants                          |
-| Standard JSON Schema | Schema library              | MCP-B routes       | Yes            | Apps that want library typing and MCP validation |
-
-## Define output schemas
-
-An `outputSchema` describes the intended shape of structured tool data. It
-drives TypeScript inference and MCP-B metadata; it does not validate a return
-value or add `structuredContent` by itself. A handler that constructs an MCP
-response directly should return both human-readable `content` and
-machine-readable `structuredContent` when clients need both.
-
-### Add an output schema
-
-```ts title="output-schema-tool.ts"
+```ts title="search-summary-tool.ts"
 import '@mcp-b/global';
 import type { JsonSchemaForInference, ToolDescriptorFromSchema } from '@mcp-b/webmcp-types';
 
-const inputSchema = { type: 'object', properties: {} } as const;
-
-const outputSchema = {
+const inputSchema = {
   type: 'object',
   properties: {
-    counter: { type: 'number' },
-    timestamp: { type: 'string' },
+    query: { type: 'string' },
+    limit: { type: 'integer', minimum: 1 },
   },
-  required: ['counter', 'timestamp'],
-} as const satisfies JsonSchemaForInference;
-
-const tool = {
-  name: 'counter_get',
-  description: 'Get counter value',
-  inputSchema,
-  outputSchema,
-  async execute() {
-    const structuredContent = { counter: 0, timestamp: new Date().toISOString() };
-    return {
-      content: [{ type: 'text', text: JSON.stringify(structuredContent) }],
-      structuredContent,
-    };
-  },
-} satisfies ToolDescriptorFromSchema<typeof inputSchema, typeof outputSchema>;
-
-await document.modelContext.registerTool(tool);
-```
-
-Typing the descriptor separately checks `structuredContent` against a literal `outputSchema` while registration still uses the canonical document API. MCP-B consumes the extra metadata; native Chrome and the strict polyfill ignore it. The current W3C and Chrome tool dictionary defines `inputSchema` only. MCP [SEP-2106](https://modelcontextprotocol.io/seps/2106-json-schema-2020-12) applies to MCP tool output schemas and structured content.
-
-### Non-object output schemas
-
-Use array or primitive output schemas when the natural result is not an object:
-
-```ts title="array-output-tool.ts"
-import '@mcp-b/global';
-import type { JsonSchemaForInference, ToolDescriptorFromSchema } from '@mcp-b/webmcp-types';
-
-const inputSchema = { type: 'object', properties: {} } as const;
-
-const outputSchema = {
-  type: 'array',
-  items: { type: 'string' },
-} as const satisfies JsonSchemaForInference;
-
-const tool = {
-  name: 'tags_list',
-  description: 'List tags on the current document',
-  inputSchema,
-  outputSchema,
-  async execute() {
-    return ['webmcp', 'docs'];
-  },
-} satisfies ToolDescriptorFromSchema<typeof inputSchema, typeof outputSchema>;
-
-await document.modelContext.registerTool(tool);
-```
-
-### Output schemas with `usewebmcp`
-
-The `usewebmcp` hook infers `state.lastResult` from the output schema:
-
-```tsx title="CounterTool.tsx"
-import { useWebMCP } from 'usewebmcp';
-
-const OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    count: { type: 'integer' },
-  },
-  required: ['count'],
+  required: ['query'],
   additionalProperties: false,
-} as const;
+} as const satisfies JsonSchemaForInference;
 
-export function CounterTool() {
-  const tool = useWebMCP({
-    name: 'counter_get',
-    description: 'Get current count',
-    outputSchema: OUTPUT_SCHEMA,
-    execute: async () => ({ count: 42 }),
-  });
+const outputSchema = {
+  type: 'object',
+  properties: {
+    total: { type: 'integer' },
+    items: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['total'],
+  additionalProperties: false,
+} as const satisfies JsonSchemaForInference;
 
-  // tool.state.lastResult is inferred as { count: number } | null
-  return <p>Count: {tool.state.lastResult?.count ?? 'none'}</p>;
-}
+const tool = {
+  name: 'search_summary',
+  description: 'Search with summary',
+  inputSchema,
+  outputSchema,
+  execute: ({ query }) => ({ total: 1, items: [query] }),
+} satisfies ToolDescriptorFromSchema<typeof inputSchema, typeof outputSchema>;
+
+await document.modelContext.registerTool(tool);
 ```
 
-<Warning>
-  If `outputSchema` is defined, the tool implementation must return a JSON-serializable value that
-  matches the schema for MCP-B helpers that consume it. Native WebMCP does not enforce this field.
-  The MCP transport bridge currently forwards object-shaped `structuredContent`; use the
-  feature-detected Chrome-compatible `executeTool()` path for primitive or array structured outputs
-  until downstream MCP clients accept SEP-2106 shapes.
-</Warning>
+`outputSchema` is MCP-B metadata for output inference and structured MCP responses. If your handler
+constructs an MCP `CallToolResult` directly, include schema-compatible `structuredContent` as well
+as human-readable `content`. The [package reference](/packages/webmcp-types/reference) lists the
+output inference types.
 
-### Keep text and structure aligned
+## Check the agent-facing schema
 
-When you construct an MCP response directly, keep `content` and `structuredContent` aligned. Text is
-for chat UIs; structured content is for programmatic consumption.
+After registration, inspect the emitted schema in Chrome's [WebMCP DevTools
+panel](https://developer.chrome.com/docs/devtools/application/webmcp). Then run the [Lighthouse
+WebMCP schema validity
+audit](https://developer.chrome.com/docs/lighthouse/agentic-browsing/webmcp-schema-validity).
 
-```ts
-async execute() {
-  const data = { total: 5, items: ['a', 'b', 'c', 'd', 'e'] };
-  return {
-    content: [{ type: 'text', text: `Found ${data.total} items` }],
-    structuredContent: data,
-  };
-}
-```
-
-With `usewebmcp`, return the raw data instead. The hook creates text content and preserves a
-JSON-compatible value as `structuredContent`.
-
-### When to use output schemas
-
-Add `outputSchema` when:
-
-- The AI agent needs to pass your tool's result to another tool (structured data enables chaining).
-- You want compile-time type checking on the return value.
-- You need the agent to parse specific fields from the response rather than interpreting free text.
-
-Skip `outputSchema` when the tool returns simple text responses where structured parsing adds no value.
-
-## Tool design checklist
-
-Before publishing a tool:
-
-- Give it one clear job and use a stable, action-oriented name.
-- State when an agent should use it, including important exclusions.
-- Keep required inputs minimal and describe every property.
-- Use enums, bounds, formats, and `additionalProperties: false` where they
-  reduce ambiguity.
-- Return concise human-readable `content` and machine-readable
-  `structuredContent` when another tool may consume the result.
-- Mark destructive or externally visible actions with appropriate annotations
-  and require confirmation in the product UI.
-- Test success, validation failure, permission failure, and cancellation paths.
-
-## Further reading
-
-- [Chrome's WebMCP best practices](https://developer.chrome.com/docs/ai/webmcp/best-practices) for tool naming, descriptions, and schema design.
-- [`@mcp-b/webmcp-types` reference](/packages/webmcp-types/reference) for the full list of schema types and inference utilities.
-- [Add Tools to an Existing App](/how-to/add-tools-to-an-existing-app) for the broader pattern of integrating tools into a working application.
+Use Chrome's [WebMCP best
+practices](https://developer.chrome.com/docs/ai/webmcp/best-practices) for names, descriptions, and
+schema design. Use [WebMCP evals](https://developer.chrome.com/docs/ai/webmcp/evals) to test whether
+agents select the tool and supply the expected arguments.

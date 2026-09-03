@@ -293,18 +293,13 @@ export function McpClientProvider({
       try {
         await refreshInventory(connectionGeneration);
       } catch {
-        if (connectionGeneration === connectionGenerationRef.current) {
-          // Inventory failure does not undo the completed MCP handshake.
-          connectionStateRef.current = 'connected';
-          setConnectionState('connected');
-        }
-        return;
+        // Inventory failure does not undo the completed MCP handshake.
       }
-      if (connectionGeneration !== connectionGenerationRef.current) {
-        return;
+
+      if (connectionGeneration === connectionGenerationRef.current) {
+        connectionStateRef.current = 'connected';
+        setConnectionState('connected');
       }
-      connectionStateRef.current = 'connected';
-      setConnectionState('connected');
     },
     [client, transport, refreshInventory, requestOptsRef]
   );
@@ -390,6 +385,9 @@ export function McpClientProvider({
     client.onclose = handleClientClose;
     connectionStateRef.current = 'disconnected';
     setConnectionState('disconnected');
+    setCapabilities(null);
+    setResources([]);
+    setTools([]);
 
     // Initial connection - reconnect() has its own guard to prevent concurrent connections
     reconnect().catch((err) => {

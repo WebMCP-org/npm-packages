@@ -1,5 +1,5 @@
 ---
-title: '@mcp-b/webmcp-ts-sdk'
+title: '@mcp-b/webmcp-ts-sdk reference'
 description: 'Reference for BrowserMcpServer, the WebMCP adapter over MCP TypeScript SDK v2.'
 keywords:
   [
@@ -8,7 +8,7 @@ keywords:
     'McpServer',
     'document.modelContext',
     'registerTool',
-    'native Chrome',
+    'native WebMCP',
   ]
 icon: 'layer-group'
 ---
@@ -54,7 +54,7 @@ WebMCP descriptor callbacks are single-round over MCP. An `input_required` resul
 
 ## WebMCP tool surface
 
-The [WebMCP specification](https://webmachinelearning.github.io/webmcp/) is authoritative for the standard browser API.
+The [WebMCP Community Group draft](https://webmachinelearning.github.io/webmcp/) is authoritative for the proposed browser API.
 
 ### `registerTool(tool, options?)`
 
@@ -67,12 +67,24 @@ registerTool(
 
 Registers a WebMCP descriptor and its MCP representation. When `native` is set, registration succeeds only after the native mirror accepts the tool.
 
-| Option      | Type           | Description                                                      |
-| ----------- | -------------- | ---------------------------------------------------------------- |
-| `signal`    | `AbortSignal?` | Removes the MCP registration and native mirror when aborted      |
-| `exposedTo` | `string[]?`    | Requests cross-document exposure from the native browser context |
+| Option      | Type           | Description                                                 |
+| ----------- | -------------- | ----------------------------------------------------------- |
+| `signal`    | `AbortSignal?` | Removes the MCP registration and native mirror when aborted |
+| `exposedTo` | `string[]?`    | Restricts the tool to the listed embedder origins           |
 
-A non-empty `exposedTo` array requires native WebMCP. Invalid descriptors, duplicate names, blocked Permissions Policy, and pre-aborted signals reject the returned promise.
+A tool registered with a non-empty `exposedTo` is advertised only while the
+connected peer's origin appears in that list. `BrowserMcpServer` reads the origin
+from transports that report one, such as
+[`IframeChildTransport`](/packages/transports/reference#iframechildtransport).
+Restricted tools fail closed: they stay hidden before the first peer origin
+arrives, and on transports that never report one.
+
+`exposedTo` only narrows. The child transport's `allowedOrigins` still decides
+who may connect, and enforcement is the page's own JavaScript rather than the
+user agent. See [Bridge tools across iframes](/how-to/bridge-tools-across-iframes)
+for the end-to-end setup.
+
+Invalid descriptors, duplicate names, blocked Permissions Policy, and pre-aborted signals reject the returned promise.
 
 ### `getTools(options?)`
 
@@ -92,7 +104,7 @@ executeTool(
 ): Promise<string | null>
 ```
 
-Executes a descriptor returned by `getTools()`. This optional [Chrome imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api) extension is outside the strict WebMCP core. The optional signal aborts the call.
+Executes a descriptor returned by `getTools()` using the package's serialized-JSON compatibility signature. The optional signal aborts the call. The [live proposal](https://webmachinelearning.github.io/webmcp/) currently specifies object input, while the [Chrome imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api) documents serialized JSON.
 
 ### Tool change events
 
@@ -106,7 +118,7 @@ Executes a descriptor returned by `getTools()`. This optional [Chrome imperative
 isBrowserMcpServer(context: unknown): context is BrowserMcpServer
 ```
 
-Narrows an installed `document.modelContext` without changing the strict global declaration or creating a second runtime handle.
+Narrows an installed `document.modelContext` without changing the package's global declaration or creating a second runtime handle.
 
 ### `listTools()`
 
@@ -122,7 +134,7 @@ Returns a clone of the adapter's MCP-B tool metadata, including `outputSchema` w
 syncNativeTools(): Promise<void>
 ```
 
-Reconciles the adapter with tools already visible through `native.getTools()`. Backfill requires the native context's optional descriptor-based `executeTool()` extension. Later native `toolchange` events reconcile additions, metadata changes, and removals.
+Reconciles the adapter with tools already visible through `native.getTools()`. Backfill requires the native context's descriptor-based, serialized-JSON `executeTool()` signature. Later native `toolchange` events reconcile additions, metadata changes, and removals.
 
 Use the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd) recommended by Chrome's WebMCP documentation to inspect native and mirrored tools.
 
@@ -197,4 +209,4 @@ The package exports only its adapter surface:
 
 Import MCP clients, protocol schemas, transports, validators, and upstream server types from their official `@modelcontextprotocol/*` packages.
 
-The [`@mcp-b/transports` reference](/packages/transports/reference) documents browser transports. [Strict core and MCP-B extensions](/explanation/strict-core-vs-mcp-b-extensions) defines the boundary between WebMCP and this adapter.
+The [`@mcp-b/transports` reference](/packages/transports/reference) documents browser transports. [WebMCP and MCP-B extensions](/explanation/strict-core-vs-mcp-b-extensions) defines the boundary between the proposal and this adapter.

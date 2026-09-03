@@ -1,5 +1,5 @@
 ---
-title: '@mcp-b/webmcp-local-relay'
+title: '@mcp-b/webmcp-local-relay reference'
 description: 'Local MCP relay server that bridges WebMCP tools from browser tabs to desktop AI clients over stdio.'
 keywords:
   [
@@ -186,7 +186,7 @@ Increase the per-request timeout for tools that chain several slow API calls:
 
 The relay allows `65000` ms by default. If the page timeout is higher, start the relay with a slightly larger limit. For the `120000` ms page setting above, use `--invoke-timeout 125000`.
 
-The embed script fetches the sibling `widget.html`, injects configuration, and loads it as a hidden blob iframe that inherits the host page origin. The iframe opens a WebSocket to the relay on `localhost`. Self-hosted copies must serve both `embed.js` and `widget.html`; cross-origin hosts must allow the widget fetch with CORS. The relay fails closed if that fetch fails. Page code registers tools on `document.modelContext`. The embed supports current native Chrome discovery through asynchronous `getTools()` and executes the exact returned descriptor through Chrome's feature-detected `executeTool()` extension.
+The embed script fetches the sibling `widget.html`, injects configuration, and loads it as a hidden blob iframe that inherits the host page origin. The iframe opens a WebSocket to the relay on `localhost`. Self-hosted copies must serve both `embed.js` and `widget.html`; cross-origin hosts must allow the widget fetch with CORS. The relay fails closed if that fetch fails. Page code registers tools on `document.modelContext`. The embed discovers tools through asynchronous `getTools()` and executes the returned descriptor through the feature-detected, serialized-JSON `executeTool()` signature supported by the package and current Chrome implementation.
 
 ## Reconnection and client mode
 
@@ -207,7 +207,7 @@ When a candidate port is owned by a compatible WebMCP relay, a second instance j
 The relay supports pages using:
 
 1. `@mcp-b/global` (recommended for the complete MCP-B runtime)
-2. Current native Chrome with `document.modelContext.getTools()` and its descriptor-based `executeTool()` extension, which this relay requires to invoke tools
+2. Native Chrome with `document.modelContext.getTools()` and the serialized-JSON `executeTool()` signature that this relay requires
 3. `@mcp-b/webmcp-polyfill`
 
 The browser embed always uses document-first discovery and executes the current
@@ -223,7 +223,7 @@ Local integrations therefore need a non-opaque origin such as `http://localhost`
 - Default `allowedOrigins` is `*`, permitting any browser page to connect. Use `--widget-origin` to restrict which host page origins can register tools.
 - `--widget-origin` validates the browser's WebSocket `Origin` header. The injected blob iframe inherits the host page origin, so browser connections cannot override it in `hello`.
 - `--widget-origin` is not local-process authentication. An Origin-less browser-protocol client falls back to its claimed `hello.origin`, while the internal relay-to-relay protocol is outside this browser-origin check. Keep the relay bound to loopback unless you add a separate trusted boundary.
-- [Chrome 147 and later](https://developer.chrome.com/release-notes/147) can ask a public site for Local Network Access permission before it opens the loopback WebSocket. This browser permission is separate from relay configuration.
+- Chrome can require [Local Network Access permission](https://developer.chrome.com/release-notes/147) before a public site opens the loopback WebSocket. This browser permission is separate from relay configuration.
 
 ## Exported API
 

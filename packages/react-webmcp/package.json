@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/react-webmcp",
-  "version": "4.0.0",
+  "version": "5.1.0",
   "description": "React hooks for Model Context Protocol (MCP) - expose React components as AI tools for Claude, ChatGPT, Cursor, and Copilot",
   "keywords": [
     "ai",
@@ -46,7 +46,9 @@
     "dist"
   ],
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -69,10 +71,7 @@
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
     "test:watch": "vp test",
-    "typecheck": "tsc --noEmit && vp test run --typecheck --silent",
-    "version:major": "pnpm version major --no-git-tag-version",
-    "version:minor": "pnpm version minor --no-git-tag-version",
-    "version:patch": "pnpm version patch --no-git-tag-version"
+    "typecheck": "tsc --noEmit && vp test run --typecheck.only --silent"
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",
@@ -83,6 +82,7 @@
   },
   "devDependencies": {
     "@mcp-b/global": "workspace:*",
+    "@mcp-b/transports": "workspace:*",
     "@modelcontextprotocol/server": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
@@ -93,10 +93,10 @@
     "typescript": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:",
-    "vitest-browser-react": "^2.0.4"
+    "vitest-browser-react": "^2.2.0"
   },
   "peerDependencies": {
-    "react": "^17.0.0 || ^18.0.0 || ^19.0.0"
+    "react": "^18.0.0 || ^19.0.0"
   },
   "engines": {
     "node": ">=20"

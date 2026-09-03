@@ -107,8 +107,8 @@ document origins.
 ### `getTools(options?)`
 
 Returns a sorted `Promise<RegisteredTool[]>`. Each record contains `name`,
-`title`, `description`, `window`, `origin`, and optional serialized
-`inputSchema` and annotations.
+`title`, `description`, `window`, `origin`, and an optional `inputSchema`
+JSON Schema object and annotations.
 
 An empty `fromOrigins` array discovers the current document's tools. A non-empty
 array rejects with `NotSupportedError`; native WebMCP is required for
@@ -121,9 +121,9 @@ assign `document.modelContext.ontoolchange`.
 
 ### `executeTool(tool, inputJson, options?)`
 
-The polyfill implements Chromium's optional execution extension. It is not part
-of the core `ModelContext` interface, so feature-detect it through
-`ChromeModelContext`:
+The polyfill implements the serialized-JSON execution signature used by current
+Chrome builds. The live proposal includes `executeTool()` with a different draft
+signature. Feature-detect the package method through `ChromeModelContext`:
 
 ```ts
 import type { ChromeModelContext } from '@mcp-b/webmcp-types';
@@ -199,7 +199,9 @@ When `installTestingShim` is true, `navigator.modelContextTesting` provides:
 | `ontoolchange`                           | Event handler or `null`         |
 
 This surface exists for older browser tests. Native coverage should prefer
-`getTools()` and feature-detected `executeTool()`.
+`getTools()` and feature-detected `executeTool()`. Follow the
+[Chrome imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api)
+for the current browser signature.
 
 ## Schema entry
 
@@ -221,7 +223,7 @@ The public schema entry exports these low-level adapter groups:
 | Error construction  | `createUnknownError`, `createToolInvocationFailedError`, `createInvalidStateError`                                                           |
 | Object detection    | `isPlainObject`                                                                                                                              |
 
-The strict `document.modelContext.registerTool()` boundary does not perform this
+The `document.modelContext.registerTool()` boundary does not perform this
 conversion or validate invocation arguments. It follows WebMCP and serializes the
 registered JSON Schema metadata.
 

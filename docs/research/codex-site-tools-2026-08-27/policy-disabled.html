@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codex WebMCP Permissions Policy probe</title>
+  </head>
+  <body>
+    <h1>Codex WebMCP Permissions Policy probe</h1>
+    <p>The response sets <code>Permissions-Policy: tools=()</code>.</p>
+    <pre id="results">Starting…</pre>
+    <script>
+      const results = document.querySelector('#results');
+      const context = document.modelContext;
+      results.textContent = `document.modelContext: ${typeof context}`;
+
+      if (context) {
+        context
+          .registerTool({
+            name: 'codex_probe_policy_disabled',
+            description:
+              'Reports whether Codex discovers a tool when the tools policy is disabled.',
+            inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+            execute: async () => ({ discovered: true }),
+          })
+          .then(() => {
+            results.textContent += '\nRegistration resolved';
+          })
+          .catch((error) => {
+            results.textContent += `\n${error?.name ?? 'Error'}: ${error?.message ?? String(error)}`;
+          });
+      }
+    </script>
+  </body>
+</html>

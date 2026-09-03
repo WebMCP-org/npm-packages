@@ -21,13 +21,19 @@ Documentation for [WebMCP](https://webmachinelearning.github.io/webmcp/), a Comm
 `apps/documentation-website/docs.json` is the single source of truth for navigation,
 pages, groups, and hierarchy. Read it first.
 
-| Tab               | Path prefix            | Diataxis type          |
-| ----------------- | ---------------------- | ---------------------- |
-| **Home**          | `index`, `start-here/` | Landing + routing      |
-| **Tutorials**     | `tutorials/`           | Learning-oriented      |
-| **How-To Guides** | `how-to/`              | Goal-oriented          |
-| **Reference**     | `reference/`           | Information-oriented   |
-| **Explanation**   | `explanation/`         | Understanding-oriented |
+| Tab               | Path prefix                      | Diataxis type          |
+| ----------------- | -------------------------------- | ---------------------- |
+| **Home**          | `index`, `start-here/`           | Landing + routing      |
+| **Packages**      | `packages/`, `reference/webmcp/` | Information-oriented   |
+| **Tutorials**     | `tutorials/`                     | Learning-oriented      |
+| **How-To Guides** | `how-to/`                        | Goal-oriented          |
+| **Explanation**   | `explanation/`                   | Understanding-oriented |
+
+Every package gets an `overview` page and a `reference` page under
+`packages/<name>/`. The `reference/webmcp/` pages route proposal and platform
+details to upstream sources and sit in the same tab.
+`explanation/design/spec-status-and-limitations` keeps its legacy URL but is a
+reference directory in the **WebMCP platforms and agents** navigation group.
 
 ### Key files
 
@@ -95,17 +101,19 @@ If a concept is covered on multiple pages, one page owns it. All others link to 
 | Concept                           | Canonical page                                                    |
 | --------------------------------- | ----------------------------------------------------------------- |
 | What is WebMCP                    | `explanation/what-is-webmcp`                                      |
-| WebMCP vs MCP                     | `explanation/webmcp-vs-mcp`                                       |
-| Native vs polyfill vs global      | `explanation/native-vs-polyfill-vs-global`                        |
-| Strict core vs MCP-B extensions   | `explanation/strict-core-vs-mcp-b-extensions`                     |
+| WebMCP vs MCP                     | Chrome's external `compare-mcp` guide                             |
+| WebMCP API sources                | `reference/webmcp/standard-api`                                   |
+| Declarative API                   | `reference/webmcp/declarative-api`                                |
+| Codex site tools compatibility    | `reference/webmcp/codex-site-tools`                               |
+| WebMCP and MCP-B extensions       | `explanation/strict-core-vs-mcp-b-extensions`                     |
 | Runtime layering / initialization | `explanation/architecture/runtime-layering`                       |
 | Transports and bridges            | `explanation/architecture/transports-and-bridges`                 |
 | Tool lifecycle                    | `explanation/architecture/tool-lifecycle-and-context-replacement` |
 | Security model                    | `explanation/design/security-and-human-in-the-loop`               |
-| Tool design principles            | `explanation/design/tool-design`                                  |
-| Spec status                       | `explanation/design/spec-status-and-limitations`                  |
-| Choosing a runtime                | `how-to/choose-runtime`                                           |
-| Package API details               | the matching `reference/runtime/*` or `reference/tools/*` page    |
+| Schemas and structured output     | `how-to/use-schemas-and-structured-output`                        |
+| WebMCP resources and status       | `explanation/design/spec-status-and-limitations`                  |
+| Choosing a runtime                | `how-to/choose-runtime` (native vs polyfill vs global)            |
+| Package API details               | `packages/<name>/reference`                                       |
 
 ---
 
@@ -123,7 +131,7 @@ Follow the **writing-clearly-and-concisely** skill (`~/.claude/skills/writing-cl
 
 ### Product names
 
-- "WebMCP" for the standard
+- "WebMCP" for the proposal and browser API
 - `@mcp-b/*` for packages
 - "MCP-B" only in package scope contexts (npm scope, commit messages)
 
@@ -212,14 +220,18 @@ This is critical. WebMCP is an active **Web Machine Learning Community Group pro
 
 **Community Group draft and protocol sources:**
 
-| Topic                      | Canonical URL                                                                       |
-| -------------------------- | ----------------------------------------------------------------------------------- |
-| Community Group draft      | https://webmachinelearning.github.io/webmcp/                                        |
-| WebMCP repository overview | https://github.com/webmachinelearning/webmcp/blob/main/README.md                    |
-| Declarative API explainer  | https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md |
-| Security and privacy       | https://webmachinelearning.github.io/webmcp/#security-and-privacy-considerations    |
-| W3C Community Group        | https://www.w3.org/community/webmachinelearning/                                    |
-| Model Context Protocol     | https://modelcontextprotocol.io/specification/latest                                |
+| Topic                      | Canonical URL                                                                                   |
+| -------------------------- | ----------------------------------------------------------------------------------------------- |
+| Community Group draft      | https://webmachinelearning.github.io/webmcp/                                                    |
+| WebMCP repository overview | https://github.com/webmachinelearning/webmcp/blob/main/README.md                                |
+| Declarative API explainer  | https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md             |
+| Implementation status      | https://github.com/webmachinelearning/webmcp/blob/main/implementation-status.md                 |
+| Security questionnaire     | https://github.com/webmachinelearning/webmcp/blob/main/security-privacy-questionnaire.md        |
+| Security and privacy       | https://webmachinelearning.github.io/webmcp/#security-and-privacy-considerations                |
+| WPT source and results     | https://github.com/web-platform-tests/wpt/tree/master/webmcp and https://wpt.fyi/results/webmcp |
+| Web Platform Status        | https://webstatus.dev/features/document-modelcontext                                            |
+| W3C Community Group        | https://www.w3.org/community/webmachinelearning/                                                |
+| Model Context Protocol     | https://modelcontextprotocol.io/specification/latest                                            |
 
 **Chrome team developer docs (link to these prominently):**
 
@@ -228,43 +240,55 @@ This is critical. WebMCP is an active **Web Machine Learning Community Group pro
 | WebMCP overview       | https://developer.chrome.com/docs/ai/webmcp                   |
 | Imperative API        | https://developer.chrome.com/docs/ai/webmcp/imperative-api    |
 | Declarative API       | https://developer.chrome.com/docs/ai/webmcp/declarative-api   |
+| Use cases             | https://developer.chrome.com/docs/ai/webmcp/use-cases         |
+| Best practices        | https://developer.chrome.com/docs/ai/webmcp/best-practices    |
+| Build tools           | https://developer.chrome.com/docs/ai/webmcp/build-tools       |
+| WebMCP and MCP        | https://developer.chrome.com/docs/ai/webmcp/compare-mcp       |
+| Evaluation            | https://developer.chrome.com/docs/ai/webmcp/evals             |
 | Secure tools          | https://developer.chrome.com/docs/ai/webmcp/secure-tools      |
 | Chrome DevTools panel | https://developer.chrome.com/docs/devtools/application/webmcp |
 | Chrome DevTools MCP   | https://github.com/ChromeDevTools/chrome-devtools-mcp         |
 
-**Chrome team tools and demos:**
+**Chrome-linked experimental tools and demos:**
 
 | Topic                                           | URL                                                                                                 | Local clone                                  |
 | ----------------------------------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------- |
 | Model Context Tool Inspector (Chrome Web Store) | https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd | -                                            |
 | Tool Inspector source                           | https://github.com/beaufortfrancois/model-context-tool-inspector                                    | `webmcp-tools/model-context-tool-inspector/` |
 | webmcp-tools repo (demos + utilities)           | https://github.com/GoogleChromeLabs/webmcp-tools                                                    | `webmcp-tools/`                              |
-| Live demos (flight search, bistro, pizza)       | https://googlechromelabs.github.io/webmcp-tools/demos/                                              | `webmcp-tools/demos/`                        |
-| Awesome WebMCP list                             | `webmcp-tools/AWESOME_WEBMCP.md`                                                                    | `webmcp-tools/AWESOME_WEBMCP.md`             |
+| Live WebMCP explainer                           | https://googlechromelabs.github.io/webmcp-tools/demos/explainer/                                    | `webmcp-tools/demos/explainer/`              |
+| Awesome WebMCP list                             | https://github.com/GoogleChromeLabs/webmcp-tools/blob/main/AWESOME_WEBMCP.md                        | `webmcp-tools/AWESOME_WEBMCP.md`             |
 
-**Rules for standard vs. polyfill content:**
+**OpenAI product documentation (link to these, don't re-document):**
+
+| Topic                    | URL                                                                                      |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
+| Codex site tools         | https://learn.chatgpt.com/docs/webmcp                                                    |
+| ChatGPT built-in browser | https://learn.chatgpt.com/docs/browser                                                   |
+| Site tools Help Center   | https://help.openai.com/en/articles/20001423-using-site-tools-in-the-chatgpt-desktop-app |
+
+**Rules for proposal vs. package content:**
 
 - When documenting `document.modelContext` API shape (methods, parameters,
   return types), link to the Community Group draft. Describe
   `navigator.modelContext` only as a deprecated compatibility alias. Our
-  reference pages should provide a quick-lookup summary, but always include a
-  "See the [Community Group draft](https://webmachinelearning.github.io/webmcp/) for the
-  authoritative definition" link. Do not maintain a competing full spec. If
-  the upstream spec is more detailed, say so and link.
-- When documenting the declarative API (`toolname`, form attributes, schema synthesis, CSS pseudo-classes, SubmitEvent extensions), link to Chrome's [declarative API documentation](https://developer.chrome.com/docs/ai/webmcp/declarative-api) and the Community Group's [declarative explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md). Show a short example, then link. Do not re-document the full type mapping table or constraint mapping table; those will go stale as Chrome iterates.
-- When documenting `@mcp-b/*` packages, that's ours. Document fully. But clearly mark what is "WebMCP standard" behavior vs. "MCP-B extension" behavior. Treat `registerTool`, `getTools`, and `ontoolchange` as the current standard surface; registration lifetime belongs to `AbortSignal`. Do not describe `unregisterTool`, `provideContext`, or `clearContext` as current WebMCP standard methods. `BrowserMcpServer` adds `registerPrompt`, `registerResource`, `listTools`, and the composed `mcpServer` property. Protocol-version-specific elicitation and deprecated sampling remain official MCP SDK capabilities accessed through `BrowserMcpServer.mcpServer`; never describe them as `document.modelContext` methods.
-- When showing demos or examples of the standard working, prefer linking to the Chrome team's live demos at `googlechromelabs.github.io/webmcp-tools/demos/` rather than recreating them.
+  reference pages should route readers to the authoritative source and identify
+  package-specific differences. Do not maintain a competing API table or full spec.
+- When documenting the declarative API (`toolname`, form attributes, schema synthesis, CSS pseudo-classes, SubmitEvent extensions), link to Chrome's [declarative API documentation](https://developer.chrome.com/docs/ai/webmcp/declarative-api) and the Community Group's [declarative explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md). Identify the subset implemented by MCP-B, then link. Do not re-document the full type mapping table, constraint mapping table, or event contract; those will go stale as Chrome iterates.
+- When documenting `@mcp-b/*` packages, document the implemented package behavior fully and link to source. Do not call the package's current type surface the complete WebMCP draft surface. The proposal changes quickly: as of August 2026 it includes `executeTool()` with object input, while Chrome and MCP-B compatibility implementations accept serialized JSON. Link to the live draft for the proposal and describe the package signature separately. Do not describe `unregisterTool`, `provideContext`, or `clearContext` as current WebMCP methods. `BrowserMcpServer` adds `registerPrompt`, `registerResource`, `listTools`, and the composed `mcpServer` property. Protocol-version-specific elicitation and deprecated sampling remain official MCP SDK capabilities accessed through `BrowserMcpServer.mcpServer`; never describe them as `document.modelContext` methods.
+- When showing the proposal working, prefer the Chrome team's [live explainer](https://googlechromelabs.github.io/webmcp-tools/demos/explainer/) or an individual demo from `GoogleChromeLabs/webmcp-tools` rather than recreating it.
 - Security model documentation should summarize our approach but link to the draft's [security and privacy considerations](https://webmachinelearning.github.io/webmcp/#security-and-privacy-considerations) and Chrome's [secure tools guidance](https://developer.chrome.com/docs/ai/webmcp/secure-tools) for the full threat model.
 - When mentioning native Chrome support, link to the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd) extension recommended by Chrome's WebMCP documentation. Do not describe it as an officially supported Google product.
+- When documenting Codex site tools, link to OpenAI for availability, setup, security, and current limitations. Keep our page dated and limited to independently observed compatibility differences. Do not treat those observations as permanent product behavior or generalize them to Chrome, Codex CLI, or the Codex IDE extension.
 
 **Page-specific guidance:**
 
-| Our page                               | What to keep                                                             | What to defer upstream                                                                                                                      |
-| -------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `reference/webmcp/standard-api.mdx`    | Quick-lookup method table, code examples showing usage with our polyfill | Full tool dictionary and algorithms → link to the Community Group draft                                                                     |
-| `reference/webmcp/declarative-api.mdx` | One example showing `toolname` on a form, SubmitEvent pattern            | Full type mapping table, constraint mapping table, schema synthesis rules, CSS pseudo-classes → link to Chrome team's declarative explainer |
-| `tutorials/first-native-preview.mdx`   | A guided native Chrome setup and observable result                       | Chromium source paths and implementation internals                                                                                          |
-| `explanation/what-is-webmcp.mdx`       | High-level "what and why", ecosystem positioning                         | Detailed API walkthrough → link to the Community Group draft                                                                                |
+| Our page                                | What to keep                                     | What to defer upstream                                                                          |
+| --------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `reference/webmcp/standard-api.mdx`     | Upstream source map and MCP-B package boundary   | API tables, signatures, dictionaries, and algorithms → Community Group draft                    |
+| `reference/webmcp/declarative-api.mdx`  | Upstream source map and MCP-B coverage links     | Attributes, events, schema synthesis, and browser behavior → Chrome and Community Group sources |
+| `reference/webmcp/codex-site-tools.mdx` | Dated compatibility observations and source map  | Availability, setup, product security, and supported features → OpenAI                          |
+| `explanation/what-is-webmcp.mdx`        | High-level "what and why", ecosystem positioning | Detailed API walkthrough → link to the Community Group draft                                    |
 
 ### What we own (document fully)
 
@@ -285,7 +309,7 @@ This is critical. WebMCP is an active **Web Machine Learning Community Group pro
 
 | Key           | Value                                      |
 | ------------- | ------------------------------------------ |
-| Primary color | #1F5EFF                                    |
+| Primary color | #005F8F (see `docs.json` `colors`)         |
 | Product name  | "WebMCP" (not "MCP-B" in user-facing docs) |
 | Package scope | `@mcp-b/*`                                 |
 | Organization  | WebMCP-org                                 |
@@ -307,8 +331,8 @@ This is critical. WebMCP is an active **Web Machine Learning Community Group pro
 - Reference outdated MiguelsPizza organization links
 - Mix Diataxis content types within a single page
 - Re-explain a concept that has a canonical page (link to it instead)
-- Re-document the proposed standard API surface in detail when the upstream draft is more authoritative. Summarize, then link.
-- Blur the line between "WebMCP standard" and "MCP-B extension". Always clarify which layer a feature belongs to.
+- Re-document the proposed WebMCP API surface in detail when the upstream draft is more authoritative. Summarize, then link.
+- Blur the line between the WebMCP proposal and MCP-B extensions. Always clarify which layer a feature belongs to.
 - Overuse callouts. One per section at most.
 - Use decorative formatting, emoji, or excessive bold
 

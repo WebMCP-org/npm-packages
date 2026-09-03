@@ -70,7 +70,8 @@ describe('useWebMCP in a browser runtime', () => {
 
     const tool = await findTool('browser_greet');
     expect(tool?.description).toBe('Greets a person');
-    expect(JSON.parse(tool?.inputSchema ?? '{}')).toMatchObject({
+    // An object since webmcp#241.
+    expect(tool?.inputSchema).toMatchObject({
       type: 'object',
       required: ['name'],
     });
@@ -209,6 +210,31 @@ describe('useWebMCP in a browser runtime', () => {
     expect(result.current.state.isExecuting).toBe(false);
   });
 
+  it('settles an execution that outlives the component without a React warning', async () => {
+    let settle: ((value: string) => void) | undefined;
+    const { result, unmount } = await renderHook(() =>
+      useWebMCP({
+        name: 'browser_post_unmount',
+        description: 'Settles after unmount',
+        execute: () =>
+          new Promise<string>((resolve) => {
+            settle = resolve;
+          }),
+      })
+    );
+
+    const { execute, reset } = result.current;
+    const pending = execute({});
+    const consoleError = vi.spyOn(console, 'error');
+    await unmount();
+
+    settle?.('done');
+    await expect(pending).resolves.toBe('done');
+    reset();
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
   it('normalizes raw JSON and passes through existing MCP responses', async () => {
     const { act } = await renderHook(() => {
       useWebMCP({
@@ -343,13 +369,14 @@ describe('useWebMCP in a browser runtime', () => {
       { initialProps: { revision: 1 } }
     );
 
-    const getValueDescription = async () => {
-      const schema = JSON.parse((await findTool('browser_dependency'))?.inputSchema ?? '{}');
-      return schema.properties.value.description;
+    const expectValueDescription = async (description: string) => {
+      expect((await findTool('browser_dependency'))?.inputSchema).toMatchObject({
+        properties: { value: { description } },
+      });
     };
-    expect(await getValueDescription()).toBe('Revision 1');
+    await expectValueDescription('Revision 1');
     await rerender({ revision: 2 });
-    expect(await getValueDescription()).toBe('Revision 2');
+    await expectValueDescription('Revision 2');
   });
 
   it('converts a real Zod Standard JSON Schema through the registration path', async () => {
@@ -368,7 +395,7 @@ describe('useWebMCP in a browser runtime', () => {
     );
 
     const tool = await findTool('browser_standard_schema');
-    expect(JSON.parse(tool?.inputSchema ?? '{}')).toEqual({
+    expect(tool?.inputSchema).toEqual({
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       type: 'object',
       properties: {

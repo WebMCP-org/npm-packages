@@ -26,6 +26,104 @@
   "background": {
     "decoration": "gradient"
   },
+  "banner": {
+    "content": "**Hackathon:** [OpenAI WebMCP Challenge](https://webmcp.devpost.com/). Build an agent-native web app. Submissions close September 3 at 1 p.m. PT.",
+    "dismissible": true
+  },
+  "redirects": [
+    {
+      "source": "/packages/chrome-devtools-mcp/:slug*",
+      "destination": "/how-to/debug-and-troubleshoot"
+    },
+    {
+      "source": "/packages/extension-tools/:slug*",
+      "destination": "/packages/webmcp-extension/overview"
+    },
+    {
+      "source": "/packages/agent-skills/:slug*",
+      "destination": "/packages"
+    },
+    {
+      "source": "/packages/types",
+      "destination": "/packages/webmcp-types/overview"
+    },
+    {
+      "source": "/explanation/webmcp/standard-api",
+      "destination": "/reference/webmcp/standard-api"
+    },
+    {
+      "source": "/explanation/webmcp/declarative-api",
+      "destination": "/reference/webmcp/declarative-api"
+    },
+    {
+      "source": "/explanation/webmcp/browser-support-and-flags",
+      "destination": "/explanation/design/spec-status-and-limitations"
+    },
+    {
+      "source": "/explanation/native-vs-polyfill-vs-global",
+      "destination": "/how-to/choose-runtime"
+    },
+    {
+      "source": "/getting-started/quickstart",
+      "destination": "/tutorials/first-tool"
+    },
+    {
+      "source": "/quickstart",
+      "destination": "/tutorials/first-tool"
+    },
+    {
+      "source": "/introduction",
+      "destination": "/explanation/what-is-webmcp"
+    },
+    {
+      "source": "/troubleshooting",
+      "destination": "/how-to/debug-and-troubleshoot"
+    },
+    {
+      "source": "/native-host-setup",
+      "destination": "/how-to/connect-desktop-agents-with-local-relay"
+    },
+    {
+      "source": "/security",
+      "destination": "/explanation/design/security-and-human-in-the-loop"
+    },
+    {
+      "source": "/mcp-integration",
+      "destination": "/explanation/what-is-webmcp"
+    },
+    {
+      "source": "/frameworks/:slug*",
+      "destination": "/how-to/frameworks"
+    },
+    {
+      "source": "/concepts/:slug*",
+      "destination": "/explanation"
+    },
+    {
+      "source": "/calling-tools/:slug*",
+      "destination": "/start-here/choose-your-path"
+    },
+    {
+      "source": "/extension/:slug*",
+      "destination": "/packages/webmcp-extension/overview"
+    },
+    {
+      "source": "/official-spec/:slug*",
+      "destination": "/reference/webmcp/standard-api"
+    },
+    {
+      "source": "/tutorials/first-native-preview",
+      "destination": "/explanation/design/spec-status-and-limitations"
+    },
+    {
+      "source": "/how-to/use-devtools-mcp",
+      "destination": "/how-to/debug-and-troubleshoot"
+    },
+    {
+      "source": "/explanation/webmcp-vs-mcp",
+      "destination": "/explanation/what-is-webmcp"
+    }
+  ],
   "navbar": {
     "links": [
       {
@@ -37,8 +135,8 @@
         "href": "https://github.com/WebMCP-org/npm-packages"
       },
       {
-        "label": "Chrome Extension",
-        "href": "https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa"
+        "label": "Rook Extension",
+        "href": "https://chromewebstore.google.com/detail/opojeelojlkcinlhkbahpcekdolfjmhi"
       },
       {
         "label": "Discord",
@@ -91,8 +189,13 @@
             "pages": ["packages/index"]
           },
           {
-            "group": "WebMCP standard",
-            "pages": ["reference/webmcp/standard-api", "reference/webmcp/declarative-api"]
+            "group": "WebMCP platforms and agents",
+            "pages": [
+              "explanation/design/spec-status-and-limitations",
+              "reference/webmcp/standard-api",
+              "reference/webmcp/declarative-api",
+              "reference/webmcp/codex-site-tools"
+            ]
           },
           {
             "group": "Core runtime",
@@ -174,7 +277,6 @@
               "tutorials/index",
               "tutorials/first-tool",
               "tutorials/first-react-tool",
-              "tutorials/first-native-preview",
               "tutorials/desktop-agent-relay"
             ]
           }
@@ -206,7 +308,6 @@
             "pages": [
               "how-to/connect-desktop-agents-with-local-relay",
               "how-to/bridge-tools-across-iframes",
-              "how-to/use-devtools-mcp",
               "how-to/debug-and-troubleshoot",
               "how-to/test-native-and-polyfill"
             ]
@@ -222,7 +323,6 @@
             "pages": [
               "explanation/index",
               "explanation/what-is-webmcp",
-              "explanation/webmcp-vs-mcp",
               "explanation/strict-core-vs-mcp-b-extensions"
             ]
           },
@@ -236,10 +336,7 @@
           },
           {
             "group": "Trust and status",
-            "pages": [
-              "explanation/design/security-and-human-in-the-loop",
-              "explanation/design/spec-status-and-limitations"
-            ]
+            "pages": ["explanation/design/security-and-human-in-the-loop"]
           }
         ]
       }
@@ -260,25 +357,14 @@
       "author": "WebMCP Team",
       "robots": "index, follow",
       "googlebot": "index, follow",
-      "og:title": "WebMCP Documentation",
       "og:type": "website",
-      "og:url": "https://docs.mcp-b.ai",
       "og:image": "https://docs.mcp-b.ai/logo/mcp-b-logo.png",
-      "og:description": "Package references, tutorials, how-to guides, and concise concepts for the WebMCP standard and MCP-B tooling.",
       "og:site_name": "WebMCP Documentation",
       "og:locale": "en_US",
       "twitter:card": "summary_large_image",
       "twitter:site": "@webmcp",
       "twitter:creator": "@webmcp",
-      "twitter:title": "WebMCP Documentation",
-      "twitter:description": "Tutorials, how-to guides, package references, and concise concepts for WebMCP and MCP-B.",
-      "twitter:image": "https://docs.mcp-b.ai/logo/mcp-b-logo.png",
-      "twitter:image:alt": "WebMCP Documentation",
-      "article:published_time": "2024-01-01T00:00:00+00:00",
-      "article:modified_time": "2026-06-13T00:00:00+00:00",
-      "article:author": "WebMCP Team",
-      "article:section": "Technology",
-      "article:tag": "MCP, Model Context Protocol, AI, Web Development, Browser Extension"
+      "twitter:image": "https://docs.mcp-b.ai/logo/mcp-b-logo.png"
     }
   },
   "contextual": {

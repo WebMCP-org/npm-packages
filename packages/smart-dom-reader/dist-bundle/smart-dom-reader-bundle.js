@@ -282,14 +282,22 @@ var SmartDOMReaderBundle = (function (exports) {
      * Generate XPath for an element
      */
     static generateXPath(element, root) {
-      if (element.id && SelectorGenerator.isUniqueId(element.id, element, root))
+      if (
+        element.id &&
+        !element.id.includes('"') &&
+        SelectorGenerator.isUniqueId(element.id, element, root)
+      )
         return `//*[@id="${element.id}"]`;
       const path = [];
       let current = element;
       while (current && current.nodeType === Node.ELEMENT_NODE) {
         const tagName = current.nodeName.toLowerCase();
-        if (current.id && SelectorGenerator.isUniqueId(current.id, current, root)) {
-          path.unshift(`//*[@id="${current.id}"]`);
+        if (
+          current.id &&
+          !current.id.includes('"') &&
+          SelectorGenerator.isUniqueId(current.id, current, root)
+        ) {
+          path.unshift(`*[@id="${current.id}"]`);
           break;
         }
         let xpath = tagName;
@@ -439,11 +447,21 @@ var SmartDOMReaderBundle = (function (exports) {
   //#region src/traversal.ts
   var DOMTraversal = class DOMTraversal {
     /**
+     * Check if a node is a Document.
+     *
+     * `instanceof Document` tests the *calling* realm's constructor, so a
+     * document reached through an iframe (frameSelector) always fails it.
+     * nodeType is realm-independent — use this everywhere instead.
+     */
+    static isDocument(node) {
+      return node.nodeType === Node.DOCUMENT_NODE;
+    }
+    /**
      * Check if element is visible
      */
-    static isVisible(element, computedStyle) {
+    static isVisible(element) {
       const rect = element.getBoundingClientRect();
-      const style = computedStyle || element.ownerDocument?.defaultView?.getComputedStyle(element);
+      const style = element.ownerDocument?.defaultView?.getComputedStyle(element);
       if (!style) return false;
       return !!(
         rect.width > 0 &&
@@ -456,9 +474,9 @@ var SmartDOMReaderBundle = (function (exports) {
     /**
      * Check if element is in viewport
      */
-    static isInViewport(element, viewport) {
+    static isInViewport(element) {
       const rect = element.getBoundingClientRect();
-      const view = viewport || {
+      const view = {
         width: element.ownerDocument?.defaultView?.innerWidth || 0,
         height: element.ownerDocument?.defaultView?.innerHeight || 0,
       };
@@ -469,7 +487,6 @@ var SmartDOMReaderBundle = (function (exports) {
      */
     static passesFilter(element, filter) {
       if (!filter) return true;
-      const htmlElement = element;
       if (filter.excludeSelectors?.length) {
         for (const selector of filter.excludeSelectors) if (element.matches(selector)) return false;
       }
@@ -483,7 +500,7 @@ var SmartDOMReaderBundle = (function (exports) {
         if (!matches) return false;
       }
       if (filter.tags?.length && !filter.tags.includes(element.tagName.toLowerCase())) return false;
-      const textContent = htmlElement.textContent?.toLowerCase() || '';
+      const textContent = element.textContent?.toLowerCase() || '';
       if (filter.textContains?.length) {
         let hasText = false;
         for (const text of filter.textContains)
@@ -545,11 +562,10 @@ var SmartDOMReaderBundle = (function (exports) {
      * Extract element information
      */
     static extractElement(element, options, depth = 0) {
-      if (options.maxDepth && depth > options.maxDepth) return null;
+      if (options.maxDepth !== void 0 && depth > options.maxDepth) return null;
       if (!options.includeHidden && !DOMTraversal.isVisible(element)) return null;
       if (options.viewportOnly && !DOMTraversal.isInViewport(element)) return null;
       if (!DOMTraversal.passesFilter(element, options.filter)) return null;
-      const htmlElement = element;
       const extracted = {
         tag: element.tagName.toLowerCase(),
         text: DOMTraversal.getElementText(element, options),
@@ -560,9 +576,9 @@ var SmartDOMReaderBundle = (function (exports) {
       };
       if (options.mode === 'full' && DOMTraversal.isSemanticContainer(element)) {
         const children = [];
-        if (options.includeShadowDOM && htmlElement.shadowRoot) {
+        if (options.includeShadowDOM && element.shadowRoot) {
           const shadowChildren = DOMTraversal.extractChildren(
-            htmlElement.shadowRoot,
+            element.shadowRoot,
             options,
             depth + 1
           );
@@ -579,24 +595,11 @@ var SmartDOMReaderBundle = (function (exports) {
      */
     static extractChildren(container, options, depth) {
       const children = [];
-      const elements = container.querySelectorAll('*');
-      for (const child of Array.from(elements)) {
-        if (DOMTraversal.hasExtractedAncestor(child, elements)) continue;
+      for (const child of Array.from(container.children)) {
         const extracted = DOMTraversal.extractElement(child, options, depth);
         if (extracted) children.push(extracted);
       }
       return children;
-    }
-    /**
-     * Check if element has an ancestor that was already extracted
-     */
-    static hasExtractedAncestor(element, extractedElements) {
-      let parent = element.parentElement;
-      while (parent) {
-        if (Array.from(extractedElements).includes(parent)) return true;
-        parent = parent.parentElement;
-      }
-      return false;
     }
     /**
      * Get relevant attributes for an element
@@ -685,10 +688,7 @@ var SmartDOMReaderBundle = (function (exports) {
       if (htmlElement.onsubmit || element.getAttribute('onsubmit') || element.matches('form'))
         interaction.submit = true;
       if (element.matches('a[href], button[type="submit"]')) interaction.nav = true;
-      if (
-        htmlElement.hasAttribute('disabled') ||
-        htmlElement.getAttribute('aria-disabled') === 'true'
-      )
+      if (element.hasAttribute('disabled') || element.getAttribute('aria-disabled') === 'true')
         interaction.disabled = true;
       if (!DOMTraversal.isVisible(element)) interaction.hidden = true;
       const ariaRole = element.getAttribute('role');
@@ -742,7 +742,7 @@ var SmartDOMReaderBundle = (function (exports) {
     constructor(options = {}) {
       this.options = {
         mode: options.mode || 'interactive',
-        maxDepth: options.maxDepth || 5,
+        maxDepth: options.maxDepth ?? 5,
         includeHidden: options.includeHidden || false,
         includeShadowDOM: options.includeShadowDOM ?? true,
         includeIframes: options.includeIframes || false,
@@ -768,13 +768,14 @@ var SmartDOMReaderBundle = (function (exports) {
      */
     extract(rootElement = document, runtimeOptions) {
       const startTime = Date.now();
-      const doc = rootElement instanceof Document ? rootElement : rootElement.ownerDocument;
+      const rootIsDocument = DOMTraversal.isDocument(rootElement);
+      const doc = rootIsDocument ? rootElement : rootElement.ownerDocument;
       const options = {
         ...this.options,
         ...runtimeOptions,
       };
-      let container = rootElement instanceof Document ? doc : rootElement;
-      if (options.mainContentOnly && rootElement instanceof Document)
+      let container = rootIsDocument ? doc : rootElement;
+      if (options.mainContentOnly && rootIsDocument)
         container = ContentDetection.findMainContent(doc);
       const pageState = this.extractPageState(doc);
       const landmarks = this.extractLandmarks(doc);
@@ -835,58 +836,47 @@ var SmartDOMReaderBundle = (function (exports) {
     querySelectorAll(container, selector, includeShadowDOM) {
       const matches = [...container.querySelectorAll(selector)];
       if (!includeShadowDOM) return matches;
+      if ('shadowRoot' in container && container.shadowRoot)
+        matches.push(...this.querySelectorAll(container.shadowRoot, selector, true));
       for (const element of container.querySelectorAll('*'))
         if (element.shadowRoot)
           matches.push(...this.querySelectorAll(element.shadowRoot, selector, true));
       return matches;
     }
     /**
+     * Extract every element matching a selector.
+     *
+     * DOMTraversal.extractElement already applies the visibility, viewport and
+     * filter guards, so pre-filtering here would just repeat its
+     * getBoundingClientRect/getComputedStyle work for every element.
+     */
+    extractAll(container, selector, options) {
+      const extracted = [];
+      for (const el of this.querySelectorAll(container, selector, options.includeShadowDOM)) {
+        const element = DOMTraversal.extractElement(el, options);
+        if (element) extracted.push(element);
+      }
+      return extracted;
+    }
+    /**
      * Extract interactive elements
      */
     extractInteractiveElements(container, options) {
-      const buttons = [];
-      const links = [];
-      const inputs = [];
       const clickable = [];
-      this.querySelectorAll(
-        container,
-        'button, [role="button"], input[type="button"], input[type="submit"]',
-        options.includeShadowDOM
-      ).forEach((el) => {
-        if (this.shouldIncludeElement(el, options)) {
-          const extracted = DOMTraversal.extractElement(el, options);
-          if (extracted) buttons.push(extracted);
-        }
-      });
-      this.querySelectorAll(container, 'a[href]', options.includeShadowDOM).forEach((el) => {
-        if (this.shouldIncludeElement(el, options)) {
-          const extracted = DOMTraversal.extractElement(el, options);
-          if (extracted) links.push(extracted);
-        }
-      });
-      this.querySelectorAll(
-        container,
-        'input:not([type="button"]):not([type="submit"]), textarea, select',
-        options.includeShadowDOM
-      ).forEach((el) => {
-        if (this.shouldIncludeElement(el, options)) {
-          const extracted = DOMTraversal.extractElement(el, options);
-          if (extracted) inputs.push(extracted);
-        }
-      });
-      if (options.customSelectors)
-        options.customSelectors.forEach((selector) => {
-          this.querySelectorAll(container, selector, options.includeShadowDOM).forEach((el) => {
-            if (this.shouldIncludeElement(el, options)) {
-              const extracted = DOMTraversal.extractElement(el, options);
-              if (extracted) clickable.push(extracted);
-            }
-          });
-        });
+      for (const selector of options.customSelectors ?? [])
+        clickable.push(...this.extractAll(container, selector, options));
       return {
-        buttons,
-        links,
-        inputs,
+        buttons: this.extractAll(
+          container,
+          'button, [role="button"], input[type="button"], input[type="submit"]',
+          options
+        ),
+        links: this.extractAll(container, 'a[href]', options),
+        inputs: this.extractAll(
+          container,
+          'input:not([type="button"]):not([type="submit"]), textarea, select',
+          options
+        ),
         forms: this.extractForms(container, options),
         clickable,
       };
@@ -898,30 +888,20 @@ var SmartDOMReaderBundle = (function (exports) {
       const forms = [];
       this.querySelectorAll(container, 'form', options.includeShadowDOM).forEach((form) => {
         if (!this.shouldIncludeElement(form, options)) return;
-        const formInputs = [];
-        const formButtons = [];
-        this.querySelectorAll(
-          form,
-          'input:not([type="button"]):not([type="submit"]), textarea, select',
-          options.includeShadowDOM
-        ).forEach((input) => {
-          const extracted = DOMTraversal.extractElement(input, options);
-          if (extracted) formInputs.push(extracted);
-        });
-        this.querySelectorAll(
-          form,
-          'button, input[type="button"], input[type="submit"]',
-          options.includeShadowDOM
-        ).forEach((button) => {
-          const extracted = DOMTraversal.extractElement(button, options);
-          if (extracted) formButtons.push(extracted);
-        });
         const action = form.getAttribute('action');
         const method = form.getAttribute('method');
         const formInfo = {
           selector: SelectorGenerator.generateSelectors(form).css,
-          inputs: formInputs,
-          buttons: formButtons,
+          inputs: this.extractAll(
+            form,
+            'input:not([type="button"]):not([type="submit"]), textarea, select',
+            options
+          ),
+          buttons: this.extractAll(
+            form,
+            'button, input[type="button"], input[type="submit"]',
+            options
+          ),
         };
         if (action) formInfo.action = action;
         if (method) formInfo.method = method;
@@ -933,53 +913,12 @@ var SmartDOMReaderBundle = (function (exports) {
      * Extract semantic elements (full mode only)
      */
     extractSemanticElements(container, options) {
-      const headings = [];
-      const images = [];
-      const tables = [];
-      const lists = [];
-      const articles = [];
-      this.querySelectorAll(container, 'h1, h2, h3, h4, h5, h6', options.includeShadowDOM).forEach(
-        (el) => {
-          if (this.shouldIncludeElement(el, options)) {
-            const extracted = DOMTraversal.extractElement(el, options);
-            if (extracted) headings.push(extracted);
-          }
-        }
-      );
-      this.querySelectorAll(container, 'img', options.includeShadowDOM).forEach((el) => {
-        if (this.shouldIncludeElement(el, options)) {
-          const extracted = DOMTraversal.extractElement(el, options);
-          if (extracted) images.push(extracted);
-        }
-      });
-      this.querySelectorAll(container, 'table', options.includeShadowDOM).forEach((el) => {
-        if (this.shouldIncludeElement(el, options)) {
-          const extracted = DOMTraversal.extractElement(el, options);
-          if (extracted) tables.push(extracted);
-        }
-      });
-      this.querySelectorAll(container, 'ul, ol', options.includeShadowDOM).forEach((el) => {
-        if (this.shouldIncludeElement(el, options)) {
-          const extracted = DOMTraversal.extractElement(el, options);
-          if (extracted) lists.push(extracted);
-        }
-      });
-      this.querySelectorAll(
-        container,
-        'article, [role="article"]',
-        options.includeShadowDOM
-      ).forEach((el) => {
-        if (this.shouldIncludeElement(el, options)) {
-          const extracted = DOMTraversal.extractElement(el, options);
-          if (extracted) articles.push(extracted);
-        }
-      });
       return {
-        headings,
-        images,
-        tables,
-        lists,
-        articles,
+        headings: this.extractAll(container, 'h1, h2, h3, h4, h5, h6', options),
+        images: this.extractAll(container, 'img', options),
+        tables: this.extractAll(container, 'table', options),
+        lists: this.extractAll(container, 'ul, ol', options),
+        articles: this.extractAll(container, 'article, [role="article"]', options),
       };
     }
     /**
@@ -996,7 +935,7 @@ var SmartDOMReaderBundle = (function (exports) {
         totalElements: allElements.length,
         extractedElements,
       };
-      if (options.mainContentOnly && container instanceof Element)
+      if (options.mainContentOnly && !DOMTraversal.isDocument(container))
         metadata.mainContent = SelectorGenerator.generateSelectors(container).css;
       const language = doc.documentElement.getAttribute('lang');
       if (language) metadata.language = language;
@@ -1115,9 +1054,6 @@ var SmartDOMReaderBundle = (function (exports) {
     const lastSpace = slice.lastIndexOf(' ');
     return `${lastSpace > 32 ? slice.slice(0, lastSpace) : slice}…`;
   }
-  function bestSelector(el) {
-    return el.selector?.css || '';
-  }
   function hashId(input) {
     let h = 5381;
     for (let i = 0; i < input.length; i++) h = (h * 33) ^ input.charCodeAt(i);
@@ -1145,7 +1081,7 @@ var SmartDOMReaderBundle = (function (exports) {
   }
   function elementLine(el, opts) {
     const txt = truncate(el.text || el.attributes?.ariaLabel, opts?.maxTextLength ?? 80);
-    const sel = bestSelector(el);
+    const sel = el.selector?.css || '';
     const tag = el.tag.toLowerCase();
     const action = el.interaction?.submit
       ? 'submit'
@@ -1367,7 +1303,7 @@ var SmartDOMReaderBundle = (function (exports) {
       const navs = root.querySelectorAll('nav, [role="navigation"], .nav, .navigation');
       if (navs.length > 0)
         regions.navigation = Array.from(navs).map((nav) => ProgressiveExtractor.analyzeRegion(nav));
-      if (root instanceof Document) {
+      if (DOMTraversal.isDocument(root)) {
         const main = ContentDetection.findMainContent(root);
         if (main) {
           regions.main = ProgressiveExtractor.analyzeRegion(main);
@@ -1659,7 +1595,8 @@ var SmartDOMReaderBundle = (function (exports) {
         case 'extractStructure': {
           const { selector, frameSelector, formatOptions } = args;
           const doc = resolveDocument(frameSelector);
-          const target = selector ? (doc.querySelector(selector) ?? doc) : doc;
+          const target = selector ? doc.querySelector(selector) : doc;
+          if (!target) return { error: `No element found matching selector: ${selector}` };
           const overview = ProgressiveExtractor.extractStructure(target);
           const meta = {
             title: document.title,
@@ -1712,12 +1649,11 @@ var SmartDOMReaderBundle = (function (exports) {
         case 'extractInteractive': {
           const { selector, frameSelector, options, formatOptions } = args;
           const doc = resolveDocument(frameSelector);
-          const extractResult = selector
-            ? SmartDOMReader.extractFromElement(
-                doc.querySelector(selector),
-                'interactive',
-                options || {}
-              )
+          const target = selector ? doc.querySelector(selector) : null;
+          if (selector && !target)
+            return { error: `No element found matching selector: ${selector}` };
+          const extractResult = target
+            ? SmartDOMReader.extractFromElement(target, 'interactive', options || {})
             : SmartDOMReader.extractInteractive(doc, options || {});
           const meta = {
             title: document.title,
@@ -1733,8 +1669,11 @@ var SmartDOMReaderBundle = (function (exports) {
         case 'extractFull': {
           const { selector, frameSelector, options, formatOptions } = args;
           const doc = resolveDocument(frameSelector);
-          const extractResult = selector
-            ? SmartDOMReader.extractFromElement(doc.querySelector(selector), 'full', options || {})
+          const target = selector ? doc.querySelector(selector) : null;
+          if (selector && !target)
+            return { error: `No element found matching selector: ${selector}` };
+          const extractResult = target
+            ? SmartDOMReader.extractFromElement(target, 'full', options || {})
             : SmartDOMReader.extractFull(doc, options || {});
           const meta = {
             title: document.title,

@@ -328,21 +328,14 @@ export class LocalRelayMcpServer {
    */
   private openInBrowser(url: string): Promise<void> {
     const safeUrl = new URL(url).href;
+    const command =
+      process.platform === 'darwin'
+        ? 'open'
+        : process.platform === 'win32'
+          ? 'explorer.exe'
+          : 'xdg-open';
     return new Promise((resolve, reject) => {
-      const platform = process.platform;
-      let command: string;
-      let args: string[];
-      if (platform === 'darwin') {
-        command = 'open';
-        args = [safeUrl];
-      } else if (platform === 'win32') {
-        command = 'explorer.exe';
-        args = [safeUrl];
-      } else {
-        command = 'xdg-open';
-        args = [safeUrl];
-      }
-      execFile(command, args, (err) => {
+      execFile(command, [safeUrl], (err) => {
         if (err) reject(err);
         else resolve();
       });
@@ -367,13 +360,12 @@ export class LocalRelayMcpServer {
       try {
         this.syncDynamicTools();
       } catch (err) {
-        this.logSyncError(err);
+        const details = err instanceof Error ? (err.stack ?? err.message) : String(err);
+        process.stderr.write(
+          `[webmcp-local-relay] error: failed to sync dynamic tools: ${details}\n`
+        );
       }
     }, 16);
-  }
-
-  private syncDynamicTools(): void {
-    this.applyDynamicTools(this.listAggregatedTools());
   }
 
   /**
@@ -402,7 +394,7 @@ export class LocalRelayMcpServer {
         for (const id of sourceIds) {
           const source = sourceById.get(id);
           if (source) {
-            sources.push(source as SourceInfo);
+            sources.push(source);
           } else {
             process.stderr.write(
               `[webmcp-local-relay] warn: tool "${tool.name}" references unknown sourceId "${id}"\n`
@@ -420,9 +412,10 @@ export class LocalRelayMcpServer {
   }
 
   /**
-   * Applies registry tool state to MCP dynamic registrations.
+   * Applies current aggregated tool state to MCP dynamic registrations.
    */
-  private applyDynamicTools(tools: AggregatedTool[]): void {
+  private syncDynamicTools(): void {
+    const tools = this.listAggregatedTools();
     const nextNames = new Set(tools.map((tool) => tool.name));
 
     for (const [name, registration] of this.dynamicTools) {
@@ -539,13 +532,5 @@ export class LocalRelayMcpServer {
         ? { tabId: tool.sources[0].tabId, title: tool.sources[0].title }
         : undefined,
     });
-  }
-
-  /**
-   * Logs tool sync errors with full detail.
-   */
-  private logSyncError(err: unknown): void {
-    const details = err instanceof Error ? (err.stack ?? err.message) : String(err);
-    process.stderr.write(`[webmcp-local-relay] error: failed to sync dynamic tools: ${details}\n`);
   }
 }

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codex WebMCP declarative probe</title>
+  </head>
+  <body>
+    <h1>Codex WebMCP declarative probe</h1>
+    <p>This page does not load a WebMCP polyfill.</p>
+
+    <form
+      id="product-search"
+      toolname="codex_probe_product_search"
+      tooltitle="Product search"
+      tooldescription="Searches the probe catalog by query, category, quantity, and availability."
+    >
+      <label>
+        Query
+        <input name="query" type="search" required minlength="2" maxlength="40" />
+      </label>
+      <label>
+        Category
+        <select name="category">
+          <option value="all">All</option>
+          <option value="books">Books</option>
+          <option value="hardware">Hardware</option>
+        </select>
+      </label>
+      <label>
+        Quantity
+        <input name="quantity" type="number" min="1" max="10" value="1" />
+      </label>
+      <label>
+        <input name="in_stock" type="checkbox" checked />
+        In stock only
+      </label>
+      <button type="submit">Search</button>
+    </form>
+
+    <pre id="results">Waiting for an invocation…</pre>
+
+    <script>
+      const form = document.querySelector('#product-search');
+      const results = document.querySelector('#results');
+      const events = [];
+
+      for (const eventName of ['toolactivated', 'toolcanceled', 'submit']) {
+        form.addEventListener(eventName, (event) => {
+          events.push({
+            type: event.type,
+            submitter: event.submitter?.tagName ?? null,
+            agentInvoked: event.agentInvoked ?? null,
+            toolInput: event.toolInput ?? null,
+          });
+          results.textContent = JSON.stringify(events, null, 2);
+          if (event.type === 'submit') event.preventDefault();
+        });
+      }
+    </script>
+  </body>
+</html>

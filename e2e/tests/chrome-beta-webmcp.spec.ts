@@ -94,14 +94,19 @@ test.describe('Chrome WebMCP native smoke', () => {
           invalidEntries.push({ index, reason: 'window' });
         }
         if (tool.inputSchema !== undefined) {
-          if (typeof tool.inputSchema !== 'string') {
+          // An object since webmcp#241; a serialized string from older Chrome.
+          if (typeof tool.inputSchema === 'string') {
+            try {
+              JSON.parse(tool.inputSchema);
+            } catch {
+              invalidEntries.push({ index, reason: 'inputSchema-json' });
+            }
+          } else if (
+            typeof tool.inputSchema !== 'object' ||
+            tool.inputSchema === null ||
+            Array.isArray(tool.inputSchema)
+          ) {
             invalidEntries.push({ index, reason: 'inputSchema-type' });
-            return;
-          }
-          try {
-            JSON.parse(tool.inputSchema);
-          } catch {
-            invalidEntries.push({ index, reason: 'inputSchema-json' });
           }
         }
       });
@@ -188,7 +193,7 @@ test.describe('Chrome WebMCP native smoke', () => {
 
       const nativeContext = context as {
         registerTool: (tool: unknown, options?: { signal?: AbortSignal }) => Promise<void>;
-        getTools: Document['modelContext']['getTools'];
+        getTools: NonNullable<Document['modelContext']>['getTools'];
       };
       const noSchemaName = `beta_no_schema_${Date.now()}`;
       const undefinedSchemaName = `beta_undefined_schema_${Date.now()}`;

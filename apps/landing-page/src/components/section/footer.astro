@@ -1,7 +1,7 @@
 ---
 import { siteConfig } from "@/lib/config";
 
-const { links, name, parentName, parentUrl } = siteConfig;
+const { booking, links, name } = siteConfig;
 const contactEmail = links.email;
 
 const footerSections = [
@@ -10,8 +10,8 @@ const footerSections = [
     links: [
       { label: "Documentation", href: "https://docs.mcp-b.ai" },
       {
-        label: "Extension",
-        href: "https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa",
+        label: "Rook",
+        href: links.rook,
       },
       { label: "npm packages", href: "https://www.npmjs.com/org/mcp-b" },
     ],
@@ -19,8 +19,8 @@ const footerSections = [
   {
     title: "Company",
     links: [
-      { label: "SigVelo", href: parentUrl },
-      { label: "Blog", href: "https://sigvelo.com/blog" },
+      { label: "Book a call", href: booking.href },
+      { label: "Blog", href: "/blog" },
       { label: "Privacy", href: "/privacy" },
       { label: "Terms", href: "/terms" },
     ],
@@ -62,13 +62,13 @@ const socialLinks = [
 
         <form
           class="footer-contact"
-          action={`mailto:${contactEmail}`}
+          action="/contact"
           method="get"
           data-footer-contact
           data-contact-email={contactEmail}
         >
           <p class="footer-heading">
-            Stay in touch / <a href={`mailto:${contactEmail}`}>{contactEmail}</a
+            Stay in touch / <a href="/contact">{contactEmail}</a
             >
           </p>
           <div class="footer-contact-row">
@@ -143,9 +143,6 @@ const socialLinks = [
     <div class="footer-legal">
       <span>&copy; {new Date().getFullYear()} {name}. All rights reserved.</span
       >
-      <span>
-        A <a href={parentUrl} target="_blank" rel="noreferrer">{parentName}</a> product.
-      </span>
     </div>
   </div>
 </footer>
@@ -177,7 +174,7 @@ const socialLinks = [
 
 <style>
   .site-footer {
-    background: var(--sigvelo-public-blue);
+    background: #004d73;
     color: var(--sigvelo-public-on-blue, #fff);
     padding: clamp(3rem, 6vw, 5rem) clamp(1.5rem, 4vw, 3rem) 1.5rem;
   }
@@ -206,14 +203,14 @@ const socialLinks = [
   .footer-tagline {
     max-width: 30ch;
     margin: 1rem 0 0;
-    color: rgb(255 255 255 / 0.82);
+    color: rgb(255 255 255 / 0.92);
     font-size: 1.0625rem;
     line-height: 1.6;
   }
 
   .footer-heading {
     margin: 0 0 1rem;
-    color: rgb(255 255 255 / 0.78);
+    color: rgb(255 255 255 / 0.92);
     font-size: 1rem;
   }
 
@@ -244,7 +241,7 @@ const socialLinks = [
   }
 
   .footer-links a:hover {
-    color: rgb(255 255 255 / 0.78);
+    color: rgb(255 255 255 / 0.92);
   }
 
   .footer-socials a {

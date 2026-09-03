@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codex WebMCP imperative probe</title>
+  </head>
+  <body>
+    <h1>Codex WebMCP imperative probe</h1>
+    <p>This page does not load a WebMCP polyfill.</p>
+    <pre id="results">Running…</pre>
+
+    <script>
+      const results = [];
+      const record = (name, value) => {
+        results.push({ name, value });
+        document.querySelector('#results').textContent = JSON.stringify(results, null, 2);
+        console.log('[codex-webmcp-probe]', name, value);
+      };
+
+      const describeError = (error) => ({
+        type: typeof error,
+        constructor: error?.constructor?.name ?? null,
+        name: error?.name ?? null,
+        message: error?.message ?? null,
+        string: String(error),
+        keys: error && typeof error === 'object' ? Object.keys(error) : [],
+        json: (() => {
+          try {
+            return JSON.stringify(error);
+          } catch {
+            return null;
+          }
+        })(),
+      });
+
+      const context = document.modelContext;
+      record('secureContext', window.isSecureContext);
+      record('document.modelContext', typeof context);
+      record('navigator.modelContext', typeof navigator.modelContext);
+      record('sameDocumentObject', context === document.modelContext);
+      record('navigatorAlias', context === navigator.modelContext);
+
+      if (context) {
+        const prototype = Object.getPrototypeOf(context);
+        record('prototype', prototype?.constructor?.name ?? null);
+        record(
+          'prototypeProperties',
+          prototype ? Object.getOwnPropertyNames(prototype).sort() : []
+        );
+        record('ownProperties', Object.getOwnPropertyNames(context).sort());
+        record('methods', {
+          registerTool: typeof context.registerTool,
+          getTools: typeof context.getTools,
+          executeTool: typeof context.executeTool,
+          addEventListener: typeof context.addEventListener,
+          ontoolchange: 'ontoolchange' in context,
+        });
+
+        let toolchangeCount = 0;
+        context.addEventListener?.('toolchange', () => {
+          toolchangeCount += 1;
+          record('toolchange', toolchangeCount);
+        });
+
+        const registration = new AbortController();
+        const echoTool = {
+          name: 'codex_probe_echo',
+          title: 'Codex probe echo',
+          description: 'Returns the supplied message and records the execution callback shape.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              message: { type: 'string' },
+              count: { type: 'integer', minimum: 1 },
+            },
+            required: ['message'],
+            additionalProperties: false,
+          },
+          annotations: {
+            readOnlyHint: true,
+            untrustedContentHint: false,
+          },
+          execute: async (input, options) => ({
+            input,
+            inputType: typeof input,
+            hasSignal: options?.signal instanceof AbortSignal,
+            signalAborted: options?.signal?.aborted ?? null,
+          }),
+        };
+
+        Promise.resolve()
+          .then(async () => {
+            const registrationResult = await context.registerTool(echoTool, {
+              signal: registration.signal,
+            });
+            record('registerResult', {
+              type: typeof registrationResult,
+              value: registrationResult ?? null,
+            });
+
+            if (typeof context.getTools === 'function') {
+              const tools = await context.getTools();
+              record(
+                'getTools',
+                tools.map((tool) => ({
+                  name: tool.name,
+                  title: tool.title,
+                  description: tool.description,
+                  inputSchema: tool.inputSchema,
+                  annotations: tool.annotations,
+                  origin: tool.origin,
+                  hasWindow: 'window' in tool,
+                }))
+              );
+
+              const echo = tools.find((tool) => tool.name === echoTool.name);
+              if (echo && typeof context.executeTool === 'function') {
+                for (const candidate of [
+                  { label: 'objectInput', input: { message: 'direct object', count: 2 } },
+                  {
+                    label: 'stringInput',
+                    input: JSON.stringify({ message: 'direct string', count: 3 }),
+                  },
+                ]) {
+                  try {
+                    const value = await context.executeTool(echo, candidate.input);
+                    record(`executeTool.${candidate.label}`, {
+                      type: typeof value,
+                      value,
+                    });
+                  } catch (error) {
+                    record(`executeTool.${candidate.label}`, describeError(error));
+                  }
+                }
+              }
+            }
+
+            try {
+              await context.registerTool(echoTool);
+              record('duplicateRegistration', 'resolved');
+            } catch (error) {
+              record('duplicateRegistration', describeError(error));
+            }
+
+            for (const candidate of [
+              { label: 'emptyName', tool: { ...echoTool, name: '' } },
+              { label: 'invalidName', tool: { ...echoTool, name: 'invalid name' } },
+              {
+                label: 'emptyDescription',
+                tool: { ...echoTool, name: 'empty_description', description: '' },
+              },
+            ]) {
+              try {
+                await context.registerTool(candidate.tool);
+                record(candidate.label, 'resolved');
+              } catch (error) {
+                record(candidate.label, describeError(error));
+              }
+            }
+
+            const circularSchema = { type: 'object' };
+            circularSchema.self = circularSchema;
+            try {
+              await context.registerTool({
+                ...echoTool,
+                name: 'circular_schema',
+                inputSchema: circularSchema,
+              });
+              record('circularSchema', 'resolved');
+            } catch (error) {
+              record('circularSchema', describeError(error));
+            }
+
+            const preAborted = new AbortController();
+            preAborted.abort('pre-aborted registration');
+            try {
+              await context.registerTool(
+                { ...echoTool, name: 'pre_aborted_registration' },
+                { signal: preAborted.signal }
+              );
+              record('preAbortedRegistration', 'resolved');
+            } catch (error) {
+              record('preAbortedRegistration', describeError(error));
+            }
+
+            const insecureExposure = new AbortController();
+            try {
+              await context.registerTool(
+                { ...echoTool, name: 'insecure_exposure' },
+                {
+                  signal: insecureExposure.signal,
+                  exposedTo: ['http://insecure.example'],
+                }
+              );
+              record('insecureExposedTo', 'resolved');
+            } catch (error) {
+              record('insecureExposedTo', describeError(error));
+            } finally {
+              insecureExposure.abort('probe cleanup');
+            }
+
+            if (typeof context.getTools === 'function') {
+              try {
+                await context.getTools({ fromOrigins: ['http://insecure.example'] });
+                record('insecureFromOrigins', 'resolved');
+              } catch (error) {
+                record('insecureFromOrigins', describeError(error));
+              }
+            }
+
+            const removable = new AbortController();
+            await context.registerTool(
+              { ...echoTool, name: 'codex_probe_removable' },
+              { signal: removable.signal }
+            );
+            removable.abort('probe cleanup');
+            await new Promise((resolve) => setTimeout(resolve, 50));
+            if (typeof context.getTools === 'function') {
+              const tools = await context.getTools();
+              record(
+                'abortUnregisters',
+                !tools.some((tool) => tool.name === 'codex_probe_removable')
+              );
+            }
+          })
+          .catch((error) => record('setupError', describeError(error)));
+      }
+    </script>
+  </body>
+</html>

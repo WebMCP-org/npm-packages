@@ -1,5 +1,124 @@
 # @mcp-b/react-webmcp
 
+## 5.1.0
+
+### Minor Changes
+
+- 4836fd6: Add an optional `enabled` flag, defaulting to `true`, to tool, prompt, and resource hook configs.
+  `useWebMCPContext` accepts it in an optional fourth options argument. Disabling unregisters the
+  item, and re-enabling registers the latest committed configuration. Tool execution state and
+  local `execute`/`reset` controls remain available while disabled.
+
+  Avoid allocating new execution state for no-op resets and overlapping starts with no state
+  change. Add Chromium browser regression suites using React Profiler to cover render budgets,
+  registration changes, stable callbacks, and client consumers in normal and StrictMode renders.
+
+### Patch Changes
+
+- Updated dependencies [4836fd6]
+  - usewebmcp@5.1.0
+  - @mcp-b/webmcp-types@5.1.0
+  - @mcp-b/webmcp-polyfill@5.1.0
+  - @mcp-b/webmcp-ts-sdk@5.1.0
+
+## 5.0.3
+
+### Patch Changes
+
+- 4dec56a: Clear the previous server's tools, resources, and capabilities when the client or transport changes, including when the replacement connection fails.
+- Updated dependencies [4dec56a]
+  - @mcp-b/webmcp-ts-sdk@5.0.3
+  - usewebmcp@5.0.3
+  - @mcp-b/webmcp-types@5.0.3
+  - @mcp-b/webmcp-polyfill@5.0.3
+
+## 5.0.2
+
+### Patch Changes
+
+- usewebmcp@5.0.2
+- @mcp-b/webmcp-types@5.0.2
+- @mcp-b/webmcp-polyfill@5.0.2
+- @mcp-b/webmcp-ts-sdk@5.0.2
+
+## 5.0.1
+
+### Patch Changes
+
+- Updated dependencies [2056346]
+  - @mcp-b/webmcp-ts-sdk@5.0.1
+  - usewebmcp@5.0.1
+  - @mcp-b/webmcp-types@5.0.1
+  - @mcp-b/webmcp-polyfill@5.0.1
+
+## 5.0.0
+
+### Major Changes
+
+- de0b41c: Adopt MCP SDK v2 connection options and the shared response normalizer. Remove
+  legacy sampling, elicitation, handler, formatter, and observer APIs while
+  preserving correct overlapping execution and React Strict Mode cleanup.
+- de0b41c: Drop the `zod` peer dependency and remove the `zodToJsonSchema` / `isZodSchema`
+  helpers. Tool, prompt and resource schemas are now plain JSON Schema objects,
+  matching what `document.modelContext` accepts natively, so passing a Zod schema
+  to `useWebMCPPrompt` or `registerTool` no longer works. Convert at the call site
+  with `z.toJSONSchema(schema)` (Zod 4) and keep Zod as your own dependency if you
+  still want it for validation.
+- de0b41c: Drop React 17 from the supported peer range; `react` is now `^18.0.0 || ^19.0.0`.
+  The hooks no longer carry mounted-ref guards, which React 18 made unnecessary by
+  turning post-unmount state updates into a no-op, so React 17 was already
+  unsupported in practice.
+
+### Minor Changes
+
+- de0b41c: Register a prompt once instead of on every parent render. `useWebMCPPrompt` read
+  `argsSchema` from its `useCallback` dependencies, so the inline schema literal
+  shown in the hook's own documentation unregistered and re-registered the prompt
+  on each render. The schema is now read at registration time, matching
+  `useWebMCPResource` and `useWebMCP`.
+
+  Restore the `CallToolResult`, `ModelContextProtocol`, `PromptDescriptor`,
+  `PromptMessage`, `ResourceContents`, `ResourceDescriptor`, `ToolAnnotations`,
+  and `ToolDescriptor` type exports so a `WebMCPPromptConfig['get']` or
+  `WebMCPResourceConfig['read']` handler can be given an explicit return type
+  again. `WebMCPResourceReturn` is now an alias of `WebMCPPromptReturn`; both names
+  remain exported.
+
+### Patch Changes
+
+- de0b41c: Declare `sideEffects: false` and a top-level `types` entry. Both packages are
+  pure re-exports, so bundlers can now tree-shake unused hooks, and consumers on
+  `moduleResolution: "node"` resolve types without reading the `exports` map.
+- de0b41c: Require Node 20 or newer. `@mcp-b/global`, `@mcp-b/mcp-iframe`,
+  `@mcp-b/webmcp-polyfill` and `@mcp-b/webmcp-ts-sdk` previously allowed Node 18;
+  the rest declared no `engines` range at all and now state the same floor. Node 18
+  reached end of life in April 2025. Browser builds are unaffected — this governs
+  build tooling and the relay CLI.
+- de0b41c: Stop emitting declaration source maps, and ship the MIT `LICENSE` text these
+  packages already declared. Each package shipped `dist` without `src`, so every
+  published `.d.ts.map` pointed at a file that was not in the tarball; editors
+  already fall back to the `.d.ts` itself. `@mcp-b/webmcp-types` keeps its maps —
+  it is the one package that ships `src`, so its maps resolve.
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [de0b41c]
+- Updated dependencies [f1dbaa0]
+- Updated dependencies [f80daeb]
+  - @mcp-b/webmcp-types@5.0.0
+  - @mcp-b/webmcp-ts-sdk@5.0.0
+  - @mcp-b/webmcp-polyfill@5.0.0
+  - usewebmcp@5.0.0
+
 ## 4.0.0
 
 ### Major Changes
