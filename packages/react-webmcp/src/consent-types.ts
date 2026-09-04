@@ -29,6 +29,14 @@ export interface ConsentMetadata {
    * prompt when `rollback.force === true`).
    */
   requiresApproval: boolean | ((args: unknown) => boolean);
+  /**
+   * When true, approval requires a WebAuthn user-verification ceremony
+   * (platform authenticator: Touch ID, Windows Hello, hardware key),
+   * not just a DOM click. Falls back to a standard click when no platform
+   * authenticator is available, so the demo doesn't hard-block on
+   * unsupported hardware. Recommended for irreversible, high-risk tools.
+   */
+  requireUserPresence?: boolean;
 }
 
 /** The resolution of a pending consent prompt. */
