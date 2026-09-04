@@ -79,6 +79,19 @@ export class ConsentBroker {
     return () => this.decisionListeners.delete(fn);
   }
 
+  /** Record a tool decision that did not require an interactive prompt. */
+  recordDecision(
+    input: {
+      toolName: string;
+      origin: string;
+      args: unknown;
+      consent: ConsentMetadata;
+    },
+    decision: ConsentDecision
+  ) {
+    this.notifyDecision({ id: crypto.randomUUID(), ...input, createdAt: Date.now() }, decision);
+  }
+
   private notify() {
     const list = Array.from(this.pending.values());
     this.listeners.forEach((fn) => fn(list));
