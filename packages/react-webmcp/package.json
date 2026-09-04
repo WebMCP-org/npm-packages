@@ -64,6 +64,7 @@
     "build:prod": "NODE_ENV=prod vp pack",
     "check": "vp check --fix",
     "clean": "rm -rf dist",
+    "dev": "vp pack --watch",
     "format": "vp fmt --write",
     "lint": "vp lint --fix",
     "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build:prod",
@@ -78,6 +79,7 @@
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@mcp-b/webmcp-types": "workspace:*",
     "@modelcontextprotocol/client": "catalog:",
+    "@simplewebauthn/browser": "catalog:",
     "usewebmcp": "workspace:*"
   },
   "devDependencies": {

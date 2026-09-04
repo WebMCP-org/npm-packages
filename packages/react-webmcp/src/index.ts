@@ -53,6 +53,11 @@ export {
   useConsentBroker,
   usePendingConsentRequests,
 } from './ConsentBrokerProvider.js';
+export {
+  browserSupportsWebAuthn,
+  platformAuthenticatorIsAvailable,
+  verifyUserPresence,
+} from './consent-presence.js';
 
 declare module 'react' {
   interface FormHTMLAttributes<T> {
