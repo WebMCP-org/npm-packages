@@ -1,15 +1,16 @@
 import { cleanupWebModelContext, initializeWebModelContext } from '@mcp-b/global';
+import { TabClientTransport } from '@mcp-b/transports';
 import { cleanupWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
-import { TabClientTransport } from '@mcp-b/transports';
 import { Client } from '@modelcontextprotocol/client';
+import { Component, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, renderHook } from 'vitest-browser-react';
-import { getBrowserMcpServer } from './model-context.js';
+import { cleanup, render, renderHook } from 'vitest-browser-react';
 import { ConsentBroker } from './consent-broker.js';
 import { ConsentBrokerProvider } from './ConsentBrokerProvider.js';
-import { useGuardedWebMCP } from './useGuardedWebMCP.js';
 import type { ConsentMetadata } from './consent-types.js';
+import { getBrowserMcpServer } from './model-context.js';
+import { useGuardedWebMCP } from './useGuardedWebMCP.js';
 
 let server: BrowserMcpServer;
 let client: Client;
@@ -58,13 +59,78 @@ const highRiskConsent: ConsentMetadata = {
   requiresApproval: true,
 };
 
+function provider(broker: ConsentBroker) {
+  return function Provider({ children }: { children: ReactNode }) {
+    return <ConsentBrokerProvider broker={broker}>{children}</ConsentBrokerProvider>;
+  };
+}
+
+function trackPendingIds(broker: ConsentBroker) {
+  const ids: string[] = [];
+  broker.subscribe((pending) => {
+    ids.length = 0;
+    ids.push(...pending.map((request) => request.id));
+  });
+  return ids;
+}
+
+class ErrorCatcher extends Component<
+  { children: ReactNode; onError: (error: Error) => void },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error) {
+    this.props.onError(error);
+  }
+
+  render() {
+    if (this.state.error) return null;
+    return this.props.children;
+  }
+}
+
 describe('useGuardedWebMCP', () => {
-  it('low-risk tool with requiresApproval=false calls execute directly, never touches broker', async () => {
+  it('throws when rendered outside ConsentBrokerProvider', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errors: Error[] = [];
+
+    function Outside() {
+      useGuardedWebMCP({
+        name: 'unguarded_outside',
+        description: 'Should not register',
+        consent: lowRiskConsent,
+        execute: async () => ({ ok: true }),
+      });
+      return null;
+    }
+
+    await render(
+      <ErrorCatcher
+        onError={(error) => {
+          errors.push(error);
+        }}
+      >
+        <Outside />
+      </ErrorCatcher>
+    );
+
+    await vi.waitFor(() => {
+      expect(errors.some((error) => error.message.includes('useConsentBroker'))).toBe(true);
+    });
+  });
+
+  it('auto-approves when requiresApproval is false, records the decision, and skips broker.request', async () => {
     const execute = vi.fn().mockResolvedValue({ status: 'healthy' });
     const broker = new ConsentBroker();
     const requestSpy = vi.spyOn(broker, 'request');
+    const recordSpy = vi.spyOn(broker, 'recordDecision');
 
-    await renderHook(
+    const hook = await renderHook(
       () =>
         useGuardedWebMCP({
           name: 'getServiceHealth',
@@ -73,30 +139,61 @@ describe('useGuardedWebMCP', () => {
           consent: lowRiskConsent,
           execute,
         }),
-      {
-        wrapper: ({ children }) => (
-          <ConsentBrokerProvider broker={broker}>{children}</ConsentBrokerProvider>
-        ),
-      }
+      { wrapper: provider(broker) }
     );
 
-    // Call the registered tool via MCP client
-    await hook_act(async () => {
-      await client.callTool({ name: 'getServiceHealth' });
+    let result: Awaited<ReturnType<typeof client.callTool>> | undefined;
+    await hook.act(async () => {
+      result = await client.callTool({ name: 'getServiceHealth' });
     });
 
     expect(execute).toHaveBeenCalledOnce();
-    // broker.request should NOT have been called since requiresApproval=false
     expect(requestSpy).not.toHaveBeenCalled();
+    expect(recordSpy).toHaveBeenCalledOnce();
+    expect(recordSpy).toHaveBeenCalledWith(
+      {
+        toolName: 'getServiceHealth',
+        origin: window.location.origin,
+        args: {},
+        consent: lowRiskConsent,
+      },
+      { approved: true, reason: 'user' }
+    );
+    expect(result).toMatchObject({
+      structuredContent: { status: 'healthy' },
+    });
   });
 
-  it('high-risk tool calls broker.request and only calls execute after approval', async () => {
+  it('omits inputSchema when none is provided and still maps consent annotations', async () => {
+    const broker = new ConsentBroker();
+    await renderHook(
+      () =>
+        useGuardedWebMCP({
+          name: 'pingHealth',
+          description: 'Ping health',
+          consent: lowRiskConsent,
+          execute: async () => ({ ok: true }),
+        }),
+      { wrapper: provider(broker) }
+    );
+
+    const listed = await client.listTools();
+    const tool = listed.tools.find((candidate) => candidate.name === 'pingHealth');
+    expect(tool).toMatchObject({
+      name: 'pingHealth',
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    });
+  });
+
+  it('registers high-risk annotations and only calls execute after approval', async () => {
     const execute = vi.fn().mockResolvedValue({ success: true });
     const broker = new ConsentBroker();
-    let pendingId = '';
-    broker.subscribe((pending) => {
-      if (pending.length > 0) pendingId = pending[0]!.id;
-    });
+    const pendingIds = trackPendingIds(broker);
+
     await renderHook(
       () =>
         useGuardedWebMCP({
@@ -109,60 +206,142 @@ describe('useGuardedWebMCP', () => {
           consent: highRiskConsent,
           execute,
         }),
-      {
-        wrapper: ({ children }) => (
-          <ConsentBrokerProvider broker={broker}>{children}</ConsentBrokerProvider>
-        ),
-      }
+      { wrapper: provider(broker) }
     );
 
-    const tools = await server.getTools();
-    expect(tools.some((tool) => tool.name === 'rollbackDeployment')).toBe(true);
+    const listed = await client.listTools();
+    expect(listed.tools.find((tool) => tool.name === 'rollbackDeployment')).toMatchObject({
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+      },
+    });
 
     const resultPromise = client.callTool({
       name: 'rollbackDeployment',
       arguments: { deploymentId: 'd-1' },
     });
     expect(execute).not.toHaveBeenCalled();
-    await vi.waitFor(() => expect(pendingId).not.toBe(''));
+    await vi.waitFor(() => expect(pendingIds).toHaveLength(1));
 
-    broker.decide(pendingId, true);
-    await resultPromise;
+    broker.decide(pendingIds[0]!, true);
+    const result = await resultPromise;
 
     expect(execute).toHaveBeenCalledOnce();
     expect(execute).toHaveBeenCalledWith({ deploymentId: 'd-1' });
+    expect(result).toMatchObject({ structuredContent: { success: true } });
   });
 
-  it('high-risk tool returns denial response when broker denies', async () => {
+  it('returns a structured denial when the broker denies', async () => {
     const execute = vi.fn().mockResolvedValue({ success: true });
     const broker = new ConsentBroker();
+    const pendingIds = trackPendingIds(broker);
 
-    let capturedId = '';
-    broker.subscribe((pending) => {
-      if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
-    });
+    await renderHook(
+      () =>
+        useGuardedWebMCP({
+          name: 'rollbackDeployment',
+          description: 'Rollback a deployment',
+          consent: highRiskConsent,
+          execute,
+        }),
+      { wrapper: provider(broker) }
+    );
 
-    const decisionPromise = broker.request({
-      toolName: 'rollbackDeployment',
-      origin: window.location.origin,
-      args: {},
-      consent: highRiskConsent,
-    });
+    let result: Awaited<ReturnType<typeof client.callTool>> | undefined;
+    const resultPromise = client
+      .callTool({ name: 'rollbackDeployment', arguments: {} })
+      .then((value) => {
+        result = value;
+        return value;
+      });
 
-    expect(capturedId).not.toBe('');
+    await vi.waitFor(() => expect(pendingIds).toHaveLength(1));
+    broker.decide(pendingIds[0]!, false);
+    await resultPromise;
 
-    // User denies
-    broker.decide(capturedId, false);
-    const decision = await decisionPromise;
-
-    expect(decision.approved).toBe(false);
-    expect(decision.reason).toBe('user');
-    // execute should NOT be called
     expect(execute).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      structuredContent: {
+        success: false,
+        error: 'Action denied by user (user).',
+      },
+    });
+  });
+
+  it('returns a timeout denial when the broker auto-denies', async () => {
+    const execute = vi.fn().mockResolvedValue({ success: true });
+    const broker = new ConsentBroker(50);
+
+    const hook = await renderHook(
+      () =>
+        useGuardedWebMCP({
+          name: 'rollbackDeployment',
+          description: 'Rollback a deployment',
+          consent: highRiskConsent,
+          execute,
+        }),
+      { wrapper: provider(broker) }
+    );
+
+    let result: Awaited<ReturnType<typeof client.callTool>> | undefined;
+    await hook.act(async () => {
+      result = await client.callTool({ name: 'rollbackDeployment', arguments: {} });
+    });
+
+    expect(execute).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      structuredContent: {
+        success: false,
+        error: 'Action denied by user (timeout).',
+      },
+    });
+  });
+
+  it('evaluates a requiresApproval predicate per invocation', async () => {
+    const execute = vi.fn().mockResolvedValue({ ok: true });
+    const broker = new ConsentBroker();
+    const pendingIds = trackPendingIds(broker);
+    const requestSpy = vi.spyOn(broker, 'request');
+    const consent: ConsentMetadata = {
+      scope: ['write:rollback'],
+      reversible: false,
+      riskLevel: 'high',
+      requiresApproval: (args: unknown) => Boolean((args as { force?: boolean }).force),
+    };
+
+    const hook = await renderHook(
+      () =>
+        useGuardedWebMCP({
+          name: 'conditionalRollback',
+          description: 'Rollback only when forced',
+          inputSchema: {
+            type: 'object' as const,
+            properties: { force: { type: 'boolean' as const } },
+          },
+          consent,
+          execute,
+        }),
+      { wrapper: provider(broker) }
+    );
+
+    await hook.act(async () => {
+      await client.callTool({ name: 'conditionalRollback', arguments: { force: false } });
+    });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(requestSpy).not.toHaveBeenCalled();
+
+    const forced = client.callTool({
+      name: 'conditionalRollback',
+      arguments: { force: true },
+    });
+    await vi.waitFor(() => expect(pendingIds).toHaveLength(1));
+    broker.decide(pendingIds[0]!, true);
+    await forced;
+
+    expect(requestSpy).toHaveBeenCalledOnce();
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute).toHaveBeenLastCalledWith({ force: true });
   });
 });
-
-/** Helper to run async work inside renderHook's act. */
-async function hook_act(fn: () => Promise<void>) {
-  await fn();
-}
