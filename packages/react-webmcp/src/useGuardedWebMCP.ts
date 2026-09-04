@@ -67,20 +67,35 @@ export function useGuardedWebMCP<Args, Result>(def: GuardedToolDef<Args, Result>
   return useWebMCP({
     name: def.name,
     description: def.description,
-    inputSchema: def.inputSchema,
-    annotations: toMcpAnnotations(def.consent),
-    execute: async (args: Args) => {
+    ...(def.inputSchema && { inputSchema: def.inputSchema }),
+    ...(def.consent && { annotations: toMcpAnnotations(def.consent) }),
+    execute: (async (args: Args) => {
       const needsApproval =
         typeof def.consent.requiresApproval === 'function'
           ? def.consent.requiresApproval(args)
           : def.consent.requiresApproval;
 
       if (!needsApproval) {
+        broker.recordDecision(
+          {
+            toolName: def.name,
+            // NOTE: reflects the registering page's origin, not the verified sender.
+            // The MCP tabServer transport receives the real caller's origin in the MessageEvent
+            // but discards it before the tool's execute callback is invoked. See NOTES.md.
+            origin: window.location.origin,
+            args,
+            consent: def.consent,
+          },
+          { approved: true, reason: 'user' }
+        );
         return def.execute(args);
       }
 
       const decision = await broker.request({
         toolName: def.name,
+        // NOTE: reflects the registering page's origin, not the verified sender.
+        // The MCP tabServer transport receives the real caller's origin in the MessageEvent
+        // but discards it before the tool's execute callback is invoked. See NOTES.md.
         origin: window.location.origin,
         args,
         consent: def.consent,
@@ -90,6 +105,6 @@ export function useGuardedWebMCP<Args, Result>(def: GuardedToolDef<Args, Result>
         return { success: false, error: `Action denied by user (${decision.reason}).` };
       }
       return def.execute(args);
-    },
+    }) as any,
   });
 }
