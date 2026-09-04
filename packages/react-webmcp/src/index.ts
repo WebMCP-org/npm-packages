@@ -45,7 +45,7 @@ export type {
 export type { McpToolAnnotations } from './consent-annotations.js';
 export { toMcpAnnotations } from './consent-annotations.js';
 export type { ConsentDecisionEvent } from './consent-broker.js';
-export { ConsentBroker } from './consent-broker.js';
+export { ConsentBroker, MAX_PRESENCE_ATTEMPTS } from './consent-broker.js';
 export type { GuardedToolDef } from './useGuardedWebMCP.js';
 export { useGuardedWebMCP } from './useGuardedWebMCP.js';
 export {
