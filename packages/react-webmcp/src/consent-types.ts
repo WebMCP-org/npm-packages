@@ -50,7 +50,7 @@ export interface ConsentDecision {
    * - `'session-preapproval'` — the tool+origin pair was pre-approved earlier
    *   in this session and `consent.reversible` is `true`
    */
-  reason?: 'user' | 'timeout' | 'session-preapproval';
+  reason?: 'user' | 'timeout' | 'session-preapproval' | 'presence-lockout' | 'rate-limited';
 }
 
 /**
