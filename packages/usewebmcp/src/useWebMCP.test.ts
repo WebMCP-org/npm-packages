@@ -129,6 +129,39 @@ describe('useWebMCP in a browser runtime', () => {
     });
   });
 
+  it.each([
+    { failure: 'returned Error', execute: () => new Error('Execution failed') },
+    {
+      failure: 'non-Error rejection',
+      execute: vi.fn<() => Promise<never>>().mockRejectedValue('Execution failed'),
+    },
+  ])('records a $failure for local and agent executions', async ({ execute }) => {
+    const hook = await renderHook(() =>
+      useWebMCP({ name: 'execution_failure', description: 'Reports execution failures', execute })
+    );
+    await hook.act(async () => {
+      await expect(hook.result.current.execute({})).rejects.toThrow('Execution failed');
+    });
+    expect(hook.result.current.state).toEqual({
+      isExecuting: false,
+      lastResult: null,
+      error: new Error('Execution failed'),
+      executionCount: 0,
+    });
+    await hook.act(async () => {
+      await expect(executeRegisteredTool('execution_failure')).resolves.toEqual({
+        content: [{ type: 'text', text: 'Execution failed' }],
+        isError: true,
+      });
+    });
+    expect(hook.result.current.state).toEqual({
+      isExecuting: false,
+      lastResult: null,
+      error: new Error('Execution failed'),
+      executionCount: 0,
+    });
+  });
+
   it('keeps isExecuting true until every overlapping execution settles', async () => {
     const resolvers = new Map<string, (value: string) => void>();
     const { act, result } = await renderHook(() =>
@@ -659,6 +692,30 @@ describe('useWebMCP in a browser runtime', () => {
     await expect.poll(() => hook.result.current.isRegistered).toBe(true);
     expect(hook.result.current.registrationError).toBeNull();
   });
+  it('reports circular schema metadata without registering and recovers after correction', async () => {
+    const register = vi.spyOn(document.modelContext, 'registerTool');
+    const properties: Record<string, unknown> = {};
+    const circular = { type: 'object', properties };
+    properties.self = circular;
+    const hook = await renderHook(
+      ({ broken }) =>
+        useWebMCP({
+          name: 'circular_schema',
+          description: 'Reports unserializable schemas',
+          inputSchema: broken ? circular : { type: 'object' },
+          execute: () => 'ok',
+        }),
+      { initialProps: { broken: true } }
+    );
+    expect(hook.result.current.registrationError).toBeInstanceOf(TypeError);
+    expect(hook.result.current.isRegistered).toBe(false);
+    expect(register).not.toHaveBeenCalled();
+    await hook.rerender({ broken: false });
+    await expect.poll(() => hook.result.current.isRegistered).toBe(true);
+    expect(hook.result.current.registrationError).toBeNull();
+    expect(await findTool('circular_schema')).toMatchObject({ inputSchema: { type: 'object' } });
+  });
+
   it('handles validation aborting before its promise settles', async () => {
     const validation = Promise.withResolvers<boolean>();
     const controller = new AbortController();
