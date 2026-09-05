@@ -55,12 +55,12 @@ Use [`@mcp-b/global`](../global/README.md) for MCP server features. Browser type
 ## React updates, measured
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WebMCP-org/npm-packages/01afe21437ce4fe429c3d57162edf10f61cbe38e/apps/documentation-website/images/react-hooks/performance-dark.png">
-  <img src="https://raw.githubusercontent.com/WebMCP-org/npm-packages/01afe21437ce4fe429c3d57162edf10f61cbe38e/apps/documentation-website/images/react-hooks/performance-light.png" alt="Starting ten calls: our hooks commit once, MCP Cat ten times. Google reports registration status but has no running-call state to compare.">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WebMCP-org/npm-packages/0ec463b7d622a35b8df1d70d0ba3323f5e65aa8b/apps/documentation-website/images/react-hooks/performance-dark.png">
+  <img src="https://raw.githubusercontent.com/WebMCP-org/npm-packages/0ec463b7d622a35b8df1d70d0ba3323f5e65aa8b/apps/documentation-website/images/react-hooks/performance-light.png" alt="All four hooks make zero re-registrations on parent updates and ten registrations on metadata edits. Google and our hooks produce twenty metadata commits; MCP Cat ten. Starting calls: our hooks one commit, MCP Cat ten; Google has no execution state.">
 </picture>
 
-All four hooks avoid re-registration for equivalent inline definitions.
-[Full results and methodology](https://github.com/WebMCP-org/npm-packages/tree/01afe21437ce4fe429c3d57162edf10f61cbe38e/benchmarks/react-hooks).
+Registration calls and React commits are measured separately for all four hooks.
+[Full results and methodology](https://github.com/WebMCP-org/npm-packages/tree/0ec463b7d622a35b8df1d70d0ba3323f5e65aa8b/benchmarks/react-hooks).
 
 ## Validate input with your schema library
 
