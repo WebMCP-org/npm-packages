@@ -55,12 +55,12 @@ Use [`@mcp-b/global`](../global/README.md) for MCP server features. Browser type
 ## Performance comparison
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WebMCP-org/npm-packages/b6f59f720d7be452e239ceb18bc25394f0823e38/apps/documentation-website/images/react-hooks/performance-dark.png">
-  <img src="https://raw.githubusercontent.com/WebMCP-org/npm-packages/b6f59f720d7be452e239ceb18bc25394f0823e38/apps/documentation-website/images/react-hooks/performance-light.png" alt="Re-renders for 10 description changes: usewebmcp 20, MCP-B React 20, MCP Cat 10, Google 20. For 10 overlapping calls, start to finish: 11, 11, 20; Google exposes no execution state.">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WebMCP-org/npm-packages/9fc89ad863272bc13eb5c906921b62d3deb56f36/apps/documentation-website/images/react-hooks/performance-dark.png">
+  <img src="https://raw.githubusercontent.com/WebMCP-org/npm-packages/9fc89ad863272bc13eb5c906921b62d3deb56f36/apps/documentation-website/images/react-hooks/performance-light.png" alt="Re-renders for 10 description changes: usewebmcp 10, MCP-B React 10, MCP Cat 10, Google 20. For 10 overlapping calls, start to finish: 11, 11, 20; Google exposes no execution state.">
 </picture>
 
 Registration is a tie: all four make 0 registrations on 10 unrelated re-renders, and 10 registrations on 10 description changes.
-[Benchmark details](https://github.com/WebMCP-org/npm-packages/tree/b6f59f720d7be452e239ceb18bc25394f0823e38/benchmarks/react-hooks).
+[Benchmark details](https://github.com/WebMCP-org/npm-packages/tree/9fc89ad863272bc13eb5c906921b62d3deb56f36/benchmarks/react-hooks).
 
 ## Feature comparison
 
