@@ -33,10 +33,9 @@ const server = await createServer({
       ...(designSystem
         ? {
             'design-tokens': resolve(designSystem, 'packages/design-tokens/src/index.css'),
-            'design-chart': resolve(
-              designSystem,
-              'packages/viz-components/dist/components/chart/chart.js'
-            ),
+            'design-scale': createRequire(
+              resolve(designSystem, 'packages/viz-components/package.json')
+            ).resolve('d3-scale'),
             'design-chart-card': resolve(
               designSystem,
               'packages/viz-components/dist/components/chart-card/chart-card.js'

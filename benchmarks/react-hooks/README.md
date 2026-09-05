@@ -1,8 +1,7 @@
 # React hook comparison
 
-Measure the React work around a WebMCP tool, then render the results with the shared
-[design system](https://github.com/WebMCP-org/design-system). The published figures are
-static screenshots of its D3-backed chart components.
+Measure React commits around WebMCP tools. Render the figures with D3 and the shared
+[design system](https://github.com/WebMCP-org/design-system).
 
 [Results](RESULTS.md) · [Raw samples](results.json) · [Measurement source](measure.jsx)
 
@@ -16,7 +15,8 @@ and count, producing ten commits in all three hooks.
 All four hooks avoid re-registration when a parent supplies equivalent inline definitions.
 Changing metadata triggers registration updates in all four. Our hooks and Google's hook
 also publish registration status, so that scenario produces twenty commits compared with
-MCP Cat's ten. Google's hook has no execution state; those columns are marked N/A.
+MCP Cat's ten. Google's hook reports registration status, but has no running-call state.
+Its row is visible in the chart as "Not applicable"; the table marks these columns N/A.
 
 These are React commit counts for a small component in a development build. They do not
 measure execution time, memory, bundle size, network traffic, or application performance.
@@ -71,7 +71,7 @@ scenario into one update.
 
 Five trials run with StrictMode disabled and five with it enabled for every hook,
 producing forty samples. The table reports the observed range. The chart uses the median
-and includes the range below it. Every range collapsed to a single value in the recorded run.
+and shows the range beside each bar. Every range collapsed to a single value in the recorded run.
 
 The harness also checks that exactly one tool remains registered, each call uses the
 latest committed props, all ten calls complete, exposed execution state returns to idle,
@@ -117,8 +117,9 @@ First-party sources:
 
 ## Regenerate the README images
 
-The report imports `@mcp-b/design-tokens` CSS and the existing `sigvelo-chart` and
-`sigvelo-chart-card` components from a sibling design-system checkout. Build its
+The report imports `@mcp-b/design-tokens` CSS, `sigvelo-chart-card`, and D3 scales from
+a sibling design-system checkout. The horizontal layout leaves a labeled row for hooks
+without execution state instead of drawing a misleading zero bar. Build its
 `@mcp-b/viz-components` package and workspace dependencies first. The images in this
 revision use design-system commit `75442b31fc8e8f7dc963c799951786c02d799f33`.
 
