@@ -240,6 +240,28 @@ Runtime dispatch behavior in the browser embed/widget layer:
 - Refreshes the descriptor before every invocation so Chrome never receives a
   stale registration object.
 
+### Cancellation
+
+MCP request cancellation is forwarded to the browser's `executeTool()` signal in
+both server and client modes. Timeouts and connection teardown also cancel
+outstanding calls. Each relay client can cancel only its own calls.
+
+Programmatic callers can pass a signal to an existing `RelayBridgeServer`:
+
+```ts
+const result = await bridge.invokeTool(
+  'search_docs',
+  { query: 'WebMCP' },
+  {
+    signal: AbortSignal.timeout(10_000),
+  }
+);
+```
+
+Stopping handler work requires a runtime that forwards execution signals and a
+handler that observes them. Runtimes that only cancel the wait for a result may
+leave the handler running.
+
 ### WebMCP Standard Status
 
 WebMCP is an emerging web platform proposal. This relay works with the current native Chrome preview and MCP-B runtimes, but native extension details can still change as implementations mature.
@@ -299,6 +321,12 @@ pnpm install
 pnpm --filter @mcp-b/webmcp-local-relay build
 pnpm --filter @mcp-b/webmcp-local-relay test
 pnpm --filter @mcp-b/webmcp-local-relay test:e2e
+```
+
+To include native browser cancellation tests, use Chrome Canary with WebMCP:
+
+```bash
+WEBMCP_NATIVE=1 CHROME_BIN=/path/to/chrome-canary pnpm --filter @mcp-b/webmcp-local-relay test:e2e
 ```
 
 ### Build MCPB Bundle

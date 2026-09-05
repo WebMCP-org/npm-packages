@@ -62,6 +62,7 @@ const INPUT_REQUIRED_UNSUPPORTED_MESSAGE =
 
 let widgetWindow: Window | null = null;
 let config: RelayConfig;
+const activeInvocations = new Map<string, AbortController>();
 
 function getCurrentScriptElement(): HTMLScriptElement | null {
   return document.currentScript instanceof HTMLScriptElement ? document.currentScript : null;
@@ -206,7 +207,12 @@ async function listRelayTools(): Promise<RelayToolDescriptor[]> {
     .filter((tool): tool is RelayToolDescriptor => tool !== null);
 }
 
-async function invokeRelayTool(name: string, args: JsonObject): Promise<CallToolResult> {
+async function invokeRelayTool(
+  name: string,
+  args: JsonObject,
+  signal: AbortSignal
+): Promise<CallToolResult> {
+  signal.throwIfAborted();
   const descriptorContext = getDocumentDescriptorContext();
   if (!descriptorContext) {
     throw new Error('No executable WebMCP runtime found on this page');
@@ -215,11 +221,13 @@ async function invokeRelayTool(name: string, args: JsonObject): Promise<CallTool
   // Current Chrome requires a RegisteredTool returned by getTools(), not a
   // name or a stale copy.
   const tool = (await descriptorContext.getTools()).find((candidate) => candidate.name === name);
+  signal.throwIfAborted();
   if (!tool) {
     throw new Error(`Tool not found: ${name}`);
   }
 
-  const serialized = await descriptorContext.executeTool(tool, JSON.stringify(args));
+  const serialized = await descriptorContext.executeTool(tool, JSON.stringify(args), { signal });
+  signal.throwIfAborted();
   return normalizeSerializedToolResult(serialized);
 }
 
@@ -380,8 +388,12 @@ function handleListRequest(request: WidgetRequestMessage, event: MessageEvent): 
 }
 
 function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent): void {
-  invokeRelayTool(String(request.toolName ?? ''), toInvokeArgs(request.args))
+  if (activeInvocations.has(request.requestId)) return;
+  const controller = new AbortController();
+  activeInvocations.set(request.requestId, controller);
+  invokeRelayTool(String(request.toolName ?? ''), toInvokeArgs(request.args), controller.signal)
     .then((result) => {
+      if (controller.signal.aborted) return;
       respondToSource(event.source, event.origin, {
         type: 'webmcp.tools.invoke.response',
         requestId: request.requestId,
@@ -389,11 +401,17 @@ function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent)
       });
     })
     .catch((error: unknown) => {
+      if (controller.signal.aborted) return;
       respondToSource(event.source, event.origin, {
         type: 'webmcp.tools.invoke.error',
         requestId: request.requestId,
         error: String(error instanceof Error ? error.message : error),
       });
+    })
+    .finally(() => {
+      if (activeInvocations.get(request.requestId) === controller) {
+        activeInvocations.delete(request.requestId);
+      }
     });
 }
 
@@ -492,7 +510,19 @@ if (!document.querySelector(RELAY_IFRAME_SELECTOR)) {
 
     if (request.type === 'webmcp.tools.invoke.request') {
       handleInvokeRequest(request, event);
+      return;
     }
+
+    if (request.type === 'webmcp.tools.cancel.request') {
+      const controller = activeInvocations.get(request.requestId);
+      activeInvocations.delete(request.requestId);
+      controller?.abort();
+    }
+  });
+
+  window.addEventListener('pagehide', () => {
+    for (const controller of activeInvocations.values()) controller.abort();
+    activeInvocations.clear();
   });
 
   const launchWidget = (): void => {

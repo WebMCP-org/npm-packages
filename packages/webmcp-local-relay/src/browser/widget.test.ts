@@ -808,6 +808,85 @@ describe('widget runtime', () => {
     });
   });
 
+  it('cancels only the matching host request and ignores late responses and cancellations', async () => {
+    const env = startRuntime();
+    const connection = await completeHandshake(env);
+    for (const callId of ['cancelled', 'survivor']) {
+      connection.client.send(JSON.stringify({ type: 'invoke', callId, toolName: 'slow' }));
+    }
+    const first = await waitForPostedMessage(env, 'webmcp.tools.invoke.request');
+    const second = await waitForPostedMessage(env, 'webmcp.tools.invoke.request', 1);
+    connection.client.send(JSON.stringify({ type: 'cancel', callId: 'unknown' }));
+    connection.client.send(JSON.stringify({ type: 'cancel', callId: 'cancelled' }));
+    connection.client.send(JSON.stringify({ type: 'cancel', callId: 'cancelled' }));
+    expect(getPostedMessages(env, 'webmcp.tools.cancel.request')).toEqual([
+      {
+        payload: { type: 'webmcp.tools.cancel.request', requestId: first.payload.requestId },
+        targetOrigin: APP_ORIGIN,
+      },
+    ]);
+
+    env.hostWindow.dispatchMessage(APP_ORIGIN, {
+      type: 'webmcp.tools.invoke.response',
+      requestId: first.payload.requestId,
+      result: { content: [{ type: 'text', text: 'late success' }] },
+    });
+    env.hostWindow.dispatchMessage(APP_ORIGIN, {
+      type: 'webmcp.tools.invoke.response',
+      requestId: second.payload.requestId,
+      result: { content: [{ type: 'text', text: 'survivor' }] },
+    });
+    await vi.waitFor(() => expect(connection.messages).toHaveLength(4));
+    expect(connection.messages.slice(2)).toEqual([
+      {
+        type: 'result',
+        callId: 'survivor',
+        result: { content: [{ type: 'text', text: 'survivor' }] },
+      },
+      {
+        type: 'result',
+        callId: 'cancelled',
+        result: {
+          isError: true,
+          content: [{ type: 'text', text: 'Tool execution cancelled' }],
+        },
+      },
+    ]);
+    connection.client.send(JSON.stringify({ type: 'cancel', callId: 'survivor' }));
+    expect(getPostedMessages(env, 'webmcp.tools.cancel.request')).toHaveLength(1);
+  });
+
+  it('cancels host execution when its response times out', async () => {
+    const env = startRuntime({
+      search: buildSearch({ hostOrigin: APP_ORIGIN, requestTimeout: '1000' }),
+    });
+    const connection = await completeHandshake(env);
+    vi.useFakeTimers();
+    try {
+      connection.client.send(
+        JSON.stringify({ type: 'invoke', callId: 'timeout', toolName: 'slow' })
+      );
+      const request = getPostedMessages(env, 'webmcp.tools.invoke.request')[0];
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(getPostedMessages(env, 'webmcp.tools.cancel.request')).toEqual([
+        {
+          payload: { type: 'webmcp.tools.cancel.request', requestId: request?.payload.requestId },
+          targetOrigin: APP_ORIGIN,
+        },
+      ]);
+      expect(connection.messages).toContainEqual({
+        type: 'result',
+        callId: 'timeout',
+        result: {
+          isError: true,
+          content: [{ type: 'text', text: 'Host response timeout: webmcp.tools.invoke' }],
+        },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('reconnects after handshake failures and closed pending invocations', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const env = startRuntime();
@@ -851,8 +930,17 @@ describe('widget runtime', () => {
       })
     );
 
-    await waitForPostedMessage(env, 'webmcp.tools.invoke.request');
+    const pendingInvoke = await waitForPostedMessage(env, 'webmcp.tools.invoke.request');
     secondConnection.client.close();
+    expect(getPostedMessages(env, 'webmcp.tools.cancel.request')).toEqual([
+      {
+        payload: {
+          type: 'webmcp.tools.cancel.request',
+          requestId: pendingInvoke.payload.requestId,
+        },
+        targetOrigin: APP_ORIGIN,
+      },
+    ]);
 
     await waitForConnection(env, 2);
     await waitForPostedMessage(env, 'webmcp.tools.list.request', 2);

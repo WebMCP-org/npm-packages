@@ -47,9 +47,9 @@ const SUPPORTED_SUBPROTOCOLS = new Set([
  */
 interface PendingInvocation {
   connectionId: string;
-  timeoutId: ReturnType<typeof setTimeout>;
   resolve: (result: RelayCallToolResult) => void;
-  reject: (error: Error) => void;
+  reject: (reason: unknown) => void;
+  cancel: (reason: unknown) => void;
 }
 
 function formatPayloadLimit(bytes: number): string {
@@ -161,6 +161,7 @@ export class RelayBridgeServer extends EventEmitter {
   private readonly pendingInvocations = new Map<string, PendingInvocation>();
   private readonly browserClientConnectionIds = new Set<string>();
   private readonly relayClientConnectionIds = new Set<string>();
+  private readonly relayClientInvocations = new Map<string, Map<string, AbortController>>();
   private readonly heartbeatIntervalByConnectionId = new Map<
     string,
     ReturnType<typeof setInterval>
@@ -390,10 +391,8 @@ export class RelayBridgeServer extends EventEmitter {
 
     if (this._mode === 'client') {
       for (const pending of this.clientPendingInvocations.values()) {
-        clearTimeout(pending.timeoutId);
-        pending.reject(new Error('Relay client stopped'));
+        pending.cancel(new Error('Relay client stopped'));
       }
-      this.clientPendingInvocations.clear();
       this.clientTools = [];
       this.clientSources = [];
       this.clientToolSourceMap = {};
@@ -412,6 +411,14 @@ export class RelayBridgeServer extends EventEmitter {
     }
 
     this.off('stateChanged', this.onStateChangedPushRelay);
+
+    for (const pending of this.pendingInvocations.values()) {
+      pending.cancel(new Error('Relay server stopped before tool invocation completed'));
+    }
+    for (const invocations of this.relayClientInvocations.values()) {
+      for (const controller of invocations.values()) controller.abort();
+    }
+    this.relayClientInvocations.clear();
 
     for (const [connectionId, socket] of this.socketByConnectionId) {
       this.registry.removeConnection(connectionId);
@@ -434,12 +441,6 @@ export class RelayBridgeServer extends EventEmitter {
     this.requestOriginByConnectionId.clear();
     this.browserClientConnectionIds.clear();
     this.relayClientConnectionIds.clear();
-
-    for (const pending of this.pendingInvocations.values()) {
-      clearTimeout(pending.timeoutId);
-      pending.reject(new Error('Relay server stopped before tool invocation completed'));
-    }
-    this.pendingInvocations.clear();
 
     const wss = this.wss;
     this.wss = null;
@@ -490,10 +491,13 @@ export class RelayBridgeServer extends EventEmitter {
     options: {
       sourceId?: string;
       requestTabId?: string;
+      /** Cancels the invocation and forwards cancellation to the browser runtime. */
+      signal?: AbortSignal;
     } = {}
   ): Promise<RelayCallToolResult> {
+    options.signal?.throwIfAborted();
     if (this._mode === 'client') {
-      return this.invokeToolViaRelay(toolName, args);
+      return this.invokeToolViaRelay(toolName, args, options.signal);
     }
 
     return this.invokeToolLocally(toolName, args, options);
@@ -611,7 +615,7 @@ export class RelayBridgeServer extends EventEmitter {
   private async invokeToolLocally(
     toolName: string,
     args: RelayInvokeArgs,
-    options: { sourceId?: string; requestTabId?: string }
+    options: { sourceId?: string; requestTabId?: string; signal?: AbortSignal }
   ): Promise<RelayCallToolResult> {
     const resolved = this.registry.resolveInvocation({
       toolName,
@@ -630,42 +634,19 @@ export class RelayBridgeServer extends EventEmitter {
       );
     }
 
-    const callId = randomUUID();
-
-    return new Promise<RelayCallToolResult>((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        this.pendingInvocations.delete(callId);
-        reject(
-          new Error(`Invocation for tool "${toolName}" timed out after ${this.invokeTimeoutMs}ms`)
-        );
-      }, this.invokeTimeoutMs);
-
-      this.pendingInvocations.set(callId, {
-        connectionId: resolved.connectionId,
-        timeoutId,
-        resolve,
-        reject,
-      });
-
-      const message: RelayToBrowserMessage = {
+    return this.requestTool(
+      socket,
+      this.pendingInvocations,
+      resolved.connectionId,
+      {
         type: 'invoke',
-        callId,
+        callId: randomUUID(),
         toolName: resolved.tool.name,
         args,
-      };
-
-      try {
-        socket.send(JSON.stringify(message));
-      } catch (err) {
-        clearTimeout(timeoutId);
-        this.pendingInvocations.delete(callId);
-        reject(
-          new Error(
-            `Failed to send invocation for tool "${toolName}": ${err instanceof Error ? err.message : err}`
-          )
-        );
-      }
-    });
+      },
+      `Invocation for tool "${toolName}" timed out after ${this.invokeTimeoutMs}ms`,
+      options.signal
+    );
   }
 
   /** Handles a raw message according to the negotiated WebSocket protocol. */
@@ -796,8 +777,6 @@ export class RelayBridgeServer extends EventEmitter {
           break;
         }
 
-        clearTimeout(pending.timeoutId);
-        this.pendingInvocations.delete(message.callId);
         pending.resolve(this.normalizeCallToolResult(message.result));
         break;
       }
@@ -841,21 +820,43 @@ export class RelayBridgeServer extends EventEmitter {
 
       case 'relay/invoke': {
         const { callId, toolName, args } = message;
-        void this.invokeToolLocally(toolName, args ?? {}, {}).then(
-          (result) => this.sendRelayResult(connectionId, callId, result),
-          (error: unknown) =>
-            this.sendRelayResult(connectionId, callId, {
-              content: [
-                {
-                  type: 'text',
-                  text: `Relay invocation failed: ${error instanceof Error ? error.message : String(error)}`,
-                },
-              ],
-              isError: true,
-            })
-        );
+        let invocations = this.relayClientInvocations.get(connectionId);
+        if (!invocations) {
+          invocations = new Map();
+          this.relayClientInvocations.set(connectionId, invocations);
+        }
+        if (invocations.has(callId)) break;
+        const controller = new AbortController();
+        invocations.set(callId, controller);
+        void this.invokeToolLocally(toolName, args ?? {}, { signal: controller.signal })
+          .then(
+            (result) => {
+              if (!controller.signal.aborted) this.sendRelayResult(connectionId, callId, result);
+            },
+            (error: unknown) => {
+              if (!controller.signal.aborted) {
+                this.sendRelayResult(connectionId, callId, {
+                  content: [
+                    {
+                      type: 'text',
+                      text: `Relay invocation failed: ${error instanceof Error ? error.message : String(error)}`,
+                    },
+                  ],
+                  isError: true,
+                });
+              }
+            }
+          )
+          .finally(() => {
+            invocations.delete(callId);
+            if (invocations.size === 0) this.relayClientInvocations.delete(connectionId);
+          });
         break;
       }
+
+      case 'relay/cancel':
+        this.relayClientInvocations.get(connectionId)?.get(message.callId)?.abort();
+        break;
     }
   }
 
@@ -917,6 +918,10 @@ export class RelayBridgeServer extends EventEmitter {
     this.requestOriginByConnectionId.delete(connectionId);
     this.browserClientConnectionIds.delete(connectionId);
     this.relayClientConnectionIds.delete(connectionId);
+    for (const controller of this.relayClientInvocations.get(connectionId)?.values() ?? []) {
+      controller.abort();
+    }
+    this.relayClientInvocations.delete(connectionId);
     this.registry.removeConnection(connectionId);
     this.socketByConnectionId.delete(connectionId);
     this.emit('stateChanged');
@@ -926,13 +931,10 @@ export class RelayBridgeServer extends EventEmitter {
     // the invocation time out silently after invokeTimeoutMs.
     const isPayloadExceeded = code === 1009;
 
-    for (const [callId, pending] of this.pendingInvocations.entries()) {
+    for (const pending of this.pendingInvocations.values()) {
       if (pending.connectionId !== connectionId) {
         continue;
       }
-
-      clearTimeout(pending.timeoutId);
-      this.pendingInvocations.delete(callId);
 
       if (isPayloadExceeded) {
         pending.reject(
@@ -1116,9 +1118,7 @@ export class RelayBridgeServer extends EventEmitter {
 
     ws.on('close', () => {
       this.clientSocket = null;
-      for (const [callId, pending] of this.clientPendingInvocations) {
-        clearTimeout(pending.timeoutId);
-        this.clientPendingInvocations.delete(callId);
+      for (const pending of this.clientPendingInvocations.values()) {
         pending.reject(new Error('Relay server connection lost during invocation'));
       }
 
@@ -1191,8 +1191,6 @@ export class RelayBridgeServer extends EventEmitter {
           );
           break;
         }
-        clearTimeout(pending.timeoutId);
-        this.clientPendingInvocations.delete(message.callId);
         pending.resolve(message.result);
         break;
       }
@@ -1253,46 +1251,82 @@ export class RelayBridgeServer extends EventEmitter {
 
   private async invokeToolViaRelay(
     toolName: string,
-    args: RelayInvokeArgs
+    args: RelayInvokeArgs,
+    signal?: AbortSignal
   ): Promise<RelayCallToolResult> {
     if (!this.clientSocket || this.clientSocket.readyState !== WebSocket.OPEN) {
       throw new Error('Not connected to relay server');
     }
 
-    const callId = randomUUID();
-    const socket = this.clientSocket;
+    return this.requestTool(
+      this.clientSocket,
+      this.clientPendingInvocations,
+      'relay-server',
+      { type: 'relay/invoke', callId: randomUUID(), toolName, args },
+      `Proxied invocation for tool "${toolName}" timed out after ${this.invokeTimeoutMs}ms`,
+      signal
+    );
+  }
 
+  private requestTool(
+    socket: WebSocket,
+    invocations: Map<string, PendingInvocation>,
+    connectionId: string,
+    message:
+      | Extract<RelayToBrowserMessage, { type: 'invoke' }>
+      | Extract<RelayClientToServerMessage, { type: 'relay/invoke' }>,
+    timeoutMessage: string,
+    signal?: AbortSignal
+  ): Promise<RelayCallToolResult> {
+    signal?.throwIfAborted();
+    const { callId } = message;
     return new Promise<RelayCallToolResult>((resolve, reject) => {
       const timeoutId = setTimeout(() => {
-        this.clientPendingInvocations.delete(callId);
-        reject(
-          new Error(
-            `Proxied invocation for tool "${toolName}" timed out after ${this.invokeTimeoutMs}ms`
-          )
-        );
+        pending.cancel(new Error(timeoutMessage));
       }, this.invokeTimeoutMs);
-
-      this.clientPendingInvocations.set(callId, {
-        connectionId: 'relay-server',
-        timeoutId,
-        resolve,
-        reject,
-      });
-
-      const message: RelayClientToServerMessage = {
-        type: 'relay/invoke',
-        callId,
-        toolName,
-        args,
+      const onAbort = () => pending.cancel(signal?.reason);
+      const cleanup = () => {
+        if (!invocations.delete(callId)) return false;
+        clearTimeout(timeoutId);
+        signal?.removeEventListener('abort', onAbort);
+        return true;
       };
+      const pending: PendingInvocation = {
+        connectionId,
+        resolve: (result) => {
+          if (cleanup()) resolve(result);
+        },
+        reject: (reason) => {
+          if (cleanup()) reject(reason);
+        },
+        cancel: (reason) => {
+          if (!cleanup()) return;
+          try {
+            if (socket.readyState === WebSocket.OPEN) {
+              const cancellation: RelayToBrowserMessage | RelayClientToServerMessage = {
+                type: message.type === 'invoke' ? 'cancel' : 'relay/cancel',
+                callId,
+              };
+              socket.send(JSON.stringify(cancellation));
+            }
+          } catch (error) {
+            process.stderr.write(
+              `[webmcp-local-relay] warn: failed to cancel call ${callId}: ${error instanceof Error ? error.message : String(error)}\n`
+            );
+          }
+          reject(reason);
+        },
+      };
+      invocations.set(callId, pending);
+      signal?.addEventListener('abort', onAbort, { once: true });
 
       try {
         socket.send(JSON.stringify(message));
       } catch (err) {
-        clearTimeout(timeoutId);
-        this.clientPendingInvocations.delete(callId);
-        reject(
-          new Error(`Failed to send relay invocation: ${err instanceof Error ? err.message : err}`)
+        pending.reject(
+          new Error(
+            `Failed to send invocation: ${err instanceof Error ? err.message : String(err)}`
+          )
         );
       }
     });

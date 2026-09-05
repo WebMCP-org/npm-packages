@@ -475,10 +475,11 @@ export class LocalRelayMcpServer {
         ...(tool.icons ? { icons: tool.icons } : {}),
         ...(tool._meta ? { _meta: tool._meta } : {}),
       },
-      async (args: Record<string, unknown>) => {
+      async (args: Record<string, unknown>, context) => {
         try {
-          return await this.bridge.invokeTool(tool.name, args);
+          return await this.bridge.invokeTool(tool.name, args, { signal: context.mcpReq.signal });
         } catch (err) {
+          if (context.mcpReq.signal.aborted) throw err;
           const message = err instanceof Error ? err.message : String(err);
           const details = err instanceof Error ? (err.stack ?? err.message) : String(err);
           process.stderr.write(
