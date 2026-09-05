@@ -75,9 +75,9 @@ try {
       await page.evaluate((theme) => {
         document.documentElement.dataset.theme = theme;
       }, theme);
-      for (const id of ['performance', 'architecture']) {
-        await page.locator(`#${id}`).screenshot({ path: resolve(assets, `${id}-${theme}.png`) });
-      }
+      await page.locator('#performance').screenshot({
+        path: resolve(assets, `performance-${theme}.png`),
+      });
     }
     writeFileSync(
       resolve(assets, 'provenance.json'),

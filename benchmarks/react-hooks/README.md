@@ -1,25 +1,23 @@
 # React hook comparison
 
-Measure React commits around WebMCP tools. Render the figures with D3 and the shared
+Measure React commits around WebMCP tools. Render the chart with D3 and the shared
 [design system](https://github.com/WebMCP-org/design-system).
 
 [Results](RESULTS.md) · [Raw samples](results.json) · [Measurement source](measure.jsx)
 
-## What the numbers show
+## Performance comparison
 
-Registration is measured for all four hooks. Ten parent updates with equivalent definitions
-cause zero re-registrations. Ten metadata changes cause ten registrations in every hook.
-Google and both of our hooks produce twenty React commits for those metadata changes;
-MCP Cat produces ten. Commit counts include registration status where exposed.
+The chart compares component re-renders in two scenarios:
 
-Execution is a separate comparison. Starting ten overlapping calls produces one commit in
-each of our hooks and ten in MCP Cat. Completing those calls produces ten commits in all
-three. Google's registration counts appear alongside theirs; only its execution-state
-columns are N/A because it exposes no running-call state.
+- **Change a tool's description 10 times:** our hooks and Google produce 20 re-renders;
+  MCP Cat produces 10. Counts include registration-status updates where exposed.
+- **Run 10 overlapping calls, from start to finish:** our hooks produce 11 re-renders;
+  MCP Cat produces 20. Google exposes no execution state, so this comparison does not apply.
 
-These are React commit counts for a small component in a development build. They do not
-measure execution time, memory, bundle size, network traffic, or application performance.
-Do not turn the result into a "10× faster" claim.
+Registration is a tie: all four make 0 registrations on 10 unrelated re-renders, and 10 registrations on 10 description changes.
+
+These are committed React updates in a development build, not elapsed time or a general
+speed ranking. The call total adds each sample's start and settle counts before summarizing.
 
 ## Reproduce the measurements
 
@@ -78,31 +76,26 @@ and unmount removes the tool. These assertions keep an inactive or broken hook f
 appearing efficient. This fixture does not replace the
 [lifecycle and package tests](../../docs/TESTING.md#react-hook-harness).
 
-## Choosing a hook
+## Feature comparison
 
-This table describes the versions measured above. "Yes" means the hook supplies the
-feature without application glue.
+| Feature                         | `usewebmcp`     | `@mcp-b/react-webmcp` | MCP Cat | Google |
+| ------------------------------- | --------------- | --------------------- | ------- | ------ |
+| Schema validation               | Standard Schema | Standard Schema       | Zod     | Manual |
+| Registration status             | Yes             | Yes                   | No      | Yes    |
+| Running, result & error state   | Yes             | Yes                   | Yes     | No     |
+| Call tools from React           | Yes             | Yes                   | Yes     | No     |
+| Automatic MCP result formatting | No              | Yes                   | No      | Yes    |
+| Prompt & resource hooks         | No              | Yes                   | No      | No     |
 
-| Capability                                     | `usewebmcp`         | `@mcp-b/react-webmcp` | MCP Cat `webmcp-react` | Google `use-webmcp-tool` |
-| ---------------------------------------------- | ------------------- | --------------------- | ---------------------- | ------------------------ |
-| Plain JSON Schema input                        | Yes                 | Yes                   | Yes                    | Yes                      |
-| Input validation supplied by a schema library  | Standard Schema     | Standard Schema       | Zod                    | In your handler          |
-| Local execution and observable execution state | Yes                 | Yes                   | Yes                    | Registration only        |
-| Dedicated registration status                  | Yes                 | Yes                   | No                     | Yes                      |
-| Default successful agent result                | Raw handler value   | MCP response          | MCP response           | MCP response             |
-| Prompt, resource, and MCP client hooks         | Use the MCP adapter | Yes                   | No                     | No                       |
+All four accept JSON Schema. Compared: our PR #329, [MCP Cat 1.1.0](https://www.npmjs.com/package/webmcp-react/v/1.1.0), and [Google 0.2.0](https://www.npmjs.com/package/use-webmcp-tool/v/0.2.0).
 
-Equivalent inline definitions are stable in all four hooks in this fixture. SSR and
-StrictMode support are also shared capabilities, not reasons to dismiss the alternatives.
-MCP Cat includes a provider and polyfill for setup; our hooks leave runtime installation
-to the application. Its hook can also use an installed runtime without that provider.
-Google's smaller API is useful when registration is all a component needs.
+"Yes" means the hook supplies the feature. "Manual" validation runs in your handler.
+Automatic MCP result formatting means the hook wraps a successful handler result in MCP content.
+The core hook and MCP Cat can return MCP responses supplied by your handler.
 
-Our core hook uses the Community Group's
-[`webmcp-types`](https://github.com/webmachinelearning/webmcp-types). It calls the supplied
-[Standard JSON Schema](https://standardschema.dev/json-schema) converter and
-[Standard Schema](https://standardschema.dev/) validator rather than installing a validation
-engine. The MCP adapter adds protocol features while sharing that lifecycle.
+Standard Schema support needs both Standard JSON Schema conversion and Standard Schema
+validation. The hook calls your schema library; it ships no validation engine.
+Google's error state covers registration, while execution errors have an `onError` callback.
 
 First-party sources:
 
@@ -117,8 +110,8 @@ First-party sources:
 ## Regenerate the README images
 
 The report imports `@mcp-b/design-tokens` CSS, `sigvelo-chart-card`, and D3 scales from
-a sibling design-system checkout. The figure separates registration calls from React commits
-and includes Google's registration measurements. Build its
+a sibling design-system checkout. Both chart panels count component re-renders on a shared
+scale. Build its
 `@mcp-b/viz-components` package and workspace dependencies first. The images in this
 revision use design-system commit `75442b31fc8e8f7dc963c799951786c02d799f33`.
 
@@ -128,7 +121,7 @@ DESIGN_SYSTEM_DIR=../design-system \
   node benchmarks/react-hooks/run.mjs --render
 ```
 
-This reads the recorded results without rerunning measurements. It captures both figures
+This reads the recorded results without rerunning measurements. It captures the chart
 in light and dark themes at 2× resolution and writes them to
 [`apps/documentation-website/images/react-hooks`](../../apps/documentation-website/images/react-hooks).
 The adjacent `provenance.json` records the design-system commit, result-file hash, and
