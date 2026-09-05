@@ -19,38 +19,25 @@ import CalculatorExample from '/snippets/packages/react-webmcp-quickstart.mdx';
 
 <CalculatorExample />
 
-The handler returns `{ total: 7 }` for `{ left: 3, right: 4 }`. React state retains that value;
-the agent response includes text content and `structuredContent: { total: 7 }`.
-The example uses Zod 4.2 or newer; the [framework guide](/how-to/frameworks) covers installation.
+For `{ left: 3, right: 4 }`, React state holds `{ total: 7 }`; the agent receives MCP text and `structuredContent`.
 
 ## Package boundary
-
-Tool lifecycle, execution state, cancellation, and Standard Schema validation come from
-[`usewebmcp`](/packages/usewebmcp/overview). This package adds `outputSchema`, MCP annotations,
-automatic MCP formatting, context tools, prompt/resource hooks, and an MCP client provider.
-Both packages support React 18/19 and preserve `'use client'`.
 
 <Frame>
   <img
     className="block dark:hidden"
     src="/images/react-hooks/architecture-light.png"
-    alt="The MCP adapter shares usewebmcp's registration, supplied schema validation, execution state, and cancellation, then adds MCP features."
+    alt="Choose usewebmcp for raw browser tools or @mcp-b/react-webmcp for MCP features. Both use your schema library and runtime."
   />
   <img
     className="hidden dark:block"
     src="/images/react-hooks/architecture-dark.png"
-    alt="The MCP adapter shares usewebmcp's registration, supplied schema validation, execution state, and cancellation, then adds MCP features."
+    alt="Choose usewebmcp for raw browser tools or @mcp-b/react-webmcp for MCP features. Both use your schema library and runtime."
   />
 </Frame>
 
-Choose `usewebmcp` when you want browser tools with raw results. Choose this package for any of the
-MCP features above. Both call the validator supplied by your input schema; see the
-[schema guide](/how-to/use-schemas-and-structured-output).
-
-The [React commit comparison](/packages/usewebmcp/overview#react-updates-measured) measures
-both tool hooks against MCP Cat and Google's hooks. The
-[full results and feature table](https://github.com/WebMCP-org/npm-packages/tree/b45d1e9e2e51b0b49f959b02960e37002d0a65bf/benchmarks/react-hooks)
-explain the scenarios and API differences.
+Both hooks share lifecycle, Standard Schema validation, and React 18/19 support, including
+`'use client'`. See the [React commit comparison](/packages/usewebmcp/overview#react-updates-measured).
 
 ## Runtime requirements
 
@@ -60,7 +47,7 @@ explain the scenarios and API differences.
 | Prompt and resource hooks     | [`@mcp-b/global`](/packages/global/overview) or a configured `BrowserMcpServer` |
 | MCP client provider and hooks | A supplied MCP client and transport; no browser registry required               |
 
-MCP `outputSchema` discovery and protocol validation require the MCP-B runtime. Native WebMCP and
-the standalone polyfill do not advertise this metadata. The [reference](/packages/react-webmcp/reference)
-describes each hook and the [boundary explanation](/explanation/strict-core-vs-mcp-b-extensions)
-connects the browser and MCP layers.
+MCP `outputSchema` discovery and validation require the MCP-B runtime.
+
+[Framework setup](/how-to/frameworks) · [API reference](/packages/react-webmcp/reference) ·
+[Schema guide](/how-to/use-schemas-and-structured-output)

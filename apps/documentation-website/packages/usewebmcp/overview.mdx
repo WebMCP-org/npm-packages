@@ -11,44 +11,32 @@ import CounterExample from '/snippets/packages/usewebmcp-quickstart.mdx';
 
 <CounterExample />
 
-The next agent call observes the updated counter after each click. The hook registers after commit,
-keeps the latest committed callback, and removes the registration on unmount.
+Each call reads the latest committed counter. Registration and cleanup follow the component lifecycle.
 
 ## React updates, measured
 
-Equivalent inline schemas stay registered across parent updates. Overlapping calls share
-pending state, while completed calls publish their results.
-
-<Frame caption="Five trials per StrictMode setting, using React 19.2.8 and native Chrome WebMCP.">
+<Frame>
   <img
     className="block dark:hidden"
     src="/images/react-hooks/performance-light.png"
-    alt="Starting ten overlapping calls: usewebmcp and its MCP adapter each commit once; MCP Cat webmcp-react 1.1.0 commits ten times."
+    alt="Starting ten calls: our hooks commit once, MCP Cat ten times. Google reports registration status but has no running-call state to compare."
   />
   <img
     className="hidden dark:block"
     src="/images/react-hooks/performance-dark.png"
-    alt="Starting ten overlapping calls: usewebmcp and its MCP adapter each commit once; MCP Cat webmcp-react 1.1.0 commits ten times."
+    alt="Starting ten calls: our hooks commit once, MCP Cat ten times. Google reports registration status but has no running-call state to compare."
   />
 </Frame>
 
-All four hooks tested avoid re-registration for equivalent definitions. Google's
-`use-webmcp-tool` exposes registration state only, so it is excluded from this execution-state
-chart. These counts describe this fixture, not execution speed. The
-[full results and feature comparison](https://github.com/WebMCP-org/npm-packages/tree/b45d1e9e2e51b0b49f959b02960e37002d0a65bf/benchmarks/react-hooks)
-include metadata updates, call completion, pinned versions, and reproduction steps.
+All four hooks avoid re-registration for equivalent inline definitions.
+[Full results and methodology](https://github.com/WebMCP-org/npm-packages/tree/01afe21437ce4fe429c3d57162edf10f61cbe38e/benchmarks/react-hooks).
 
 ## Package boundary
 
-The hook uses the Community Group's [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types).
-It supplies React lifecycle, execution state, cancellation, and input inference. A supplied Standard
-Schema validator runs before local and agent calls, including async validation and transforms.
-The package does not install a validation engine, polyfill, or MCP SDK.
-
-`document.modelContext` comes from native support, an initialized
-[`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview), or
-[`@mcp-b/global`](/packages/global/overview). React 18 and 19 are supported, and the published
-entry point preserves `'use client'`.
+The hook uses Community Group [types](https://github.com/webmachinelearning/webmcp-types)
+and calls your schema's validator. Supply native WebMCP, the
+[polyfill](/packages/webmcp-polyfill/overview), or [MCP-B runtime](/packages/global/overview).
+React 18/19 and `'use client'` are supported.
 
 ## Choose a hook
 
@@ -58,8 +46,5 @@ entry point preserves `'use client'`.
 | MCP `outputSchema`, annotations, or result formatting            | [`@mcp-b/react-webmcp`](/packages/react-webmcp/overview) |
 | Context, prompt, resource, or MCP client hooks                   | [`@mcp-b/react-webmcp`](/packages/react-webmcp/overview) |
 
-Standard Schema support is shared by both packages. The
-[boundary explanation](/explanation/strict-core-vs-mcp-b-extensions#why-standard-schema-support-lives-in-the-adapters)
-describes why it belongs in the callback adapter. The
-[framework guide](/how-to/frameworks) covers runtime setup, and the
-[reference](/packages/usewebmcp/reference) covers configuration, state, and migration.
+[Framework setup](/how-to/frameworks) · [API reference](/packages/usewebmcp/reference) ·
+[Schema guide](/how-to/use-schemas-and-structured-output)
