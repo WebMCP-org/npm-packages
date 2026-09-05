@@ -1,12 +1,10 @@
-import { initializeWebModelContext } from '@mcp-b/global';
-import type { CallToolResult, ChromeModelContext, ModelContext } from '@mcp-b/webmcp-types';
+import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import type { ChromeModelContext, ModelContext } from '@mcp-b/webmcp-types';
 import { StrictMode, Suspense, createElement, useLayoutEffect } from 'react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { renderHook } from 'vitest-browser-react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, renderHook } from 'vitest-browser-react';
 import { z } from 'zod';
 import { useWebMCP } from './useWebMCP.js';
-
-const TEST_CHANNEL_ID = `usewebmcp-browser-${Date.now()}`;
 
 function hasDescriptorExecution(context: ModelContext): context is ChromeModelContext {
   return 'executeTool' in context && typeof context.executeTool === 'function';
@@ -15,7 +13,7 @@ function hasDescriptorExecution(context: ModelContext): context is ChromeModelCo
 async function executeRegisteredTool(
   name: string,
   args: Record<string, unknown> = {}
-): Promise<CallToolResult> {
+): Promise<unknown> {
   const modelContext = document.modelContext;
   if (!hasDescriptorExecution(modelContext)) {
     throw new Error('Chrome descriptor execution is unavailable');
@@ -31,7 +29,11 @@ async function executeRegisteredTool(
     throw new Error(`Tool execution was interrupted: ${name}`);
   }
 
-  return JSON.parse(serialized) as CallToolResult;
+  try {
+    return JSON.parse(serialized);
+  } catch {
+    return serialized;
+  }
 }
 
 async function findTool(name: string) {
@@ -39,16 +41,19 @@ async function findTool(name: string) {
 }
 
 describe('useWebMCP in a browser runtime', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error');
+  });
+  afterEach(async () => {
+    await cleanup();
+    const errors = vi.mocked(console.error).mock.calls;
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    expect(errors).toEqual([]);
+  });
   beforeAll(() => {
     if (!document.modelContext) {
-      initializeWebModelContext({
-        transport: {
-          tabServer: {
-            channelId: TEST_CHANNEL_ID,
-            allowedOrigins: [window.location.origin],
-          },
-        },
-      });
+      initializeWebMCPPolyfill();
     }
   });
 
@@ -76,66 +81,16 @@ describe('useWebMCP in a browser runtime', () => {
       required: ['name'],
     });
 
-    let response: CallToolResult | undefined;
+    let response: unknown;
     await act(async () => {
       response = await executeRegisteredTool('browser_greet', { name: 'Ada' });
     });
-    expect(response?.content[0]).toMatchObject({ type: 'text', text: 'Hello, Ada' });
+    expect(response).toBe('Hello, Ada');
     expect(result.current.state.lastResult).toBe('Hello, Ada');
     expect(result.current.state.executionCount).toBe(1);
 
-    unmount();
+    await unmount();
     expect(await findTool('browser_greet')).toBeUndefined();
-  });
-
-  it('publishes JSON structured content when an output schema is present', async () => {
-    const { act } = await renderHook(() =>
-      useWebMCP({
-        name: 'browser_total',
-        description: 'Adds two numbers',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            left: { type: 'number' },
-            right: { type: 'number' },
-          },
-          required: ['left', 'right'],
-        } as const,
-        outputSchema: {
-          type: 'object',
-          properties: { total: { type: 'number' } },
-          required: ['total'],
-        } as const,
-        execute: async ({ left, right }) => ({ total: left + right }),
-      })
-    );
-
-    let response: CallToolResult | undefined;
-    await act(async () => {
-      response = await executeRegisteredTool('browser_total', { left: 3, right: 4 });
-    });
-    expect(response?.structuredContent).toEqual({ total: 7 });
-  });
-
-  it('records non-serializable schema output as an execution error', async () => {
-    const cyclic: { self?: unknown } = {};
-    cyclic.self = cyclic;
-    const { act, result } = await renderHook(() =>
-      useWebMCP({
-        name: 'browser_invalid_output',
-        description: 'Returns invalid structured output',
-        outputSchema: { type: 'object', properties: { ok: { type: 'boolean' } } } as const,
-        execute: async () => cyclic as { ok?: boolean },
-      })
-    );
-
-    let response: CallToolResult | undefined;
-    await act(async () => {
-      response = await executeRegisteredTool('browser_invalid_output');
-    });
-    expect(response?.isError).toBe(true);
-    expect(result.current.state.executionCount).toBe(0);
-    expect(result.current.state.error?.message).toContain('JSON-serializable');
   });
 
   it('tracks manual execution, errors, and reset state', async () => {
@@ -170,6 +125,39 @@ describe('useWebMCP in a browser runtime', () => {
       isExecuting: false,
       lastResult: null,
       error: null,
+      executionCount: 0,
+    });
+  });
+
+  it.each([
+    { failure: 'returned Error', execute: () => new Error('Execution failed') },
+    {
+      failure: 'non-Error rejection',
+      execute: vi.fn<() => Promise<never>>().mockRejectedValue('Execution failed'),
+    },
+  ])('records a $failure for local and agent executions', async ({ execute }) => {
+    const hook = await renderHook(() =>
+      useWebMCP({ name: 'execution_failure', description: 'Reports execution failures', execute })
+    );
+    await hook.act(async () => {
+      await expect(hook.result.current.execute({})).rejects.toThrow('Execution failed');
+    });
+    expect(hook.result.current.state).toEqual({
+      isExecuting: false,
+      lastResult: null,
+      error: new Error('Execution failed'),
+      executionCount: 0,
+    });
+    await hook.act(async () => {
+      await expect(executeRegisteredTool('execution_failure')).resolves.toEqual({
+        content: [{ type: 'text', text: 'Execution failed' }],
+        isError: true,
+      });
+    });
+    expect(hook.result.current.state).toEqual({
+      isExecuting: false,
+      lastResult: null,
+      error: new Error('Execution failed'),
       executionCount: 0,
     });
   });
@@ -212,7 +200,7 @@ describe('useWebMCP in a browser runtime', () => {
 
   it('settles an execution that outlives the component without a React warning', async () => {
     let settle: ((value: string) => void) | undefined;
-    const { result, unmount } = await renderHook(() =>
+    const { act, result, unmount } = await renderHook(() =>
       useWebMCP({
         name: 'browser_post_unmount',
         description: 'Settles after unmount',
@@ -224,47 +212,16 @@ describe('useWebMCP in a browser runtime', () => {
     );
 
     const { execute, reset } = result.current;
-    const pending = execute({});
-    const consoleError = vi.spyOn(console, 'error');
+    let pending!: Promise<unknown>;
+    await act(() => {
+      pending = execute({});
+    });
     await unmount();
 
     settle?.('done');
     await expect(pending).resolves.toBe('done');
     reset();
-    expect(consoleError).not.toHaveBeenCalled();
-    consoleError.mockRestore();
-  });
-
-  it('normalizes raw JSON and passes through existing MCP responses', async () => {
-    const { act } = await renderHook(() => {
-      useWebMCP({
-        name: 'browser_response',
-        description: 'Returns an MCP response',
-        execute: async () => ({
-          content: [{ type: 'text' as const, text: 'ready' }],
-          isError: false,
-        }),
-      });
-      useWebMCP({
-        name: 'browser_raw_json',
-        description: 'Returns raw JSON',
-        execute: async () => ({ ready: true }),
-      });
-    });
-
-    let response: CallToolResult | undefined;
-    let rawResponse: CallToolResult | undefined;
-    await act(async () => {
-      [response, rawResponse] = await Promise.all([
-        executeRegisteredTool('browser_response'),
-        executeRegisteredTool('browser_raw_json'),
-      ]);
-    });
-    expect(response).toEqual({
-      content: [{ type: 'text', text: 'ready' }],
-      isError: false,
-    });
-    expect(rawResponse?.structuredContent).toEqual({ ready: true });
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it('uses the latest implementation without re-registering the descriptor', async () => {
@@ -284,16 +241,16 @@ describe('useWebMCP in a browser runtime', () => {
     ).length;
     await rerender({ version: 'second' });
 
-    let response: CallToolResult | undefined;
+    let response: unknown;
     await act(async () => {
       response = await executeRegisteredTool('browser_latest_execute');
     });
-    expect(response?.content[0]).toMatchObject({ type: 'text', text: 'second' });
+    expect(response).toBe('second');
     expect(
       registerTool.mock.calls.filter(([tool]) => tool.name === 'browser_latest_execute')
     ).toHaveLength(registrationsAfterMount);
     registerTool.mockRestore();
-    unmount();
+    await unmount();
   });
 
   it('publishes the latest implementation before later layout effects', async () => {
@@ -341,11 +298,11 @@ describe('useWebMCP in a browser runtime', () => {
 
     await hook.rerender({ value: 'uncommitted', suspend: true });
 
-    let response: CallToolResult | undefined;
+    let response: unknown;
     await hook.act(async () => {
       response = await executeRegisteredTool('browser_committed_execute');
     });
-    expect(response?.content[0]).toMatchObject({ type: 'text', text: 'committed' });
+    expect(response).toBe('committed');
     await hook.unmount();
   });
 
@@ -404,5 +361,419 @@ describe('useWebMCP in a browser runtime', () => {
       },
       required: ['query'],
     });
+  });
+
+  it('validates and transforms Standard Schema input on local and registered calls', async () => {
+    const inputSchema = z.object({
+      count: z.string().regex(/^\d+$/, 'Count must contain digits').transform(Number),
+      limit: z.number().default(10),
+    });
+    const execute = vi.fn(({ count, limit }: z.output<typeof inputSchema>) => count + limit);
+    const hook = await renderHook(() =>
+      useWebMCP({
+        name: 'validated_input',
+        description: 'Validates before execution',
+        inputSchema,
+        execute,
+      })
+    );
+    await hook.act(async () => {
+      await expect(hook.result.current.execute({ count: '2' })).resolves.toBe(12);
+      await expect(executeRegisteredTool('validated_input', { count: '3' })).resolves.toBe(13);
+      await expect(hook.result.current.execute({ count: 'bad' })).rejects.toThrow(
+        'Count must contain digits'
+      );
+      const response = await executeRegisteredTool('validated_input', { count: 3 });
+      expect(response).toMatchObject({ isError: true });
+    });
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[0]?.[0]).toEqual({ count: 2, limit: 10 });
+    expect(hook.result.current.state.error?.message).toContain('Invalid tool input');
+    expect(hook.result.current.state.executionCount).toBe(2);
+  });
+
+  it('awaits async validation and refuses invalid local input before side effects', async () => {
+    const inputSchema = z.object({
+      name: z.string().refine(async (name) => name !== 'blocked', 'Name is blocked'),
+    });
+    const execute = vi.fn(({ name }: z.output<typeof inputSchema>) => name.toUpperCase());
+    const hook = await renderHook(() =>
+      useWebMCP({ name: 'async_validation', description: 'Checks names', inputSchema, execute })
+    );
+    await hook.act(async () => {
+      await expect(hook.result.current.execute({ name: 'blocked' })).rejects.toThrow(
+        'Name is blocked'
+      );
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(hook.result.current.state).toMatchObject({ isExecuting: false, executionCount: 0 });
+    await hook.act(async () => {
+      await expect(hook.result.current.execute({ name: 'Ada' })).resolves.toBe('ADA');
+    });
+  });
+
+  it('tracks cancellation separately for overlapping executions and ignores late completion', async () => {
+    const first = Promise.withResolvers<string>();
+    const second = Promise.withResolvers<string>();
+    const signals: AbortSignal[] = [];
+    const hook = await renderHook(() =>
+      useWebMCP({
+        name: 'cancel_execution',
+        description: 'Handles cancellation',
+        inputSchema: {
+          type: 'object',
+          properties: { first: { type: 'boolean' } },
+          required: ['first'],
+        },
+        execute: ({ first: isFirst }, { signal }) => {
+          signals.push(signal);
+          return isFirst ? first.promise : second.promise;
+        },
+      })
+    );
+    const controller = new AbortController();
+    let cancelled!: Promise<unknown>;
+    let surviving!: Promise<unknown>;
+    await hook.act(() => {
+      cancelled = hook.result.current.execute({ first: true }, { signal: controller.signal });
+      surviving = hook.result.current.execute({ first: false });
+    });
+    await hook.act(async () => {
+      const rejection = expect(cancelled).rejects.toThrow('cancelled');
+      controller.abort(new Error('cancelled'));
+      await rejection;
+      first.resolve('too late');
+    });
+    expect(signals[0]).toBe(controller.signal);
+    expect(signals[1]?.aborted).toBe(false);
+    expect(hook.result.current.state).toMatchObject({
+      isExecuting: true,
+      lastResult: null,
+      executionCount: 0,
+    });
+    await hook.act(async () => {
+      hook.result.current.reset();
+      second.resolve('success');
+      await surviving;
+    });
+    expect(hook.result.current.state).toEqual({
+      isExecuting: false,
+      lastResult: 'success',
+      error: null,
+      executionCount: 1,
+    });
+  });
+
+  it('does not execute an already-cancelled request', async () => {
+    const execute = vi.fn();
+    const hook = await renderHook(() =>
+      useWebMCP({ name: 'already_cancelled', description: 'Does not run', execute })
+    );
+    await hook.act(async () => {
+      await expect(
+        hook.result.current.execute({}, { signal: AbortSignal.abort() })
+      ).rejects.toThrow();
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(hook.result.current.state.isExecuting).toBe(false);
+  });
+
+  it('forwards native execution options and supplies options to older runtimes', async () => {
+    const register = vi.spyOn(document.modelContext!, 'registerTool');
+    const signals: AbortSignal[] = [];
+    const hook = await renderHook(() =>
+      useWebMCP({
+        name: 'native_options',
+        description: 'Forwards options',
+        execute: (_, { signal }) => {
+          signals.push(signal);
+          return 'ok';
+        },
+      })
+    );
+    const tool = register.mock.calls[0]?.[0];
+    if (!tool) throw new Error('Tool was not registered');
+    const signal = new AbortController().signal;
+    await hook.act(async () => {
+      await tool.execute({}, { signal });
+      await executeRegisteredTool('native_options');
+    });
+    expect(signals[0]).toBe(signal);
+    expect(signals[1]).toBeInstanceOf(AbortSignal);
+  });
+
+  it('updates schema and annotations by value without inline-object registration churn', async () => {
+    const register = vi.spyOn(document.modelContext!, 'registerTool');
+    const hook = await renderHook(
+      ({ revision }) =>
+        useWebMCP({
+          name: 'metadata_updates',
+          title: `Revision ${revision}`,
+          description: 'Updates metadata',
+          inputSchema: {
+            type: 'object',
+            properties: { query: { type: 'string', description: `Revision ${revision}` } },
+          },
+          annotations: { readOnlyHint: revision === 1 },
+          execute: () => revision,
+        }),
+      { initialProps: { revision: 1 } }
+    );
+    await hook.rerender({ revision: 1 });
+    expect(register).toHaveBeenCalledTimes(1);
+    await hook.rerender({ revision: 2 });
+    expect(register).toHaveBeenCalledTimes(2);
+    expect(await findTool('metadata_updates')).toMatchObject({
+      title: 'Revision 2',
+      annotations: { readOnlyHint: false },
+      inputSchema: { properties: { query: { description: 'Revision 2' } } },
+    });
+  });
+
+  it('can disable and re-enable registration while keeping local execution available', async () => {
+    const hook = await renderHook(
+      ({ enabled }) =>
+        useWebMCP({
+          name: 'enabled_tool',
+          description: 'Conditional registration',
+          enabled,
+          execute: () => 'ok',
+        }),
+      { initialProps: { enabled: false } }
+    );
+    expect(hook.result.current).toMatchObject({
+      isSupported: true,
+      isRegistered: false,
+      registrationError: null,
+    });
+    expect(await findTool('enabled_tool')).toBeUndefined();
+    await hook.act(async () => {
+      await expect(hook.result.current.execute({})).resolves.toBe('ok');
+    });
+    await hook.rerender({ enabled: true });
+    await expect.poll(() => hook.result.current.isRegistered).toBe(true);
+    await hook.rerender({ enabled: false });
+    expect(await findTool('enabled_tool')).toBeUndefined();
+    expect(hook.result.current.isRegistered).toBe(false);
+  });
+
+  it('reports a duplicate registration without unregistering the original owner', async () => {
+    const first = await renderHook(() =>
+      useWebMCP({ name: 'duplicate_owner', description: 'First owner', execute: () => 'first' })
+    );
+    const second = await renderHook(
+      ({ enabled }) =>
+        useWebMCP({
+          name: 'duplicate_owner',
+          description: 'Second owner',
+          execute: () => 'second',
+          enabled,
+        }),
+      { initialProps: { enabled: false } }
+    );
+    await second.act(async () => {
+      await second.rerender({ enabled: true });
+    });
+    await second.act(async () => {
+      await expect
+        .poll(() => second.result.current.registrationError?.name)
+        .toBe('InvalidStateError');
+    });
+    await second.unmount();
+    expect(first.result.current.isRegistered).toBe(true);
+    await first.act(async () => {
+      expect(await executeRegisteredTool('duplicate_owner')).toBe('first');
+    });
+  });
+
+  it('reports synchronous platform rejection without breaking rendering', async () => {
+    vi.spyOn(document.modelContext!, 'registerTool').mockImplementationOnce(() => {
+      throw new DOMException('Not allowed', 'NotAllowedError');
+    });
+    const hook = await renderHook(() =>
+      useWebMCP({
+        name: 'not_allowed',
+        description: 'Denied by the platform',
+        execute: () => 'never',
+      })
+    );
+    expect(hook.result.current.registrationError?.name).toBe('NotAllowedError');
+    expect(hook.result.current.isRegistered).toBe(false);
+  });
+
+  it.each(['resolve', 'reject'] as const)(
+    'ignores a stale registration that later %ss',
+    async (outcome) => {
+      const delayed = Promise.withResolvers<void>();
+      const register = vi
+        .spyOn(document.modelContext!, 'registerTool')
+        .mockImplementationOnce(() => delayed.promise);
+      const hook = await renderHook(
+        ({ name }) => useWebMCP({ name, description: 'Async registration', execute: () => name }),
+        { initialProps: { name: 'stale_registration' } }
+      );
+      expect(hook.result.current.isRegistered).toBe(false);
+      await hook.rerender({ name: 'current_registration' });
+      await expect.poll(() => hook.result.current.isRegistered).toBe(true);
+      expect(register.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+      await hook.act(async () => {
+        if (outcome === 'resolve') delayed.resolve();
+        else delayed.reject(new Error('Late failure'));
+        await Promise.resolve();
+      });
+      expect(hook.result.current).toMatchObject({ isRegistered: true, registrationError: null });
+    }
+  );
+
+  it('detects a late-injected API and stops probing after registration', async () => {
+    const documentContext = vi.spyOn(document, 'modelContext', 'get').mockReturnValue(undefined);
+    const navigatorContext = vi.spyOn(navigator, 'modelContext', 'get').mockReturnValue(undefined);
+    vi.useFakeTimers();
+    const hook = await renderHook(() =>
+      useWebMCP({
+        name: 'late_runtime',
+        description: 'Waits for injection',
+        execute: () => 'ready',
+      })
+    );
+    expect(hook.result.current.isSupported).toBe(false);
+    documentContext.mockRestore();
+    navigatorContext.mockRestore();
+    await hook.act(async () => {
+      await vi.advanceTimersByTimeAsync(501);
+    });
+    expect(hook.result.current).toMatchObject({ isSupported: true, isRegistered: true });
+    expect(vi.getTimerCount()).toBe(0);
+    await hook.unmount();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('bounds unsupported-browser discovery and cancels it on unmount', async () => {
+    vi.spyOn(document, 'modelContext', 'get').mockReturnValue(undefined);
+    const legacyContext = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
+    Reflect.deleteProperty(navigator, 'modelContext');
+    try {
+      expect('modelContext' in navigator).toBe(false);
+      vi.useFakeTimers();
+      const hook = await renderHook(() =>
+        useWebMCP({ name: 'unsupported', description: 'No API', execute: () => 'local' })
+      );
+      await hook.act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+      expect(hook.result.current).toMatchObject({
+        isSupported: false,
+        isRegistered: false,
+        registrationError: null,
+      });
+      expect(vi.getTimerCount()).toBe(0);
+      await hook.unmount();
+      const second = await renderHook(() =>
+        useWebMCP({ name: 'unmounted_probe', description: 'No API', execute: () => 'local' })
+      );
+      await second.unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      if (legacyContext) Object.defineProperty(navigator, 'modelContext', legacyContext);
+    }
+  });
+
+  it('exposes schema conversion errors and recovers when supplied a valid schema', async () => {
+    const invalid = z.object({ value: z.custom<symbol>() });
+    const valid = z.object({ value: z.string() });
+    const hook = await renderHook(
+      ({ broken }) =>
+        useWebMCP({
+          name: 'schema_error',
+          description: 'Reports bad schemas',
+          inputSchema: broken ? invalid : valid,
+          execute: () => 'ok',
+        }),
+      { initialProps: { broken: true } }
+    );
+    expect(hook.result.current.registrationError?.message).toContain('Failed to convert');
+    expect(await findTool('schema_error')).toBeUndefined();
+    await hook.rerender({ broken: false });
+    await expect.poll(() => hook.result.current.isRegistered).toBe(true);
+    expect(hook.result.current.registrationError).toBeNull();
+  });
+  it('reports circular schema metadata without registering and recovers after correction', async () => {
+    const register = vi.spyOn(document.modelContext, 'registerTool');
+    const properties: Record<string, unknown> = {};
+    const circular = { type: 'object', properties };
+    properties.self = circular;
+    const hook = await renderHook(
+      ({ broken }) =>
+        useWebMCP({
+          name: 'circular_schema',
+          description: 'Reports unserializable schemas',
+          inputSchema: broken ? circular : { type: 'object' },
+          execute: () => 'ok',
+        }),
+      { initialProps: { broken: true } }
+    );
+    expect(hook.result.current.registrationError).toBeInstanceOf(TypeError);
+    expect(hook.result.current.isRegistered).toBe(false);
+    expect(register).not.toHaveBeenCalled();
+    await hook.rerender({ broken: false });
+    await expect.poll(() => hook.result.current.isRegistered).toBe(true);
+    expect(hook.result.current.registrationError).toBeNull();
+    expect(await findTool('circular_schema')).toMatchObject({ inputSchema: { type: 'object' } });
+  });
+
+  it('handles validation aborting before its promise settles', async () => {
+    const validation = Promise.withResolvers<boolean>();
+    const controller = new AbortController();
+    const execute = vi.fn(() => 'unexpected');
+    const inputSchema = z.object({
+      value: z.string().refine(() => {
+        controller.abort();
+        return validation.promise;
+      }),
+    });
+    const hook = await renderHook(() =>
+      useWebMCP({
+        name: 'cancel_validation',
+        description: 'Cancel validation',
+        inputSchema,
+        execute,
+      })
+    );
+    await hook.act(async () => {
+      await expect(
+        hook.result.current.execute({ value: 'ok' }, { signal: controller.signal })
+      ).rejects.toThrow();
+      validation.resolve(true);
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(hook.result.current.state.isExecuting).toBe(false);
+  });
+
+  it('formats agent results without changing local values and records formatter failures', async () => {
+    const hook = await renderHook(
+      ({ fail }) =>
+        useWebMCP({
+          name: 'formatted_result',
+          description: 'Formats output',
+          execute: () => ({ count: 3 }),
+          formatOutput: async ({ count }) => {
+            if (fail) throw new Error('Formatting failed');
+            return `Count: ${count}`;
+          },
+        }),
+      { initialProps: { fail: false } }
+    );
+    await hook.act(async () => {
+      await expect(executeRegisteredTool('formatted_result')).resolves.toBe('Count: 3');
+      await expect(hook.result.current.execute({})).resolves.toEqual({ count: 3 });
+    });
+    expect(hook.result.current.state.lastResult).toEqual({ count: 3 });
+    await hook.rerender({ fail: true });
+    await hook.act(async () => {
+      expect(await executeRegisteredTool('formatted_result')).toMatchObject({ isError: true });
+    });
+    expect(hook.result.current.state.error?.message).toBe('Formatting failed');
+    expect(hook.result.current.state.executionCount).toBe(2);
   });
 });

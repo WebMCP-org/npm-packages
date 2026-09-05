@@ -1,5 +1,13 @@
 import type { ModelContext, ModelContextTesting } from './model-context.js';
 
+/**
+ * Loads upstream browser globals, including optional `document.modelContext`.
+ * Availability is per-runtime: Chromium exposes it under WebMCP flags,
+ * ChatGPT's built-in browser ships it for Codex site tools, and elsewhere
+ * the property is absent. Feature-detect it or install the polyfill.
+ */
+export type { WebMCP } from 'webmcp-types';
+
 export type {
   CallToolResult,
   ContentBlock,
@@ -34,6 +42,7 @@ export type {
   ToolAnnotations,
   ToolDescriptor,
   ToolDescriptorFromSchema,
+  ToolExecuteCallbackOptions,
   ToolListItem,
   ToolResultFromOutputSchema,
   WebMcpToolAnnotations,
@@ -53,18 +62,6 @@ declare global {
         [Symbol.hasInstance](value: unknown): value is ModelContext;
       })
     | undefined;
-
-  interface Document {
-    /**
-     * Canonical WebMCP API for this document.
-     *
-     * Optional because no browser ships WebMCP unflagged: Chromium exposes it
-     * only under `--enable-features=WebMCP`, and elsewhere the property is
-     * genuinely absent (`'modelContext' in document === false`). Feature-detect
-     * it, or install `@mcp-b/webmcp-polyfill`.
-     */
-    readonly modelContext?: ModelContext;
-  }
 
   interface Navigator {
     /** @deprecated Use `document.modelContext`. */

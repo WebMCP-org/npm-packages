@@ -1,4 +1,5 @@
-import { useWebMCP, type WebMCPConfig, type WebMCPReturn } from 'usewebmcp';
+import type { WebMCPConfig, WebMCPReturn } from './types.js';
+import { useWebMCP } from './useWebMCP.js';
 
 /**
  * Convenience hook for exposing read-only context data to AI assistants.

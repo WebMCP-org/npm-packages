@@ -4,15 +4,19 @@ description: 'Register WebMCP tools in React with MCP-B hooks and use upstream g
 keywords: ['react', 'angular', 'puppeteer', 'framework', 'usewebmcp', '@mcp-b/react-webmcp']
 ---
 
+import CalculatorExample from '/snippets/packages/react-webmcp-quickstart.mdx';
+
+import CounterExample from '/snippets/packages/usewebmcp-quickstart.mdx';
+
 Use MCP-B's React hooks when tool availability follows component state. For other frameworks, use
 the WebMCP API with that framework's native lifecycle guidance.
 
 ## Choose a React hook
 
-| Package                                                   | Use it when                                                              |
-| --------------------------------------------------------- | ------------------------------------------------------------------------ |
-| [`usewebmcp`](/packages/usewebmcp/reference)              | Your component only registers WebMCP tools.                              |
-| [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) | Your app also registers prompts or resources, or consumes an MCP server. |
+| Package                                                   | Use it when                                                          |
+| --------------------------------------------------------- | -------------------------------------------------------------------- |
+| [`usewebmcp`](/packages/usewebmcp/reference)              | Browser tools with raw results and Standard Schema input validation. |
+| [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) | MCP output schemas/formatting, prompts, resources, or client hooks.  |
 
 Both hooks register after React commits the component and abort the registration when it unmounts.
 You do not need to manage an `AbortController` in the component.
@@ -22,15 +26,17 @@ You do not need to manage an `AbortController` in the component.
 Install the complete runtime and React integration:
 
 ```bash title="Install the React integration"
-pnpm add @mcp-b/global @mcp-b/react-webmcp
+pnpm add @mcp-b/global @mcp-b/react-webmcp zod@^4.2
 ```
 
 Import `@mcp-b/global` once in your client entry point, then mount a component that calls
 `useWebMCP`:
 
-<Snippet file="snippets/packages/react-webmcp-quickstart.ts" />
+<CalculatorExample />
 
-Pass component dependencies as the hook's second argument when registered metadata must change.
+This example uses Zod; use your existing Standard Schema implementation or plain JSON Schema as needed.
+Metadata changes refresh registration automatically. Use the optional second argument only when you
+need to force an additional registration refresh.
 Read the [`@mcp-b/react-webmcp` reference](/packages/react-webmcp/reference) for execution state,
 prompt and resource hooks, and MCP client-provider hooks.
 
@@ -43,9 +49,11 @@ Install the focused hook and provide `document.modelContext` through native supp
 pnpm add usewebmcp react @mcp-b/webmcp-polyfill
 ```
 
-<Snippet file="snippets/packages/usewebmcp-quickstart.ts" />
+<CounterExample />
 
-Use `usewebmcp` when you only need tool registration and local execution state. Use
+Both hooks convert Standard JSON Schema and call a supplied Standard Schema validator before
+execution. Follow the [schema guide](/how-to/use-schemas-and-structured-output) for transforms and
+direct browser registrations. Use `usewebmcp` for tool registration, raw results, and local execution state. Use
 [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference) to initialize the tool-only runtime.
 
 ## Handle server rendering
@@ -54,6 +62,7 @@ Mount tool hooks only in client-rendered components. Importing `@mcp-b/global` a
 `initializeWebMCPPolyfill()` are safe during server rendering, but code that reads `document`,
 `window`, or page state must run on the client.
 
+Both published hook entry points preserve `'use client'`, and their server render does not register tools.
 For Next.js, keep the hook inside a Client Component. Initialize the runtime above that component
 so `document.modelContext` exists before the hook commits.
 

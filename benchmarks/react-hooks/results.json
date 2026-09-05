@@ -1,0 +1,655 @@
+{
+  "recordedAt": "2026-09-05T19:12:22.490Z",
+  "sourceCommit": "35eed2b044d08a247e1d330d7b5a74f28938ee81",
+  "browser": "155.0.8043.0",
+  "platform": "darwin/arm64",
+  "packages": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "use-webmcp-tool": "0.2.0",
+    "webmcp-react": "1.1.0",
+    "zod": "4.4.3"
+  },
+  "samples": [
+    {
+      "library": "usewebmcp",
+      "strict": false,
+      "trial": 1,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "usewebmcp",
+      "strict": false,
+      "trial": 2,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "usewebmcp",
+      "strict": false,
+      "trial": 3,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "usewebmcp",
+      "strict": false,
+      "trial": 4,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "usewebmcp",
+      "strict": false,
+      "trial": 5,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "usewebmcp",
+      "strict": true,
+      "trial": 1,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "usewebmcp",
+      "strict": true,
+      "trial": 2,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "usewebmcp",
+      "strict": true,
+      "trial": 3,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "usewebmcp",
+      "strict": true,
+      "trial": 4,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "usewebmcp",
+      "strict": true,
+      "trial": 5,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "@mcp-b/react-webmcp",
+      "strict": false,
+      "trial": 1,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "@mcp-b/react-webmcp",
+      "strict": false,
+      "trial": 2,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "@mcp-b/react-webmcp",
+      "strict": false,
+      "trial": 3,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "@mcp-b/react-webmcp",
+      "strict": false,
+      "trial": 4,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "@mcp-b/react-webmcp",
+      "strict": false,
+      "trial": 5,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "@mcp-b/react-webmcp",
+      "strict": true,
+      "trial": 1,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "@mcp-b/react-webmcp",
+      "strict": true,
+      "trial": 2,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "@mcp-b/react-webmcp",
+      "strict": true,
+      "trial": 3,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "@mcp-b/react-webmcp",
+      "strict": true,
+      "trial": 4,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "@mcp-b/react-webmcp",
+      "strict": true,
+      "trial": 5,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 1,
+      "settle": 10
+    },
+    {
+      "library": "webmcp-react",
+      "strict": false,
+      "trial": 1,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 10,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 10,
+      "settle": 10
+    },
+    {
+      "library": "webmcp-react",
+      "strict": false,
+      "trial": 2,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 10,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 10,
+      "settle": 10
+    },
+    {
+      "library": "webmcp-react",
+      "strict": false,
+      "trial": 3,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 10,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 10,
+      "settle": 10
+    },
+    {
+      "library": "webmcp-react",
+      "strict": false,
+      "trial": 4,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 10,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 10,
+      "settle": 10
+    },
+    {
+      "library": "webmcp-react",
+      "strict": false,
+      "trial": 5,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 10,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 10,
+      "settle": 10
+    },
+    {
+      "library": "webmcp-react",
+      "strict": true,
+      "trial": 1,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 10,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 10,
+      "settle": 10
+    },
+    {
+      "library": "webmcp-react",
+      "strict": true,
+      "trial": 2,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 10,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 10,
+      "settle": 10
+    },
+    {
+      "library": "webmcp-react",
+      "strict": true,
+      "trial": 3,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 10,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 10,
+      "settle": 10
+    },
+    {
+      "library": "webmcp-react",
+      "strict": true,
+      "trial": 4,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 10,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 10,
+      "settle": 10
+    },
+    {
+      "library": "webmcp-react",
+      "strict": true,
+      "trial": 5,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 10,
+        "registrations": 10
+      },
+      "executionState": true,
+      "start": 10,
+      "settle": 10
+    },
+    {
+      "library": "use-webmcp-tool",
+      "strict": false,
+      "trial": 1,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": false,
+      "start": 0,
+      "settle": 0
+    },
+    {
+      "library": "use-webmcp-tool",
+      "strict": false,
+      "trial": 2,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": false,
+      "start": 0,
+      "settle": 0
+    },
+    {
+      "library": "use-webmcp-tool",
+      "strict": false,
+      "trial": 3,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": false,
+      "start": 0,
+      "settle": 0
+    },
+    {
+      "library": "use-webmcp-tool",
+      "strict": false,
+      "trial": 4,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": false,
+      "start": 0,
+      "settle": 0
+    },
+    {
+      "library": "use-webmcp-tool",
+      "strict": false,
+      "trial": 5,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": false,
+      "start": 0,
+      "settle": 0
+    },
+    {
+      "library": "use-webmcp-tool",
+      "strict": true,
+      "trial": 1,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": false,
+      "start": 0,
+      "settle": 0
+    },
+    {
+      "library": "use-webmcp-tool",
+      "strict": true,
+      "trial": 2,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": false,
+      "start": 0,
+      "settle": 0
+    },
+    {
+      "library": "use-webmcp-tool",
+      "strict": true,
+      "trial": 3,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": false,
+      "start": 0,
+      "settle": 0
+    },
+    {
+      "library": "use-webmcp-tool",
+      "strict": true,
+      "trial": 4,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": false,
+      "start": 0,
+      "settle": 0
+    },
+    {
+      "library": "use-webmcp-tool",
+      "strict": true,
+      "trial": 5,
+      "parent": {
+        "commits": 10,
+        "registrations": 0
+      },
+      "metadata": {
+        "commits": 20,
+        "registrations": 10
+      },
+      "executionState": false,
+      "start": 0,
+      "settle": 0
+    }
+  ]
+}

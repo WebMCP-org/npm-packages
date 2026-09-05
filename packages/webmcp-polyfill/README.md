@@ -159,15 +159,56 @@ coverage.
 
 ## Schema helpers
 
-The `@mcp-b/webmcp-polyfill/schema` entry owns shared browser-runtime adapters
-used by MCP-B packages. `normalizeInputSchema()` accepts plain JSON Schema and
-Standard Schema v1 implementations that expose `~standard.jsonSchema.input()`.
-This conversion is an MCP-B adapter feature; the strict WebMCP registration
-boundary itself accepts JSON Schema.
+`@mcp-b/webmcp-polyfill/schema` is an optional adapter entry. Use `normalizeInputSchema()` to convert a Standard JSON Schema implementation, then call its supplied validator in your handler:
 
-For literal-schema TypeScript inference, install `@mcp-b/webmcp-types` and use
-`JsonSchemaForInference`. Runtime-defined schemas safely fall back to
-object-or-array input.
+```ts
+import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
+import { z } from 'zod';
+
+const totalInput = z.object({
+  count: z.string().regex(/^\d+$/).transform(Number),
+  limit: z.number().default(10),
+});
+
+export async function registerTotalTool() {
+  initializeWebMCPPolyfill();
+  const context = document.modelContext;
+  if (!context) throw new Error('WebMCP is unavailable');
+  const registration = new AbortController();
+
+  await context.registerTool(
+    {
+      name: 'calculate_total',
+      description: 'Add a numeric count to a limit, which defaults to 10',
+      // Keep vendor validation in this handler, including when called through MCP.
+      inputSchema: { ...normalizeInputSchema(totalInput).inputSchema },
+      async execute(input) {
+        const result = await totalInput['~standard'].validate(input);
+        if (result.issues) {
+          throw new TypeError(result.issues.map((issue) => issue.message).join('; '));
+        }
+        return { total: result.value.count + result.value.limit };
+      },
+    },
+    { signal: registration.signal }
+  );
+
+  return () => registration.abort();
+}
+```
+
+The spread copies only JSON metadata, leaving the supplied validator in the callback. This avoids applying vendor transforms twice if the same tool is later registered through the MCP-B runtime.
+
+This example uses Zod 4.2 or newer (`pnpm add zod@^4.2`). Call `registerTotalTool()` in browser setup and retain the returned cleanup function. The validation method belongs to your schema; the polyfill does not ship a schema validator.
+
+[Standard JSON Schema](https://standardschema.dev/json-schema) supplies `~standard.jsonSchema.input()` for metadata conversion. [Standard Schema](https://standardschema.dev/) supplies `~standard.validate()` for validation and transforms. An object can implement either or both.
+
+`normalizeInputSchema()` converts metadata and preserves a supplied validator for the MCP SDK. It does not call the validator or wrap your handler. The standalone polyfill's `registerTool()` accepts JSON Schema, and its imperative execution path does not validate arguments against that schema. Declarative forms separately use browser form constraints.
+
+In React, [`usewebmcp`](../usewebmcp/README.md) performs conversion and validation for you on both native and polyfill paths. [`@mcp-b/react-webmcp`](../react-webmcp/README.md) shares that implementation. Outside React, [`BrowserMcpServer`](../webmcp-ts-sdk/README.md#schema-boundary) delegates validation to the official MCP server for MCP calls. Direct browser calls still need validation in the handler.
+
+The [schema guide](https://docs.mcp-b.ai/how-to/use-schemas-and-structured-output) covers each path. Browser-facing declarations come from upstream `webmcp-types`; use `@mcp-b/webmcp-types` when you also need MCP-B extension or legacy compatibility types.
 
 ## Compatibility boundary
 

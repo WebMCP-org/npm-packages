@@ -1,53 +1,66 @@
 ---
 title: '@mcp-b/react-webmcp overview'
-description: 'When to use the full React integration package, how it differs from usewebmcp, and which runtime stack it expects.'
-keywords: ['@mcp-b/react-webmcp', 'overview', 'react', 'MCP-B', 'useWebMCP', 'McpClientProvider']
+description: 'React tool hooks with MCP output schemas, prompts, resources, and client connections.'
+keywords:
+  [
+    '@mcp-b/react-webmcp',
+    'overview',
+    'react',
+    'standard schema',
+    'outputSchema',
+    'McpClientProvider',
+  ]
 icon: 'react'
 ---
 
-`@mcp-b/react-webmcp` is the full React surface for MCP-B. It covers tool registration, prompt and resource hooks, and client/provider APIs for consuming MCP servers from a React tree.
+import CalculatorExample from '/snippets/packages/react-webmcp-quickstart.mdx';
 
-## When to use this package
+`@mcp-b/react-webmcp` adds MCP output schemas and response formatting to the shared React tool hook:
 
-- You want WebMCP tool, prompt, and resource registration from React.
-- You want JSON Schema or Standard JSON Schema input schemas in hook configuration.
-- You need client/provider hooks (`McpClientProvider`, `useMcpClient`) in addition to browser-exposed tools.
+<CalculatorExample />
 
-## When not to use this package
+The handler returns `{ total: 7 }` for `{ left: 3, right: 4 }`. React state retains that value;
+the agent response includes text content and `structuredContent: { total: 7 }`.
+The example uses Zod 4.2 or newer; the [framework guide](/how-to/frameworks) covers installation.
 
-- You only need tool registration. Use [`usewebmcp`](/packages/usewebmcp/overview).
+## Package boundary
 
-## Where it sits in the package graph
+Tool lifecycle, execution state, cancellation, and Standard Schema validation come from
+[`usewebmcp`](/packages/usewebmcp/overview). This package adds `outputSchema`, MCP annotations,
+automatic MCP formatting, context tools, prompt/resource hooks, and an MCP client provider.
+Both packages support React 18/19 and preserve `'use client'`.
 
-This package combines two layers: `useWebMCP` works with native or polyfilled tool registration, while prompt and resource hooks use the `BrowserMcpServer` from `@mcp-b/global`.
+<Frame>
+  <img
+    className="block dark:hidden"
+    src="/images/react-hooks/architecture-light.png"
+    alt="The MCP adapter shares usewebmcp's registration, supplied schema validation, execution state, and cancellation, then adds MCP features."
+  />
+  <img
+    className="hidden dark:block"
+    src="/images/react-hooks/architecture-dark.png"
+    alt="The MCP adapter shares usewebmcp's registration, supplied schema validation, execution state, and cancellation, then adds MCP features."
+  />
+</Frame>
 
-React peer dependency: `^18.0.0 || ^19.0.0`.
+Choose `usewebmcp` when you want browser tools with raw results. Choose this package for any of the
+MCP features above. Both call the validator supplied by your input schema; see the
+[schema guide](/how-to/use-schemas-and-structured-output).
 
-## First step
+The [React commit comparison](/packages/usewebmcp/overview#react-updates-measured) measures
+both tool hooks against MCP Cat and Google's hooks. The
+[full results and feature table](https://github.com/WebMCP-org/npm-packages/tree/b45d1e9e2e51b0b49f959b02960e37002d0a65bf/benchmarks/react-hooks)
+explain the scenarios and API differences.
 
-Choose the owner for the hooks you use: `useWebMCP` needs native WebMCP or an initialized polyfill; prompt and resource hooks need [`@mcp-b/global`](/packages/global/overview); client/provider hooks use their configured MCP client and transport without requiring a browser runtime. The [reference page](/packages/react-webmcp/reference) covers each surface.
+## Runtime requirements
 
-## Related pages
+| Surface                       | Runtime                                                                         |
+| ----------------------------- | ------------------------------------------------------------------------------- |
+| Tool and context hooks        | Native WebMCP, an initialized polyfill, or the MCP-B runtime                    |
+| Prompt and resource hooks     | [`@mcp-b/global`](/packages/global/overview) or a configured `BrowserMcpServer` |
+| MCP client provider and hooks | A supplied MCP client and transport; no browser registry required               |
 
-<CardGroup cols={2}>
-  <Card title="Reference" icon="book-open" href="/packages/react-webmcp/reference">
-    Hook APIs, provider APIs, schema support, and return types.
-  </Card>
-  <Card title="Your first React tool" icon="graduation-cap" href="/tutorials/first-react-tool">
-    Guided tutorial for registering a React tool.
-  </Card>
-  <Card
-    title="Register prompts and resources"
-    icon="folder-tree"
-    href="/how-to/register-prompts-and-resources"
-  >
-    Apply the full MCP-B React surface.
-  </Card>
-  <Card
-    title="WebMCP and MCP-B extensions"
-    icon="diagram-venn"
-    href="/explanation/strict-core-vs-mcp-b-extensions"
-  >
-    Decide whether the full React surface is necessary.
-  </Card>
-</CardGroup>
+MCP `outputSchema` discovery and protocol validation require the MCP-B runtime. Native WebMCP and
+the standalone polyfill do not advertise this metadata. The [reference](/packages/react-webmcp/reference)
+describes each hook and the [boundary explanation](/explanation/strict-core-vs-mcp-b-extensions)
+connects the browser and MCP layers.

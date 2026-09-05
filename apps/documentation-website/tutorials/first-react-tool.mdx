@@ -10,6 +10,7 @@ In this tutorial, we will create a minimal React app that registers one WebMCP t
 ## Prerequisites
 
 - Node.js 22.12 or later
+- pnpm
 - A text editor
 - A modern web browser
 
@@ -28,15 +29,15 @@ A React app with a single component that:
 
 Create a new React project with Vite:
 
-```bash
-npm create vite@latest my-webmcp-react -- --template react-ts
+```bash title="Create the React app"
+pnpm create vite my-webmcp-react --template react-ts
 cd my-webmcp-react
 ```
 
 Install the WebMCP dependencies:
 
-```bash
-npm install @mcp-b/webmcp-polyfill usewebmcp
+```bash title="Install the hook and polyfill"
+pnpm add @mcp-b/webmcp-polyfill usewebmcp
 ```
 
 `@mcp-b/webmcp-polyfill` provides the `document.modelContext` runtime. `usewebmcp` provides the React hook for tool registration.
@@ -70,7 +71,9 @@ Calling `initializeWebMCPPolyfill()` once at the top level makes `document.model
 
 Replace the contents of `src/App.tsx` with:
 
-```tsx src/App.tsx
+```tsx title="src/App.tsx"
+'use client';
+
 import { useWebMCP } from 'usewebmcp';
 
 const INPUT_SCHEMA = {
@@ -86,7 +89,7 @@ export function App() {
     description: 'Returns a hello message',
     inputSchema: INPUT_SCHEMA,
     execute: async (args) => ({
-      content: [{ type: 'text', text: `Hello ${args?.name ?? 'world'}!` }],
+      message: `Hello ${args.name ?? 'world'}!`,
     }),
   });
 
@@ -114,8 +117,8 @@ The `useWebMCP` hook registers the tool when the component mounts and unregister
 
 <Step title="Start the development server">
 
-```bash
-npm run dev
+```bash title="Start Vite"
+pnpm dev
 ```
 
 Open `http://localhost:5173` in your browser. You should see:
@@ -135,7 +138,7 @@ Click the **Run Tool Locally** button. Notice the page updates:
 
 ```text title="Expected result"
 Executions: 1
-Last result: {"content":[{"type":"text","text":"Hello React!"}]}
+Last result: {"message":"Hello React!"}
 ```
 
 Click the button a few more times. The execution count increases with each click.
@@ -146,7 +149,7 @@ Click the button a few more times. The execution count increases with each click
 
 Open the browser console (F12) and verify the tool is registered:
 
-```javascript
+```javascript title="Find the registered tool"
 const modelContext = document.modelContext;
 const tools = await modelContext.getTools();
 console.log(tools);
@@ -154,7 +157,7 @@ console.log(tools);
 
 You should see an array containing your `say_hello` tool. Now feature-detect the polyfill's serialized-JSON execution method and call it:
 
-```javascript
+```javascript title="Call the tool through the polyfill"
 const tool = tools.find((candidate) => candidate.name === 'say_hello');
 if (!tool) throw new Error('say_hello is not registered');
 
@@ -169,9 +172,9 @@ console.log(result === null ? null : JSON.parse(result));
 
 The output should be an object containing the tool response:
 
-```json
+```json title="Expected agent result"
 {
-  "content": [{ "type": "text", "text": "Hello Console!" }]
+  "message": "Hello Console!"
 }
 ```
 
@@ -185,7 +188,7 @@ Notice that the execution count in the UI also incremented, because the same und
 
 - `initializeWebMCPPolyfill()` should be called once at app startup, before components mount
 - `useWebMCP` registers a tool on mount and unregisters on unmount
-- Schema object identity does not trigger re-registration; use `deps` when registered metadata changes
+- Metadata changes update registration automatically; equivalent inline schemas do not cause re-registration
 - The hook returns `state` (with `executionCount`, `lastResult`, `error`, `isExecuting`) and an `execute` function for local invocation
 - Tools registered via the hook are discoverable with `document.modelContext.getTools()` and callable when the runtime exposes its serialized-JSON `executeTool()` signature
 
@@ -193,4 +196,4 @@ Notice that the execution count in the UI also incremented, because the same und
 
 - [WebMCP resources and status](/explanation/design/spec-status-and-limitations) for current native browser guidance
 - [Connect a Desktop Agent](/tutorials/desktop-agent-relay) to let Claude or Cursor call your tools
-- See the [`usewebmcp` reference](/packages/usewebmcp/reference) for the full hook API, output schemas, and advanced patterns
+- See the [`usewebmcp` reference](/packages/usewebmcp/reference) for the full hook API, Standard Schema validation, and cancellation

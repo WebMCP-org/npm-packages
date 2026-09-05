@@ -706,6 +706,9 @@ importers:
       vitest-browser-react:
         specifier: ^2.2.0
         version: 2.2.0(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(@voidzero-dev/vite-plus-test@0.1.24)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
 
   packages/smart-dom-reader:
     devDependencies:
@@ -789,16 +792,22 @@ importers:
 
   packages/usewebmcp:
     dependencies:
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
+      webmcp-types:
+        specifier: ^0.1.6
+        version: 0.1.6
+    devDependencies:
+      '@mcp-b/global':
+        specifier: workspace:*
+        version: link:../global
       '@mcp-b/webmcp-polyfill':
         specifier: workspace:*
         version: link:../webmcp-polyfill
       '@mcp-b/webmcp-types':
         specifier: workspace:*
         version: link:../webmcp-types
-    devDependencies:
-      '@mcp-b/global':
-        specifier: workspace:*
-        version: link:../global
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.1
@@ -968,6 +977,9 @@ importers:
       '@modelcontextprotocol/server':
         specifier: 'catalog:'
         version: 2.0.0
+      webmcp-types:
+        specifier: ^0.1.6
+        version: 0.1.6
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -11518,6 +11530,9 @@ packages:
 
   webidl-conversions@3.0.1:
     resolution: {integrity: sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==}
+
+  webmcp-types@0.1.6:
+    resolution: {integrity: sha512-vWYNhhBXQhP4flPIk3sJuzsonPGSTdDyhWgpmPYCNdpIcLHJgjHE51lU0S7gi+UtdxO84FsCnvSJaMfLGWP+3Q==}
 
   whatwg-mimetype@3.0.0:
     resolution: {integrity: sha512-nt+N2dzIutVRxARx1nghPKGv1xHikU7HKdfafKkLNLindmPU/ch3U31NOCGGA/dmPcmb1VlofO0vnKAcsm0o/Q==}
@@ -24906,6 +24921,8 @@ snapshots:
   web-namespaces@2.0.1: {}
 
   webidl-conversions@3.0.1: {}
+
+  webmcp-types@0.1.6: {}
 
   whatwg-mimetype@3.0.0:
     optional: true

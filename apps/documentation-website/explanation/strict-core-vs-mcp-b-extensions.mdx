@@ -24,7 +24,7 @@ flowchart TB
   end
 
   subgraph Project["MCP-B packages"]
-    Portable["Portable layer<br/>types, helpers, polyfill"]
+    Portable["Portable layer<br/>hooks, helpers, polyfill"]
     Extensions["Extension layer<br/>BrowserMcpServer, MCP features, transports"]
     Portable -->|"extended by"| Extensions
   end
@@ -52,3 +52,47 @@ that need prompts, resources, bridges, or desktop MCP clients use the extension
 layer. See [Runtime layering](/explanation/architecture/runtime-layering) for
 the composition model and [Choose a runtime](/how-to/choose-runtime) for
 package selection.
+
+## Why Standard Schema support lives in the adapters
+
+A tool needs both a description of its input and a way to check actual arguments. These are separate
+jobs. [Standard JSON Schema](https://standardschema.dev/json-schema) lets a schema library produce
+JSON Schema metadata. [Standard Schema](https://standardschema.dev/) lets an integration call that
+library's validator. The library remains responsible for its refinements, defaults, transforms, and
+async checks.
+
+The shared [`usewebmcp` hook](/packages/usewebmcp/reference) owns the React callback, so it can run the
+supplied validator before either a local call or an agent call. This keeps validation consistent
+whether `document.modelContext` comes from the browser, the polyfill, or the MCP-B runtime. It adds
+no dependency on a validation engine. [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) uses
+the same callback and adds MCP result formatting and output metadata.
+
+```mermaid
+flowchart TD
+  Schema["Your schema library"] --> Metadata["Standard JSON Schema conversion"]
+  Metadata --> Browser["JSON metadata registered with WebMCP"]
+  Schema --> Validator["Supplied Standard Schema validator"]
+  Agent["Agent call"] --> Hook["React hook callback"]
+  Local["Local execute call"] --> Hook
+  Hook --> Validator
+  Validator -->|"Validated and transformed input"| Handler["Your tool implementation"]
+```
+
+The standalone polyfill keeps its browser contract focused on JSON Schema metadata. Adding an
+optional helper under [`@mcp-b/webmcp-polyfill/schema`](/packages/webmcp-polyfill/reference#schema-entry)
+does not change `document.modelContext.registerTool()` or make it call a validator. This is an
+adapter extension, not a browser API feature. Declarative forms separately use the browser's form
+constraint validation.
+
+The MCP route has another validation owner: the official server composed by
+[`BrowserMcpServer`](/packages/webmcp-ts-sdk/reference#schema-boundary). It can use a validator
+preserved by the schema adapter, but direct browser calls bypass that MCP server. React hooks
+therefore forward plain JSON metadata and keep vendor validation in their callback. Applying a
+string-to-number transform in both places would feed the first transform's number back into a
+validator expecting a string.
+
+The [schema guide](/how-to/use-schemas-and-structured-output) shows how to keep one owner for vendor
+validation when registering directly, and how to add MCP output schemas independently. Upstream
+[`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) owns the core browser declarations;
+[`@mcp-b/webmcp-types`](/packages/webmcp-types/reference) derives compatibility and MCP extension types.
+Neither type package performs runtime validation.

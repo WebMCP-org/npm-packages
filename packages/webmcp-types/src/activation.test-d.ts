@@ -1,5 +1,5 @@
 import { expectTypeOf, test } from 'vitest';
-import type { ModelContext } from './index.js';
+import type { WebMCP } from './index.js';
 
 test('type-only import activates global Document.modelContext typing', () => {
   expectTypeOf<Document>().toHaveProperty('modelContext');
@@ -9,7 +9,7 @@ test('type-only import activates global Document.modelContext typing', () => {
 test('Document.modelContext is optional so feature detection narrows it', () => {
   const useWhenPresent = (doc: Document) => {
     if (!doc.modelContext) return;
-    expectTypeOf(doc.modelContext).toEqualTypeOf<ModelContext>();
+    expectTypeOf(doc.modelContext).toEqualTypeOf<WebMCP.ModelContext>();
   };
   expectTypeOf(useWhenPresent).toBeFunction();
 });
