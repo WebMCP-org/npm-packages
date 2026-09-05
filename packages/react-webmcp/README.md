@@ -47,15 +47,13 @@ Import `@mcp-b/global` once in your client entry. Zod is optional; compatible sc
 
 Native WebMCP and the standalone polyfill do not advertise MCP `outputSchema` metadata. Use the MCP-B runtime to expose that metadata to MCP clients.
 
-## Choose between the two tool hooks
+## Compare hooks
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WebMCP-org/npm-packages/01afe21437ce4fe429c3d57162edf10f61cbe38e/apps/documentation-website/images/react-hooks/architecture-dark.png">
-  <img src="https://raw.githubusercontent.com/WebMCP-org/npm-packages/01afe21437ce4fe429c3d57162edf10f61cbe38e/apps/documentation-website/images/react-hooks/architecture-light.png" alt="Choose usewebmcp for raw browser tools or @mcp-b/react-webmcp for MCP features. Both use your schema library and runtime.">
-</picture>
+Use `usewebmcp` for raw browser tools. This package adds MCP responses, prompts, resources,
+and client hooks. Both share registration, validation, execution state, and cancellation.
 
-Both hooks share registration, validation, execution state, and cancellation.
-See the [measured comparison](https://docs.mcp-b.ai/packages/usewebmcp/overview#react-updates-measured).
+[Performance comparison](https://docs.mcp-b.ai/packages/usewebmcp/overview#performance-comparison) ·
+[Feature matrix](https://docs.mcp-b.ai/packages/usewebmcp/overview#feature-comparison)
 
 ## Schemas and results
 

@@ -23,21 +23,11 @@ For `{ left: 3, right: 4 }`, React state holds `{ total: 7 }`; the agent receive
 
 ## Package boundary
 
-<Frame>
-  <img
-    className="block dark:hidden"
-    src="/images/react-hooks/architecture-light.png"
-    alt="Choose usewebmcp for raw browser tools or @mcp-b/react-webmcp for MCP features. Both use your schema library and runtime."
-  />
-  <img
-    className="hidden dark:block"
-    src="/images/react-hooks/architecture-dark.png"
-    alt="Choose usewebmcp for raw browser tools or @mcp-b/react-webmcp for MCP features. Both use your schema library and runtime."
-  />
-</Frame>
-
 Both hooks share lifecycle, Standard Schema validation, and React 18/19 support, including
-`'use client'`. See the [React commit comparison](/packages/usewebmcp/overview#react-updates-measured).
+`'use client'`. This package adds MCP responses, prompts, resources, and client hooks.
+
+[Performance comparison](/packages/usewebmcp/overview#performance-comparison) ·
+[Feature matrix](/packages/usewebmcp/overview#feature-comparison)
 
 ## Runtime requirements
 

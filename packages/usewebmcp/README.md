@@ -52,15 +52,28 @@ initializeWebMCPPolyfill();
 
 Use [`@mcp-b/global`](../global/README.md) for MCP server features. Browser types come from the Community Group's [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types).
 
-## React updates, measured
+## Performance comparison
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WebMCP-org/npm-packages/0ec463b7d622a35b8df1d70d0ba3323f5e65aa8b/apps/documentation-website/images/react-hooks/performance-dark.png">
-  <img src="https://raw.githubusercontent.com/WebMCP-org/npm-packages/0ec463b7d622a35b8df1d70d0ba3323f5e65aa8b/apps/documentation-website/images/react-hooks/performance-light.png" alt="All four hooks make zero re-registrations on parent updates and ten registrations on metadata edits. Google and our hooks produce twenty metadata commits; MCP Cat ten. Starting calls: our hooks one commit, MCP Cat ten; Google has no execution state.">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WebMCP-org/npm-packages/b6f59f720d7be452e239ceb18bc25394f0823e38/apps/documentation-website/images/react-hooks/performance-dark.png">
+  <img src="https://raw.githubusercontent.com/WebMCP-org/npm-packages/b6f59f720d7be452e239ceb18bc25394f0823e38/apps/documentation-website/images/react-hooks/performance-light.png" alt="Re-renders for 10 description changes: usewebmcp 20, MCP-B React 20, MCP Cat 10, Google 20. For 10 overlapping calls, start to finish: 11, 11, 20; Google exposes no execution state.">
 </picture>
 
-Registration calls and React commits are measured separately for all four hooks.
-[Full results and methodology](https://github.com/WebMCP-org/npm-packages/tree/0ec463b7d622a35b8df1d70d0ba3323f5e65aa8b/benchmarks/react-hooks).
+Registration is a tie: all four make 0 registrations on 10 unrelated re-renders, and 10 registrations on 10 description changes.
+[Benchmark details](https://github.com/WebMCP-org/npm-packages/tree/b6f59f720d7be452e239ceb18bc25394f0823e38/benchmarks/react-hooks).
+
+## Feature comparison
+
+| Feature                         | `usewebmcp`     | `@mcp-b/react-webmcp` | MCP Cat | Google |
+| ------------------------------- | --------------- | --------------------- | ------- | ------ |
+| Schema validation               | Standard Schema | Standard Schema       | Zod     | Manual |
+| Registration status             | Yes             | Yes                   | No      | Yes    |
+| Running, result & error state   | Yes             | Yes                   | Yes     | No     |
+| Call tools from React           | Yes             | Yes                   | Yes     | No     |
+| Automatic MCP result formatting | No              | Yes                   | No      | Yes    |
+| Prompt & resource hooks         | No              | Yes                   | No      | No     |
+
+All four accept JSON Schema. Compared: our PR #329, [MCP Cat 1.1.0](https://www.npmjs.com/package/webmcp-react/v/1.1.0), and [Google 0.2.0](https://www.npmjs.com/package/use-webmcp-tool/v/0.2.0).
 
 ## Validate input with your schema library
 
@@ -94,17 +107,6 @@ The hook calls your schema's converter and validator, including async validation
 and transforms. It ships no validation engine. Plain JSON Schema provides metadata and
 inference only; validate in your handler when using it.
 [Schema details](https://docs.mcp-b.ai/packages/usewebmcp/reference#schemas-and-inference).
-
-## How the packages fit together
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WebMCP-org/npm-packages/01afe21437ce4fe429c3d57162edf10f61cbe38e/apps/documentation-website/images/react-hooks/architecture-dark.png">
-  <img src="https://raw.githubusercontent.com/WebMCP-org/npm-packages/01afe21437ce4fe429c3d57162edf10f61cbe38e/apps/documentation-website/images/react-hooks/architecture-light.png" alt="Choose usewebmcp for raw browser tools or @mcp-b/react-webmcp for MCP features. Both use your schema library and runtime.">
-</picture>
-
-Both hooks share Standard Schema support. Outside React, the optional
-[polyfill schema helper](../webmcp-polyfill/README.md#schema-helpers) converts metadata only;
-see the [schema guide](https://docs.mcp-b.ai/how-to/use-schemas-and-structured-output) for validation.
 
 ## State and lifecycle
 
