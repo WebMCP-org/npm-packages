@@ -45,6 +45,7 @@ interface PendingRequest {
   timeoutId: ReturnType<typeof setTimeout>;
   responseType: string;
   errorType: string;
+  callId?: string;
 }
 
 interface RelayHelloMessage {
@@ -417,6 +418,7 @@ async function probeRelayEndpoint(candidate: {
 
 function runWidget(cfg: WidgetConfig): void {
   const pendingRequests = new Map<string, PendingRequest>();
+  const invocationRequests = new Map<string, string>();
   let activeEndpoint: RelayEndpoint | null = null;
   let activeSocket: WebSocket | null = null;
   let helloAccepted = false;
@@ -426,21 +428,39 @@ function runWidget(cfg: WidgetConfig): void {
   let discoveryCycleCount = 0;
   let dormantHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
-  const rejectPendingRequests = (reason: string): void => {
-    for (const [requestId, pending] of pendingRequests) {
+  const takePendingRequest = (requestId: string): PendingRequest | undefined => {
+    const pending = pendingRequests.get(requestId);
+    if (pending) {
       clearTimeout(pending.timeoutId);
       pendingRequests.delete(requestId);
-      pending.reject(new Error(reason));
+      if (pending.callId !== undefined) invocationRequests.delete(pending.callId);
     }
+    return pending;
   };
 
-  function requestHost(baseType: string, payload: Record<string, unknown>): Promise<HostMessage> {
+  const cancelHostRequest = (requestId: string, reason: string): void => {
+    const pending = takePendingRequest(requestId);
+    if (!pending) return;
+    if (pending.callId !== undefined) {
+      window.parent.postMessage({ type: 'webmcp.tools.cancel.request', requestId }, cfg.hostOrigin);
+    }
+    pending.reject(new Error(reason));
+  };
+
+  const rejectPendingRequests = (reason: string): void => {
+    for (const requestId of pendingRequests.keys()) cancelHostRequest(requestId, reason);
+  };
+
+  function requestHost(
+    baseType: string,
+    payload: Record<string, unknown>,
+    callId?: string
+  ): Promise<HostMessage> {
     const requestId = createRequestId();
 
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
-        pendingRequests.delete(requestId);
-        reject(new Error(`Host response timeout: ${baseType}`));
+        cancelHostRequest(requestId, `Host response timeout: ${baseType}`);
       }, cfg.requestTimeoutMs);
 
       pendingRequests.set(requestId, {
@@ -449,7 +469,9 @@ function runWidget(cfg: WidgetConfig): void {
         timeoutId,
         responseType: `${baseType}.response`,
         errorType: `${baseType}.error`,
+        ...(callId === undefined ? {} : { callId }),
       });
+      if (callId !== undefined) invocationRequests.set(callId, requestId);
 
       window.parent.postMessage(
         { type: `${baseType}.request`, requestId, ...payload },
@@ -485,6 +507,7 @@ function runWidget(cfg: WidgetConfig): void {
     phase = 'idle';
 
     socket.addEventListener('message', (event) => {
+      if (activeSocket !== socket) return;
       let parsed: unknown;
       try {
         parsed = JSON.parse(String(event.data));
@@ -554,6 +577,13 @@ function runWidget(cfg: WidgetConfig): void {
         return;
       }
 
+      if (relayMessage.type === 'cancel') {
+        if (typeof relayMessage.callId !== 'string') return;
+        const requestId = invocationRequests.get(relayMessage.callId);
+        if (requestId !== undefined) cancelHostRequest(requestId, 'Tool execution cancelled');
+        return;
+      }
+
       if (relayMessage.type !== 'invoke') {
         console.debug(
           '[webmcp-relay-widget] Ignoring unrecognized message type:',
@@ -562,10 +592,18 @@ function runWidget(cfg: WidgetConfig): void {
         return;
       }
 
-      requestHost('webmcp.tools.invoke', {
-        toolName: relayMessage.toolName,
-        args: isJsonObject(relayMessage.args) ? relayMessage.args : {},
-      })
+      if (typeof relayMessage.callId !== 'string' || invocationRequests.has(relayMessage.callId)) {
+        return;
+      }
+
+      requestHost(
+        'webmcp.tools.invoke',
+        {
+          toolName: relayMessage.toolName,
+          args: isJsonObject(relayMessage.args) ? relayMessage.args : {},
+        },
+        relayMessage.callId
+      )
         .then((hostResponse) => {
           safeSend(
             socket,
@@ -886,15 +924,13 @@ function runWidget(cfg: WidgetConfig): void {
     }
 
     if (message.type === pending.responseType) {
-      clearTimeout(pending.timeoutId);
-      pendingRequests.delete(message.requestId);
+      takePendingRequest(message.requestId);
       pending.resolve(message);
       return;
     }
 
     if (message.type === pending.errorType) {
-      clearTimeout(pending.timeoutId);
-      pendingRequests.delete(message.requestId);
+      takePendingRequest(message.requestId);
       pending.reject(new Error(String(message.error || 'Unknown host error')));
     }
   });

@@ -28,7 +28,7 @@ const RUNTIME_CONTRACT_MODULE_PATH = resolve(
 const REAL_EMBED_PATH = resolve(PACKAGE_DIR, 'dist/browser/embed.js');
 const REAL_WIDGET_PATH = resolve(PACKAGE_DIR, 'dist/browser/widget.html');
 
-type RuntimeMode = 'fixture-native' | 'global' | 'polyfill-testing';
+type RuntimeMode = 'native' | 'fixture-native' | 'global' | 'polyfill-testing';
 
 interface RuntimeCase {
   mode: RuntimeMode;
@@ -604,6 +604,12 @@ async function setupE2EHarness(options: {
     browser = await chromium.launch({
       headless: true,
       channel: process.env.PLAYWRIGHT_CHROMIUM_CHANNEL,
+      ...(runtimeCase.mode === 'native'
+        ? {
+            executablePath: process.env.CHROME_BIN,
+            args: ['--enable-features=WebMCP'],
+          }
+        : {}),
     });
     page = await browser.newPage();
     page.on('pageerror', (runtimeError) => {
@@ -893,6 +899,85 @@ describe('relay e2e (real browser assets)', () => {
       }
     });
   }
+
+  it.runIf(process.env.WEBMCP_NATIVE === '1').each(['server', 'client'] as const)(
+    'forwards MCP cancellation to a native browser handler in %s mode',
+    async (mode) => {
+      let widgetServer: StartedHttpServer | null = null;
+      let ownerRelay: SpawnedRelay | null = null;
+      let harness: E2EHarness | null = null;
+
+      try {
+        const relayPort = await getOpenPort();
+        widgetServer = await startWidgetAssetServer();
+        if (mode === 'client') ownerRelay = await startRelayProcess(relayPort);
+        harness = await setupE2EHarness({
+          runtimeCase: { mode: 'native', scriptRoute: '/runtime/native.js', scriptSource: '' },
+          relayPort,
+          widgetOrigin: widgetServer.origin,
+          clientName: `webmcp-local-relay-e2e-cancellation-${mode}`,
+        });
+
+        await harness.page.evaluate(async () => {
+          if (!document.modelContext || Reflect.get(document.modelContext, '__isWebMCPPolyfill')) {
+            throw new Error('This test requires native Chrome WebMCP');
+          }
+          await document.modelContext.registerTool({
+            name: 'cancel_cooperative',
+            description: 'Waits until the MCP caller cancels',
+            inputSchema: { type: 'object', properties: {} },
+            execute: (_input, options?: { signal: AbortSignal }) => {
+              if (!options?.signal) throw new Error('Native execution signal is unavailable');
+              const { signal } = options;
+              document.documentElement.dataset.relayExecution = 'started';
+              return new Promise<never>((_resolve, reject) => {
+                signal.addEventListener(
+                  'abort',
+                  () => {
+                    document.documentElement.dataset.relayExecution = 'aborted';
+                    reject(signal.reason);
+                  },
+                  { once: true }
+                );
+              });
+            },
+          });
+        });
+        await waitForValue(async () => {
+          const tools = await harness?.client.listTools();
+          return tools?.tools.some((tool) => tool.name === 'cancel_cooperative') ? true : undefined;
+        });
+
+        const controller = new AbortController();
+        const call = harness.client
+          .callTool({ name: 'cancel_cooperative', arguments: {} }, { signal: controller.signal })
+          .then(
+            () => 'resolved',
+            () => 'rejected'
+          );
+        await harness.page.waitForFunction(
+          () => document.documentElement.dataset.relayExecution === 'started'
+        );
+        controller.abort(new Error('Cancelled by the MCP caller'));
+        expect(await call).toBe('rejected');
+        await harness.page.waitForFunction(
+          () => document.documentElement.dataset.relayExecution === 'aborted'
+        );
+
+        const next = await harness.client.callTool({
+          name: harness.expectedToolName,
+          arguments: { a: 2, b: 5 },
+        });
+        expect(firstContentText(next)).toBe('sum:7');
+      } catch (error) {
+        throw formatE2EError(`native cancellation ${mode}`, error, harness, ownerRelay?.logs);
+      } finally {
+        await harness?.cleanup();
+        await ownerRelay?.stop();
+        await stopHttpServer(widgetServer?.server ?? null);
+      }
+    }
+  );
 
   it('works through a second relay in client mode when port owner already exists', async () => {
     let widgetServer: StartedHttpServer | null = null;

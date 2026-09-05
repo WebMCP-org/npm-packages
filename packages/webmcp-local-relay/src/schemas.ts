@@ -129,6 +129,11 @@ const RelayInvokeMessageSchema = z.object({
   args: RelayInvokeArgsSchema,
 });
 
+const RelayCancelMessageSchema = z.object({
+  type: z.literal('cancel'),
+  callId: z.string().min(1),
+});
+
 const RelayPingMessageSchema = z.object({
   type: z.literal('ping'),
 });
@@ -145,6 +150,7 @@ export const RelayToBrowserMessageSchema = z.discriminatedUnion('type', [
   RelayHelloAcceptedMessageSchema,
   RelayHelloRejectedMessageSchema,
   RelayInvokeMessageSchema,
+  RelayCancelMessageSchema,
   RelayPingMessageSchema,
   RelayReloadMessageSchema,
 ]);
@@ -189,6 +195,11 @@ const RelayClientInvokeSchema = z.object({
   args: RelayInvokeArgsSchema,
 });
 
+const RelayClientCancelSchema = z.object({
+  type: z.literal('relay/cancel'),
+  callId: z.string().min(1),
+});
+
 /**
  * Union schema for all relay-client-to-server messages.
  */
@@ -196,6 +207,7 @@ export const RelayClientToServerMessageSchema = z.discriminatedUnion('type', [
   RelayClientHelloSchema,
   RelayClientListToolsSchema,
   RelayClientInvokeSchema,
+  RelayClientCancelSchema,
 ]);
 
 /**

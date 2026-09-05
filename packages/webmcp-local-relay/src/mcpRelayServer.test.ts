@@ -699,6 +699,37 @@ describe('LocalRelayMcpServer', () => {
     await cleanup();
   });
 
+  it('forwards MCP caller cancellation to the browser execution', async () => {
+    const { bridge, client, cleanup } = await createConnectedRelay({ invokeTimeoutMs: 2000 });
+    let ws: WebSocket | undefined;
+    try {
+      ws = await connectBrowser(bridge, {
+        tabId: 'tab-cancel',
+        url: 'https://example.com',
+        tools: [{ name: 'slow_tool', description: 'Waits for cancellation' }],
+      });
+      const messages: Array<{ type: string; callId: string }> = [];
+      ws.on('message', (raw) => messages.push(JSON.parse(String(raw))));
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+      await waitForClientTool(client, toolName);
+
+      const controller = new AbortController();
+      const pending = client.callTool(
+        { name: toolName, arguments: {} },
+        { signal: controller.signal }
+      );
+      const rejected = expect(pending).rejects.toThrow('caller cancelled');
+      const invocation = await waitFor(() => messages.find((message) => message.type === 'invoke'));
+      controller.abort(new Error('caller cancelled'));
+      await rejected;
+      const cancel = await waitFor(() => messages.find((message) => message.type === 'cancel'));
+      expect(cancel.callId).toBe(invocation.callId);
+    } finally {
+      ws?.close();
+      await cleanup();
+    }
+  });
+
   it('drops invalid annotations with a warning', async () => {
     const { bridge, relay, cleanup } = await createConnectedRelay();
 
