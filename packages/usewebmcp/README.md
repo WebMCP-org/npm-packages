@@ -54,6 +54,24 @@ initializeWebMCPPolyfill();
 
 Use [`@mcp-b/global`](../global/README.md) instead when you need an MCP server and transports. `usewebmcp` itself installs neither a polyfill nor an MCP SDK. Its browser types come from the Community Group's [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types).
 
+## React updates, measured
+
+Write tool definitions inline, keep handlers current, and observe execution from your component.
+Equivalent inline schemas stay registered across parent updates. Overlapping calls share pending
+state, while each completed call publishes its result.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WebMCP-org/npm-packages/b45d1e9e2e51b0b49f959b02960e37002d0a65bf/apps/documentation-website/images/react-hooks/performance-dark.png">
+  <img src="https://raw.githubusercontent.com/WebMCP-org/npm-packages/b45d1e9e2e51b0b49f959b02960e37002d0a65bf/apps/documentation-website/images/react-hooks/performance-light.png" alt="Starting ten overlapping calls: usewebmcp and its MCP adapter each commit once; MCP Cat webmcp-react 1.1.0 commits ten times.">
+</picture>
+
+The fixture runs five times with StrictMode on and five with it off, using React 19.2.8 and
+native Chrome WebMCP. All four hooks avoid re-registration for equivalent definitions.
+Google's `use-webmcp-tool` exposes registration state only, so it is excluded from this
+execution-state chart. These counts describe this scenario, not execution speed.
+See the [full results, feature comparison, and reproduction steps](https://github.com/WebMCP-org/npm-packages/tree/b45d1e9e2e51b0b49f959b02960e37002d0a65bf/benchmarks/react-hooks),
+including metadata updates and call completion.
+
 ## Validate input with your schema library
 
 Pass a schema that provides both Standard JSON Schema conversion and Standard Schema validation. This example uses Zod 4.2 or newer (`pnpm add zod@^4.2`):
@@ -100,15 +118,10 @@ Plain JSON Schema objects are supported too, with inferred inputs. They describe
 
 ## How the packages fit together
 
-```mermaid
-flowchart TD
-  Schema["Your schema library"] -->|"JSON Schema metadata"| Runtime["Native WebMCP or a supplied runtime"]
-  Runtime -->|"Agent arguments"| Hook["usewebmcp callback"]
-  Local["Local tool.execute(input)"] --> Hook
-  Hook -->|"Calls the supplied validate method"| Validate["Validated and transformed input"]
-  Validate --> Handler["Your execute handler"]
-  Handler --> Result["Raw result and React state"]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WebMCP-org/npm-packages/b45d1e9e2e51b0b49f959b02960e37002d0a65bf/apps/documentation-website/images/react-hooks/architecture-dark.png">
+  <img src="https://raw.githubusercontent.com/WebMCP-org/npm-packages/b45d1e9e2e51b0b49f959b02960e37002d0a65bf/apps/documentation-website/images/react-hooks/architecture-light.png" alt="Your component uses usewebmcp for registration, validation, and execution state with a supplied runtime. Your schema library supplies validation; the MCP adapter adds protocol features.">
+</picture>
 
 Standard Schema support lives in this hook so it works with either native WebMCP or the polyfill. [`@mcp-b/react-webmcp`](../react-webmcp/README.md) reuses it and adds MCP features.
 

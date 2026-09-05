@@ -70,6 +70,18 @@ Native WebMCP and the standalone polyfill do not advertise MCP `outputSchema` me
 
 Choose [`usewebmcp`](../usewebmcp/README.md) when you need browser tools with raw results. Choose this package when you need MCP formatting or the additional hooks. Both accept the same Standard Schema inputs.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WebMCP-org/npm-packages/b45d1e9e2e51b0b49f959b02960e37002d0a65bf/apps/documentation-website/images/react-hooks/architecture-dark.png">
+  <img src="https://raw.githubusercontent.com/WebMCP-org/npm-packages/b45d1e9e2e51b0b49f959b02960e37002d0a65bf/apps/documentation-website/images/react-hooks/architecture-light.png" alt="The MCP adapter shares usewebmcp's lifecycle and supplied schema validation, then adds MCP results, output schemas, and context, prompt, resource, and client hooks.">
+</picture>
+
+The shared lifecycle also keeps execution updates small: starting ten overlapping calls
+produced one React commit in each of our tool hooks, versus ten in MCP Cat's
+`webmcp-react` 1.1.0. All four hooks tested avoided re-registration for equivalent inline
+definitions. This is a commit count for one fixture; the
+[full results and feature comparison](https://github.com/WebMCP-org/npm-packages/tree/b45d1e9e2e51b0b49f959b02960e37002d0a65bf/benchmarks/react-hooks)
+cover the other scenarios and the differences in exposed state.
+
 ## Input validation uses your schema
 
 `useWebMCP` delegates conversion and validation to the shared `usewebmcp` hook:

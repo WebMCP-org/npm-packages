@@ -30,9 +30,27 @@ Tool lifecycle, execution state, cancellation, and Standard Schema validation co
 automatic MCP formatting, context tools, prompt/resource hooks, and an MCP client provider.
 Both packages support React 18/19 and preserve `'use client'`.
 
+<Frame>
+  <img
+    className="block dark:hidden"
+    src="/images/react-hooks/architecture-light.png"
+    alt="The MCP adapter shares usewebmcp's registration, supplied schema validation, execution state, and cancellation, then adds MCP features."
+  />
+  <img
+    className="hidden dark:block"
+    src="/images/react-hooks/architecture-dark.png"
+    alt="The MCP adapter shares usewebmcp's registration, supplied schema validation, execution state, and cancellation, then adds MCP features."
+  />
+</Frame>
+
 Choose `usewebmcp` when you want browser tools with raw results. Choose this package for any of the
 MCP features above. Both call the validator supplied by your input schema; see the
 [schema guide](/how-to/use-schemas-and-structured-output).
+
+The [React commit comparison](/packages/usewebmcp/overview#react-updates-measured) measures
+both tool hooks against MCP Cat and Google's hooks. The
+[full results and feature table](https://github.com/WebMCP-org/npm-packages/tree/b45d1e9e2e51b0b49f959b02960e37002d0a65bf/benchmarks/react-hooks)
+explain the scenarios and API differences.
 
 ## Runtime requirements
 

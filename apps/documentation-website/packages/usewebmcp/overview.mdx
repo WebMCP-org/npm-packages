@@ -14,6 +14,30 @@ import CounterExample from '/snippets/packages/usewebmcp-quickstart.mdx';
 The next agent call observes the updated counter after each click. The hook registers after commit,
 keeps the latest committed callback, and removes the registration on unmount.
 
+## React updates, measured
+
+Equivalent inline schemas stay registered across parent updates. Overlapping calls share
+pending state, while completed calls publish their results.
+
+<Frame caption="Five trials per StrictMode setting, using React 19.2.8 and native Chrome WebMCP.">
+  <img
+    className="block dark:hidden"
+    src="/images/react-hooks/performance-light.png"
+    alt="Starting ten overlapping calls: usewebmcp and its MCP adapter each commit once; MCP Cat webmcp-react 1.1.0 commits ten times."
+  />
+  <img
+    className="hidden dark:block"
+    src="/images/react-hooks/performance-dark.png"
+    alt="Starting ten overlapping calls: usewebmcp and its MCP adapter each commit once; MCP Cat webmcp-react 1.1.0 commits ten times."
+  />
+</Frame>
+
+All four hooks tested avoid re-registration for equivalent definitions. Google's
+`use-webmcp-tool` exposes registration state only, so it is excluded from this execution-state
+chart. These counts describe this fixture, not execution speed. The
+[full results and feature comparison](https://github.com/WebMCP-org/npm-packages/tree/b45d1e9e2e51b0b49f959b02960e37002d0a65bf/benchmarks/react-hooks)
+include metadata updates, call completion, pinned versions, and reproduction steps.
+
 ## Package boundary
 
 The hook uses the Community Group's [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types).
