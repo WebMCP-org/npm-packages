@@ -37,16 +37,28 @@
         width: 100%;
         border-collapse: collapse;
         text-align: left;
+        table-layout: fixed;
       }
       th,
       td {
-        padding: 17px 0;
+        padding: 15px 10px;
         border-top: 1px solid var(--sigvelo-color-neutral-border-muted);
       }
-      th {
-        width: 310px;
+      tbody th {
         font-size: 20px;
         font-weight: 500;
+      }
+      thead th {
+        font-size: 15px;
+        text-align: center;
+        font-weight: 500;
+      }
+      thead th:first-child[rowspan] {
+        width: 280px;
+        text-align: left;
+      }
+      .divider {
+        border-left: 1px solid var(--sigvelo-color-neutral-border-muted);
       }
       small {
         display: block;
@@ -58,20 +70,22 @@
       svg {
         display: block;
         width: 100%;
-        height: 22px;
+        height: 6px;
+        margin-top: 8px;
       }
       rect {
         fill: var(--sigvelo-color-viz-series-1);
       }
-      .count {
-        width: 56px;
-        padding-left: 16px;
-        text-align: right;
-        font-size: 28px;
+      td {
+        text-align: center;
+        font-size: 26px;
         font-variant-numeric: tabular-nums;
       }
       .unavailable {
-        font-size: 20px;
+        font-size: 18px;
+      }
+      .unavailable small {
+        font-size: 13px;
       }
       .source {
         margin: 20px 0 0;
@@ -100,11 +114,27 @@
   </head>
   <body>
     <article id="performance" aria-labelledby="performance-title">
-      <h1 id="performance-title">Starting 10 overlapping calls</h1>
-      <p class="intro">React commits before any call finishes</p>
-      <table aria-label="React commits while ten calls start">
+      <h1 id="performance-title">Registration and execution</h1>
+      <p class="intro">10 updates or calls per scenario</p>
+      <table aria-label="Registration calls and React commits for all four hooks">
+        <thead>
+          <tr>
+            <th scope="col" rowspan="2">Hook</th>
+            <th scope="colgroup" colspan="2">Registration calls</th>
+            <th scope="colgroup" colspan="2" class="divider">React commits</th>
+          </tr>
+          <tr>
+            <th scope="col">Parent<br />updates</th>
+            <th scope="col">Metadata<br />edits</th>
+            <th scope="col" class="divider">Metadata<br />edits</th>
+            <th scope="col">Call<br />starts</th>
+          </tr>
+        </thead>
         <tbody id="counts"></tbody>
       </table>
+      <p class="source">
+        Metadata edits change the description. Commits include registration-status updates.
+      </p>
       <p class="source" id="measurement-source"></p>
     </article>
     <article id="architecture" aria-labelledby="architecture-title">
@@ -133,6 +163,16 @@
         ['webmcp-react', 'MCP Cat', 'webmcp-react ' + report.packages['webmcp-react']],
         ['use-webmcp-tool', 'Google', 'use-webmcp-tool ' + report.packages['use-webmcp-tool']],
       ];
+      const summarize = (values) => {
+        if (values.some((value) => !Number.isFinite(value) || value < 0)) {
+          throw new Error('Expected non-negative measured counts');
+        }
+        values.sort((a, b) => a - b);
+        return {
+          value: (values[4] + values[5]) / 2,
+          range: values[0] === values[9] ? String(values[0]) : values[0] + '–' + values[9],
+        };
+      };
       const rows = definitions.map(([name, label, detail]) => {
         const samples = report.samples.filter((row) => row.library === name);
         if (
@@ -141,18 +181,27 @@
         ) {
           throw new Error('Expected ten consistent samples per hook');
         }
-        const values = samples.map((row) => row.start).sort((a, b) => a - b);
         return {
           name,
           label,
           detail,
-          value: samples[0].executionState ? (values[4] + values[5]) / 2 : null,
-          range: values[0] === values[9] ? String(values[0]) : values[0] + '–' + values[9],
+          counts: [
+            summarize(samples.map((row) => row.parent.registrations)),
+            summarize(samples.map((row) => row.metadata.registrations)),
+            summarize(samples.map((row) => row.metadata.commits)),
+            samples[0].executionState ? summarize(samples.map((row) => row.start)) : null,
+          ],
         };
       });
       const scale = scaleLinear()
-        .domain([0, Math.max(1, ...rows.map((row) => row.value ?? 0))])
-        .range([0, 500]);
+        .domain([
+          0,
+          Math.max(
+            1,
+            ...rows.flatMap((row) => row.counts.slice(2).map((count) => count?.value ?? 0))
+          ),
+        ])
+        .range([0, 100]);
       for (const row of rows) {
         const tr = document.createElement('tr');
         tr.dataset.library = row.name;
@@ -163,30 +212,31 @@
         detail.textContent = row.detail;
         label.append(detail);
         tr.append(label);
-        const cell = document.createElement('td');
-        if (row.value === null) {
-          cell.colSpan = 2;
-          cell.className = 'unavailable';
-          cell.textContent = 'Not applicable';
-          const reason = document.createElement('small');
-          reason.textContent = 'Tracks registration, not running calls.';
-          cell.append(reason);
+        for (const [index, count] of row.counts.entries()) {
+          const cell = document.createElement('td');
+          if (index === 2) cell.className = 'divider';
+          if (count === null) {
+            cell.className = 'unavailable';
+            cell.textContent = 'N/A';
+            const reason = document.createElement('small');
+            reason.textContent = 'No call state';
+            cell.append(reason);
+          } else {
+            cell.textContent = count.range;
+            if (index >= 2) {
+              const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+              svg.setAttribute('viewBox', '0 0 100 6');
+              svg.setAttribute('preserveAspectRatio', 'none');
+              svg.setAttribute('aria-hidden', 'true');
+              const bar = document.createElementNS(svg.namespaceURI, 'rect');
+              bar.setAttribute('width', String(scale(count.value)));
+              bar.setAttribute('height', '6');
+              bar.setAttribute('rx', '1');
+              svg.append(bar);
+              cell.append(svg);
+            }
+          }
           tr.append(cell);
-        } else {
-          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-          svg.setAttribute('viewBox', '0 0 500 22');
-          svg.setAttribute('preserveAspectRatio', 'none');
-          svg.setAttribute('aria-hidden', 'true');
-          const bar = document.createElementNS(svg.namespaceURI, 'rect');
-          bar.setAttribute('width', String(scale(row.value)));
-          bar.setAttribute('height', '22');
-          bar.setAttribute('rx', '3');
-          svg.append(bar);
-          cell.append(svg);
-          const count = document.createElement('td');
-          count.className = 'count';
-          count.textContent = row.range;
-          tr.append(cell, count);
         }
         document.querySelector('#counts').append(tr);
       }

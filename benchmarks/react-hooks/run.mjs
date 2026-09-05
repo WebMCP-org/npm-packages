@@ -122,7 +122,7 @@ try {
         : `${Math.min(...values)}–${Math.max(...values)}`;
     const table = [...new Set(samples.map((sample) => sample.library))].map((name) => {
       const rows = samples.filter((sample) => sample.library === name);
-      return `| ${name} | ${range(rows.map((row) => row.parent.commits))} | ${range(rows.map((row) => row.parent.registrations))} | ${range(rows.map((row) => row.metadata.commits))} | ${rows[0].executionState ? range(rows.map((row) => row.start)) : 'N/A'} | ${rows[0].executionState ? range(rows.map((row) => row.settle)) : 'N/A'} |`;
+      return `| ${name} | ${range(rows.map((row) => row.parent.commits))} | ${range(rows.map((row) => row.parent.registrations))} | ${range(rows.map((row) => row.metadata.registrations))} | ${range(rows.map((row) => row.metadata.commits))} | ${rows[0].executionState ? range(rows.map((row) => row.start)) : 'N/A'} | ${rows[0].executionState ? range(rows.map((row) => row.settle)) : 'N/A'} |`;
     });
     writeFileSync(
       resolve(directory, 'RESULTS.md'),
@@ -136,8 +136,8 @@ External packages: webmcp-react ${report.packages['webmcp-react']} and use-webmc
 Five trials per hook with StrictMode off and five with it on. Cells show the observed range.
 Every scenario performs ten operations. Mount commits are excluded.
 
-| Hook | Parent-update commits | Re-registrations on parent updates | Metadata-update commits | Start pending calls | Settle calls |
-| --- | ---: | ---: | ---: | ---: | ---: |
+| Hook | Parent-update commits | Re-registrations on parent updates | Registrations on metadata changes | Metadata-update commits | Start pending calls | Settle calls |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
 ${table.join('\n')}
 
 All hooks register ten times when metadata changes. The parent-update baseline is ten requested commits, so ten means zero extra commits.

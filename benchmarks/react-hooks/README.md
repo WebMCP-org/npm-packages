@@ -7,16 +7,15 @@ Measure React commits around WebMCP tools. Render the figures with D3 and the sh
 
 ## What the numbers show
 
-In this fixture, starting ten overlapping calls causes one commit in `usewebmcp` and
-`@mcp-b/react-webmcp`, and ten in MCP Cat's `webmcp-react`. Our hooks keep the same
-pending state while additional calls start. Each completed call still updates its result
-and count, producing ten commits in all three hooks.
+Registration is measured for all four hooks. Ten parent updates with equivalent definitions
+cause zero re-registrations. Ten metadata changes cause ten registrations in every hook.
+Google and both of our hooks produce twenty React commits for those metadata changes;
+MCP Cat produces ten. Commit counts include registration status where exposed.
 
-All four hooks avoid re-registration when a parent supplies equivalent inline definitions.
-Changing metadata triggers registration updates in all four. Our hooks and Google's hook
-also publish registration status, so that scenario produces twenty commits compared with
-MCP Cat's ten. Google's hook reports registration status, but has no running-call state.
-Its row is visible in the chart as "Not applicable"; the table marks these columns N/A.
+Execution is a separate comparison. Starting ten overlapping calls produces one commit in
+each of our hooks and ten in MCP Cat. Completing those calls produces ten commits in all
+three. Google's registration counts appear alongside theirs; only its execution-state
+columns are N/A because it exposes no running-call state.
 
 These are React commit counts for a small component in a development build. They do not
 measure execution time, memory, bundle size, network traffic, or application performance.
@@ -70,8 +69,8 @@ scenario into one update.
 4. **Settle calls:** resolve those handlers one at a time, allowing each update to commit.
 
 Five trials run with StrictMode disabled and five with it enabled for every hook,
-producing forty samples. The table reports the observed range. The chart uses the median
-and shows the range beside each bar. Every range collapsed to a single value in the recorded run.
+producing forty samples. The tables report observed ranges; bars show median React commits
+on a shared scale. Every range collapsed to a single value in the recorded run.
 
 The harness also checks that exactly one tool remains registered, each call uses the
 latest committed props, all ten calls complete, exposed execution state returns to idle,
@@ -118,8 +117,8 @@ First-party sources:
 ## Regenerate the README images
 
 The report imports `@mcp-b/design-tokens` CSS, `sigvelo-chart-card`, and D3 scales from
-a sibling design-system checkout. The horizontal layout leaves a labeled row for hooks
-without execution state instead of drawing a misleading zero bar. Build its
+a sibling design-system checkout. The figure separates registration calls from React commits
+and includes Google's registration measurements. Build its
 `@mcp-b/viz-components` package and workspace dependencies first. The images in this
 revision use design-system commit `75442b31fc8e8f7dc963c799951786c02d799f33`.
 
