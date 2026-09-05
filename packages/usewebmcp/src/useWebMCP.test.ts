@@ -651,26 +651,32 @@ describe('useWebMCP in a browser runtime', () => {
 
   it('bounds unsupported-browser discovery and cancels it on unmount', async () => {
     vi.spyOn(document, 'modelContext', 'get').mockReturnValue(undefined);
-    vi.spyOn(navigator, 'modelContext', 'get').mockReturnValue(undefined);
-    vi.useFakeTimers();
-    const hook = await renderHook(() =>
-      useWebMCP({ name: 'unsupported', description: 'No API', execute: () => 'local' })
-    );
-    await hook.act(async () => {
-      await vi.advanceTimersByTimeAsync(10_000);
-    });
-    expect(hook.result.current).toMatchObject({
-      isSupported: false,
-      isRegistered: false,
-      registrationError: null,
-    });
-    expect(vi.getTimerCount()).toBe(0);
-    await hook.unmount();
-    const second = await renderHook(() =>
-      useWebMCP({ name: 'unmounted_probe', description: 'No API', execute: () => 'local' })
-    );
-    await second.unmount();
-    expect(vi.getTimerCount()).toBe(0);
+    const legacyContext = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
+    Reflect.deleteProperty(navigator, 'modelContext');
+    try {
+      expect('modelContext' in navigator).toBe(false);
+      vi.useFakeTimers();
+      const hook = await renderHook(() =>
+        useWebMCP({ name: 'unsupported', description: 'No API', execute: () => 'local' })
+      );
+      await hook.act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+      expect(hook.result.current).toMatchObject({
+        isSupported: false,
+        isRegistered: false,
+        registrationError: null,
+      });
+      expect(vi.getTimerCount()).toBe(0);
+      await hook.unmount();
+      const second = await renderHook(() =>
+        useWebMCP({ name: 'unmounted_probe', description: 'No API', execute: () => 'local' })
+      );
+      await second.unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      if (legacyContext) Object.defineProperty(navigator, 'modelContext', legacyContext);
+    }
   });
 
   it('exposes schema conversion errors and recovers when supplied a valid schema', async () => {

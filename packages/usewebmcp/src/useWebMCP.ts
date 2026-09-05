@@ -148,12 +148,7 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
     let timer: ReturnType<typeof setInterval> | undefined;
     const register = () => {
       const context =
-        typeof document === 'undefined'
-          ? undefined
-          : (document.modelContext ??
-            (typeof navigator !== 'undefined' && 'modelContext' in navigator
-              ? navigator.modelContext
-              : undefined));
+        document.modelContext ?? ('modelContext' in navigator ? navigator.modelContext : undefined);
       const isSupported = canRegister(context);
       const { config: current, descriptor: tool, preparationError: error } = committed.current;
       setRegistration((previous) =>
@@ -198,7 +193,7 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
       }
       return true;
     };
-    if (!register() && typeof document !== 'undefined') {
+    if (!register()) {
       // Extensions can inject after mount. Bound discovery to 10 seconds per hook.
       let attempts = 0;
       timer = setInterval(() => {
