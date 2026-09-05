@@ -1,44 +1,41 @@
 ---
 title: 'usewebmcp overview'
-description: 'When to use the tool-only React hook, how it differs from @mcp-b/react-webmcp, and what runtime it expects.'
-keywords: ['usewebmcp', 'overview', 'react', 'tool registration', 'useWebMCP']
+description: 'Register React state and actions as WebMCP tools, with upstream types and optional Standard Schema validation.'
+keywords: ['usewebmcp', 'overview', 'react', 'standard schema', 'useWebMCP']
 icon: 'react'
 ---
 
-`usewebmcp` is the tool-only React package. It gives React components a hook-based way to register WebMCP tools without taking a dependency on the broader MCP-B runtime surface.
+import CounterExample from '/snippets/packages/usewebmcp-quickstart.mdx';
 
-## When to use this package
+`usewebmcp` exposes a component's current state and actions through WebMCP tools:
 
-- You are building a React app that only needs `registerTool`.
-- You want React ergonomics without MCP-B prompt, resource, server, or transport extensions.
-- You want to pair React components with [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview) or native support.
+<CounterExample />
 
-## When not to use this package
+The next agent call observes the updated counter after each click. The hook registers after commit,
+keeps the latest committed callback, and removes the registration on unmount.
 
-- You need prompt, resource, or client-provider hooks. Use [`@mcp-b/react-webmcp`](/packages/react-webmcp/overview).
-- You are not using React.
+## Package boundary
 
-## Where it sits in the package graph
+The hook uses the Community Group's [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types).
+It supplies React lifecycle, execution state, cancellation, and input inference. A supplied Standard
+Schema validator runs before local and agent calls, including async validation and transforms.
+The package does not install a validation engine, polyfill, or MCP SDK.
 
-`usewebmcp` sits on top of the polyfill and type packages. It does not depend on `BrowserMcpServer`, prompts, or transport helpers.
+`document.modelContext` comes from native support, an initialized
+[`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview), or
+[`@mcp-b/global`](/packages/global/overview). React 18 and 19 are supported, and the published
+entry point preserves `'use client'`.
 
-## First step
+## Choose a hook
 
-Ensure `document.modelContext` exists through native support, [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview), or [`@mcp-b/global`](/packages/global/overview), then register a hook in a client component. The [reference page](/packages/usewebmcp/reference) covers the hook signature, state model, and inference behavior.
+| Requirement                                                      | Package                                                  |
+| ---------------------------------------------------------------- | -------------------------------------------------------- |
+| Browser tools with raw results, state, and Standard Schema input | `usewebmcp`                                              |
+| MCP `outputSchema`, annotations, or result formatting            | [`@mcp-b/react-webmcp`](/packages/react-webmcp/overview) |
+| Context, prompt, resource, or MCP client hooks                   | [`@mcp-b/react-webmcp`](/packages/react-webmcp/overview) |
 
-## Related pages
-
-<CardGroup cols={2}>
-  <Card title="Reference" icon="book-open" href="/packages/usewebmcp/reference">
-    Hook signature, config fields, re-registration rules, and types.
-  </Card>
-  <Card title="Your first React tool" icon="graduation-cap" href="/tutorials/first-react-tool">
-    Guided React tutorial using WebMCP hooks.
-  </Card>
-  <Card title="Framework guide" icon="code" href="/how-to/frameworks">
-    Runtime setup patterns across React and other frameworks.
-  </Card>
-  <Card title="@mcp-b/react-webmcp overview" icon="react" href="/packages/react-webmcp/overview">
-    Compare the full React package to the tool-only hook.
-  </Card>
-</CardGroup>
+Standard Schema support is shared by both packages. The
+[boundary explanation](/explanation/strict-core-vs-mcp-b-extensions#why-standard-schema-support-lives-in-the-adapters)
+describes why it belongs in the callback adapter. The
+[framework guide](/how-to/frameworks) covers runtime setup, and the
+[reference](/packages/usewebmcp/reference) covers configuration, state, and migration.

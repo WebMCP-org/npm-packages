@@ -14,7 +14,7 @@ keywords:
 icon: 'brackets-curly'
 ---
 
-`@mcp-b/webmcp-types` emits TypeScript declarations only. It defines the browser contracts implemented by MCP-B packages separately from MCP-B extensions and serialized-JSON execution compatibility.
+`@mcp-b/webmcp-types` emits TypeScript declarations only. It loads upstream `webmcp-types` and adds MCP-B extensions, schema helpers, and serialized-JSON execution compatibility. Both packages can be loaded together.
 
 The [WebMCP draft](https://webmachinelearning.github.io/webmcp/) is authoritative for the browser API.
 For ambient declarations that track that proposal directly, use the Community Group's
@@ -62,7 +62,7 @@ declarative API support.
 
 | Property                        | Type                                           | Status                                   |
 | ------------------------------- | ---------------------------------------------- | ---------------------------------------- |
-| `document.modelContext`         | `ModelContext?`                                | Canonical                                |
+| `document.modelContext`         | `WebMCP.ModelContext?`                         | Canonical                                |
 | `navigator.modelContext`        | `ModelContext \| undefined`                    | Deprecated compatibility alias           |
 | `navigator.modelContextTesting` | `ModelContextTesting \| undefined`             | Deprecated testing compatibility surface |
 | `SubmitEvent.agentInvoked`      | `boolean?`                                     | Declarative forms                        |
@@ -91,7 +91,7 @@ want the surface installed rather than detected.
 
 ### `ModelContext`
 
-`ModelContext` is the package-supported registration and discovery type for `document.modelContext`. The live proposal may contain additional or changed members.
+`document.modelContext` uses upstream `WebMCP.ModelContext`. The exported MCP-B `ModelContext` derives registration and events from upstream and widens discovery metadata for older Chrome versions. The live proposal may contain additional or changed members.
 
 | Member                         | Type                         |
 | ------------------------------ | ---------------------------- |
@@ -138,28 +138,35 @@ The MCP-B extension surface provides schema-aware `registerTool()` overloads and
 
 The generic tool dictionary used by the package's browser registration contracts.
 
-| Property      | Type                                      | Required |
-| ------------- | ----------------------------------------- | -------- |
-| `name`        | `TName`                                   | Yes      |
-| `description` | `string`                                  | Yes      |
-| `title`       | `string`                                  | No       |
-| `inputSchema` | `InputSchema`                             | No       |
-| `annotations` | `WebMcpToolAnnotations`                   | No       |
-| `execute`     | `(input: TArgs) => MaybePromise<TResult>` | Yes      |
+| Property      | Type                                                                            | Required |
+| ------------- | ------------------------------------------------------------------------------- | -------- |
+| `name`        | `TName`                                                                         | Yes      |
+| `description` | `string`                                                                        | Yes      |
+| `title`       | `string`                                                                        | No       |
+| `inputSchema` | `InputSchema`                                                                   | No       |
+| `annotations` | `WebMcpToolAnnotations`                                                         | No       |
+| `execute`     | `(input: TArgs, options?: ToolExecuteCallbackOptions) => MaybePromise<TResult>` | Yes      |
+
+The proposal always passes `ToolExecuteCallbackOptions` (a required cancellation
+`signal`) as the callback's second argument. The package types it optional
+because [Codex site tools](/reference/webmcp/codex-site-tools) invoke the
+callback with the input alone and `@mcp-b/webmcp-polyfill` cancels by racing
+the returned promise. Read it as `options?.signal` instead of destructuring
+`{ signal }`.
 
 ### `ToolDescriptor<TArgs, TResult, TName>`
 
 The MCP-B descriptor adds `outputSchema` and MCP annotations.
 
-| Property       | Type                                     | Required |
-| -------------- | ---------------------------------------- | -------- |
-| `name`         | `TName`                                  | Yes      |
-| `description`  | `string`                                 | Yes      |
-| `title`        | `string`                                 | No       |
-| `inputSchema`  | `InputSchema`                            | No       |
-| `outputSchema` | `JsonSchemaForInference`                 | No       |
-| `annotations`  | `ToolAnnotations`                        | No       |
-| `execute`      | `(args: TArgs) => MaybePromise<TResult>` | Yes      |
+| Property       | Type                                                                           | Required |
+| -------------- | ------------------------------------------------------------------------------ | -------- |
+| `name`         | `TName`                                                                        | Yes      |
+| `description`  | `string`                                                                       | Yes      |
+| `title`        | `string`                                                                       | No       |
+| `inputSchema`  | `InputSchema`                                                                  | No       |
+| `outputSchema` | `JsonSchemaForInference`                                                       | No       |
+| `annotations`  | `ToolAnnotations`                                                              | No       |
+| `execute`      | `(args: TArgs, options?: ToolExecuteCallbackOptions) => MaybePromise<TResult>` | Yes      |
 
 `ToolDescriptorFromSchema<TInput, TOutput, TName>` infers callback input and output from literal schemas. `ToolListItem<TName>` describes the metadata returned by `listTools()`.
 

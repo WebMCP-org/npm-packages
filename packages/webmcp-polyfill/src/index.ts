@@ -136,10 +136,7 @@ class StrictWebMCPContext extends EventTarget implements ModelContext {
   // is what gives these three the arity WebIDL requires and idlharness checks
   // (1, 0, 2). The `options?.` reads stay too — a default only fills in
   // `undefined`, so an explicitly passed `null` still reaches the body.
-  async registerTool<TArgs extends WebMcpToolInput>(
-    tool: ModelContextTool<TArgs>,
-    options: ModelContextRegisterToolOptions = {}
-  ): Promise<void> {
+  async registerTool(tool: object, options: ModelContextRegisterToolOptions = {}): Promise<void> {
     validateWebMcpAccess(this.#ownerDocument);
     const signal = options?.signal;
     const normalized = normalizeToolDescriptor(tool, this.#tools);
@@ -417,8 +414,8 @@ class PolyfillTestingShim extends EventTarget implements ModelContextTesting {
   }
 }
 
-function normalizeToolDescriptor<TArgs extends WebMcpToolInput>(
-  tool: ModelContextTool<TArgs>,
+function normalizeToolDescriptor(
+  tool: object,
   existing: Map<string, PolyfillToolDescriptor>
 ): PolyfillToolDescriptor {
   if (!tool || typeof tool !== 'object') {

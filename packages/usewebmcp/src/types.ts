@@ -1,35 +1,25 @@
-import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';
-import type {
-  InferArgsFromInputSchema,
-  InferJsonSchema,
-  InputSchema,
-  JsonSchemaForInference,
-  ToolAnnotations,
-} from '@mcp-b/webmcp-types';
+import type { StandardJSONSchemaV1, StandardSchemaV1 } from '@standard-schema/spec';
+import type { WebMCP } from 'webmcp-types';
 
-/** Infers tool input from a JSON Schema literal or Standard JSON Schema. */
-export type InferToolInput<T> = T extends { readonly '~standard': { readonly types?: infer Types } }
-  ? NonNullable<Types> extends { readonly input: infer Input }
-    ? Input
-    : Record<string, unknown>
-  : T extends InputSchema
-    ? InferArgsFromInputSchema<T>
-    : Record<string, unknown>;
+/** JSON Schema, or a schema implementing Standard JSON Schema v1. */
+export type ToolInputSchema = NonNullable<WebMCP.ModelContextTool['inputSchema']>;
 
-/** Infers tool output from a JSON Schema literal. */
-export type InferOutput<TOutputSchema extends JsonSchemaForInference | undefined = undefined> =
-  TOutputSchema extends undefined
-    ? unknown
-    : TOutputSchema extends JsonSchemaForInference
-      ? InferJsonSchema<TOutputSchema>
-      : unknown;
+/** Input accepted by the returned execute function, before validation/transforms. */
+export type InferToolInput<T extends ToolInputSchema> = T extends StandardJSONSchemaV1
+  ? StandardJSONSchemaV1.InferInput<T>
+  : Parameters<WebMCP.ModelContextToolFromSchema<T>['execute']>[0];
 
-/** Current state for local and MCP-triggered tool executions. */
-export interface ToolExecutionState<TOutput = unknown> {
+/** Input received by the implementation, after Standard Schema validation/transforms. */
+export type InferValidatedToolInput<T extends ToolInputSchema> = T extends StandardSchemaV1
+  ? StandardSchemaV1.InferOutput<T>
+  : InferToolInput<T>;
+
+/** Current state for local and agent-triggered tool executions. */
+export interface ToolExecutionState<TResult = unknown> {
   /** Whether at least one execution is pending. */
   isExecuting: boolean;
-  /** Most recent successful result, or `null` before one exists. */
-  lastResult: TOutput | null;
+  /** Most recent successful result, or null before one exists. */
+  lastResult: TResult | null;
   /** Most recent execution error. */
   error: Error | null;
   /** Number of successful executions since the last reset. */
@@ -38,39 +28,38 @@ export interface ToolExecutionState<TOutput = unknown> {
 
 /** Synchronous or asynchronous tool implementation. */
 export type ToolExecuteFunction<
-  TInputSchema extends ToolInputSchema = InputSchema,
-  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
+  TInputSchema extends ToolInputSchema = object,
+  TResult = unknown,
 > = (
-  input: InferToolInput<TInputSchema>
-) => Promise<InferOutput<TOutputSchema>> | InferOutput<TOutputSchema>;
+  input: InferValidatedToolInput<TInputSchema>,
+  options: WebMCP.ToolExecuteCallbackOptions
+) => WebMCP.MaybePromise<TResult>;
 
-/** Configuration for a tool registered by `useWebMCP`. */
+/** Standard tool metadata plus React lifecycle and execution options. */
 export interface WebMCPConfig<
-  TInputSchema extends ToolInputSchema = InputSchema,
-  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
-> {
-  /** Unique WebMCP tool name. */
-  name: string;
-  /** Description shown to MCP clients. */
-  description: string;
-  /** Whether to register with the runtime. Defaults to `true`. */
-  enabled?: boolean;
-  /** JSON Schema literal or Standard JSON Schema for the tool input. */
+  TInputSchema extends ToolInputSchema = object,
+  TResult = unknown,
+> extends Omit<WebMCP.ModelContextTool, 'inputSchema' | 'execute'> {
   inputSchema?: TInputSchema;
-  /** JSON Schema used for output inference and structured content. */
-  outputSchema?: TOutputSchema;
-  /** Optional WebMCP behavior hints. */
-  annotations?: ToolAnnotations;
-  /** Tool implementation. */
-  execute: ToolExecuteFunction<TInputSchema, TOutputSchema>;
+  execute: ToolExecuteFunction<TInputSchema, TResult>;
+  /** Register while true. Local execution remains available when false. */
+  enabled?: boolean;
+  /** Origins allowed to discover/call the tool, enforced by the browser. */
+  exposedTo?: WebMCP.ModelContextRegisterToolOptions['exposedTo'];
+  /** Format agent-facing results; local execution and state retain the original result. */
+  formatOutput?: (result: TResult) => unknown;
 }
 
-/** State and controls returned by `useWebMCP`. */
-export interface WebMCPReturn<
-  TOutputSchema extends JsonSchemaForInference | undefined = undefined,
-  TInputSchema extends ToolInputSchema = InputSchema,
-> {
-  state: ToolExecutionState<InferOutput<TOutputSchema>>;
-  execute: (input: InferToolInput<TInputSchema>) => Promise<InferOutput<TOutputSchema>>;
+/** State and controls returned by useWebMCP. */
+export interface WebMCPReturn<TInputSchema extends ToolInputSchema = object, TResult = unknown> {
+  state: ToolExecutionState<TResult>;
+  isSupported: boolean;
+  isRegistered: boolean;
+  registrationError: Error | null;
+  execute: (
+    input: InferToolInput<TInputSchema>,
+    options?: WebMCP.ToolExecuteCallbackOptions
+  ) => Promise<TResult>;
+  /** Clears observed execution state without cancelling pending work. */
   reset: () => void;
 }

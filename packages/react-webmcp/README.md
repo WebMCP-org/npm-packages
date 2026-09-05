@@ -1,192 +1,181 @@
 # @mcp-b/react-webmcp
 
-> React hooks for Model Context Protocol (MCP) - Let AI agents like Claude, ChatGPT, Cursor, and Copilot control your React components
-
-[![npm version](https://img.shields.io/npm/v/@mcp-b/react-webmcp?style=flat-square)](https://www.npmjs.com/package/@mcp-b/react-webmcp)
-[![npm downloads](https://img.shields.io/npm/dm/@mcp-b/react-webmcp?style=flat-square)](https://www.npmjs.com/package/@mcp-b/react-webmcp)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue?style=flat-square)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-17--19-61DAFB?style=flat-square&logo=react)](https://react.dev/)
-
-**[Reference](https://docs.mcp-b.ai/packages/react-webmcp/reference)** | **[React Tutorial](https://docs.mcp-b.ai/tutorials/first-react-tool)** | **[Framework Guides](https://docs.mcp-b.ai/how-to/frameworks)**
-
-**@mcp-b/react-webmcp** provides React hooks that expose your components as AI-callable tools via the Model Context Protocol. Build AI-powered React applications where Claude, ChatGPT, Gemini, Cursor, and Copilot can interact with your app's functionality.
-
-## Why Use @mcp-b/react-webmcp?
-
-| Feature                      | Benefit                                                                           |
-| ---------------------------- | --------------------------------------------------------------------------------- |
-| **React-First Design**       | Hooks follow React patterns with automatic cleanup and StrictMode support         |
-| **Type-Safe Schemas**        | JSON Schema and Standard JSON Schema input typing, plus JSON Schema output typing |
-| **Two-Way Integration**      | Both expose tools TO AI agents AND consume tools FROM MCP servers                 |
-| **Execution State Tracking** | Built-in loading, success, and error states for UI feedback                       |
-| **Works with Any AI**        | Compatible with Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client      |
-
-## Installation
-
-```bash
-pnpm add @mcp-b/global @mcp-b/react-webmcp
-```
-
-You can omit `@mcp-b/global` when you only consume an MCP server as a client, or when a native
-WebMCP implementation supplies `document.modelContext` and you only use the core `useWebMCP` tool
-hook. Prompt and resource hooks require the MCP-B extensions installed by
-`@mcp-b/global`. If you only want strict core WebMCP hooks, install `usewebmcp` directly.
-
-For client functionality, you'll also need:
-
-```bash
-pnpm add @mcp-b/transports @modelcontextprotocol/client
-```
-
-**Prerequisites:** Provider hooks require `document.modelContext`. Install `@mcp-b/global`, or use
-a native WebMCP implementation for the core `useWebMCP` tool hook.
-
-Provider hooks register tools with `document.modelContext.registerTool(tool, {
-signal })` and abort the controller on unmount. The hooks retain a
-`navigator.modelContext` fallback for older preview runtimes, but
-`document.modelContext` is the canonical surface. Install `@mcp-b/global`
-when you need a portable runtime with spec-aligned cleanup behavior.
-
-`outputSchema` is MCP-B helper metadata for output typing and structured MCP
-responses. Native Chrome WebMCP does not currently define or enforce it.
-
-## Quick Start - Provider (Registering Tools)
+React hooks for WebMCP tools with MCP output schemas, prompts, resources, and client connections.
 
 ```tsx
+'use client';
+
 import '@mcp-b/global';
 import { useWebMCP } from '@mcp-b/react-webmcp';
+import { z } from 'zod';
 
-function PostsPage() {
-  const likeTool = useWebMCP({
-    name: 'posts_like',
-    description: 'Like a post by ID. Increments the like count.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        postId: { type: 'string', description: 'The post ID to like' },
-      },
-      required: ['postId'],
-    } as const,
+export function CalculatorTool() {
+  const tool = useWebMCP({
+    name: 'add_numbers',
+    description: 'Add two numbers',
+    inputSchema: z.object({ left: z.number(), right: z.number() }),
     outputSchema: {
       type: 'object',
-      properties: {
-        success: { type: 'boolean' },
-        postId: { type: 'string' },
-      },
-      required: ['success', 'postId'],
-    } as const,
-    annotations: {
-      title: 'Like Post',
-      readOnlyHint: false,
-      idempotentHint: true,
+      properties: { total: { type: 'number' } },
+      required: ['total'],
     },
-    execute: async (input) => {
-      await api.posts.like(input.postId);
-      return { success: true, postId: input.postId };
-    },
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    execute: ({ left, right }) => ({ total: left + right }),
   });
 
-  return (
-    <div>
-      {likeTool.state.isExecuting && <Spinner />}
-      {likeTool.state.error && <ErrorAlert error={likeTool.state.error} />}
-    </div>
-  );
+  return <output>Last total: {tool.state.lastResult?.total ?? 'Not called yet'}</output>;
 }
 ```
 
-## Quick Start - Client (Consuming Tools)
+With arguments `{ left: 3, right: 4 }`, the handler and React state hold `{ total: 7 }`. The agent receives an MCP response:
+
+```json
+{
+  "content": [{ "type": "text", "text": "{\"total\":7}" }],
+  "structuredContent": { "total": 7 },
+  "isError": false
+}
+```
+
+[API reference](https://docs.mcp-b.ai/packages/react-webmcp/reference) · [Framework setup](https://docs.mcp-b.ai/how-to/frameworks)
+
+## Install
+
+In a React 18 or 19 application, install the packages used above:
+
+```bash
+pnpm add @mcp-b/react-webmcp @mcp-b/global zod@^4.2
+```
+
+Import `@mcp-b/global` once in your client entry to install the MCP-B runtime. Zod is optional: use your existing compatible schema library or plain JSON Schema instead.
+
+| What you use                             | Runtime needed                                                     |
+| ---------------------------------------- | ------------------------------------------------------------------ |
+| `useWebMCP` or `useWebMCPContext`        | Native WebMCP, an initialized polyfill, or `@mcp-b/global`         |
+| `useWebMCPPrompt` or `useWebMCPResource` | `@mcp-b/global` or a configured `BrowserMcpServer`                 |
+| `McpClientProvider` and `useMcpClient`   | Your MCP client and transport; no `document.modelContext` required |
+
+Native WebMCP and the standalone polyfill do not advertise MCP `outputSchema` metadata. Use the MCP-B runtime to expose that metadata to MCP clients.
+
+## Choose between the two tool hooks
+
+| Feature                                                  | `usewebmcp`             | `@mcp-b/react-webmcp`                      |
+| -------------------------------------------------------- | ----------------------- | ------------------------------------------ |
+| React lifecycle, state, cancellation, and `'use client'` | Yes                     | Shared core implementation                 |
+| JSON Schema input inference                              | Upstream `webmcp-types` | Shared core implementation                 |
+| Standard Schema validation and transforms                | Yes                     | Shared core implementation                 |
+| Default successful agent result                          | Your raw value          | MCP `content` and JSON `structuredContent` |
+| `outputSchema` and MCP annotations                       |                         | Yes                                        |
+| Context, prompt, resource, and MCP client hooks          |                         | Yes                                        |
+
+Choose [`usewebmcp`](../usewebmcp/README.md) when you need browser tools with raw results. Choose this package when you need MCP formatting or the additional hooks. Both accept the same Standard Schema inputs.
+
+## Input validation uses your schema
+
+`useWebMCP` delegates conversion and validation to the shared `usewebmcp` hook:
+
+1. `schema['~standard'].jsonSchema.input()` produces the browser's JSON Schema metadata.
+2. `schema['~standard'].validate(input)` validates each local or agent call, when supplied.
+3. Your handler receives the validated value, including transforms and defaults.
+
+The validator comes from your schema library. The hook does not implement a second validator. Async validation is awaited, and invalid input never reaches your handler. The hook forwards plain JSON metadata so the MCP SDK does not run the same vendor transforms a second time.
+
+Standard Schema validation and Standard JSON Schema conversion are separate interfaces. Converter-only schemas provide metadata without validation; validator-only schemas also need a converter for registration. Plain JSON Schema is supported but does not add hook-level validation.
+
+For a complete transform example, see the [core hook README](../usewebmcp/README.md#validate-input-with-your-schema-library). The [schema guide](https://docs.mcp-b.ai/how-to/use-schemas-and-structured-output) covers direct polyfill and SDK usage.
+
+## Output schemas and formatting
+
+`outputSchema` is a JSON Schema object that constrains the handler's return type and types `state.lastResult`. It is an MCP-B extension. It is separate from a schema library's transformed _input_ type.
+
+The hook checks that schema-backed results are JSON-serializable. It does not validate them against `outputSchema`. The official MCP server validates output on MCP calls; native and direct browser calls do not pass through that validation.
+
+Existing MCP responses pass through unchanged. Other JSON values become text and `structuredContent`, even without an `outputSchema`. `formatOutput(result)` overrides agent formatting while local execution and state retain the handler's value. Thrown or returned errors produce an `isError` response; local calls reject.
+
+## Expose context, prompts, and resources
+
+```ts
+'use client';
+
+import '@mcp-b/global';
+import { useWebMCPContext, useWebMCPPrompt, useWebMCPResource } from '@mcp-b/react-webmcp';
+
+export function PageTools({ title }: { title: string }) {
+  useWebMCPContext('page_context', 'Get the current page title', () => ({ title }));
+
+  useWebMCPPrompt({
+    name: 'summarize_page',
+    get: () => ({
+      messages: [{ role: 'user', content: { type: 'text', text: `Summarize: ${title}` } }],
+    }),
+  });
+
+  useWebMCPResource({
+    name: 'Page title',
+    uri: 'page://title',
+    read: async (uri) => ({
+      contents: [{ uri: uri.href, mimeType: 'text/plain', text: title }],
+    }),
+  });
+
+  return null;
+}
+```
+
+The hooks publish the latest committed props and clean up their registrations on unmount. Context uses a read-only tool. Prompts and resources use the MCP-B runtime; see [register prompts and resources](https://docs.mcp-b.ai/how-to/register-prompts-and-resources).
+
+Prompts and resources accept `enabled: false` to remove their registration. Context tools accept it in a fourth `{ enabled }` argument. Re-enabling uses the latest committed configuration.
+
+## Consume an MCP server
+
+Pass stable client and transport instances from your browser setup into the provider:
 
 ```tsx
-import { McpClientProvider, useMcpClient } from '@mcp-b/react-webmcp';
-import { TabClientTransport } from '@mcp-b/transports';
-import { Client } from '@modelcontextprotocol/client';
+'use client';
 
-const client = new Client(
-  { name: 'MyApp', version: '1.0.0' },
-  { versionNegotiation: { mode: 'auto' } }
-);
-const transport = new TabClientTransport({
-  channelId: 'mcp',
-  targetOrigin: window.location.origin,
-});
+import { McpClientProvider, useMcpClient, type McpClientProviderProps } from '@mcp-b/react-webmcp';
 
-function App() {
+export function ToolBrowser({
+  client,
+  transport,
+}: Pick<McpClientProviderProps, 'client' | 'transport'>) {
   return (
     <McpClientProvider client={client} transport={transport}>
-      <ToolConsumer />
+      <ToolList />
     </McpClientProvider>
   );
 }
 
-function ToolConsumer() {
-  const { client, tools, isConnected } = useMcpClient();
-
-  const handleCallTool = async () => {
-    const result = await client.callTool({ name: 'posts_like', arguments: { postId: '123' } });
-    console.log('Result:', result.content[0].text);
-  };
-
+function ToolList() {
+  const { tools, isConnected, error } = useMcpClient();
+  if (error) return <p role="alert">{error.message}</p>;
+  if (!isConnected) return <p>Connecting…</p>;
   return (
-    <div>
-      <p>Connected: {isConnected ? 'Yes' : 'No'}</p>
-      <p>Available Tools: {tools.length}</p>
-      <button onClick={handleCallTool} disabled={!isConnected}>
-        Call Tool
-      </button>
-    </div>
+    <ul>
+      {tools.map((tool) => (
+        <li key={tool.name}>{tool.name}</li>
+      ))}
+    </ul>
   );
 }
 ```
 
-`useMcpClient().reconnect()` retries tool and resource discovery while the client remains connected.
-If a one-shot transport closes, construct a new transport and pass it to
-`reconnect(newTransport)`; closed transport instances are not generally reusable.
+The provider connects and cleans up the client, and refreshes its tool and resource inventory. It does not need `@mcp-b/global`. Keep browser-global reads such as `window.location.origin` in client setup, not at module scope in server-rendered components.
 
-## API Overview
+`reconnect()` refreshes discovery while connected. After a one-shot transport closes, pass a fresh transport to `reconnect(newTransport)`. See the [client reference](https://docs.mcp-b.ai/packages/react-webmcp/reference#client-hooks) for transport setup and tool calls.
 
-### Provider Hooks
+## State and lifecycle
 
-| Hook                                                      | Description                                               |
-| --------------------------------------------------------- | --------------------------------------------------------- |
-| `useWebMCP(config, deps?)`                                | Register a tool with full control over behavior and state |
-| `useWebMCPContext(name, description, getValue, options?)` | Simplified hook for read-only context exposure            |
-| `useWebMCPPrompt(config)`                                 | Register a reusable MCP prompt                            |
-| `useWebMCPResource(config)`                               | Register an MCP resource                                  |
+`useWebMCP` returns `state`, `execute`, `reset`, `isSupported`, `isRegistered`, and `registrationError`. Set `enabled: false` to unregister a tool while retaining local execution. Handlers receive `(input, { signal })` for cancellation.
 
-All registration hooks support `enabled`, defaulting to `true`. Pass it in the config for
-tools, prompts, and resources, or as the fourth argument (`{ enabled: false }`) to
-`useWebMCPContext`. Disabling unregisters the item; re-enabling registers the latest committed
-configuration. Keep the hook call unconditional.
+Metadata changes update registration automatically. Equivalent inline schemas do not re-register; optional `deps` can force a refresh. Shared behavior, including StrictMode and server rendering, is documented in the [core hook reference](https://docs.mcp-b.ai/packages/usewebmcp/reference).
 
-Disabled prompt and resource hooks report `isRegistered: false`. Tool and context hooks retain
-their execution state and local `execute`/`reset` controls. Disabling does not cancel the handler's
-work, though the runtime may reject an in-flight MCP request when its registration is removed.
+Importing this package also adds React JSX declarations for declarative WebMCP form attributes. Use `toolautosubmit=""`, as shown in the [form reference](https://docs.mcp-b.ai/packages/react-webmcp/reference#declarative-form-attributes).
 
-### Client Hooks
+## Development
 
-| Hook / Component    | Description                                               |
-| ------------------- | --------------------------------------------------------- |
-| `McpClientProvider` | Provider component managing an MCP client connection      |
-| `useMcpClient()`    | Access client, tools, connection status, and capabilities |
-
-## Schema Compatibility
-
-Inputs accept JSON Schema or Standard JSON Schema v1 implementations such as Zod 4.2+. Outputs use JSON Schema for typed `structuredContent`.
-
-## Related Packages
-
-- [`@mcp-b/global`](https://docs.mcp-b.ai/packages/global/reference) - Full MCP-B browser runtime (required for provider hooks)
-- [`@mcp-b/transports`](https://docs.mcp-b.ai/packages/transports/reference) - Browser-specific MCP transports
-- [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) - Upstream Chrome DevTools MCP server
-- [`usewebmcp`](../usewebmcp) - React hooks for strict core WebMCP API only
-
-## Resources
-
-- [WebMCP Documentation](https://docs.mcp-b.ai)
-- [Model Context Protocol Spec](https://modelcontextprotocol.io)
+After `pnpm build` at the repository root, run `pnpm test:hooks`. The [harness](../../docs/TESTING.md#react-hook-harness) checks both hook packages in real browsers and packed React 18/19 consumers, including server rendering and preserved client directives.
 
 ## License
 
-MIT - see [LICENSE](../../LICENSE) for details
+[MIT](../../LICENSE)

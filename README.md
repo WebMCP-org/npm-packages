@@ -82,6 +82,8 @@ await document.modelContext.registerTool({
 Or with React: `pnpm add usewebmcp`
 
 ```tsx
+'use client';
+
 import { useWebMCP } from 'usewebmcp';
 
 function PageTitle() {
@@ -133,6 +135,8 @@ Or as a script tag (zero build step):
 Or with React: `pnpm add @mcp-b/global @mcp-b/react-webmcp`
 
 ```tsx
+'use client';
+
 import '@mcp-b/global';
 import { useWebMCP } from '@mcp-b/react-webmcp';
 
@@ -210,15 +214,16 @@ Any website running `@mcp-b/global` becomes callable from your desktop AI agent.
 
 ## Which Package?
 
-| I want to…                       | Package                                                                        |
-| -------------------------------- | ------------------------------------------------------------------------------ |
-| Add tools to my site (simplest)  | [`@mcp-b/global`](./packages/global)                                           |
-| Just the polyfill, no MCP bridge | [`@mcp-b/webmcp-polyfill`](./packages/webmcp-polyfill)                         |
-| Register tools from React        | [`@mcp-b/react-webmcp`](./packages/react-webmcp)                               |
-| Add WebMCP from an extension     | [`@mcp-b/webmcp-extension`](./packages/webmcp-extension)                       |
-| Forward tools to local AI agents | [`@mcp-b/webmcp-local-relay`](./packages/webmcp-local-relay)                   |
-| Control Chrome from an AI agent  | [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) |
-| Just the TypeScript types        | [`@mcp-b/webmcp-types`](./packages/webmcp-types)                               |
+| I want to…                        | Package                                                                        |
+| --------------------------------- | ------------------------------------------------------------------------------ |
+| Add tools to my site (simplest)   | [`@mcp-b/global`](./packages/global)                                           |
+| Just the polyfill, no MCP bridge  | [`@mcp-b/webmcp-polyfill`](./packages/webmcp-polyfill)                         |
+| Register browser tools from React | [`usewebmcp`](./packages/usewebmcp)                                            |
+| React tools with MCP extensions   | [`@mcp-b/react-webmcp`](./packages/react-webmcp)                               |
+| Add WebMCP from an extension      | [`@mcp-b/webmcp-extension`](./packages/webmcp-extension)                       |
+| Forward tools to local AI agents  | [`@mcp-b/webmcp-local-relay`](./packages/webmcp-local-relay)                   |
+| Control Chrome from an AI agent   | [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) |
+| Just the TypeScript types         | [`@mcp-b/webmcp-types`](./packages/webmcp-types)                               |
 
 Chrome DevTools integration now lives entirely upstream; its WebMCP changes have all landed there.
 
@@ -239,7 +244,7 @@ pnpm add -D @mcp-b/webmcp-types
 # React hooks for full runtime
 pnpm add @mcp-b/react-webmcp
 
-# React hooks for strict WebMCP core only
+# React hooks with upstream types and Standard Schema validation
 pnpm add usewebmcp
 
 # Transport layer (custom integrations)

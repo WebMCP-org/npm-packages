@@ -13,30 +13,33 @@ keywords:
 icon: 'react'
 ---
 
+import CalculatorExample from '/snippets/packages/react-webmcp-quickstart.mdx';
+
 `@mcp-b/react-webmcp` is the full React surface for MCP-B. It supports tool registration, prompt and resource hooks, and client/provider hooks for consuming MCP servers.
 
 Producer hooks register against `document.modelContext`. An internal fallback to the deprecated `navigator.modelContext` alias remains only for older preview runtimes; application code should not use it.
 
+## Minimal example
+
+<CalculatorExample />
+
 ## Installation
 
 ```bash title="Install provider hooks"
-pnpm add @mcp-b/global @mcp-b/react-webmcp
+pnpm add @mcp-b/global @mcp-b/react-webmcp zod@^4.2
 ```
 
-Omit `@mcp-b/global` only when the application exclusively uses the client hooks, or when a native
-WebMCP implementation supplies `document.modelContext` and the application only uses the core
-`useWebMCP` tool hook. Prompt and resource hooks require the MCP-B
-extensions installed by `@mcp-b/global`.
+Zod is used by the example; any supported schema implementation or plain JSON Schema can be used instead.
+Tool and context hooks work with native WebMCP, an initialized polyfill, or the MCP-B runtime.
+Prompt and resource hooks require the MCP-B extensions installed by `@mcp-b/global`. Client hooks
+only require their supplied client and transport. Native WebMCP and the standalone polyfill do not
+advertise MCP `outputSchema` metadata.
 
 For client functionality:
 
 ```bash title="Install client dependencies"
 pnpm add @mcp-b/transports @modelcontextprotocol/client
 ```
-
-## Minimal example
-
-<Snippet file="snippets/packages/react-webmcp-quickstart.ts" />
 
 ## Declarative form attributes
 
@@ -70,26 +73,27 @@ runtime behavior.
 import { useWebMCP } from '@mcp-b/react-webmcp';
 ```
 
-This package re-exports the same hook implementation and function signature as
-[`usewebmcp`](/packages/usewebmcp/reference).
+This hook wraps [`usewebmcp`](/packages/usewebmcp/reference) with MCP annotations, output-schema
+inference, and automatic text/`structuredContent` response formatting. Its lifecycle, Standard Schema
+validation, cancellation, `enabled`, `exposedTo`, and registration state come from the core hook.
+The published entry point preserves `'use client'` and supports React 18/19 server rendering.
 
-| Field            | Type                                   | Required | Description                              |
-| ---------------- | -------------------------------------- | -------- | ---------------------------------------- |
-| `name`           | `string`                               | Yes      | Unique tool identifier                   |
-| `description`    | `string`                               | Yes      | Human-readable description               |
-| `enabled`        | `boolean`                              | No       | Whether to register. Defaults to `true`. |
-| `inputSchema`    | JSON Schema or Standard JSON Schema v1 | No       | Input parameters                         |
-| `outputSchema`   | JSON Schema                            | No       | MCP-B output helper metadata             |
-| `annotations`    | `ToolAnnotations`                      | No       | Metadata hints                           |
-| `execute(input)` | `(input) => T \| Promise<T>`           | Yes      | Tool implementation                      |
+| Field                     | Type                                     | Required | Description                  |
+| ------------------------- | ---------------------------------------- | -------- | ---------------------------- |
+| `name`                    | `string`                                 | Yes      | Unique tool identifier       |
+| `description`             | `string`                                 | Yes      | Human-readable description   |
+| `inputSchema`             | JSON Schema or Standard JSON Schema v1   | No       | Input parameters             |
+| `outputSchema`            | JSON Schema                              | No       | MCP-B output helper metadata |
+| `annotations`             | `ToolAnnotations`                        | No       | Metadata hints               |
+| `execute(input, options)` | `(input, { signal }) => T \| Promise<T>` | Yes      | Tool implementation          |
 
-**Returns:** `WebMCPReturn`
+**Returns:** `WebMCPReturn`, including `state`, `execute`, `reset`, `isSupported`, `isRegistered`, and `registrationError`.
 
 Native Chrome WebMCP does not currently define or enforce `outputSchema`. The
 React hooks use it for output typing and structured MCP responses.
 
 `enabled` controls registration, not local execution. See
-[conditional registration](/packages/usewebmcp/reference#conditional-registration) for state and
+[registration configuration](/packages/usewebmcp/reference#config-fields) for state and
 in-flight execution behavior.
 
 ### `useWebMCPContext(name, description, getValue, options?)`
@@ -117,13 +121,12 @@ import { useWebMCPPrompt } from '@mcp-b/react-webmcp';
 
 Registers an MCP prompt through the `BrowserMcpServer` installed by `@mcp-b/global`. It does not register against a native tool-only context.
 
-| Config field  | Type                                      | Required | Description                              |
-| ------------- | ----------------------------------------- | -------- | ---------------------------------------- |
-| `name`        | `string`                                  | Yes      | Prompt identifier                        |
-| `description` | `string`                                  | No       | Human-readable description               |
-| `enabled`     | `boolean`                                 | No       | Whether to register. Defaults to `true`. |
-| `argsSchema`  | JSON Schema or Standard Schema v1         | No       | Argument schema                          |
-| `get(args)`   | `(args) => { messages: PromptMessage[] }` | Yes      | Message generator                        |
+| Config field  | Type                                      | Required | Description                |
+| ------------- | ----------------------------------------- | -------- | -------------------------- |
+| `name`        | `string`                                  | Yes      | Prompt identifier          |
+| `description` | `string`                                  | No       | Human-readable description |
+| `argsSchema`  | JSON Schema or Standard JSON Schema v1    | No       | Argument schema            |
+| `get(args)`   | `(args) => { messages: PromptMessage[] }` | Yes      | Message generator          |
 
 **Returns:** `WebMCPPromptReturn`, with `isRegistered: boolean` indicating whether the prompt's
 registration is active.
@@ -160,20 +163,26 @@ the latest committed handler is available without replacing its registration.
 
 ### `McpClientProvider`
 
-```tsx title="Create an MCP client and transport"
-import { McpClientProvider } from '@mcp-b/react-webmcp';
+```ts title="browser-connection.ts"
 import { TabClientTransport } from '@mcp-b/transports';
 import { Client } from '@modelcontextprotocol/client';
 
-const client = new Client(
-  { name: 'MyApp', version: '1.0.0' },
-  { versionNegotiation: { mode: 'auto' } }
-);
-const transport = new TabClientTransport({
-  channelId: 'mcp',
-  targetOrigin: window.location.origin,
-});
+export function createBrowserConnection() {
+  return {
+    client: new Client(
+      { name: 'tool-browser', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    ),
+    transport: new TabClientTransport({
+      channelId: 'mcp',
+      targetOrigin: window.location.origin,
+    }),
+  };
+}
 ```
+
+Call `createBrowserConnection()` in browser setup and pass its stable instances to the provider.
+The [framework guide](/how-to/frameworks#handle-server-rendering) covers browser-global access during server rendering.
 
 Provider component that manages an MCP client connection and shares tools, resources, capabilities, and connection state with descendant components.
 
@@ -211,23 +220,30 @@ reusing a closed transport is not supported by every transport implementation.
 
 `@mcp-b/react-webmcp` no longer accepts raw Zod object maps. Use JSON Schema directly, or pass a
 Standard JSON Schema object such as `z.object(...)` from Zod 4.2 or newer. `outputSchema` remains
-JSON Schema-only because native WebMCP does not define output schema enforcement.
+JSON Schema-only. The tool hook runs a supplied `~standard.validate()` on local and agent calls,
+awaits async validation, and passes transformed output to the handler. Callers supply the schema's input
+type. JSON Schema metadata alone does not add validation. The hook checks output JSON serializability;
+the official MCP server enforces the output schema on MCP client calls. Local calls, direct browser execution, and native mirrors bypass that MCP validation.
+
+The tool hook forwards plain JSON metadata and keeps the supplied vendor validator in its callback, so the MCP SDK does not apply those transforms twice. The standalone [polyfill schema entry](/packages/webmcp-polyfill/reference#schema-entry) only converts metadata. The [schema guide](/how-to/use-schemas-and-structured-output) shows validation outside React.
 
 ## Exported types
 
-| Type                     | Description                                              |
-| ------------------------ | -------------------------------------------------------- |
-| `InferOutput`            | Infers a tool result from an output schema               |
-| `InferToolInput`         | Infers tool input from a supported input schema          |
-| `ToolExecutionState`     | State exposed by `useWebMCP`                             |
-| `WebMCPConfig`           | Configuration accepted by `useWebMCP`                    |
-| `WebMCPReturn`           | Return value from `useWebMCP` and `useWebMCPContext`     |
-| `ToolInputSchema`        | Supported JSON Schema or Standard JSON Schema input type |
-| `McpClientProviderProps` | Props accepted by `McpClientProvider`                    |
-| `WebMCPPromptConfig`     | Configuration accepted by `useWebMCPPrompt`              |
-| `WebMCPPromptReturn`     | Registration state returned by `useWebMCPPrompt`         |
-| `WebMCPResourceConfig`   | Configuration accepted by `useWebMCPResource`            |
-| `WebMCPResourceReturn`   | Registration state returned by `useWebMCPResource`       |
+| Type                      | Description                                              |
+| ------------------------- | -------------------------------------------------------- |
+| `InferOutput`             | Infers a tool result from an output schema               |
+| `InferToolInput`          | Caller input before validation                           |
+| `InferValidatedToolInput` | Handler input after validation and transforms            |
+| `WebMCP`                  | Upstream browser type namespace                          |
+| `ToolExecutionState`      | State exposed by `useWebMCP`                             |
+| `WebMCPConfig`            | Configuration accepted by `useWebMCP`                    |
+| `WebMCPReturn`            | Return value from `useWebMCP` and `useWebMCPContext`     |
+| `ToolInputSchema`         | Supported JSON Schema or Standard JSON Schema input type |
+| `McpClientProviderProps`  | Props accepted by `McpClientProvider`                    |
+| `WebMCPPromptConfig`      | Configuration accepted by `useWebMCPPrompt`              |
+| `WebMCPPromptReturn`      | Registration state returned by `useWebMCPPrompt`         |
+| `WebMCPResourceConfig`    | Configuration accepted by `useWebMCPResource`            |
+| `WebMCPResourceReturn`    | Registration state returned by `useWebMCPResource`       |
 
 ## Related pages
 

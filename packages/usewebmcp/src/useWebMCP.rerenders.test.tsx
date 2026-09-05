@@ -68,7 +68,7 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
     expect(await modelContext.getTools()).toEqual([]);
   });
 
-  it('toggles registration without resetting state or adding effect-driven commits', async () => {
+  it('bounds registration commits without resetting execution state', async () => {
     const onRender = vi.fn<ProfilerOnRenderCallback>();
     const modelContext = document.modelContext;
     if (!modelContext) throw new Error('WebMCP polyfill is unavailable');
@@ -109,8 +109,14 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
       { enabled: true, revision: 3 },
     ]) {
       onRender.mockClear();
+      const wasRegistered = hook.result.current.isRegistered;
       await hook.rerender(props);
-      expect(onRender).toHaveBeenCalledTimes(1);
+      // Exposure changes also publish the newly observable registration status.
+      expect(onRender).toHaveBeenCalled();
+      expect(onRender.mock.calls.length).toBeLessThanOrEqual(
+        props.enabled === wasRegistered ? 1 : 2
+      );
+      expect(hook.result.current.isRegistered).toBe(props.enabled);
       expect(hook.result.current.state).toBe(state);
       expect(hook.result.current.execute).toBe(execute);
       expect(hook.result.current.reset).toBe(reset);
@@ -133,7 +139,7 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
     expect(await modelContext.getTools()).toEqual([]);
   });
 
-  it('does not commit when resetting an already idle state', async () => {
+  it('preserves an already idle state when resetting', async () => {
     const onRender = vi.fn<ProfilerOnRenderCallback>();
     const hook = await renderHook(
       () => useWebMCP({ name: 'render_reset', description: 'Resets state', execute: () => 'done' }),
@@ -145,7 +151,8 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
 
     await hook.act(async () => hook.result.current.reset());
 
-    expect(onRender).not.toHaveBeenCalled();
+    // React may report one empty Profiler commit after a same-state bailout.
+    expect(onRender.mock.calls.length).toBeLessThanOrEqual(1);
     expect(hook.result.current.state).toBe(state);
   });
 

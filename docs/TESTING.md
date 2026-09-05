@@ -121,6 +121,29 @@ This lane keeps direct runtime and demo validation for:
 - `e2e/tests/chrome-beta-webmcp.spec.ts`
 - `e2e/playwright-native-showcase.config.ts`
 
+### React hook harness
+
+After `pnpm build`, run `pnpm test:hooks` for browser integration tests and packed-package checks.
+`pnpm test:hooks:package` builds minified hook packages, verifies their client directives, and installs
+tarballs into isolated React 18 and React 19 consumers. It checks server rendering without browser
+globals and declarations with `skipLibCheck: false`, with strict null checking enabled and disabled.
+The React 18 consumer installs core hooks only; React 19 also checks MCP-B/upstream type coexistence.
+
+Browser tests cover StrictMode, suspended renders, metadata updates, duplicate and delayed
+registrations, late runtime injection, Standard Schema validation/transforms, and cancellation.
+Platform failure tests mock the browser registration boundary; successful calls use the real runtime.
+
+For native registration, validation, cleanup, and execution-signal propagation:
+
+```bash
+CHROME_BIN=/path/to/chrome-canary pnpm --filter usewebmcp test:native
+```
+
+The native lane enables WebMCP and fails if the API is unavailable; it does not install a polyfill.
+Prior art: [GoogleChromeLabs/use-webmcp-tool](https://github.com/GoogleChromeLabs/use-webmcp-tool),
+[upstream types](https://github.com/webmachinelearning/webmcp-types),
+and [Standard Schema](https://standardschema.dev/).
+
 ### Framework Integration
 
 `pnpm --filter mcp-e2e-tests test:integration:frameworks`
@@ -145,7 +168,7 @@ after a verified mount, including nested updates. They run with and without
 Do not count component-body calls or assert wall-clock durations.
 
 Each test pairs a commit budget with observable state, registration, or callback-identity checks.
-An explicit parent rerender costs one commit; prompt/resource registration status can require a
+An explicit parent rerender costs one commit; tool/prompt/resource registration status can require a
 second. React may report an empty bailout commit for a same-state update, so those checks also
 require preserved state identity. See [React's state bailout caveat](https://react.dev/reference/react/useState#setstate).
 

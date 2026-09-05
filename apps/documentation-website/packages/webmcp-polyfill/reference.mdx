@@ -205,11 +205,26 @@ for the current browser signature.
 
 ## Schema entry
 
-`normalizeInputSchema()` on `@mcp-b/webmcp-polyfill/schema` converts plain JSON
-Schema and Standard Schema v1 implementations that expose
-`~standard.jsonSchema.input()`. MCP-B runtimes use the converted JSON Schema for
-browser metadata and preserve `~standard.validate()` for the MCP SDK when it is
-available.
+`normalizeInputSchema()` on `@mcp-b/webmcp-polyfill/schema` converts plain JSON Schema and
+[Standard JSON Schema v1](https://standardschema.dev/json-schema) implementations. Conversion calls
+`~standard.jsonSchema.input()`, trying `draft-2020-12` and then `draft-07`. When a
+[Standard Schema v1](https://standardschema.dev/) validator is also present, the helper preserves
+`~standard.validate()` as a non-enumerable property for the MCP SDK. It does not invoke the validator
+or wrap the tool's callback.
+
+| Registration/execution path                                | Schema conversion                                    | Argument validation                                                       |
+| ---------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------- |
+| `usewebmcp` or the MCP-B tool hook                         | Automatic for Standard JSON Schema                   | Supplied Standard Schema validator on local and agent calls               |
+| Standalone polyfill imperative API                         | Caller supplies JSON Schema                          | Caller validates in the handler                                           |
+| `normalizeInputSchema()` helper                            | Converts metadata and preserves a supplied validator | None; this helper does not execute tools                                  |
+| `BrowserMcpServer` through an MCP client                   | Automatic conversion                                 | Official MCP server uses a preserved validator or its JSON Schema adapter |
+| Direct `BrowserMcpServer.executeTool()` or a native mirror | Already converted metadata                           | Bypasses MCP validation; caller validates in the handler                  |
+
+The [schema guide](/how-to/use-schemas-and-structured-output) includes a direct-registration example.
+When that callback owns validation, `{ ...normalizeInputSchema(schema).inputSchema }` copies only
+JSON metadata. It prevents the MCP SDK from also applying the vendor transforms if the tool later
+uses the MCP-B runtime. The [React hook](/packages/usewebmcp/reference#schemas-and-inference) already
+keeps vendor validation in its callback.
 
 The public schema entry exports these low-level adapter groups:
 

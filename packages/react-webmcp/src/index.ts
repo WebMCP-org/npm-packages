@@ -6,19 +6,19 @@
  */
 
 export type {
-  InferOutput,
   InferToolInput,
+  InferValidatedToolInput,
   ToolExecutionState,
-  WebMCPConfig,
-  WebMCPReturn,
+  WebMCP,
 } from 'usewebmcp';
-export { useWebMCP } from 'usewebmcp';
+export { useWebMCP } from './useWebMCP.js';
 
 export type { ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';
 export type { McpClientProviderProps } from './client/McpClientProvider.js';
 export { McpClientProvider, useMcpClient } from './client/McpClientProvider.js';
 export type {
   CallToolResult,
+  InferOutput,
   ModelContextProtocol,
   PromptDescriptor,
   PromptMessage,
@@ -26,6 +26,9 @@ export type {
   ResourceDescriptor,
   ToolAnnotations,
   ToolDescriptor,
+  ToolExecuteFunction,
+  WebMCPConfig,
+  WebMCPReturn,
   WebMCPPromptConfig,
   WebMCPPromptReturn,
   WebMCPResourceConfig,

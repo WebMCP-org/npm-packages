@@ -82,9 +82,13 @@ await server.syncNativeTools();
 
 ## Schema boundary
 
-The browser-facing API accepts JSON Schema and Standard Schema inputs. The adapter converts them to the MCP SDK v2 contract. Direct upstream registrations can use Zod 4.2 or newer or the official `fromJsonSchema` helper; Zod 3 is unsupported.
+`BrowserMcpServer` converts JSON Schema or Standard JSON Schema input metadata through the optional [`@mcp-b/webmcp-polyfill/schema`](../webmcp-polyfill/README.md#schema-helpers) adapter. When the supplied schema also has `~standard.validate()`, the adapter preserves that method for the official MCP server. For plain JSON Schema, the server uses the MCP SDK's `fromJsonSchema` adapter.
 
-MCP requires an object-root tool input schema. An array-root WebMCP tool remains available through WebMCP but is omitted from MCP discovery.
+This validation runs on **MCP client calls**. Direct `executeTool()` calls and native WebMCP mirrors invoke the browser callback without passing through MCP validation. Validate in that callback when exposing tools through both paths, and pass plain JSON metadata so the MCP SDK does not also apply the vendor transforms. The [`usewebmcp`](../usewebmcp/README.md) hook already does this for local and agent calls using the validator supplied in your schema.
+
+`outputSchema` is likewise enforced by the MCP server on MCP calls, not on direct browser calls. See [schemas and structured output](https://docs.mcp-b.ai/how-to/use-schemas-and-structured-output) for examples and [the package reference](https://docs.mcp-b.ai/packages/webmcp-ts-sdk/reference#schema-boundary) for the contracts.
+
+MCP requires an object-root tool input schema. An array-root WebMCP tool remains available through WebMCP but is omitted from MCP discovery. Direct registrations on `server.mcpServer` use the official SDK's schema APIs; Zod 4.2 or newer is supported, and Zod 3 is unsupported.
 
 ## Exports
 
