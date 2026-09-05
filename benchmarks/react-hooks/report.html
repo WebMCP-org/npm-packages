@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <title>WebMCP hook benchmark figures</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: var(--sigvelo-font-sans);
+        color: var(--sigvelo-color-text);
+        background: var(--sigvelo-color-surface-under);
+      }
+      article {
+        width: 1056px;
+        margin: 32px;
+        padding: 40px;
+        background: var(--sigvelo-color-surface);
+        border: 1px solid var(--sigvelo-color-neutral-border-muted);
+        border-radius: var(--sigvelo-radius-xl);
+      }
+      .eyebrow {
+        margin: 0 0 18px;
+        font: 500 14px var(--sigvelo-font-mono);
+        color: var(--sigvelo-color-primary);
+        letter-spacing: 0.04em;
+      }
+      h1 {
+        margin: 0;
+        font-size: 42px;
+        font-weight: 600;
+        line-height: 1.14;
+        letter-spacing: -0.035em;
+      }
+      .intro {
+        margin: 14px 0 28px;
+        color: var(--sigvelo-color-text-muted);
+        font-size: 19px;
+        line-height: 1.5;
+      }
+      sigvelo-chart-card {
+        margin-top: 24px;
+      }
+      sigvelo-chart-card::part(heading) {
+        font-size: 18px;
+      }
+      sigvelo-chart {
+        max-width: 790px;
+        margin: 0 auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 15px;
+      }
+      td,
+      th {
+        padding: 10px 12px;
+        border-top: 1px solid var(--sigvelo-color-neutral-border-muted);
+      }
+      th {
+        font-weight: 500;
+        color: var(--sigvelo-color-text-muted);
+      }
+      td:last-child,
+      th:last-child {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .note {
+        margin: 18px 0 0;
+        font-size: 15px;
+        color: var(--sigvelo-color-text-muted);
+        line-height: 1.5;
+      }
+      .source {
+        margin: 24px 0 0;
+        font: 12px/1.6 var(--sigvelo-font-mono);
+        color: var(--sigvelo-color-text-muted);
+        white-space: pre-line;
+      }
+      .flow {
+        display: grid;
+        grid-template-columns: 1fr 28px 1.2fr 28px 1fr;
+        align-items: stretch;
+        margin-top: 30px;
+      }
+      .flow sigvelo-chart-card {
+        margin: 0;
+      }
+      .flow sigvelo-chart-card p {
+        margin: 8px 0 0;
+        font-size: 17px;
+        line-height: 1.55;
+        color: var(--sigvelo-color-text-muted);
+      }
+      .arrow {
+        align-self: center;
+        text-align: center;
+        color: var(--sigvelo-color-text-muted);
+        font-size: 23px;
+      }
+      .details {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-top: 20px;
+      }
+      .details sigvelo-chart-card {
+        margin: 0;
+      }
+      .details p {
+        margin: 8px 0 0;
+        font-size: 16px;
+        line-height: 1.5;
+        color: var(--sigvelo-color-text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <article id="performance" aria-labelledby="performance-title">
+      <p class="eyebrow">WEBMCP / REACT HOOKS</p>
+      <h1 id="performance-title">Ten overlapping calls.</h1>
+      <p class="intro">
+        React commits while starting ten overlapping tool calls, before any resolves.
+      </p>
+      <sigvelo-chart-card
+        heading="Updates to execution state"
+        description="Bars show median commits; the table shows the observed range."
+      >
+        <sigvelo-chart
+          id="commits"
+          type="bar"
+          label="React commits while starting ten overlapping tool calls"
+          x-field="label"
+          y-field="value"
+        ></sigvelo-chart>
+        <table aria-label="Commit counts">
+          <thead>
+            <tr>
+              <th scope="col">Hook</th>
+              <th scope="col">Commits</th>
+            </tr>
+          </thead>
+          <tbody id="counts"></tbody>
+        </table>
+      </sigvelo-chart-card>
+      <p class="note">
+        Google's use-webmcp-tool exposes registration state only, so it is excluded from this
+        execution-state chart. All four hooks avoid re-registration on equivalent inline
+        definitions.
+      </p>
+      <p class="source" id="measurement-source"></p>
+    </article>
+    <article id="architecture" aria-labelledby="architecture-title">
+      <p class="eyebrow">WEBMCP / PACKAGE CHOICES</p>
+      <h1 id="architecture-title">Your schema. Your runtime.</h1>
+      <p class="intro">
+        Register React state and actions with a shared lifecycle across both hooks.
+      </p>
+      <div class="flow">
+        <sigvelo-chart-card heading="Your component"
+          ><p>State and actions<br />Latest committed handler</p></sigvelo-chart-card
+        >
+        <span class="arrow" aria-hidden="true">→</span>
+        <sigvelo-chart-card heading="usewebmcp"
+          ><p>
+            Tool registration<br />Validation and transforms<br />Execution state and cancellation
+          </p></sigvelo-chart-card
+        >
+        <span class="arrow" aria-hidden="true">→</span>
+        <sigvelo-chart-card heading="Your runtime"
+          ><p>Native WebMCP<br />Standalone polyfill<br />Or @mcp-b/global</p></sigvelo-chart-card
+        >
+      </div>
+      <div class="details">
+        <sigvelo-chart-card heading="Bring your schema library"
+          ><p>
+            Standard JSON Schema supplies metadata.<br />Standard Schema validates each call.
+          </p></sigvelo-chart-card
+        >
+        <sigvelo-chart-card heading="Add MCP features when you need them"
+          ><p>
+            @mcp-b/react-webmcp adds MCP results, output schemas, and context, prompt, resource, and
+            client hooks.
+          </p></sigvelo-chart-card
+        >
+      </div>
+      <p class="note">
+        Both packages preserve 'use client' and support React 18 and 19. The core hook uses
+        Community Group types and installs no validator, polyfill, or MCP SDK.
+      </p>
+    </article>
+    <script type="module">
+      import 'design-tokens';
+      import 'design-chart';
+      import 'design-chart-card';
+      const report = await fetch('./results.json').then((response) => response.json());
+      const definitions = [
+        ['usewebmcp', 'usewebmcp', 'usewebmcp · PR #329'],
+        ['@mcp-b/react-webmcp', 'MCP adapter', '@mcp-b/react-webmcp · PR #329'],
+        ['webmcp-react', 'MCP Cat', 'webmcp-react · ' + report.packages['webmcp-react']],
+      ];
+      const rows = definitions.map(([name, label, fullName]) => {
+        const values = report.samples
+          .filter((row) => row.library === name)
+          .map((row) => row.start)
+          .sort((a, b) => a - b);
+        if (values.length !== 10)
+          throw new Error('Each library needs five trials in both StrictMode settings');
+        return {
+          label,
+          fullName,
+          value: (values[4] + values[5]) / 2,
+          range: values[0] === values[9] ? String(values[0]) : values[0] + '–' + values[9],
+        };
+      });
+      const chart = document.querySelector('#commits');
+      chart.data = rows;
+      if (rows.slice(0, 2).every((row) => row.range === '1')) {
+        document.querySelector('#performance-title').textContent =
+          'Ten calls. One update to pending state.';
+      }
+      for (const row of rows) {
+        const tr = document.createElement('tr');
+        for (const value of [row.fullName, row.range]) {
+          const td = document.createElement('td');
+          td.textContent = value;
+          tr.append(td);
+        }
+        document.querySelector('#counts').append(tr);
+      }
+      document.querySelector('#measurement-source').textContent =
+        report.recordedAt.slice(0, 10) +
+        ' · React ' +
+        report.packages.react +
+        ' · Chrome ' +
+        report.browser +
+        '\nFive trials per mode · StrictMode on + off · Source ' +
+        report.sourceCommit.slice(0, 8);
+      await Promise.all(
+        [...document.querySelectorAll('sigvelo-chart, sigvelo-chart-card')].map(
+          (element) => element.updateComplete
+        )
+      );
+      await document.fonts.ready;
+      window.reportReady = true;
+    </script>
+  </body>
+</html>
