@@ -9,8 +9,8 @@ Measure React commits around WebMCP tools. Render the chart with D3 and the shar
 
 The chart compares component re-renders in two scenarios:
 
-- **Change a tool's description 10 times:** our hooks and Google produce 20 re-renders;
-  MCP Cat produces 10. Counts include registration-status updates where exposed.
+- **Change a tool's description 10 times:** our hooks and MCP Cat produce 10 re-renders;
+  Google produces 20. Our hooks reuse the successful registration state when updates batch.
 - **Run 10 overlapping calls, from start to finish:** our hooks produce 11 re-renders;
   MCP Cat produces 20. Google exposes no execution state, so this comparison does not apply.
 
