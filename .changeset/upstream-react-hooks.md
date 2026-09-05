@@ -24,7 +24,9 @@ an AbortSignal, including when older runtimes omit the options bag.
 Add `exposedTo`, `formatOutput`, and registration status/error fields alongside `enabled`. Serialized metadata
 changes refresh registration without churn from equivalent inline objects. Missing APIs are checked
 for up to ten seconds after mount. Cancelled executions cannot overwrite later state, and stale
-registration promises cannot alter replacement registrations.
+registration promises cannot alter replacement registrations. Reuse successful registration state
+so batched metadata updates avoid redundant React commits; pending and failed
+registrations still update their status.
 
 Add browser and native Chrome regression coverage plus packed-package tests for production
 `'use client'` directives, isolated strict declarations, upstream/MCP-B coexistence, and React 18/19

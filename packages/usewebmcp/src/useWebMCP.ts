@@ -8,6 +8,8 @@ import type { ToolExecutionState, ToolInputSchema, WebMCPConfig, WebMCPReturn } 
 
 const INITIAL_STATE = { isExecuting: false, lastResult: null, error: null, executionCount: 0 };
 const INITIAL_REGISTRATION = { isSupported: false, isRegistered: false, registrationError: null };
+// A batched pending/success cycle should preserve the previously committed state.
+const REGISTERED = { isSupported: true, isRegistered: true, registrationError: null };
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 function toError(error: unknown): Error {
@@ -185,7 +187,7 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
         );
         void Promise.resolve(registered).then(() => {
           if (!controller.signal.aborted) {
-            setRegistration({ isSupported: true, isRegistered: true, registrationError: null });
+            setRegistration(REGISTERED);
           }
         }, failed);
       } catch (cause) {

@@ -168,9 +168,10 @@ after a verified mount, including nested updates. They run with and without
 Do not count component-body calls or assert wall-clock durations.
 
 Each test pairs a commit budget with observable state, registration, or callback-identity checks.
-An explicit parent rerender costs one commit; tool/prompt/resource registration status can require a
-second. React may report an empty bailout commit for a same-state update, so those checks also
-require preserved state identity. See [React's state bailout caveat](https://react.dev/reference/react/useState#setstate).
+An explicit parent rerender costs one commit. Batched tool metadata updates add no consumer
+commit when registration ends unchanged; an inner Profiler excludes empty bailout commits.
+Deferred registration still publishes pending, success, and failure states. Other same-state
+checks also require preserved state identity because an outer Profiler may report an empty commit. See [React's state bailout caveat](https://react.dev/reference/react/useState#setstate).
 
 Deferred promises separate pending, success, and error transitions into awaited `hook.act` scopes.
 Await `rerender` and `unmount`; do not use sleeps to settle React. The

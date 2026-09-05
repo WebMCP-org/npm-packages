@@ -602,6 +602,49 @@ describe('useWebMCP in a browser runtime', () => {
   });
 
   it.each(['resolve', 'reject'] as const)(
+    'publishes pending metadata registration and its %s outcome before recovery',
+    async (outcome) => {
+      const name = `registration_update_${outcome}`;
+      const hook = await renderHook(
+        ({ revision }) =>
+          useWebMCP({ name, description: `Revision ${revision}`, execute: () => revision }),
+        { initialProps: { revision: 1 } }
+      );
+      expect(hook.result.current.isRegistered).toBe(true);
+      const context = document.modelContext;
+      const registerTool = context.registerTool;
+      const delayed = Promise.withResolvers<void>();
+      vi.spyOn(context, 'registerTool').mockImplementationOnce(async (...args) => {
+        await delayed.promise;
+        return registerTool.apply(context, args);
+      });
+
+      await hook.rerender({ revision: 2 });
+      expect(hook.result.current).toMatchObject({
+        isSupported: true,
+        isRegistered: false,
+        registrationError: null,
+      });
+      expect(await findTool(name)).toBeUndefined();
+
+      const failure = new Error('Metadata registration failed');
+      await hook.act(async () => {
+        if (outcome === 'resolve') delayed.resolve();
+        else delayed.reject(failure);
+        await Promise.resolve();
+      });
+      expect(hook.result.current).toMatchObject({
+        isRegistered: outcome === 'resolve',
+        registrationError: outcome === 'reject' ? failure : null,
+      });
+
+      await hook.rerender({ revision: 3 });
+      expect(hook.result.current).toMatchObject({ isRegistered: true, registrationError: null });
+      expect(await findTool(name)).toMatchObject({ description: 'Revision 3' });
+    }
+  );
+
+  it.each(['resolve', 'reject'] as const)(
     'ignores a stale registration that later %ss',
     async (outcome) => {
       const delayed = Promise.withResolvers<void>();

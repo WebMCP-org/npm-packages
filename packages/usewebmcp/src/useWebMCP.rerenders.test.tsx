@@ -1,7 +1,14 @@
 import { cleanupWebMCPPolyfill, initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
-import { Profiler, type ProfilerOnRenderCallback, type PropsWithChildren } from 'react';
+import {
+  act,
+  Profiler,
+  type ProfilerOnRenderCallback,
+  type PropsWithChildren,
+  useState,
+} from 'react';
+import { flushSync } from 'react-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, configure, renderHook } from 'vitest-browser-react/pure';
+import { cleanup, configure, render, renderHook } from 'vitest-browser-react/pure';
 import { useWebMCP } from './useWebMCP.js';
 
 function withProfiler(onRender: ProfilerOnRenderCallback) {
@@ -66,6 +73,59 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
     expect(register).toHaveBeenCalledTimes(registrations);
     await hook.unmount();
     expect(await modelContext.getTools()).toEqual([]);
+  });
+
+  it('adds no consumer commits when metadata registration finishes in the same batch', async () => {
+    const onRender = vi.fn<ProfilerOnRenderCallback>();
+    const modelContext = document.modelContext;
+    const register = vi.spyOn(modelContext, 'registerTool');
+    let update!: (revision: number) => void;
+    function Consumer({ revision }: { revision: number }) {
+      const { isRegistered } = useWebMCP({
+        name: 'render_metadata',
+        description: `Revision ${revision}`,
+        execute: () => revision,
+      });
+      // Inside the consumer: an outer Profiler can count empty bailout commits.
+      return (
+        <Profiler id="metadata" onRender={onRender}>
+          <output aria-label="Registration status">
+            {isRegistered ? 'registered' : 'pending'}
+          </output>
+        </Profiler>
+      );
+    }
+    function Parent() {
+      const [revision, setRevision] = useState(0);
+      update = setRevision;
+      return <Consumer revision={revision} />;
+    }
+    const screen = await render(<Parent />);
+    await expect
+      .element(screen.getByLabelText('Registration status'))
+      .toHaveTextContent('registered');
+    onRender.mockClear();
+    register.mockClear();
+
+    const actEnvironment = Reflect.get(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
+    Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
+    try {
+      for (let revision = 1; revision <= 10; revision += 1) {
+        await act(async () => {
+          flushSync(() => update(revision));
+          await Promise.all(register.mock.results.map(({ value }) => value));
+        });
+      }
+    } finally {
+      Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', actEnvironment);
+    }
+
+    expect(register).toHaveBeenCalledTimes(10);
+    expect(onRender).toHaveBeenCalledTimes(10); // Only the requested parent updates.
+    expect(await modelContext.getTools()).toMatchObject([{ description: 'Revision 10' }]);
+    await expect
+      .element(screen.getByLabelText('Registration status'))
+      .toHaveTextContent('registered');
   });
 
   it('bounds registration commits without resetting execution state', async () => {
