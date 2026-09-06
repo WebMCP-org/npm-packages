@@ -179,6 +179,10 @@ Await `rerender` and `unmount`; do not use sleeps to settle React. The
 provide the act environment and cleanup. Client tests profile a memoized consumer, then verify a
 real inventory change reaches it so a disconnected observer cannot pass a zero-commit assertion.
 
+The [hook comparison harness](../benchmarks/react-hooks/README.md) separately measures
+production registration/render counts, scaling to 100 tools, sequential calls, and hook
+bundle sizes. Its hardware-dependent timings are informational, not CI pass/fail thresholds.
+
 ## CI / Default Gate
 
 The canonical runtime gate lives in `.github/workflows/e2e.yml`.

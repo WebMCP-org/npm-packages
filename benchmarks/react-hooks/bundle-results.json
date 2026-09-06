@@ -1,0 +1,68 @@
+{
+  "recordedAt": "2026-09-06T02:06:36.227Z",
+  "sourceCommit": "93d574b2d2d6cf402c2e3b0d4ccec26a3c9f3389",
+  "platform": "darwin/arm64",
+  "node": "v22.23.2",
+  "bundler": {
+    "vitePlus": "0.1.24",
+    "vite": "8.0.16"
+  },
+  "config": {
+    "target": "es2022",
+    "format": "es",
+    "minifier": "oxc",
+    "gzipLevel": 9,
+    "mode": "production",
+    "external": ["react", "react/*", "react-dom", "react-dom/*"]
+  },
+  "installedDependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "use-webmcp-tool": "0.2.0",
+    "webmcp-react": "1.1.0",
+    "zod": "4.4.3"
+  },
+  "scope": "One tool-hook export; React excluded; built-in dependencies included; no app validator or runtime setup.",
+  "samples": [
+    {
+      "library": "usewebmcp",
+      "version": "5.1.0",
+      "exportName": "useWebMCP",
+      "entry": "./dist/index.js",
+      "rawBytes": 5475,
+      "minifiedBytes": 4092,
+      "gzipBytes": 1615,
+      "externalImports": ["react"]
+    },
+    {
+      "library": "@mcp-b/react-webmcp",
+      "version": "5.1.0",
+      "exportName": "useWebMCP",
+      "entry": "./dist/index.js",
+      "rawBytes": 7564,
+      "minifiedBytes": 5222,
+      "gzipBytes": 1997,
+      "externalImports": ["react", "react/jsx-runtime"]
+    },
+    {
+      "library": "webmcp-react",
+      "version": "1.1.0",
+      "exportName": "useMcpTool",
+      "entry": "./dist/index.js",
+      "rawBytes": 179387,
+      "minifiedBytes": 96847,
+      "gzipBytes": 24207,
+      "externalImports": ["react", "react/jsx-runtime"]
+    },
+    {
+      "library": "use-webmcp-tool",
+      "version": "0.2.0",
+      "exportName": "useWebMCP",
+      "entry": "./useWebMCP.js",
+      "rawBytes": 3753,
+      "minifiedBytes": 1569,
+      "gzipBytes": 689,
+      "externalImports": ["react"]
+    }
+  ]
+}
