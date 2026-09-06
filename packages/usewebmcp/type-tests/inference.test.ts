@@ -23,6 +23,7 @@ export type InferenceAssertions = [
   Assert<Equal<InferToolInput<typeof schema>, z.input<typeof schema>>>,
   Assert<Equal<InferValidatedToolInput<typeof schema>, z.output<typeof schema>>>,
   Assert<Equal<WebMCPReturn['state']['lastResult'], unknown>>,
+  Assert<Equal<Extract<keyof WebMCPReturn, 'isRegistered'>, never>>,
   Assert<Equal<WebMCPConfig['annotations'], WebMCP.ToolAnnotations | undefined>>,
   Assert<Equal<Document['modelContext'], WebMCP.ModelContext | undefined>>,
 ];

@@ -133,6 +133,7 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
         check(!error, String(error));
       }
       check(performance.now() < deadline, `${name}: timed out settling revision ${revision}`);
+      // Native promise completion determines readiness; hook success flags are optional.
       const ready =
         pending.size === 0 &&
         controls.length === toolCount &&
@@ -141,7 +142,7 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
         passiveRenders === renders &&
         controls.every(
           (control) =>
-            control.isRegistered !== false &&
+            control.isSupported !== false &&
             control.registered !== false &&
             !control.state?.isExecuting
         ) &&
@@ -175,6 +176,16 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
     }
     const metadata = await phase(() => update({ revision: 11, metadataRevision: 1 }), 11);
     check(metadata.registrations >= toolCount, 'Metadata changes must update every tool');
+    if (name === 'usewebmcp' || name === '@mcp-b/react-webmcp') {
+      check(
+        metadata.registrations === toolCount,
+        `${name}: metadata changes must register each tool exactly once`
+      );
+      check(
+        metadata.renders === toolCount,
+        `${name}: metadata refresh committed ${metadata.renders}/${toolCount} consumer renders; successful registration must add no renders`
+      );
+    }
     const inventory = await context.getTools();
     check(
       inventory.length === toolCount &&

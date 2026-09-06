@@ -24,6 +24,9 @@ export function useWebMCP<
         return result;
       },
       formatOutput: config.formatOutput ?? normalizeToolResponse,
+      formatError:
+        config.formatError ??
+        ((error) => ({ content: [{ type: 'text', text: error.message }], isError: true })),
     },
     deps
   );

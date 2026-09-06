@@ -180,11 +180,14 @@ console.error = (...args) => warnings.push(args);
 function App() {
   const tool = useWebMCP({ name: 'ssr', description: 'Server rendering', execute: () => 'ready' });
   assert.equal(tool.isSupported, false);
-  assert.equal(tool.isRegistered, false);
+  assert.equal('isRegistered' in tool, false);
+  assert.equal(tool.registrationError, null);
   assert.equal(tool.state.isExecuting, false);
   ${
     extended
-      ? `mcp.useWebMCP({ name: 'ssr_extended', description: 'Extended server rendering', execute: () => 'ready' });
+      ? `const extendedTool = mcp.useWebMCP({ name: 'ssr_extended', description: 'Extended server rendering', execute: () => 'ready' });
+  assert.equal('isRegistered' in extendedTool, false);
+  assert.equal(extendedTool.registrationError, null);
   mcp.useWebMCPContext('ssr_context', 'Context', () => ({ ready: true }));
   mcp.useWebMCPPrompt({ name: 'ssr_prompt', get: () => ({ messages: [] }) });
   mcp.useWebMCPResource({ name: 'ssr_resource', uri: 'data://ssr', read: () => ({ contents: [] }) });`

@@ -19,21 +19,29 @@ beforeAll(() => {
 });
 
 it('registers, validates, executes, and cleans up through native WebMCP in StrictMode', async () => {
+  const failure = new Error('Count must be nonnegative');
   const hook = await renderHook(
     () =>
       useWebMCP({
         name: 'native_validated',
         description: 'Native validation',
         inputSchema: z.object({ count: z.string().transform(Number) }),
-        execute: ({ count }) => ({ total: count + 1 }),
+        execute: ({ count }) => {
+          if (count < 0) throw failure;
+          return { total: count + 1 };
+        },
       }),
     { wrapper: ({ children }) => createElement(StrictMode, null, children) }
   );
   const context = document.modelContext;
   if (!hasExecution(context)) throw new Error('Native executeTool is unavailable');
   await hook.act(async () => {
-    await expect.poll(() => hook.result.current.isRegistered).toBe(true);
+    await expect
+      .poll(async () => (await context.getTools()).some((tool) => tool.name === 'native_validated'))
+      .toBe(true);
   });
+  expect(hook.result.current).not.toHaveProperty('isRegistered');
+  expect(hook.result.current.registrationError).toBeNull();
   const tools = (await context.getTools()).filter((tool) => tool.name === 'native_validated');
   expect(tools).toHaveLength(1);
   const tool = tools[0];
@@ -41,9 +49,18 @@ it('registers, validates, executes, and cleans up through native WebMCP in Stric
   await hook.act(async () => {
     const response = await context.executeTool(tool, JSON.stringify({ count: '2' }));
     expect(response && JSON.parse(response)).toEqual({ total: 3 });
-    const invalid = await context.executeTool(tool, JSON.stringify({ count: 2 }));
-    expect(invalid && JSON.parse(invalid)).toMatchObject({ isError: true });
+    await expect(context.executeTool(tool, JSON.stringify({ count: 2 }))).rejects.toMatchObject({
+      name: 'UnknownError',
+    });
   });
+  expect(hook.result.current.state.error).toBeInstanceOf(TypeError);
+  await hook.act(async () => {
+    await expect(context.executeTool(tool, JSON.stringify({ count: '-1' }))).rejects.toMatchObject({
+      name: 'UnknownError',
+    });
+  });
+  expect(hook.result.current.state.error).toBe(failure);
+  expect(hook.result.current.state.isExecuting).toBe(false);
   expect(hook.result.current.state.executionCount).toBe(1);
   await hook.unmount();
   expect((await context.getTools()).some((tool) => tool.name === 'native_validated')).toBe(false);
@@ -64,7 +81,9 @@ it('forwards native cancellation to the handler and clears pending state', async
   const context = document.modelContext;
   if (!hasExecution(context)) throw new Error('Native executeTool is unavailable');
   await hook.act(async () => {
-    await expect.poll(() => hook.result.current.isRegistered).toBe(true);
+    await expect
+      .poll(async () => (await context.getTools()).some((tool) => tool.name === 'native_cancelled'))
+      .toBe(true);
   });
   const tool = (await context.getTools()).find((tool) => tool.name === 'native_cancelled');
   if (!tool) throw new Error('Native tool is missing');

@@ -294,10 +294,10 @@ it('forwards context enabled options with bounded commits and stable local contr
   for (const enabled of [true, false, true]) {
     onRender.mockClear();
     await hook.rerender({ enabled, value: 'latest' });
-    await expect.poll(() => hook.result.current.isRegistered).toBe(enabled);
+    expect(hook.result.current.registrationError).toBeNull();
     expect((await client.listTools()).tools).toHaveLength(enabled ? 1 : 0);
     expect(onRender).toHaveBeenCalled();
-    expect(onRender.mock.calls.length).toBeLessThanOrEqual(2); // Parent and registration status.
+    expect(onRender).toHaveBeenCalledTimes(1); // The requested parent update only.
     expect(hook.result.current.state).toBe(state);
     expect(hook.result.current.execute).toBe(execute);
     expect(hook.result.current.reset).toBe(reset);

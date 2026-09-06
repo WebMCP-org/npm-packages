@@ -7,10 +7,10 @@ import { toInputSchema, validateInput } from './schema.js';
 import type { ToolExecutionState, ToolInputSchema, WebMCPConfig, WebMCPReturn } from './types.js';
 
 const INITIAL_STATE = { isExecuting: false, lastResult: null, error: null, executionCount: 0 };
-const INITIAL_REGISTRATION = { isSupported: false, isRegistered: false, registrationError: null };
-// A batched pending/success cycle should preserve the previously committed state.
-const REGISTERED = { isSupported: true, isRegistered: true, registrationError: null };
+const INITIAL_REGISTRATION = { isSupported: false, registrationError: null };
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
+type ExecutionOutcome<T> = { result: T; output: unknown } | { error: Error; output?: unknown };
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
@@ -32,15 +32,17 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
 ): WebMCPReturn<TInputSchema, TResult> {
   const [state, setState] = useState<ToolExecutionState<TResult>>(INITIAL_STATE);
   const [registration, setRegistration] =
-    useState<Pick<WebMCPReturn, 'isSupported' | 'isRegistered' | 'registrationError'>>(
-      INITIAL_REGISTRATION
-    );
+    useState<Pick<WebMCPReturn, 'isSupported' | 'registrationError'>>(INITIAL_REGISTRATION);
   const pendingExecutions = useRef(0);
   const schema = useMemo(() => {
     try {
-      return {
-        value: config.inputSchema === undefined ? undefined : toInputSchema(config.inputSchema),
-      };
+      const value =
+        config.inputSchema === undefined ? undefined : toInputSchema(config.inputSchema);
+      const key = JSON.stringify(value);
+      if (value !== undefined && key === undefined) {
+        throw new TypeError('inputSchema must serialize to JSON');
+      }
+      return { value, key };
     } catch (error) {
       return { error: toError(error) };
     }
@@ -48,6 +50,8 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
   const {
     execute: _execute,
     formatOutput: _formatOutput,
+    formatError: _formatError,
+    inputSchema: _inputSchema,
     enabled = true,
     exposedTo,
     ...metadata
@@ -59,7 +63,7 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
   let preparationError = schema.error;
   let descriptorKey: string;
   try {
-    descriptorKey = JSON.stringify([descriptor, exposedTo]);
+    descriptorKey = JSON.stringify([metadata, exposedTo]);
   } catch (error) {
     preparationError = toError(error);
     descriptorKey = preparationError.message;
@@ -76,7 +80,7 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
       input: unknown,
       options: WebMCP.ToolExecuteCallbackOptions = { signal: new AbortController().signal },
       forAgent = false
-    ): Promise<{ result: TResult; output: unknown }> => {
+    ): Promise<ExecutionOutcome<TResult>> => {
       const executionConfig = committed.current.config;
       const { signal } = options;
       pendingExecutions.current += 1;
@@ -86,50 +90,66 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
           : { ...previous, isExecuting: true, error: null }
       );
       let onAbort: (() => void) | undefined;
+      let outcome: ExecutionOutcome<TResult>;
       try {
         signal.throwIfAborted();
-        const operation = async () => {
-          const validated = await validateInput(executionConfig.inputSchema, input);
-          signal.throwIfAborted();
-          const result = await executionConfig.execute(validated, options);
-          signal.throwIfAborted();
-          if (result instanceof Error) throw result;
-          const output =
-            forAgent && executionConfig.formatOutput
-              ? await executionConfig.formatOutput(result)
-              : result;
-          signal.throwIfAborted();
-          return { result, output };
+        const operation = async (): Promise<ExecutionOutcome<TResult>> => {
+          try {
+            const validated = await validateInput(executionConfig.inputSchema, input);
+            signal.throwIfAborted();
+            const result = await executionConfig.execute(validated, options);
+            signal.throwIfAborted();
+            if (result instanceof Error) throw result;
+            const output =
+              forAgent && executionConfig.formatOutput
+                ? await executionConfig.formatOutput(result)
+                : result;
+            signal.throwIfAborted();
+            return { result, output };
+          } catch (cause) {
+            signal.throwIfAborted();
+            const error = toError(cause);
+            if (!forAgent || !executionConfig.formatError) return { error };
+            const output = await executionConfig.formatError(error);
+            signal.throwIfAborted();
+            return { error, output };
+          }
         };
-        const { result, output } = await Promise.race([
+        outcome = await Promise.race([
           new Promise<never>((_, reject) => {
             onAbort = () => reject(signal.reason);
             signal.addEventListener('abort', onAbort, { once: true });
           }),
           operation(),
         ]);
-        setState((previous) => ({
-          ...previous,
-          lastResult: result,
-          error: null,
-          executionCount: previous.executionCount + 1,
-        }));
-        return { result, output };
       } catch (error) {
-        const normalized = toError(error);
-        setState((previous) => ({ ...previous, error: normalized }));
-        throw normalized;
+        outcome = { error: toError(error) };
       } finally {
         if (onAbort) signal.removeEventListener('abort', onAbort);
         pendingExecutions.current -= 1;
-        setState((previous) => ({ ...previous, isExecuting: pendingExecutions.current > 0 }));
       }
+      const isExecuting = pendingExecutions.current > 0;
+      setState((previous) =>
+        'error' in outcome
+          ? { ...previous, isExecuting, error: outcome.error }
+          : {
+              isExecuting,
+              lastResult: outcome.result,
+              error: null,
+              executionCount: previous.executionCount + 1,
+            }
+      );
+      return outcome;
     },
     []
   );
 
   const execute = useCallback<WebMCPReturn<TInputSchema, TResult>['execute']>(
-    async (input, options) => (await run(input, options)).result,
+    async (input, options) => {
+      const outcome = await run(input, options);
+      if ('error' in outcome) throw outcome.error;
+      return outcome.result;
+    },
     [run]
   );
 
@@ -154,11 +174,9 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
       const isSupported = canRegister(context);
       const { config: current, descriptor: tool, preparationError: error } = committed.current;
       setRegistration((previous) =>
-        previous.isSupported === isSupported &&
-        !previous.isRegistered &&
-        previous.registrationError === (error ?? null)
+        previous.isSupported === isSupported && previous.registrationError === (error ?? null)
           ? previous
-          : { isSupported, isRegistered: false, registrationError: error ?? null }
+          : { isSupported, registrationError: error ?? null }
       );
       if (error || !enabled) return true;
       if (!isSupported) return false;
@@ -167,7 +185,6 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
         controller.abort();
         setRegistration({
           isSupported: true,
-          isRegistered: false,
           registrationError: toError(cause),
         });
       };
@@ -176,20 +193,14 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
           {
             ...tool,
             execute: async (input, options) => {
-              try {
-                return (await run(input, options, true)).output;
-              } catch (cause) {
-                return { content: [{ type: 'text', text: toError(cause).message }], isError: true };
-              }
+              const outcome = await run(input, options, true);
+              if ('output' in outcome) return outcome.output;
+              throw outcome.error;
             },
           },
           { signal: controller.signal, ...(current.exposedTo && { exposedTo: current.exposedTo }) }
         );
-        void Promise.resolve(registered).then(() => {
-          if (!controller.signal.aborted) {
-            setRegistration(REGISTERED);
-          }
-        }, failed);
+        void Promise.resolve(registered).catch(failed);
       } catch (cause) {
         failed(cause);
       }
@@ -208,7 +219,7 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
     };
     // Descriptor contents avoid churn from inline schemas; deps can explicitly refresh registration.
     // oxlint-disable-next-line react-doctor/exhaustive-deps -- Metadata is compared by value and callbacks are read after commit.
-  }, [descriptorKey, preparationError?.message, enabled, ...(deps ?? [])]);
+  }, [descriptorKey, schema.key, preparationError?.message, enabled, ...(deps ?? [])]);
 
   return { state, ...registration, execute, reset };
 }

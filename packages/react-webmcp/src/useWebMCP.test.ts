@@ -138,6 +138,135 @@ describe('useWebMCP in a browser runtime', () => {
     expect(result.current.state.error?.message).toContain('JSON-serializable');
   });
 
+  it.each(['default', 'custom'] as const)(
+    'formats agent failures as MCP errors while local calls reject (%s)',
+    async (formatter) => {
+      const register = vi.spyOn(document.modelContext, 'registerTool');
+      try {
+        const failure = new Error('Handler failed');
+        const formatError =
+          formatter === 'custom'
+            ? vi.fn((error: Error) => ({
+                content: [{ type: 'text', text: `Custom: ${error.message}` }],
+                isError: true,
+              }))
+            : undefined;
+        const hook = await renderHook(() =>
+          useWebMCP({
+            name: 'mcp_agent_failure',
+            description: 'Preserves agent and local error contracts',
+            ...(formatError && { formatError }),
+            execute: () => {
+              throw failure;
+            },
+          })
+        );
+        const tool = register.mock.calls.find(([tool]) => tool.name === 'mcp_agent_failure')?.[0];
+        if (!tool) throw new Error('Tool was not registered');
+
+        await hook.act(async () => {
+          await expect(tool.execute({}, { signal: new AbortController().signal })).resolves.toEqual(
+            {
+              content: [
+                { type: 'text', text: `${formatter === 'custom' ? 'Custom: ' : ''}Handler failed` },
+              ],
+              isError: true,
+            }
+          );
+          await expect(hook.result.current.execute({})).rejects.toBe(failure);
+        });
+        expect(hook.result.current.state).toEqual({
+          isExecuting: false,
+          lastResult: null,
+          error: failure,
+          executionCount: 0,
+        });
+        if (formatError) expect(formatError).toHaveBeenCalledExactlyOnceWith(failure);
+      } finally {
+        register.mockRestore();
+      }
+    }
+  );
+
+  it('formats Standard Schema failures before the handler runs', async () => {
+    const register = vi.spyOn(document.modelContext, 'registerTool');
+    try {
+      const execute = vi.fn(() => 'unexpected');
+      const hook = await renderHook(() =>
+        useWebMCP({
+          name: 'mcp_validation_failure',
+          description: 'Formats invalid input for agents',
+          inputSchema: z.object({ count: z.string().regex(/^\d+$/, 'Use digits') }),
+          execute,
+        })
+      );
+      const tool = register.mock.calls.find(
+        ([tool]) => tool.name === 'mcp_validation_failure'
+      )?.[0];
+      if (!tool) throw new Error('Tool was not registered');
+
+      await hook.act(async () => {
+        await expect(
+          tool.execute({ count: 'invalid' }, { signal: new AbortController().signal })
+        ).resolves.toEqual({
+          content: [{ type: 'text', text: 'Invalid tool input: Use digits' }],
+          isError: true,
+        });
+        await expect(hook.result.current.execute({ count: 'invalid' })).rejects.toThrow(
+          'Use digits'
+        );
+      });
+      expect(execute).not.toHaveBeenCalled();
+      expect(hook.result.current.state).toEqual({
+        isExecuting: false,
+        lastResult: null,
+        error: new TypeError('Invalid tool input: Use digits'),
+        executionCount: 0,
+      });
+    } finally {
+      register.mockRestore();
+    }
+  });
+
+  it('keeps cancelled agent calls rejected instead of formatting an MCP error', async () => {
+    const register = vi.spyOn(document.modelContext, 'registerTool');
+    try {
+      const started = Promise.withResolvers<void>();
+      const hook = await renderHook(() =>
+        useWebMCP({
+          name: 'mcp_agent_cancellation',
+          description: 'Preserves cancellation through error formatting',
+          execute: () => {
+            started.resolve();
+            return new Promise<never>(() => {});
+          },
+        })
+      );
+      const tool = register.mock.calls.find(
+        ([tool]) => tool.name === 'mcp_agent_cancellation'
+      )?.[0];
+      if (!tool) throw new Error('Tool was not registered');
+      const controller = new AbortController();
+      const reason = new Error('Cancelled');
+
+      await hook.act(async () => {
+        const execution = tool.execute({}, { signal: controller.signal });
+        const rejection = expect(execution).rejects.toBe(reason);
+        await started.promise;
+        controller.abort(reason);
+        await rejection;
+      });
+      expect(hook.result.current.state).toEqual({
+        isExecuting: false,
+        lastResult: null,
+        error: reason,
+        executionCount: 0,
+      });
+    } finally {
+      register.mockRestore();
+    }
+  });
+
   it('normalizes raw JSON and passes through existing MCP responses', async () => {
     const { act } = await renderHook(() => {
       useWebMCP({

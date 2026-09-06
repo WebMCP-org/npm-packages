@@ -48,13 +48,14 @@ export interface WebMCPConfig<
   exposedTo?: WebMCP.ModelContextRegisterToolOptions['exposedTo'];
   /** Format agent-facing results; local execution and state retain the original result. */
   formatOutput?: (result: TResult) => unknown;
+  /** Format agent-facing failures; local execution continues to reject. Cancellation always rejects. */
+  formatError?: (error: Error) => unknown;
 }
 
 /** State and controls returned by useWebMCP. */
 export interface WebMCPReturn<TInputSchema extends ToolInputSchema = object, TResult = unknown> {
   state: ToolExecutionState<TResult>;
   isSupported: boolean;
-  isRegistered: boolean;
   registrationError: Error | null;
   execute: (
     input: InferToolInput<TInputSchema>,
