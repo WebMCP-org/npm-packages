@@ -54,9 +54,24 @@ Use [`@mcp-b/global`](../global/README.md) for MCP server features. Browser type
 
 ## Performance comparison
 
-`useWebMCPTool` has no execution-state subscription. `useWebMCP` includes pending,
-result, and error updates. The [comparison harness](https://github.com/WebMCP-org/npm-packages/tree/alex/invocation-runtime/benchmarks/react-hooks)
-measures both modes, registration changes, Google, and MCP Cat using the same workloads.
+Choose `useWebMCPTool` for registration only, or `useWebMCP` for pending, result, and error state.
+
+| Measured work                        | Our registration hook | Our stateful hook |  MCP Cat |  Google |
+| ------------------------------------ | --------------------: | ----------------: | -------: | ------: |
+| Re-renders per tool call             |                 **0** |                 2 |      1–2 |   **0** |
+| Registrations on mount               |                     1 |                 1 |        2 |       1 |
+| Registrations per unrelated update   |                     0 |                 0 |        0 |       0 |
+| Registrations per description change |                     1 |                 1 |        1 |       1 |
+| Re-renders per description change    |                     1 |                 1 |        1 |       2 |
+| Hook bundle, gzip                    |               3.56 kB |           3.91 kB | 24.21 kB | 0.69 kB |
+
+One tool, one-field stable JSON Schema, five production-browser trials. Call/update renders
+exclude mount. Registration-only hooks and Google supply no execution state. The MCP-B
+adapter matches our render counts; its hooks cost 3.93/4.28 kB gzip respectively. React and
+application validators are excluded from bundle sizes.
+[Results and method](https://github.com/WebMCP-org/npm-packages/tree/700e3de44faeb523792b718657f505b4ee8fe346/benchmarks/react-hooks)
+cover 540 samples, including optional plugins. These guarantees add bundle cost; Google remains
+smaller.
 
 ## Feature comparison
 
@@ -64,7 +79,7 @@ measures both modes, registration changes, Google, and MCP Cat using the same wo
 | ------------------------------- | --------------- | --------------------- | ------- | --------- |
 | Schema validation               | Standard Schema | Standard Schema       | Zod     | Manual    |
 | Registration errors             | Yes             | Yes                   | Yes     | Sync only |
-| Running, result & error state   | Yes             | Yes                   | Yes     | No        |
+| Running, result & error state   | Optional        | Optional              | Yes     | No        |
 | Call tools from React           | Yes             | Yes                   | Yes     | No        |
 | Automatic MCP result formatting | No              | Yes                   | No      | Yes       |
 | Prompt & resource hooks         | No              | Yes                   | No      | No        |
