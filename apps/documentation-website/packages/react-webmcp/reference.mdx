@@ -75,19 +75,27 @@ import { useWebMCP } from '@mcp-b/react-webmcp';
 
 This hook wraps [`usewebmcp`](/packages/usewebmcp/reference) with MCP annotations, output-schema
 inference, and automatic text/`structuredContent` response formatting. Its lifecycle, Standard Schema
-validation, cancellation, `enabled`, `exposedTo`, and registration state come from the core hook.
+validation, cancellation, `enabled`, `exposedTo`, and registration errors come from the core hook.
 The published entry point preserves `'use client'` and supports React 18/19 server rendering.
 
-| Field                     | Type                                     | Required | Description                  |
-| ------------------------- | ---------------------------------------- | -------- | ---------------------------- |
-| `name`                    | `string`                                 | Yes      | Unique tool identifier       |
-| `description`             | `string`                                 | Yes      | Human-readable description   |
-| `inputSchema`             | JSON Schema or Standard JSON Schema v1   | No       | Input parameters             |
-| `outputSchema`            | JSON Schema                              | No       | MCP-B output helper metadata |
-| `annotations`             | `ToolAnnotations`                        | No       | Metadata hints               |
-| `execute(input, options)` | `(input, { signal }) => T \| Promise<T>` | Yes      | Tool implementation          |
+| Field                     | Type                                     | Required | Description                      |
+| ------------------------- | ---------------------------------------- | -------- | -------------------------------- |
+| `name`                    | `string`                                 | Yes      | Unique tool identifier           |
+| `description`             | `string`                                 | Yes      | Human-readable description       |
+| `inputSchema`             | JSON Schema or Standard JSON Schema v1   | No       | Input parameters                 |
+| `outputSchema`            | JSON Schema                              | No       | MCP-B output helper metadata     |
+| `annotations`             | `ToolAnnotations`                        | No       | Metadata hints                   |
+| `execute(input, options)` | `(input, { signal }) => T \| Promise<T>` | Yes      | Tool implementation              |
+| `formatOutput`            | `(result: T) => unknown`                 | No       | Overrides MCP success formatting |
+| `formatError`             | `(error: Error) => unknown`              | No       | Overrides MCP error formatting   |
 
-**Returns:** `WebMCPReturn`, including `state`, `execute`, `reset`, `isSupported`, `isRegistered`, and `registrationError`.
+**Returns:** `WebMCPReturn`, including `state`, `execute`, `reset`, `isSupported`, and `registrationError`.
+Tool hooks no longer return `isRegistered`; use the runtime’s `getTools()` for confirmed discovery.
+
+Agent failures default to `{ content: [{ type: "text", text: error.message }], isError: true }`.
+`formatError` overrides this response. Both formatters may be async and are awaited. Local failures
+and cancellation always reject. `state.error` retains execution failures separately
+from `registrationError`. See [response behavior](/packages/usewebmcp/reference#tool-responses).
 
 Native Chrome WebMCP does not currently define or enforce `outputSchema`. The
 React hooks use it for output typing and structured MCP responses.
@@ -222,8 +230,12 @@ reusing a closed transport is not supported by every transport implementation.
 Standard JSON Schema object such as `z.object(...)` from Zod 4.2 or newer. `outputSchema` remains
 JSON Schema-only. The tool hook runs a supplied `~standard.validate()` on local and agent calls,
 awaits async validation, and passes transformed output to the handler. Callers supply the schema's input
-type. JSON Schema metadata alone does not add validation. The hook checks output JSON serializability;
-the official MCP server enforces the output schema on MCP client calls. Local calls, direct browser execution, and native mirrors bypass that MCP validation.
+type. JSON Schema metadata alone does not add validation.
+
+Treat input schemas as immutable: conversion and serialization are cached by identity. Replace the
+object to change its contents; equivalent serialized contents do not refresh registration.
+The hook checks output JSON serializability; the official MCP server enforces the output schema
+on MCP client calls. Local calls, direct browser execution, and native mirrors bypass that validation.
 
 The tool hook forwards plain JSON metadata and keeps the supplied vendor validator in its callback, so the MCP SDK does not apply those transforms twice. The standalone [polyfill schema entry](/packages/webmcp-polyfill/reference#schema-entry) only converts metadata. The [schema guide](/how-to/use-schemas-and-structured-output) shows validation outside React.
 

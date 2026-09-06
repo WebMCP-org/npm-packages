@@ -9,11 +9,13 @@ import '@mcp-b/global';
 import { useWebMCP } from '@mcp-b/react-webmcp';
 import { z } from 'zod';
 
+const calculatorInput = z.object({ left: z.number(), right: z.number() });
+
 export function CalculatorTool() {
   const tool = useWebMCP({
     name: 'add_numbers',
     description: 'Add two numbers',
-    inputSchema: z.object({ left: z.number(), right: z.number() }),
+    inputSchema: calculatorInput,
     outputSchema: {
       type: 'object',
       properties: { total: { type: 'number' } },
@@ -58,9 +60,10 @@ and client hooks. Both share registration, validation, execution state, and canc
 ## Schemas and results
 
 - The hook calls your schema's converter and supplied validator, including async transforms. It ships no validator.
-- Plain JSON Schema supplies metadata and inference only.
+- Plain JSON Schema supplies metadata and inference only. Reuse immutable schemas to cache conversion and serialization.
 - `outputSchema` types the result. The MCP server validates it on MCP calls; local and native calls bypass that validation.
 - Local execution and React state retain your value. Agent calls receive MCP formatting; `formatOutput` can override it.
+- `formatError` defaults to an MCP response with `isError: true`. Async formatters are awaited; local failures and cancellation always reject.
 
 [Input example](../usewebmcp/README.md#validate-input-with-your-schema-library) ·
 [Schema guide](https://docs.mcp-b.ai/how-to/use-schemas-and-structured-output) ·
@@ -107,7 +110,9 @@ Wrap your UI in `McpClientProvider`, supplying stable client and transport insta
 
 ## State and lifecycle
 
-The tool hook returns `state`, `execute`, `reset`, and registration status.
+The tool hook returns `state`, `execute`, `reset`, `isSupported`, and `registrationError`.
+`isRegistered` was removed from tool hooks; use the runtime’s `getTools()` for discovery.
+Prompt and resource hooks retain `isRegistered`.
 Use `enabled: false` to unregister, and the handler's `{ signal }` for cancellation.
 React 18/19, SSR, StrictMode, and `'use client'` are supported.
 

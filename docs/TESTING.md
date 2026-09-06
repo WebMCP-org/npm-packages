@@ -168,12 +168,15 @@ after a verified mount, including nested updates. They run with and without
 Do not count component-body calls or assert wall-clock durations.
 
 Each test pairs a commit budget with observable state, registration, or callback-identity checks.
-An explicit parent rerender costs one commit. Batched tool metadata updates add no consumer
-commit when registration ends unchanged; an inner Profiler excludes empty bailout commits.
-Deferred registration still publishes pending, success, and failure states. Other same-state
-checks also require preserved state identity because an outer Profiler may report an empty commit. See [React's state bailout caveat](https://react.dev/reference/react/useState#setstate).
+An explicit parent rerender costs one commit. Successful tool registration adds no consumer
+commit, including when the native promise settles later. Registration failures remain observable
+through `registrationError`; tests verify the actual registry to distinguish pending and completed
+registration. Other same-state checks require preserved state identity because an outer Profiler
+may report an empty commit. See [React's state bailout caveat](https://react.dev/reference/react/useState#setstate).
 
-Deferred promises separate pending, success, and error transitions into awaited `hook.act` scopes.
+Deferred promises separate execution start, completion, and errors into awaited `hook.act` scopes.
+Execution tests cover overlapping completions, cancellation during validation and formatting,
+and committed callback snapshots. Schema tests verify stable inputs are not serialized again.
 Await `rerender` and `unmount`; do not use sleeps to settle React. The
 [browser React utilities](https://github.com/vitest-community/vitest-browser-react/blob/v2.0.4/src/pure.tsx)
 provide the act environment and cleanup. Client tests profile a memoized consumer, then verify a

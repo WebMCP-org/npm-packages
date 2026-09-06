@@ -1,6 +1,6 @@
 ---
 'usewebmcp': major
-'@mcp-b/react-webmcp': minor
+'@mcp-b/react-webmcp': major
 '@mcp-b/webmcp-types': major
 '@mcp-b/webmcp-polyfill': patch
 ---
@@ -21,12 +21,19 @@ validation, and pass transformed output to the handler. Caller types retain the 
 JSON Schema metadata alone does not add validation. Handlers always receive execution options with
 an AbortSignal, including when older runtimes omit the options bag.
 
-Add `exposedTo`, `formatOutput`, and registration status/error fields alongside `enabled`. Serialized metadata
-changes refresh registration without churn from equivalent inline objects. Missing APIs are checked
-for up to ten seconds after mount. Cancelled executions cannot overwrite later state, and stale
-registration promises cannot alter replacement registrations. Reuse successful registration state
-so batched metadata updates avoid redundant React commits; pending and failed
-registrations still update their status.
+Add `exposedTo`, `formatOutput`, and `formatError` alongside `enabled`. Both tool hooks remove
+`isRegistered`; use runtime discovery to confirm registration. `isSupported` reports API availability
+and `registrationError` reports setup failures separately from execution errors. Prompt and resource
+hooks retain `isRegistered`.
+
+Core agent failures now reject by default. The MCP adapter supplies MCP error responses through
+`formatError`. Async success/error formatters are awaited for agent calls; local failures and
+cancellation always reject. Formatted errors do not count as successful executions.
+
+Input schema conversion and serialization are memoized by object identity. Treat schemas as
+immutable and replace them when their contents change; equivalent serialized contents preserve
+registration. Missing APIs are checked for up to ten seconds after mount. Cancelled executions
+cannot overwrite later state, and stale registration promises cannot alter replacement registrations.
 
 Add browser and native Chrome regression coverage plus packed-package tests for production
 `'use client'` directives, isolated strict declarations, upstream/MCP-B coexistence, and React 18/19

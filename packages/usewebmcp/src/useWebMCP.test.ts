@@ -813,29 +813,35 @@ describe('useWebMCP in a browser runtime', () => {
     expect(await findTool('undefined_schema')).toMatchObject({ inputSchema: { type: 'object' } });
   });
 
-  it('reports circular schema metadata without registering and recovers after correction', async () => {
-    const register = vi.spyOn(document.modelContext, 'registerTool');
-    const properties: Record<string, unknown> = {};
-    const circular = { type: 'object', properties };
-    properties.self = circular;
-    const hook = await renderHook(
-      ({ broken }) =>
-        useWebMCP({
-          name: 'circular_schema',
-          description: 'Reports unserializable schemas',
-          inputSchema: broken ? circular : { type: 'object' },
-          execute: () => 'ok',
-        }),
-      { initialProps: { broken: true } }
-    );
-    expect(hook.result.current.registrationError).toBeInstanceOf(TypeError);
-    expect(await findTool('circular_schema')).toBeUndefined();
-    expect(register).not.toHaveBeenCalled();
-    await hook.rerender({ broken: false });
-    await expect.poll(() => findTool('circular_schema')).toBeDefined();
-    expect(hook.result.current.registrationError).toBeNull();
-    expect(await findTool('circular_schema')).toMatchObject({ inputSchema: { type: 'object' } });
-  });
+  it.each(['schema', 'annotations'] as const)(
+    'reports circular %s without registering and recovers after correction',
+    async (source) => {
+      const register = vi.spyOn(document.modelContext, 'registerTool');
+      const properties: Record<string, unknown> = {};
+      const circular = { type: 'object', properties };
+      properties.self = circular;
+      const annotations: { readOnlyHint: boolean; self?: unknown } = { readOnlyHint: true };
+      annotations.self = annotations;
+      const hook = await renderHook(
+        ({ broken }) =>
+          useWebMCP({
+            name: 'circular_schema',
+            description: 'Reports unserializable schemas',
+            inputSchema: broken && source === 'schema' ? circular : { type: 'object' },
+            annotations: broken && source === 'annotations' ? annotations : undefined,
+            execute: () => 'ok',
+          }),
+        { initialProps: { broken: true } }
+      );
+      expect(hook.result.current.registrationError).toBeInstanceOf(TypeError);
+      expect(await findTool('circular_schema')).toBeUndefined();
+      expect(register).not.toHaveBeenCalled();
+      await hook.rerender({ broken: false });
+      await expect.poll(() => findTool('circular_schema')).toBeDefined();
+      expect(hook.result.current.registrationError).toBeNull();
+      expect(await findTool('circular_schema')).toMatchObject({ inputSchema: { type: 'object' } });
+    }
+  );
 
   it('handles validation aborting before its promise settles', async () => {
     const validation = Promise.withResolvers<boolean>();
