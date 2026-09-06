@@ -419,6 +419,7 @@ function runWidget(cfg: WidgetConfig): void {
   const pendingRequests = new Map<string, PendingRequest>();
   let activeEndpoint: RelayEndpoint | null = null;
   let activeSocket: WebSocket | null = null;
+  let latestTools: unknown[] = [];
   let helloAccepted = false;
   let helloAckTimer: ReturnType<typeof setTimeout> | null = null;
   let scheduledReconnect: ReturnType<typeof setTimeout> | null = null;
@@ -459,7 +460,7 @@ function runWidget(cfg: WidgetConfig): void {
   }
 
   const activateSocket = (socket: WebSocket, endpoint: RelayEndpoint): void => {
-    let initialTools: unknown[] = [];
+    latestTools = [];
 
     const clearHelloAckTimer = (): void => {
       if (!helloAckTimer) {
@@ -470,7 +471,7 @@ function runWidget(cfg: WidgetConfig): void {
     };
 
     const sendInitialTools = (): void => {
-      safeSend(socket, JSON.stringify({ type: 'tools/list', tools: initialTools }));
+      safeSend(socket, JSON.stringify({ type: 'tools/list', tools: latestTools }));
     };
 
     if (scheduledReconnect) {
@@ -623,7 +624,7 @@ function runWidget(cfg: WidgetConfig): void {
 
     requestHost('webmcp.tools.list', {})
       .then((message) => {
-        initialTools = Array.isArray(message.tools) ? message.tools : [];
+        latestTools = Array.isArray(message.tools) ? message.tools : [];
         safeSend(
           socket,
           JSON.stringify({
@@ -854,12 +855,14 @@ function runWidget(cfg: WidgetConfig): void {
 
     const data = event.data;
     if (isJsonObject(data) && data.type === 'webmcp.tools.changed') {
+      // Keep updates during the handshake: the embed will not resend an unchanged list.
+      latestTools = Array.isArray(data.tools) ? data.tools : [];
       if (activeSocket && helloAccepted) {
         safeSend(
           activeSocket,
           JSON.stringify({
             type: 'tools/changed',
-            tools: Array.isArray(data.tools) ? data.tools : [],
+            tools: latestTools,
           })
         );
       }

@@ -674,6 +674,35 @@ describe('widget runtime', () => {
     });
   });
 
+  it('preserves tool changes received while awaiting hello acceptance', async () => {
+    const env = startRuntime({ sendHelloAccepted: false });
+    const connection = await waitForConnection(env);
+    const request = await waitForPostedMessage(env, 'webmcp.tools.list.request');
+
+    env.hostWindow.dispatchMessage(APP_ORIGIN, {
+      requestId: request.payload.requestId,
+      tools: [],
+      type: 'webmcp.tools.list.response',
+    });
+
+    await vi.waitFor(() => {
+      expect(connection.messages).toHaveLength(1);
+      expect(connection.messages[0]).toMatchObject({ type: 'hello' });
+    });
+
+    const tools = [{ name: 'sum', description: 'Adds numbers' }];
+    env.hostWindow.dispatchMessage(APP_ORIGIN, {
+      tools,
+      type: 'webmcp.tools.changed',
+    });
+    expect(connection.messages).toHaveLength(1);
+
+    connection.client.send(JSON.stringify({ type: 'hello/accepted' }));
+
+    expect(connection.messages).toHaveLength(2);
+    expect(connection.messages[1]).toEqual({ type: 'tools/list', tools });
+  });
+
   it('falls back to Unknown page when no title or referrer is available', async () => {
     const env = startRuntime();
     const connection = await completeHandshake(env);
