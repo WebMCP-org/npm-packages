@@ -1,6 +1,7 @@
 {
-  "recordedAt": "2026-09-06T02:44:03.887Z",
-  "sourceCommit": "e4bc3510295d19fdd8653b47a9694b0bfe8c8819",
+  "recordedAt": "2026-09-06T07:52:53.641Z",
+  "sourceCommit": "b4815a19507a491b1c9383990b021fcd8525349e",
+  "sourceDirty": false,
   "platform": "darwin/arm64",
   "node": "v22.23.2",
   "bundler": {
@@ -29,9 +30,9 @@
       "version": "5.1.0",
       "exportName": "useWebMCP",
       "entry": "./dist/index.js",
-      "rawBytes": 5594,
-      "minifiedBytes": 4226,
-      "gzipBytes": 1654,
+      "rawBytes": 18902,
+      "minifiedBytes": 10576,
+      "gzipBytes": 3910,
       "externalImports": ["react"]
     },
     {
@@ -39,9 +40,9 @@
       "version": "5.1.0",
       "exportName": "useWebMCP",
       "entry": "./dist/index.js",
-      "rawBytes": 7812,
-      "minifiedBytes": 5442,
-      "gzipBytes": 2068,
+      "rawBytes": 21228,
+      "minifiedBytes": 11932,
+      "gzipBytes": 4278,
       "externalImports": ["react", "react/jsx-runtime"]
     },
     {
@@ -63,6 +64,81 @@
       "minifiedBytes": 1569,
       "gzipBytes": 689,
       "externalImports": ["react"]
+    },
+    {
+      "library": "usewebmcp",
+      "version": "5.1.0",
+      "exportName": "useWebMCPTool",
+      "entry": "./dist/index.js",
+      "rawBytes": 16741,
+      "minifiedBytes": 9582,
+      "gzipBytes": 3557,
+      "externalImports": ["react"]
+    },
+    {
+      "library": "@mcp-b/react-webmcp",
+      "version": "5.1.0",
+      "exportName": "useWebMCPTool",
+      "entry": "./dist/index.js",
+      "rawBytes": 19063,
+      "minifiedBytes": 10938,
+      "gzipBytes": 3926,
+      "externalImports": ["react", "react/jsx-runtime"]
+    },
+    {
+      "library": "@mcp-b/webmcp-polyfill",
+      "subpath": "invocation",
+      "version": "5.1.0",
+      "exportName": "invoke",
+      "entry": "./dist/invocation.js",
+      "rawBytes": 10311,
+      "minifiedBytes": 5316,
+      "gzipBytes": 2141,
+      "externalImports": []
+    },
+    {
+      "library": "@mcp-b/webmcp-polyfill",
+      "subpath": "standard-schema",
+      "version": "5.1.0",
+      "exportName": "standardSchema",
+      "entry": "./dist/standard-schema.js",
+      "rawBytes": 1668,
+      "minifiedBytes": 1027,
+      "gzipBytes": 468,
+      "externalImports": []
+    },
+    {
+      "library": "@mcp-b/webmcp-polyfill",
+      "subpath": "execution-state",
+      "version": "5.1.0",
+      "exportName": "createExecutionState",
+      "entry": "./dist/execution-state.js",
+      "rawBytes": 2253,
+      "minifiedBytes": 967,
+      "gzipBytes": 509,
+      "externalImports": []
+    },
+    {
+      "library": "@mcp-b/webmcp-polyfill",
+      "subpath": "consent",
+      "version": "5.1.0",
+      "exportName": "ConsentBroker",
+      "entry": "./dist/consent.js",
+      "rawBytes": 6238,
+      "minifiedBytes": 3603,
+      "gzipBytes": 1492,
+      "externalImports": []
+    },
+    {
+      "library": "@mcp-b/webmcp-polyfill",
+      "subpath": "otel",
+      "version": "5.1.0",
+      "exportName": "createOtelMiddleware",
+      "entry": "./dist/otel.js",
+      "rawBytes": 30556,
+      "minifiedBytes": 9134,
+      "gzipBytes": 3391,
+      "externalImports": []
     }
   ]
 }
