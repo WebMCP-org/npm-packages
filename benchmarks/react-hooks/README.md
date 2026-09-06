@@ -12,20 +12,20 @@ The README chart uses the production build: one tool with a stable one-field JSO
 five trials, excluding mount.
 Bars show medians; labels show observed ranges.
 
-- **Change its description once:** our hooks produce 3 re-renders, MCP Cat 1, Google 2.
+- **Change its description once:** our hooks and MCP Cat produce 1 re-render, Google 2.
 - **Run one asynchronous call:** our hooks produce 2 re-renders, MCP Cat 1–2.
   Google exposes no execution state.
 
 All four register once per description change and never on unrelated updates. MCP Cat's
 provider makes two registrations per tool on mount; the others make one.
 
-Our metadata counts include the requested parent update, pending registration, and native
-registration success. MCP Cat exposes no registration status. Google keeps its successful
-status during replacement and does not await the native registration promise. Fewer
-re-renders therefore do not imply equivalent behavior.
+Our metadata count is the requested parent update. Successful registration adds no render;
+registration errors remain observable. MCP Cat reports registration failures in execution state.
+Google declares success without awaiting the native registration promise. The harness waits
+for native registration in every case.
 
-With 100 tools and 100 fields per schema, the core's unrelated updates measured 0.83 ms
-with stable schema objects versus 1.80 ms with inline objects in the recorded run.
+With 100 tools and 100 fields per schema, the core's unrelated updates measured 0.18 ms
+with stable schema objects versus 1.92 ms with inline objects in the recorded run.
 Define large schemas outside the component when possible.
 
 ## Reproduce the measurements
@@ -36,6 +36,7 @@ benchmark dependencies:
 ```bash
 pnpm install --frozen-lockfile
 pnpm build
+pnpm --filter usewebmcp --filter @mcp-b/react-webmcp build:prod
 pnpm --dir benchmarks/react-hooks install --frozen-lockfile --ignore-scripts
 CHROME_BIN=/path/to/chrome-canary node benchmarks/react-hooks/run.mjs
 CHROME_BIN=/path/to/chrome-canary node benchmarks/react-hooks/production.mjs
@@ -130,7 +131,8 @@ appearing efficient. This fixture does not replace the
 ## Bundle method
 
 The [bundle runner](bundle.mjs) imports only each package's tool hook from its production
-ESM entry and tree-shakes it with Vite+, targeting ES2022. It records raw, Oxc-minified,
+ESM entry and tree-shakes it with Vite+, targeting ES2022. Build the workspace hooks with
+`build:prod` first, as shown above, to match their published entry points. It records raw, Oxc-minified,
 and gzip level 9 sizes. React is external; built-in dependencies remain included.
 Application validators, providers, runtime setup, and the rest of the application are
 outside this measurement. The runner checks entry resolution, the expected export,
@@ -141,15 +143,15 @@ download sizes. Results and exact toolchain versions are in [bundle-results.json
 
 ## Feature comparison
 
-| Feature                         | `usewebmcp`     | `@mcp-b/react-webmcp` | MCP Cat | Google |
-| ------------------------------- | --------------- | --------------------- | ------- | ------ |
-| Hook bundle (gzip)              | 1.6 kB          | 2.0 kB                | 24.2 kB | 0.7 kB |
-| Schema validation               | Standard Schema | Standard Schema       | Zod     | Manual |
-| Registration status             | Yes             | Yes                   | No      | Yes    |
-| Running, result & error state   | Yes             | Yes                   | Yes     | No     |
-| Call tools from React           | Yes             | Yes                   | Yes     | No     |
-| Automatic MCP result formatting | No              | Yes                   | No      | Yes    |
-| Prompt & resource hooks         | No              | Yes                   | No      | No     |
+| Feature                         | `usewebmcp`     | `@mcp-b/react-webmcp` | MCP Cat | Google    |
+| ------------------------------- | --------------- | --------------------- | ------- | --------- |
+| Hook bundle (gzip)              | 1.7 kB          | 2.1 kB                | 24.2 kB | 0.7 kB    |
+| Schema validation               | Standard Schema | Standard Schema       | Zod     | Manual    |
+| Registration errors             | Yes             | Yes                   | Yes     | Sync only |
+| Running, result & error state   | Yes             | Yes                   | Yes     | No        |
+| Call tools from React           | Yes             | Yes                   | Yes     | No        |
+| Automatic MCP result formatting | No              | Yes                   | No      | Yes       |
+| Prompt & resource hooks         | No              | Yes                   | No      | No        |
 
 All four accept JSON Schema. Compared: our PR #329, [MCP Cat 1.1.0](https://www.npmjs.com/package/webmcp-react/v/1.1.0), and [Google 0.2.0](https://www.npmjs.com/package/use-webmcp-tool/v/0.2.0).
 
@@ -159,7 +161,8 @@ The core hook and MCP Cat can return MCP responses supplied by your handler.
 
 Standard Schema support needs both Standard JSON Schema conversion and Standard Schema
 validation. The hook calls your schema library; it ships no validation engine.
-Google's error state covers registration, while execution errors have an `onError` callback.
+MCP Cat stores registration failures in its execution error state. Google's registration error
+state catches synchronous failures only; execution errors have an `onError` callback.
 
 First-party sources:
 

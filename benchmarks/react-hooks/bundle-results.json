@@ -1,6 +1,6 @@
 {
-  "recordedAt": "2026-09-06T02:06:36.227Z",
-  "sourceCommit": "93d574b2d2d6cf402c2e3b0d4ccec26a3c9f3389",
+  "recordedAt": "2026-09-06T02:44:03.887Z",
+  "sourceCommit": "e4bc3510295d19fdd8653b47a9694b0bfe8c8819",
   "platform": "darwin/arm64",
   "node": "v22.23.2",
   "bundler": {
@@ -29,9 +29,9 @@
       "version": "5.1.0",
       "exportName": "useWebMCP",
       "entry": "./dist/index.js",
-      "rawBytes": 5475,
-      "minifiedBytes": 4092,
-      "gzipBytes": 1615,
+      "rawBytes": 5594,
+      "minifiedBytes": 4226,
+      "gzipBytes": 1654,
       "externalImports": ["react"]
     },
     {
@@ -39,9 +39,9 @@
       "version": "5.1.0",
       "exportName": "useWebMCP",
       "entry": "./dist/index.js",
-      "rawBytes": 7564,
-      "minifiedBytes": 5222,
-      "gzipBytes": 1997,
+      "rawBytes": 7812,
+      "minifiedBytes": 5442,
+      "gzipBytes": 2068,
       "externalImports": ["react", "react/jsx-runtime"]
     },
     {
