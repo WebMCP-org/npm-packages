@@ -19,28 +19,31 @@ Each call reads the latest committed counter. Registration and cleanup follow th
   <img
     className="block dark:hidden"
     src="/images/react-hooks/performance-light.png"
-    alt="Re-renders for 10 description changes: usewebmcp 10, MCP-B React 10, MCP Cat 10, Google 20. For 10 overlapping calls, start to finish: 11, 11, 20; Google exposes no execution state."
+    alt="Production React re-renders with one tool, five trials. One description change: usewebmcp 3, MCP-B React 3, MCP Cat 1, Google 2. One sequential call: 2, 2, 1–2; Google exposes no execution state."
   />
   <img
     className="hidden dark:block"
     src="/images/react-hooks/performance-dark.png"
-    alt="Re-renders for 10 description changes: usewebmcp 10, MCP-B React 10, MCP Cat 10, Google 20. For 10 overlapping calls, start to finish: 11, 11, 20; Google exposes no execution state."
+    alt="Production React re-renders with one tool, five trials. One description change: usewebmcp 3, MCP-B React 3, MCP Cat 1, Google 2. One sequential call: 2, 2, 1–2; Google exposes no execution state."
   />
 </Frame>
 
-Registration is a tie: all four make 0 registrations on 10 unrelated re-renders, and 10 registrations on 10 description changes.
-[Benchmark details](https://github.com/WebMCP-org/npm-packages/tree/9fc89ad863272bc13eb5c906921b62d3deb56f36/benchmarks/react-hooks).
+All four register once per description change and never on unrelated updates in this benchmark. Our extra re-renders report pending and completed registration.
+[Benchmark details](https://github.com/WebMCP-org/npm-packages/tree/92de19b4f4d9a3a806285d408b0a482fe2d75ce2/benchmarks/react-hooks).
 
 ## Feature comparison
 
 | Feature                         | `usewebmcp`     | `@mcp-b/react-webmcp` | MCP Cat | Google |
 | ------------------------------- | --------------- | --------------------- | ------- | ------ |
+| Hook bundle (gzip)              | 1.6 kB          | 2.0 kB                | 24.2 kB | 0.7 kB |
 | Schema validation               | Standard Schema | Standard Schema       | Zod     | Manual |
 | Registration status             | Yes             | Yes                   | No      | Yes    |
 | Running, result & error state   | Yes             | Yes                   | Yes     | No     |
 | Call tools from React           | Yes             | Yes                   | Yes     | No     |
 | Automatic MCP result formatting | No              | Yes                   | No      | Yes    |
 | Prompt & resource hooks         | No              | Yes                   | No      | No     |
+
+Bundle sizes exclude React and include built-in dependencies. App validators and runtimes are extra.
 
 All four accept JSON Schema. Compared: our PR #329, [MCP Cat 1.1.0](https://www.npmjs.com/package/webmcp-react/v/1.1.0), and [Google 0.2.0](https://www.npmjs.com/package/use-webmcp-tool/v/0.2.0).
 
