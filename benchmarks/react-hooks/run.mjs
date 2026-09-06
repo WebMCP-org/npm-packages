@@ -14,7 +14,8 @@ const { chromium } = require('playwright');
 const renderOnly = process.argv.includes('--render');
 const designSystem = process.env.DESIGN_SYSTEM_DIR && resolve(process.env.DESIGN_SYSTEM_DIR);
 if (renderOnly) assert(designSystem, 'Set DESIGN_SYSTEM_DIR to the design-system checkout');
-const resultFile = resolve(directory, 'results.json');
+const resultFilename = renderOnly ? 'production-results.json' : 'results.json';
+const resultFile = resolve(directory, resultFilename);
 const assets = resolve(root, 'apps/documentation-website/images/react-hooks');
 const server = await createServer({
   configFile: false,
@@ -87,6 +88,7 @@ try {
             cwd: designSystem,
             encoding: 'utf8',
           }).trim(),
+          resultsFile: resultFilename,
           resultsSha256: createHash('sha256').update(readFileSync(resultFile)).digest('hex'),
           browser: browser.version(),
           viewportWidth: 1120,

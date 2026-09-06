@@ -5,8 +5,15 @@ const isCI = process.env.CI === 'true';
 const native = process.env.WEBMCP_NATIVE === '1';
 
 export default defineConfig({
-  // Both test entries must share the same prebundled React instance.
-  optimizeDeps: { include: ['vitest-browser-react', 'vitest-browser-react/pure'] },
+  // Prebundle every React test entry to avoid reloads that invalidate render counts.
+  optimizeDeps: {
+    include: [
+      'react-dom',
+      'react/jsx-dev-runtime',
+      'vitest-browser-react',
+      'vitest-browser-react/pure',
+    ],
+  },
   pack: {
     entry: ['src/index.ts'],
     platform: 'browser',

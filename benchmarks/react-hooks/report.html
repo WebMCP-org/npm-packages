@@ -86,12 +86,12 @@
       <h1 id="performance-title">Performance comparison</h1>
       <p class="intro">React re-renders · Fewer is better</p>
       <div class="charts">
-        <sigvelo-chart-card heading="Change a tool 10 times">
-          <p class="description">Update the tool's description.</p>
+        <sigvelo-chart-card heading="Change a tool">
+          <p class="description">One description update.</p>
           <div id="updates"></div>
         </sigvelo-chart-card>
-        <sigvelo-chart-card heading="Run 10 tool calls">
-          <p class="description">Overlapping calls, from start to finish.</p>
+        <sigvelo-chart-card heading="Run a tool">
+          <p class="description">One call, from start to finish.</p>
           <div id="calls"></div>
         </sigvelo-chart-card>
       </div>
@@ -102,7 +102,7 @@
       import 'design-chart-card';
       import { scaleLinear } from 'design-scale';
 
-      const report = await fetch('./results.json').then((response) => response.json());
+      const report = await fetch('./production-results.json').then((response) => response.json());
       const definitions = [
         ['usewebmcp', 'usewebmcp'],
         ['@mcp-b/react-webmcp', '@mcp-b/react-webmcp'],
@@ -110,30 +110,46 @@
         ['use-webmcp-tool', 'Google'],
       ];
       const summarize = (values) => {
-        if (values.some((value) => !Number.isFinite(value) || value < 0)) {
+        if (values.length === 0 || values.some((value) => !Number.isInteger(value) || value < 0)) {
           throw new Error('Expected non-negative measured counts');
         }
-        values.sort((a, b) => a - b);
+        const sorted = values.toSorted((a, b) => a - b);
+        const length = sorted.length;
+        const first = sorted[0];
+        const last = sorted[length - 1];
         return {
-          value: (values[4] + values[5]) / 2,
-          range: values[0] === values[9] ? String(values[0]) : values[0] + '–' + values[9],
+          value: (sorted[Math.floor((length - 1) / 2)] + sorted[Math.floor(length / 2)]) / 2,
+          range: first === last ? String(first) : first + '–' + last,
         };
       };
       const rows = definitions.map(([name, label]) => {
-        const samples = report.samples.filter((row) => row.library === name);
+        const samples = report.samples.filter(
+          (row) =>
+            row.library === name &&
+            row.toolCount === 1 &&
+            row.fields === 1 &&
+            row.schemaMode === 'stable'
+        );
         if (
-          samples.length !== 10 ||
-          samples.some((row) => row.executionState !== samples[0].executionState)
+          report.mode !== 'production' ||
+          samples.length !== 5 ||
+          new Set(samples.map((row) => row.trial)).size !== 5 ||
+          samples.some(
+            (row) =>
+              !Number.isInteger(row.trial) ||
+              row.trial < 1 ||
+              row.trial > 5 ||
+              row.calls.length !== 10
+          )
         ) {
-          throw new Error('Expected ten consistent samples per hook');
+          throw new Error('Expected five production trials with ten calls per hook');
         }
+        const calls = samples.flatMap((row) => row.calls.map((call) => call.renders));
         return {
           name,
           label,
-          updates: summarize(samples.map((row) => row.metadata.commits)),
-          calls: samples[0].executionState
-            ? summarize(samples.map((row) => row.start + row.settle))
-            : null,
+          updates: summarize(samples.map((row) => row.metadata.renders)),
+          calls: calls.every((value) => value === null) ? null : summarize(calls),
         };
       });
       const scale = scaleLinear()
@@ -174,7 +190,7 @@
       document.querySelector('#measurement-source').textContent =
         'React ' +
         report.packages.react +
-        ' (development) · 10 trials per hook · Mount excluded · ' +
+        ' (production) · 1 tool · 5 trials · Mount excluded · ' +
         report.recordedAt.slice(0, 10);
       await Promise.all(
         [...document.querySelectorAll('sigvelo-chart-card')].map(
