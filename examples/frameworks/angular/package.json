@@ -16,10 +16,10 @@
     "tslib": "^2.3.0"
   },
   "devDependencies": {
-    "@angular/build": "^21.2.22",
-    "@angular/cli": "^21.2.22",
+    "@angular/build": "^21.2.23",
+    "@angular/cli": "^21.2.23",
     "@angular/compiler-cli": "^21.2.22",
-    "@typescript-eslint/parser": "^8.68.0",
+    "@typescript-eslint/parser": "^8.69.0",
     "baseline-browser-mapping": "^2.11.20",
     "typescript": "~5.9.3"
   }
