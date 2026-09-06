@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/webmcp-types",
   "version": "5.1.0",
-  "description": "Strict TypeScript type definitions for the WebMCP core API (document.modelContext)",
+  "description": "MCP-B extensions and browser compatibility types built on upstream webmcp-types",
   "keywords": [
     "document-modelcontext",
     "model-context",
@@ -55,7 +55,8 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json && vp test run --typecheck.only --silent"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "catalog:"
+    "@modelcontextprotocol/server": "catalog:",
+    "webmcp-types": "^0.1.6"
   },
   "devDependencies": {
     "typescript": "catalog:",

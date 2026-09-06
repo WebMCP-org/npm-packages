@@ -39,9 +39,7 @@ function toDomString(value: unknown): string {
 export function coerceWebMcpToolDescriptor<TArgs extends WebMcpToolInput>(
   tool: ToolDescriptor<TArgs>
 ): ToolDescriptor<TArgs>;
-export function coerceWebMcpToolDescriptor(
-  tool: Record<string, unknown>
-): ToolDescriptor<WebMcpToolInput>;
+export function coerceWebMcpToolDescriptor(tool: object): ToolDescriptor<WebMcpToolInput>;
 export function coerceWebMcpToolDescriptor(tool: object): ToolDescriptor<WebMcpToolInput> {
   const name: unknown = Reflect.get(tool, 'name');
   const description: unknown = Reflect.get(tool, 'description');

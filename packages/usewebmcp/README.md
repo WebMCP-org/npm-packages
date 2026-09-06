@@ -1,119 +1,158 @@
 # usewebmcp
 
-React hook for registering strict-core WebMCP tools with `document.modelContext`.
-
-Use `usewebmcp` when an app only needs standard tool registration. Use
-`@mcp-b/react-webmcp` for prompts, resources, or MCP client/provider flows.
-
-## Install
-
-```bash
-pnpm add usewebmcp react
-```
-
-The hook expects `document.modelContext` to exist before it is enabled. Provide it through
-native browser support, `@mcp-b/webmcp-polyfill`, or `@mcp-b/global`. Older
-`navigator.modelContext` runtimes remain a fallback.
-
-## Quick start
+Expose React state and actions as WebMCP tools, with automatic registration and cleanup.
 
 ```tsx
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+'use client';
+
+import { useState } from 'react';
 import { useWebMCP } from 'usewebmcp';
 
-initializeWebMCPPolyfill();
+export function Counter() {
+  const [count, setCount] = useState(0);
 
-const INPUT_SCHEMA = {
-  type: 'object',
-  properties: { query: { type: 'string' } },
-  required: ['query'],
-} as const;
-
-const OUTPUT_SCHEMA = {
-  type: 'object',
-  properties: { total: { type: 'integer' } },
-  required: ['total'],
-} as const;
-
-export function SearchTool() {
-  const search = useWebMCP({
-    name: 'search',
-    description: 'Search indexed documents',
-    inputSchema: INPUT_SCHEMA,
-    outputSchema: OUTPUT_SCHEMA,
-    execute: async ({ query }) => ({ total: await countMatches(query) }),
+  useWebMCP({
+    name: 'get_count',
+    description: 'Get the current counter value',
+    annotations: { readOnlyHint: true },
+    execute: () => ({ count }),
   });
 
   return (
-    <button disabled={search.state.isExecuting} onClick={() => search.execute({ query: 'webmcp' })}>
-      Run search ({search.state.executionCount})
+    <button type="button" onClick={() => setCount((value) => value + 1)}>
+      Count: {count}
     </button>
   );
 }
 ```
 
-JSON Schema literals infer the `execute` input, output, returned `execute(input)`, and
-`state.lastResult` types. Standard JSON Schema v1 inputs such as Zod 4.2+ are also supported.
+Each agent call reads the latest committed `count`.
 
-## API
+[API reference](https://docs.mcp-b.ai/packages/usewebmcp/reference) · [Framework setup](https://docs.mcp-b.ai/how-to/frameworks)
 
-```ts
-const { state, execute, reset } = useWebMCP(config, deps?);
+## Install and provide a runtime
+
+In a React 18 or 19 application:
+
+```bash
+pnpm add usewebmcp
 ```
 
-`config` contains:
+The hook uses `document.modelContext`. For browsers without it, install and initialize the polyfill:
 
-- `name` and `description`
-- optional `enabled`, which defaults to `true`
-- optional `inputSchema`, `outputSchema`, and `annotations`
-- `execute(input)`, which may return synchronously or asynchronously
+```bash
+pnpm add @mcp-b/webmcp-polyfill
+```
 
-`state` contains `isExecuting`, `lastResult`, `error`, and `executionCount`. The returned
-`execute(input)` invokes the same implementation locally. `reset()` clears observed state; it does
-not cancel work already running.
+```ts
+import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 
-## Conditional registration
+initializeWebMCPPolyfill();
+```
 
-Pass `enabled: false` to keep the tool unregistered. Changing it to `true` registers the latest
-committed configuration; changing it back to `false` unregisters the tool. Call the hook
-unconditionally and pass your condition as `enabled`.
+Use [`@mcp-b/global`](../global/README.md) for MCP server features. Browser types come from the Community Group's [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types).
 
-Disabling preserves execution state and the local `execute` and `reset` controls. It does not
-cancel your `execute` implementation. An in-flight MCP request may still be rejected by the
-runtime when its registration is removed. `enabled` controls exposure, not authorization.
+## Performance comparison
 
-## Tool responses
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WebMCP-org/npm-packages/92071e32a39585fe412de3e4ed651391c47ebcf7/apps/documentation-website/images/react-hooks/performance-dark.png">
+  <img src="https://raw.githubusercontent.com/WebMCP-org/npm-packages/92071e32a39585fe412de3e4ed651391c47ebcf7/apps/documentation-website/images/react-hooks/performance-light.png" alt="Production React re-renders with one tool, five trials. One description change: usewebmcp 1, MCP-B React 1, MCP Cat 1, Google 2. One sequential call: 2, 2, 1–2; Google exposes no execution state.">
+</picture>
 
-Raw return values use the same normalization as the MCP-B runtime:
+Both hooks add no renders for successful registration. All four register once per description change and never on unrelated updates in this benchmark.
+[Benchmark details](https://github.com/WebMCP-org/npm-packages/tree/92071e32a39585fe412de3e4ed651391c47ebcf7/benchmarks/react-hooks).
 
-- Existing MCP responses with a `content` array pass through unchanged.
-- Strings become text content.
-- JSON values become text content plus `structuredContent`.
-- Other values receive a safe text representation.
+## Feature comparison
 
-When `outputSchema` is present, a non-JSON-serializable result rejects local execution and becomes
-an MCP error response. Native Chrome WebMCP does not advertise `outputSchema`; it is MCP-B metadata
-for output inference and compatible runtimes.
+| Feature                         | `usewebmcp`     | `@mcp-b/react-webmcp` | MCP Cat | Google    |
+| ------------------------------- | --------------- | --------------------- | ------- | --------- |
+| Hook bundle (gzip)              | 1.7 kB          | 2.1 kB                | 24.2 kB | 0.7 kB    |
+| Schema validation               | Standard Schema | Standard Schema       | Zod     | Manual    |
+| Registration errors             | Yes             | Yes                   | Yes     | Sync only |
+| Running, result & error state   | Yes             | Yes                   | Yes     | No        |
+| Call tools from React           | Yes             | Yes                   | Yes     | No        |
+| Automatic MCP result formatting | No              | Yes                   | No      | Yes       |
+| Prompt & resource hooks         | No              | Yes                   | No      | No        |
 
-## Re-registration
+Bundle sizes exclude React and include built-in dependencies. App validators and runtimes are extra.
 
-While enabled, the tool re-registers when `name`, `description`, or a value in `deps` changes. Implementations,
-schemas, and annotations use their latest committed values without reference-driven churn. Include
-a primitive schema or annotation revision in `deps` when registered metadata must change.
+All four accept JSON Schema. Compared: our PR #329, [MCP Cat 1.1.0](https://www.npmjs.com/package/webmcp-react/v/1.1.0), and [Google 0.2.0](https://www.npmjs.com/package/use-webmcp-tool/v/0.2.0).
 
-Registration is aborted on unmount or when disabled. If the runtime is missing while enabled, the hook warns and skips
-registration; initialize the runtime first rather than polling once per hook.
+## Validate input with your schema library
 
-## Exports
+Pass a schema with Standard JSON Schema conversion and Standard Schema validation. This example uses Zod 4.2+:
 
-- `useWebMCP`
-- `WebMCPConfig`
-- `WebMCPReturn`
-- `ToolExecutionState`
-- `ToolExecuteFunction`
-- `InferToolInput`
-- `InferOutput`
+```ts
+'use client';
+
+import { useWebMCP } from 'usewebmcp';
+import { z } from 'zod';
+
+const totalInput = z.object({
+  count: z.string().regex(/^\d+$/, 'Use digits for count').transform(Number),
+  limit: z.number().default(10),
+});
+
+export function useTotalTool() {
+  return useWebMCP({
+    name: 'calculate_total',
+    description: 'Add a numeric count to a limit, which defaults to 10',
+    inputSchema: totalInput,
+    execute: ({ count, limit }) => ({ total: count + limit }),
+  });
+}
+```
+
+Arguments `{ count: "2" }` become `{ count: 2, limit: 10 }`, producing `{ total: 12 }`.
+TypeScript infers the caller input, validated input, and result.
+
+The hook calls your schema's converter and validator, including async validation, defaults,
+and transforms. It ships no validation engine. Plain JSON Schema provides metadata and
+inference only; validate in your handler when using it. Reuse immutable schema objects to cache
+conversion and serialization; replace the object when the schema changes.
+[Schema details](https://docs.mcp-b.ai/packages/usewebmcp/reference#schemas-and-inference).
+
+## State and lifecycle
+
+- `state` exposes `isExecuting`, `lastResult`, `error`, and `executionCount`.
+- `execute(input, options?)` calls the validated handler locally. `reset()` clears state without cancelling work.
+- `isSupported` reports API availability; `registrationError` reports setup failures separately from `state.error`.
+- `enabled: false` unregisters the tool while keeping local execution available.
+- Local and agent failures reject by default. `formatOutput` and `formatError` customize agent responses and await async formatters.
+- Handlers receive `(input, { signal })` for cancellation, which always rejects.
+- Both packages preserve `'use client'` and support React 18/19, SSR, and StrictMode.
+
+See the [reference](https://docs.mcp-b.ai/packages/usewebmcp/reference) for metadata updates,
+cancellation, late runtime discovery, and response formatting.
+
+## Migrating from the previous hook
+
+The core hook now returns raw results and uses upstream WebMCP types. To keep `outputSchema`,
+MCP annotations, `InferOutput`, and automatic MCP responses, change your import:
+
+```ts
+import { useWebMCP } from '@mcp-b/react-webmcp';
+```
+
+Both tool hooks remove `isRegistered`; use the runtime’s `getTools()` for confirmed discovery.
+Prompt and resource hooks retain their registration status. Core failures now reject unless
+`formatError` is supplied; the MCP adapter keeps MCP error responses by default.
+
+Core `WebMCPConfig` and `WebMCPReturn` now take `TResult` as their second generic.
+`InferToolInput` describes caller input; `InferValidatedToolInput` describes validated input.
+[Type reference](https://docs.mcp-b.ai/packages/usewebmcp/reference#exported-types).
+
+## Development
+
+From the repository root after `pnpm build`:
+
+```bash
+pnpm test:hooks
+CHROME_BIN=/path/to/chrome-canary pnpm --filter usewebmcp test:native
+```
+
+[Harness details](../../docs/TESTING.md#react-hook-harness). Prior art: [GoogleChromeLabs/use-webmcp-tool](https://github.com/GoogleChromeLabs/use-webmcp-tool).
 
 ## License
 
-MIT
+[MIT](../../LICENSE)

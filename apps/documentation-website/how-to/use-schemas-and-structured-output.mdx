@@ -1,6 +1,6 @@
 ---
 title: 'Use WebMCP input schemas and structured output'
-description: 'Use MCP-B schema adapters, input inference, and output metadata in WebMCP tools.'
+description: 'Validate and transform WebMCP tool arguments with Standard Schema, then add optional MCP output metadata.'
 keywords:
   [
     'inputSchema',
@@ -15,71 +15,108 @@ keywords:
 icon: 'brackets-curly'
 ---
 
-Use JSON Schema for the browser-facing `inputSchema`. MCP-B can infer literal schemas, convert
-[Standard JSON Schema](https://standardschema.dev/json-schema) implementations, and attach
-`outputSchema` metadata for typed MCP results.
+import StandardSchemaExample from '/snippets/packages/usewebmcp-standard-schema.mdx';
 
-The [WebMCP Community Group draft](https://webmachinelearning.github.io/webmcp/) remains the
-authority for the browser's tool dictionary.
+Use your schema library to validate tool arguments and transform them before your handler runs.
+The [schema boundary explanation](/explanation/strict-core-vs-mcp-b-extensions#why-standard-schema-support-lives-in-the-adapters) describes how browser metadata and validation relate.
+
+## Validate React tool input
+
+Install the hook and the schema library used in this example:
+
+```bash title="Install the hook and Zod"
+pnpm add usewebmcp zod@^4.2
+```
+
+Provide a runtime as described in the [framework guide](/how-to/frameworks). Pass the complete
+schema as `inputSchema`:
+
+<StandardSchemaExample />
+
+Call `useTotalTool()` in your component. An agent call with `{ count: "2" }`, or a local
+`tool.execute({ count: "2" })`, returns `{ total: 12 }`. The handler receives the number `2` and
+the default limit `10`. Invalid input fails before execution; async validation is awaited.
+
+Use the same schema with [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) when you also need
+MCP output metadata or formatting. Both hooks use the validator supplied by the schema. See the
+[core reference](/packages/usewebmcp/reference#schemas-and-inference) for supported interfaces and types.
+
+If your library supplies only Standard Schema validation, also provide its Standard JSON Schema
+converter. Consult the [Standard JSON Schema implementer guide](https://standardschema.dev/json-schema)
+for your library's conversion API. Passing a converter-only object supplies metadata but does not
+add validation to the hook.
 
 ## Infer input from a JSON Schema literal
 
-Install the declaration package when you want TypeScript to infer the handler input:
+Pass an inline JSON Schema object to either hook. The hook preserves literal types without `as const`.
+For a reusable schema constant, use `as const` to keep its literal information. Validate in your
+handler when using plain JSON Schema; hook input inference does not perform runtime validation.
 
-```bash title="Install the type declarations"
-pnpm add -D @mcp-b/webmcp-types
+For direct browser registration, activate the Community Group's declarations:
+
+```bash title="Install browser declarations"
+pnpm add -D webmcp-types
 ```
 
-Preserve literal information with `as const satisfies JsonSchemaForInference`:
+Import `type { WebMCP }` from `webmcp-types` when naming browser contracts. Use
+[`@mcp-b/webmcp-types`](/packages/webmcp-types/reference) for MCP-B descriptor helpers and
+compatibility types. Both packages can be loaded together.
 
-<Snippet file="snippets/packages/webmcp-types-quickstart.ts" />
+## Convert a Standard JSON Schema implementation outside React
 
-If a schema is loaded or widened at runtime, narrow the handler input yourself. MCP-B cannot infer
-specific fields from a broad runtime type. See the [`@mcp-b/webmcp-types`
-reference](/packages/webmcp-types/reference) for supported inference keywords.
-
-## Convert a Standard JSON Schema implementation
-
-MCP-B hooks accept Standard JSON Schema v1 objects directly. Pass a Zod 4.2 schema as the
-`inputSchema` in [`usewebmcp`](/packages/usewebmcp/reference) or
-[`@mcp-b/react-webmcp`](/packages/react-webmcp/reference).
-
-For direct `registerTool()` calls, convert the schema through the MCP-B adapter and validate inside
-the handler:
+For direct native or polyfilled `registerTool()` calls, convert the metadata and validate in the
+callback. The optional adapter lives at [`@mcp-b/webmcp-polyfill/schema`](/packages/webmcp-polyfill/reference#schema-entry):
 
 ```bash title="Install the adapter and Zod"
 pnpm add @mcp-b/webmcp-polyfill zod@^4.2
 ```
 
-```ts title="search-tool.ts"
+```ts title="total-tool.ts"
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
 import { z } from 'zod';
 
-initializeWebMCPPolyfill();
-
-const searchInput = z.object({
-  query: z.string(),
-  limit: z.number().int().min(1).max(50).optional(),
+const totalInput = z.object({
+  count: z.string().regex(/^\d+$/).transform(Number),
+  limit: z.number().default(10),
 });
 
-await document.modelContext.registerTool({
-  name: 'search',
-  description: 'Search indexed docs',
-  inputSchema: normalizeInputSchema(searchInput).inputSchema,
-  async execute(input) {
-    const args = searchInput.parse(input);
-    return {
-      content: [{ type: 'text', text: `Searching for ${args.query}` }],
-    };
-  },
-});
+export async function registerTotalTool() {
+  initializeWebMCPPolyfill();
+  const context = document.modelContext;
+  if (!context) throw new Error('WebMCP is unavailable');
+  const registration = new AbortController();
+
+  await context.registerTool(
+    {
+      name: 'calculate_total',
+      description: 'Add a numeric count to a limit, which defaults to 10',
+      // Keep vendor validation in this handler, including when called through MCP.
+      inputSchema: { ...normalizeInputSchema(totalInput).inputSchema },
+      async execute(input) {
+        const result = await totalInput['~standard'].validate(input);
+        if (result.issues) {
+          throw new TypeError(result.issues.map((issue) => issue.message).join('; '));
+        }
+        return { total: result.value.count + result.value.limit };
+      },
+    },
+    { signal: registration.signal }
+  );
+
+  return () => registration.abort();
+}
 ```
 
-<Warning>
-  Convert refinements into JSON Schema where possible, but still parse untrusted input inside the
-  handler. Browser execution does not run your schema library before calling the handler.
-</Warning>
+Call `registerTotalTool()` in browser setup, then call its returned cleanup function when the tool
+is no longer needed. Keep the spread when copying the normalized schema: it passes only JSON metadata,
+so MCP calls do not apply the vendor transforms a second time. The callback invokes the schema's own `validate()` method; no second validator
+is needed. The standalone polyfill does not invoke that method for you.
+
+If you use [`BrowserMcpServer`](/packages/webmcp-ts-sdk/reference#schema-boundary), the official MCP
+server runs a preserved Standard Schema validator on MCP client calls. Direct browser calls and
+native mirrors bypass that MCP validation. Use the example above to validate in the browser callback with plain JSON metadata if both routes
+can execute it, or use the React hook when registering from React.
 
 ## Add MCP-B output metadata
 
@@ -118,13 +155,20 @@ const tool = {
   execute: ({ query }) => ({ total: 1, items: [query] }),
 } satisfies ToolDescriptorFromSchema<typeof inputSchema, typeof outputSchema>;
 
-await document.modelContext.registerTool(tool);
+const context = document.modelContext;
+if (!context) throw new Error('WebMCP is unavailable');
+await context.registerTool(tool);
 ```
 
 `outputSchema` is MCP-B metadata for output inference and structured MCP responses. If your handler
 constructs an MCP `CallToolResult` directly, include schema-compatible `structuredContent` as well
 as human-readable `content`. The [package reference](/packages/webmcp-types/reference) lists the
 output inference types.
+
+`outputSchema` is enforced on calls through the official MCP server. The React hook uses it for
+inference and checks JSON serializability, but does not enforce the output schema on local or direct
+browser calls. For React, the [MCP-B hook example](/packages/react-webmcp/overview) shows a complete
+component with an output schema.
 
 ## Check the agent-facing schema
 

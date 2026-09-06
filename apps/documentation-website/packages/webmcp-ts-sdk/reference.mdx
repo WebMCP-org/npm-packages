@@ -193,7 +193,20 @@ Stops native reconciliation, aborts native mirrors, removes registrations, and c
 
 ## Schema boundary
 
-The browser-facing tool API accepts JSON Schema and Standard Schema inputs. The adapter converts tool input schemas to the MCP v2 contract, while `McpServer` owns MCP-call validation. `PromptDescriptor.argsSchema` accepts `InputSchema`. Direct upstream registrations support Zod 4.2 or newer and the official `fromJsonSchema` helper; Zod 3 is unsupported.
+`BrowserMcpServer` normalizes JSON Schema and Standard JSON Schema inputs through the
+[polyfill's optional schema adapter](/packages/webmcp-polyfill/reference#schema-entry). If the schema
+also supplies `~standard.validate()`, the adapter preserves it for the composed `McpServer`.
+Otherwise the MCP server uses its `fromJsonSchema` adapter.
+
+This validation runs on MCP client calls. Direct `executeTool()` calls and native mirrors execute the
+browser callback without passing through MCP validation. Validate in the callback when both paths
+can call a tool, and pass plain JSON metadata so the MCP server does not also apply the vendor
+transforms. The [schema guide](/how-to/use-schemas-and-structured-output) demonstrates this pattern;
+[`usewebmcp`](/packages/usewebmcp/reference) already applies it for React registrations.
+
+`outputSchema` is enforced by the official MCP server on MCP calls. Direct browser calls do not
+perform that check. `PromptDescriptor.argsSchema` accepts `InputSchema`. Direct upstream server
+registrations support Zod 4.2 or newer and the official `fromJsonSchema` helper; Zod 3 is unsupported.
 
 MCP requires object-root tool input schemas. An array-root WebMCP tool remains available through WebMCP but is omitted from MCP discovery with a warning.
 

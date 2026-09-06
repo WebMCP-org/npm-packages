@@ -1,8 +1,7 @@
+import type { WebMCP } from 'webmcp-types';
 import type { InputSchema, WebMcpToolInput } from './common.js';
 import type { JsonSchemaForInference } from './json-schema.js';
 import type {
-  ModelContextTool,
-  ModelContextToolFromSchema,
   ToolDescriptor,
   ToolDescriptorFromSchema,
   ToolListItem,
@@ -10,13 +9,10 @@ import type {
 } from './tool.js';
 
 /** Options for tools exposed by descendant documents. */
-export interface ModelContextGetToolOptions {
-  fromOrigins?: string[];
-}
+export type ModelContextGetToolOptions = WebMCP.ModelContextGetToolOptions;
 
 /** Tool metadata returned by `document.modelContext.getTools()`. */
-export interface RegisteredTool {
-  name: string;
+export interface RegisteredTool extends Omit<WebMCP.RegisteredTool, 'title' | 'inputSchema'> {
   /**
    * Present on every tool Chrome and `@mcp-b/webmcp-polyfill` return today --
    * the spec defaults it to the empty string when a tool registers no title.
@@ -25,7 +21,6 @@ export interface RegisteredTool {
    * spec default makes it an empty string, which `??` does not fall through.
    */
   title?: string;
-  description: string;
   /**
    * A JSON Schema object since webmcp#241, rolling out from Chrome 154.0.8013
    * (cross-document tools first). Chrome 149-153 -- most of the Origin Trial
@@ -33,9 +28,7 @@ export interface RegisteredTool {
    * JSON string the change replaced. Consumers that support both generations
    * must branch on `typeof` and guard the parse of the string arm.
    */
-  inputSchema?: InputSchema | string;
-  window: Window;
-  origin: string;
+  inputSchema?: WebMCP.RegisteredTool['inputSchema'] | string;
   /**
    * Absent when the tool registered no annotations -- both the spec and the
    * polyfill omit the member rather than emitting an empty object. Each hint
@@ -76,52 +69,22 @@ export interface ModelContextTesting extends EventTarget {
 }
 
 /** Options accepted by `ModelContext.registerTool()`. */
-export interface ModelContextRegisterToolOptions {
-  signal?: AbortSignal;
-  exposedTo?: string[];
-}
+export type ModelContextRegisterToolOptions = WebMCP.ModelContextRegisterToolOptions;
 
 type WidenedSchema<TSchema extends InputSchema> = string extends TSchema['type'] ? unknown : never;
 
 /**
- * Standard `document.modelContext` API.
+ * Upstream WebMCP API with discovery compatibility for older Chrome releases.
+ *
+ * The draft makes this an `EventTarget` with `ontoolchange`, but Codex site
+ * tools ship `document.modelContext` without the event surface (observed
+ * August 27, 2026 -- see
+ * https://docs.mcp-b.ai/reference/webmcp/codex-site-tools). Feature-detect
+ * `addEventListener` and `ontoolchange` before using them.
  * @see https://webmachinelearning.github.io/webmcp/#modelcontext
  */
-export interface ModelContext extends EventTarget {
-  registerTool<
-    const TInputSchema extends JsonSchemaForInference,
-    TResult = unknown,
-    TName extends string = string,
-  >(
-    tool: ModelContextToolFromSchema<TInputSchema, TResult, TName>,
-    options?: ModelContextRegisterToolOptions
-  ): Promise<void>;
-
-  registerTool<
-    TInputSchema extends InputSchema,
-    TArgs extends WebMcpToolInput = WebMcpToolInput,
-    TResult = unknown,
-    TName extends string = string,
-  >(
-    tool: ModelContextTool<TArgs, TResult, TName> & {
-      inputSchema: TInputSchema;
-    } & WidenedSchema<TInputSchema>,
-    options?: ModelContextRegisterToolOptions
-  ): Promise<void>;
-
-  registerTool<
-    TArgs extends WebMcpToolInput = Record<string, unknown>,
-    TResult = unknown,
-    TName extends string = string,
-  >(
-    tool: Omit<ModelContextTool<TArgs, TResult, TName>, 'inputSchema'> & {
-      inputSchema?: undefined;
-    },
-    options?: ModelContextRegisterToolOptions
-  ): Promise<void>;
-
+export interface ModelContext extends Omit<WebMCP.ModelContext, 'getTools'> {
   getTools(options?: ModelContextGetToolOptions): Promise<RegisteredTool[]>;
-  ontoolchange: ((this: ModelContext, event: Event) => unknown) | null;
 }
 
 /** Non-standard methods exposed by MCP-B runtimes. */

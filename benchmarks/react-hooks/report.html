@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <title>WebMCP performance comparison</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: var(--sigvelo-font-sans);
+        color: var(--sigvelo-color-text);
+        background: var(--sigvelo-color-surface-under);
+      }
+      article {
+        width: 960px;
+        margin: 32px;
+        padding: 32px;
+        background: var(--sigvelo-color-surface);
+        border: 1px solid var(--sigvelo-color-neutral-border-muted);
+        border-radius: var(--sigvelo-radius-xl);
+      }
+      h1 {
+        margin: 0;
+        font-size: 32px;
+        font-weight: 600;
+        letter-spacing: -0.025em;
+      }
+      .intro {
+        margin: 8px 0 24px;
+        font-size: 20px;
+        color: var(--sigvelo-color-text-muted);
+      }
+      .charts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      sigvelo-chart-card::part(heading) {
+        font-size: 21px;
+      }
+      .description {
+        margin: 0 0 20px;
+        font-size: 16px;
+        color: var(--sigvelo-color-text-muted);
+      }
+      .row {
+        margin-top: 20px;
+      }
+      .label {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 18px;
+      }
+      .count {
+        font-size: 23px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      .unavailable {
+        font-size: 14px;
+        color: var(--sigvelo-color-text-muted);
+      }
+      svg {
+        display: block;
+        width: 100%;
+        height: 12px;
+        margin-top: 8px;
+      }
+      rect {
+        fill: var(--sigvelo-color-viz-series-1);
+      }
+      .source {
+        margin: 20px 0 0;
+        font-size: 14px;
+        color: var(--sigvelo-color-text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <article id="performance" aria-labelledby="performance-title">
+      <h1 id="performance-title">Performance comparison</h1>
+      <p class="intro">React re-renders · Fewer is better</p>
+      <div class="charts">
+        <sigvelo-chart-card heading="Change a tool">
+          <p class="description">One description update.</p>
+          <div id="updates"></div>
+        </sigvelo-chart-card>
+        <sigvelo-chart-card heading="Run a tool">
+          <p class="description">One call, from start to finish.</p>
+          <div id="calls"></div>
+        </sigvelo-chart-card>
+      </div>
+      <p class="source" id="measurement-source"></p>
+    </article>
+    <script type="module">
+      import 'design-tokens';
+      import 'design-chart-card';
+      import { scaleLinear } from 'design-scale';
+
+      const report = await fetch('./production-results.json').then((response) => response.json());
+      const definitions = [
+        ['usewebmcp', 'usewebmcp'],
+        ['@mcp-b/react-webmcp', '@mcp-b/react-webmcp'],
+        ['webmcp-react', 'MCP Cat'],
+        ['use-webmcp-tool', 'Google'],
+      ];
+      const summarize = (values) => {
+        if (values.length === 0 || values.some((value) => !Number.isInteger(value) || value < 0)) {
+          throw new Error('Expected non-negative measured counts');
+        }
+        const sorted = values.toSorted((a, b) => a - b);
+        const length = sorted.length;
+        const first = sorted[0];
+        const last = sorted[length - 1];
+        return {
+          value: (sorted[Math.floor((length - 1) / 2)] + sorted[Math.floor(length / 2)]) / 2,
+          range: first === last ? String(first) : first + '–' + last,
+        };
+      };
+      const rows = definitions.map(([name, label]) => {
+        const samples = report.samples.filter(
+          (row) =>
+            row.library === name &&
+            row.toolCount === 1 &&
+            row.fields === 1 &&
+            row.schemaMode === 'stable'
+        );
+        if (
+          report.mode !== 'production' ||
+          samples.length !== 5 ||
+          new Set(samples.map((row) => row.trial)).size !== 5 ||
+          samples.some(
+            (row) =>
+              !Number.isInteger(row.trial) ||
+              row.trial < 1 ||
+              row.trial > 5 ||
+              row.calls.length !== 10
+          )
+        ) {
+          throw new Error('Expected five production trials with ten calls per hook');
+        }
+        const calls = samples.flatMap((row) => row.calls.map((call) => call.renders));
+        return {
+          name,
+          label,
+          updates: summarize(samples.map((row) => row.metadata.renders)),
+          calls: calls.every((value) => value === null) ? null : summarize(calls),
+        };
+      });
+      const scale = scaleLinear()
+        .domain([
+          0,
+          Math.max(1, ...rows.flatMap((row) => [row.updates.value, row.calls?.value ?? 0])),
+        ])
+        .range([0, 100]);
+      for (const metric of ['updates', 'calls']) {
+        for (const row of rows) {
+          const count = row[metric];
+          const item = document.createElement('div');
+          item.className = 'row';
+          item.dataset.library = row.name;
+          const label = document.createElement('div');
+          label.className = 'label';
+          const name = document.createElement('span');
+          name.textContent = row.label;
+          const value = document.createElement('span');
+          value.className = count ? 'count' : 'unavailable';
+          value.textContent = count ? count.range : 'No execution state';
+          label.append(name, value);
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('viewBox', '0 0 100 12');
+          svg.setAttribute('preserveAspectRatio', 'none');
+          svg.setAttribute('aria-hidden', 'true');
+          if (count) {
+            const bar = document.createElementNS(svg.namespaceURI, 'rect');
+            bar.setAttribute('width', String(scale(count.value)));
+            bar.setAttribute('height', '12');
+            bar.setAttribute('rx', '1');
+            svg.append(bar);
+          }
+          item.append(label, svg);
+          document.getElementById(metric).append(item);
+        }
+      }
+      document.querySelector('#measurement-source').textContent =
+        'React ' +
+        report.packages.react +
+        ' (production) · 1 tool · 5 trials · Mount excluded · ' +
+        report.recordedAt.slice(0, 10);
+      await Promise.all(
+        [...document.querySelectorAll('sigvelo-chart-card')].map(
+          (element) => element.updateComplete
+        )
+      );
+      await document.fonts.ready;
+      window.reportReady = true;
+    </script>
+  </body>
+</html>

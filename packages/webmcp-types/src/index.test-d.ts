@@ -2,7 +2,7 @@ import { expectTypeOf, test } from 'vitest';
 import type {
   ChromeModelContext,
   ChromeModelContextExecuteToolOptions,
-  InputSchema,
+  WebMCP,
   ModelContext,
   ModelContextExtensions,
   ModelContextGetToolOptions,
@@ -15,7 +15,7 @@ import type {
 
 test('RegisteredTool.inputSchema spans both schema generations', () => {
   // webmcp#241: an object from Chrome >=154.0.8013, a serialized string before.
-  expectTypeOf<RegisteredTool['inputSchema']>().toEqualTypeOf<InputSchema | string | undefined>();
+  expectTypeOf<RegisteredTool['inputSchema']>().toEqualTypeOf<object | string | undefined>();
 });
 
 test('ModelContext exposes only the standard producer API', () => {
@@ -65,7 +65,7 @@ test('the Chromium testing shim retains its observable contract', () => {
 });
 
 test('global declarations use the document-first API', () => {
-  expectTypeOf<Document['modelContext']>().toEqualTypeOf<ModelContext | undefined>();
+  expectTypeOf<Document['modelContext']>().toEqualTypeOf<WebMCP.ModelContext | undefined>();
   expectTypeOf<Navigator['modelContext']>().toEqualTypeOf<ModelContext | undefined>();
   expectTypeOf<Navigator['modelContextTesting']>().toEqualTypeOf<ModelContextTesting | undefined>();
 });

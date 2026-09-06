@@ -53,15 +53,18 @@
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
+    "test:native": "WEBMCP_NATIVE=1 vp test run",
     "test:watch": "vp test",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit"
   },
   "dependencies": {
-    "@mcp-b/webmcp-polyfill": "workspace:*",
-    "@mcp-b/webmcp-types": "workspace:*"
+    "@standard-schema/spec": "^1.1.0",
+    "webmcp-types": "^0.1.6"
   },
   "devDependencies": {
     "@mcp-b/global": "workspace:*",
+    "@mcp-b/webmcp-polyfill": "workspace:*",
+    "@mcp-b/webmcp-types": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@vitest/coverage-v8": "catalog:",
