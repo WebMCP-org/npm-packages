@@ -58,12 +58,12 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit"
   },
   "dependencies": {
+    "@mcp-b/webmcp-polyfill": "workspace:*",
     "@standard-schema/spec": "^1.1.0",
     "webmcp-types": "^0.1.6"
   },
   "devDependencies": {
     "@mcp-b/global": "workspace:*",
-    "@mcp-b/webmcp-polyfill": "workspace:*",
     "@mcp-b/webmcp-types": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",

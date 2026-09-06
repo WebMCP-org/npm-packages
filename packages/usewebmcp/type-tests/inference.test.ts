@@ -1,6 +1,9 @@
 import { z } from 'zod';
+import { createExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
 import {
   useWebMCP,
+  useWebMCPTool,
+  useToolExecutionState,
   type InferToolInput,
   type InferValidatedToolInput,
   type WebMCP,
@@ -59,6 +62,21 @@ export function useInferenceExamples() {
   const parsed: Promise<number> = transformed.execute({ count: '2' });
   // @ts-expect-error - callers supply the input type, not the transformed type
   void transformed.execute({ count: 2 });
+  const execution = createExecutionState<number>();
+  const registrationOnly = useWebMCPTool({
+    name: 'observed_parse',
+    description: 'Separate registration and observation',
+    inputSchema: schema,
+    execute: ({ count, limit }) => count + limit,
+    binding: ({ count, limit }) => ({ total: count + limit }),
+    middleware: [execution.aroundInvoke],
+  });
+  const observed: number | null = useToolExecutionState(execution).lastResult;
+  const separateParsed: Promise<number> = registrationOnly.execute({ count: '2' });
+  // @ts-expect-error - registration-only tools do not subscribe to state
+  void registrationOnly.state;
+  // @ts-expect-error - callers still supply the pre-transform input
+  void registrationOnly.execute({ count: 2 });
   useWebMCP({
     name: 'extended',
     description: 'Extended',
@@ -73,5 +91,5 @@ export function useInferenceExamples() {
     annotations: { destructiveHint: true },
     execute: () => 1,
   });
-  return { result, lastResult, parsed };
+  return { result, lastResult, parsed, observed, separateParsed };
 }

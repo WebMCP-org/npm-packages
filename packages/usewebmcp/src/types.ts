@@ -1,5 +1,9 @@
 import type { StandardJSONSchemaV1, StandardSchemaV1 } from '@standard-schema/spec';
+import type { ToolExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
+import type { AroundInvoke } from '@mcp-b/webmcp-polyfill/invocation';
 import type { WebMCP } from 'webmcp-types';
+
+export type { ToolExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
 
 /** JSON Schema, or a schema implementing Standard JSON Schema v1. */
 export type ToolInputSchema = NonNullable<WebMCP.ModelContextTool['inputSchema']>;
@@ -13,18 +17,6 @@ export type InferToolInput<T extends ToolInputSchema> = T extends StandardJSONSc
 export type InferValidatedToolInput<T extends ToolInputSchema> = T extends StandardSchemaV1
   ? StandardSchemaV1.InferOutput<T>
   : InferToolInput<T>;
-
-/** Current state for local and agent-triggered tool executions. */
-export interface ToolExecutionState<TResult = unknown> {
-  /** Whether at least one execution is pending. */
-  isExecuting: boolean;
-  /** Most recent successful result, or null before one exists. */
-  lastResult: TResult | null;
-  /** Most recent execution error. */
-  error: Error | null;
-  /** Number of successful executions since the last reset. */
-  executionCount: number;
-}
 
 /** Synchronous or asynchronous tool implementation. */
 export type ToolExecuteFunction<
@@ -50,17 +42,35 @@ export interface WebMCPConfig<
   formatOutput?: (result: TResult) => unknown;
   /** Format agent-facing failures; local execution continues to reject. Cancellation always rejects. */
   formatError?: (error: Error) => unknown;
+  /** Protocol adapter seam: classify an agent response as a failed execution. */
+  isErrorResponse?: (response: unknown) => boolean;
+  /** Optional invocation observers and gates, in outermost-first order. */
+  middleware?: readonly AroundInvoke<TResult>[];
+  /** Serializable approval description when validated inputs contain non-JSON values. */
+  binding?: (input: InferValidatedToolInput<TInputSchema>) => unknown;
+  /** Recheck current authority before execution, using the latest committed checker. */
+  checkBinding?: () => void;
 }
 
-/** State and controls returned by useWebMCP. */
-export interface WebMCPReturn<TInputSchema extends ToolInputSchema = object, TResult = unknown> {
-  state: ToolExecutionState<TResult>;
+/** Registration and local execution, without an execution-state subscription. */
+export interface WebMCPToolReturn<
+  TInputSchema extends ToolInputSchema = object,
+  TResult = unknown,
+> {
   isSupported: boolean;
   registrationError: Error | null;
   execute: (
     input: InferToolInput<TInputSchema>,
     options?: WebMCP.ToolExecuteCallbackOptions
   ) => Promise<TResult>;
+}
+
+/** State and controls returned by useWebMCP. */
+export interface WebMCPReturn<
+  TInputSchema extends ToolInputSchema = object,
+  TResult = unknown,
+> extends WebMCPToolReturn<TInputSchema, TResult> {
+  state: ToolExecutionState<TResult>;
   /** Clears observed execution state without cancelling pending work. */
   reset: () => void;
 }

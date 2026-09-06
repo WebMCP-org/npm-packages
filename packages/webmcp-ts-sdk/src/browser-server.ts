@@ -16,6 +16,11 @@ import {
   withAbortSignal,
 } from '@mcp-b/webmcp-polyfill/schema';
 import type { NormalizedInputSchema } from '@mcp-b/webmcp-polyfill/schema';
+import {
+  invokeCallback,
+  isInvocationCallback,
+  type InvocationAdapterContext,
+} from '@mcp-b/webmcp-polyfill/invocation';
 import type {
   ChromeModelContextExecuteToolOptions,
   ChromeModelContextExtensions,
@@ -33,11 +38,15 @@ import type {
   WebMcpToolInput,
 } from '@mcp-b/webmcp-types';
 import {
+  BAGGAGE_META_KEY,
   fromJsonSchema,
+  isCallToolResult,
   isInputRequiredResult,
   McpServer,
   mergeCapabilities,
   ResourceTemplate,
+  TRACEPARENT_META_KEY,
+  TRACESTATE_META_KEY,
   type GetPromptResult,
   type Implementation,
   type ReadResourceResult,
@@ -67,7 +76,11 @@ export function isBrowserMcpServer(context: unknown): context is BrowserMcpServe
 interface RegisteredWebMcpTool {
   item: ToolListItem;
   registeredInputSchema?: string;
-  execute: (args: WebMcpToolInput, signal?: AbortSignal) => Promise<unknown>;
+  execute: (
+    args: WebMcpToolInput,
+    signal?: AbortSignal,
+    context?: InvocationAdapterContext
+  ) => Promise<unknown>;
   mcpHandle: McpRegisteredTool | undefined;
   exposedTo?: readonly string[];
   abortSignal?: AbortSignal;
@@ -122,6 +135,48 @@ function toMcpInputSchema(
     : fromJsonSchema<Record<string, unknown>>(
         normalized.inputSchema as Parameters<typeof fromJsonSchema>[0]
       );
+}
+
+/** The managed callback validates inside its middleware; the SDK still needs tool metadata. */
+function metadataOnlySchema<T>(schema: StandardSchemaWithJSON<T>): StandardSchemaWithJSON<T> {
+  return {
+    '~standard': {
+      ...schema['~standard'],
+      validate: (value) => ({ value: value as T }),
+    },
+  };
+}
+
+function normalizeMcpResult(toolName: string, result: unknown) {
+  if (isInputRequiredResult(result)) {
+    throw new Error(
+      `WebMCP tool "${toolName}" returned input_required. Multi-round tool flows require BrowserMcpServer.mcpServer.registerTool().`
+    );
+  }
+  return normalizeToolResponse(result);
+}
+
+async function validateMcpSchema(
+  schema: StandardSchemaWithJSON,
+  value: unknown,
+  label: string
+): Promise<unknown> {
+  const result = await schema['~standard'].validate(value);
+  if (result.issues) {
+    throw new TypeError(`${label}: ${result.issues.map((issue) => issue.message).join('; ')}`);
+  }
+  return result.value;
+}
+
+function mcpTraceContext(meta: Record<string, unknown> | undefined) {
+  const traceparent = meta?.[TRACEPARENT_META_KEY];
+  const tracestate = meta?.[TRACESTATE_META_KEY];
+  const baggage = meta?.[BAGGAGE_META_KEY];
+  return {
+    ...(typeof traceparent === 'string' ? { traceparent } : {}),
+    ...(typeof tracestate === 'string' ? { tracestate } : {}),
+    ...(typeof baggage === 'string' ? { baggage } : {}),
+  };
 }
 
 function toMcpAnnotations(
@@ -268,7 +323,9 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     try {
       await nativeRegister.call(
         this.native,
-        toNativeTool(tool, nativeInputSchema, (input) => execute(input)),
+        toNativeTool(tool, nativeInputSchema, (input, executionOptions) =>
+          execute(input, executionOptions?.signal)
+        ),
         { ...options, signal }
       );
     } catch (error) {
@@ -298,7 +355,12 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     if (this.tools.has(tool.name) || this.pendingTools.has(tool.name)) {
       throw createInvalidStateError(`Tool already registered: ${tool.name}`);
     }
-    return normalizeInputSchema(tool.inputSchema);
+    const normalized = normalizeInputSchema(tool.inputSchema);
+    if (isInvocationCallback(tool.execute)) {
+      // A managed callback owns vendor transforms; MCP validates only its JSON projection.
+      normalized.inputSchema = JSON.parse(JSON.stringify(normalized.inputSchema)) as InputSchema;
+    }
+    return normalized;
   }
 
   private registerToolInMcp(
@@ -307,6 +369,8 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     executeTool: RegisteredWebMcpTool['execute'],
     exposedTo: readonly string[] | undefined
   ): RegisteredWebMcpTool {
+    const managed = isInvocationCallback(tool.execute);
+    const mcpInputSchema = toMcpInputSchema(normalized);
     const outputSchema =
       tool.outputSchema === undefined ? undefined : structuredClone(tool.outputSchema);
     const mcpOutputSchema =
@@ -322,18 +386,50 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
           {
             ...(tool.title !== undefined ? { title: tool.title } : {}),
             description: tool.description,
-            inputSchema: toMcpInputSchema(normalized),
-            ...(mcpOutputSchema ? { outputSchema: mcpOutputSchema } : {}),
+            inputSchema: managed ? metadataOnlySchema(mcpInputSchema) : mcpInputSchema,
+            ...(mcpOutputSchema
+              ? { outputSchema: managed ? metadataOnlySchema(mcpOutputSchema) : mcpOutputSchema }
+              : {}),
             ...(mcpAnnotations ? { annotations: mcpAnnotations } : {}),
           },
           async (args, context) => {
-            const result = await executeTool(args, context.mcpReq.signal);
-            if (isInputRequiredResult(result)) {
-              throw new Error(
-                `WebMCP tool "${tool.name}" returned input_required. Multi-round tool flows require BrowserMcpServer.mcpServer.registerTool().`
-              );
-            }
-            return normalizeToolResponse(result);
+            const protocolVersion = this.mcpServer.server.getNegotiatedProtocolVersion();
+            const result = await executeTool(
+              args,
+              context.mcpReq.signal,
+              managed
+                ? {
+                    protocol: 'mcp',
+                    mcp: {
+                      requestId: String(context.mcpReq.id),
+                      ...(protocolVersion === undefined ? {} : { protocolVersion }),
+                    },
+                    traceContext: mcpTraceContext(context.mcpReq._meta),
+                    validateInput: (input) =>
+                      validateMcpSchema(mcpInputSchema, input, `Invalid input for ${tool.name}`),
+                    formatOutput: async (value) => {
+                      const response = normalizeMcpResult(tool.name, value);
+                      if (!isCallToolResult(response)) {
+                        throw new TypeError(`Tool ${tool.name} returned an invalid MCP response`);
+                      }
+                      if (mcpOutputSchema && !response.isError) {
+                        if (response.structuredContent === undefined) {
+                          throw new TypeError(`Tool ${tool.name} requires structured output`);
+                        }
+                        await validateMcpSchema(
+                          mcpOutputSchema,
+                          response.structuredContent,
+                          `Invalid output for ${tool.name}`
+                        );
+                      }
+                      return response;
+                    },
+                    isErrorResponse: (result) =>
+                      isCallToolResult(result) && result.isError === true,
+                  }
+                : undefined
+            );
+            return normalizeMcpResult(tool.name, result);
           }
         )
       : undefined;
@@ -386,12 +482,29 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     options.signal?.throwIfAborted();
     validatePotentiallyTrustworthyOrigins(options.exposedTo);
     options.signal?.throwIfAborted();
-    const execute: RegisteredWebMcpTool['execute'] = async (args, signal) => {
+    const execute: RegisteredWebMcpTool['execute'] = async (args, signal, context) => {
       signal?.throwIfAborted();
-      return withAbortSignal(
-        Promise.resolve().then(() => Reflect.apply(tool.execute, undefined, [args])),
-        signal
+      if (options.signal?.aborted) throw createUnknownError('Tool unregistered');
+      const callback = new AbortController();
+      const execution = withAbortSignal(
+        Promise.resolve().then(() => {
+          callback.signal.throwIfAborted();
+          const callbackOptions = { signal: callback.signal };
+          return isInvocationCallback(tool.execute)
+            ? invokeCallback(tool.execute, args, callbackOptions, context ?? { protocol: 'webmcp' })
+            : Reflect.apply(tool.execute, undefined, [args, callbackOptions]);
+        }),
+        options.signal,
+        () => {
+          // Keep registration cancellation consistent across browser and MCP callers.
+          callback.abort();
+          return createUnknownError('Tool unregistered');
+        }
       );
+      return withAbortSignal(execution, signal, () => {
+        callback.abort(signal?.reason);
+        return signal?.reason;
+      });
     };
     const controller = new AbortController();
     let registered: RegisteredWebMcpTool | undefined;
@@ -717,11 +830,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     if (!registered) throw createUnknownError(`Tool not found: ${tool.name}`);
     const args = parseChromeToolInput(inputArgsJson);
     try {
-      const result = await withAbortSignal(
-        registered.execute(args, options?.signal),
-        registered.abortSignal,
-        () => createUnknownError('Tool unregistered')
-      );
+      const result = await registered.execute(args, options?.signal);
       return serializeChromeToolResult(result);
     } catch (error) {
       if (options?.signal?.aborted && error === options.signal.reason) throw error;

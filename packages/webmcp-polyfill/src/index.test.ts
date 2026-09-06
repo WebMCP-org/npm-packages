@@ -239,7 +239,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     ]);
   });
 
-  it('invokes the standard execute callback with only the input argument', async () => {
+  it('invokes the standard execute callback with input and callback options', async () => {
     initializeTestPolyfill();
     let argumentCount = 0;
 
@@ -255,7 +255,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
     const [tool] = await modelContext().getTools();
     if (!tool) throw new Error('Expected the registered tool');
     await getCompatModelContext().executeTool(tool, '{}');
-    expect(argumentCount).toBe(1);
+    expect(argumentCount).toBe(2);
   });
 
   it('registerTool with options.signal unregisters when the signal aborts', async () => {
@@ -1413,6 +1413,63 @@ describe('@mcp-b/webmcp-polyfill', () => {
       expect(order).toEqual(['listener', 'replacement']);
     });
   });
+
+  it('provides a fresh, non-aborted callback signal for each execution', async () => {
+    initializeTestPolyfill();
+    const signals: (AbortSignal | undefined)[] = [];
+    await modelContext().registerTool({
+      name: 'callback_signal',
+      description: 'Captures callback signals',
+      execute: (_input, options) => {
+        signals.push(options?.signal);
+        return 'done';
+      },
+    });
+    const [tool] = await modelContext().getTools();
+    await getCompatModelContext().executeTool(tool!, '{}');
+    await getCompatModelContext().executeTool(tool!, '{}');
+
+    expect(signals).toHaveLength(2);
+    for (const signal of signals) {
+      expect(signal).toBeInstanceOf(AbortSignal);
+      expect(signal?.aborted).toBe(false);
+    }
+    expect(signals[0]).not.toBe(signals[1]);
+  });
+
+  it.each(['caller', 'registration'] as const)(
+    'forwards %s cancellation to the callback while preserving compatibility rejection',
+    async (source) => {
+      initializeTestPolyfill();
+      const caller = new AbortController();
+      const registration = new AbortController();
+      let callbackSignal: AbortSignal | undefined;
+      await modelContext().registerTool(
+        {
+          name: 'cancel_callback',
+          description: 'Resolves after cancellation',
+          execute: (_input, options) => {
+            callbackSignal = options?.signal;
+            return new Promise((resolve) => {
+              callbackSignal?.addEventListener('abort', () => resolve('late'), { once: true });
+            });
+          },
+        },
+        { signal: registration.signal }
+      );
+      const [tool] = await modelContext().getTools();
+      const result = getCompatModelContext().executeTool(tool!, '{}', { signal: caller.signal });
+      const reason = { source };
+      (source === 'caller' ? caller : registration).abort(reason);
+
+      // Registration cancellation remains a Chrome/MCP-B compatibility behavior;
+      // the September 2026 draft lets already-running invocations finish.
+      if (source === 'caller') await expect(result).rejects.toBe(reason);
+      else await expect(result).rejects.toMatchObject({ name: 'UnknownError' });
+      expect(callbackSignal?.aborted).toBe(true);
+      expect(callbackSignal?.reason).toMatchObject({ name: 'AbortError' });
+    }
+  );
 
   it('preserves an AbortSignal reason when execution is cancelled', async () => {
     initializeTestPolyfill();

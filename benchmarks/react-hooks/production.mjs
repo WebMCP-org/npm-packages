@@ -12,7 +12,17 @@ const root = resolve(directory, '../..');
 const require = createRequire(resolve(root, 'packages/usewebmcp/package.json'));
 const { chromium } = require('playwright');
 const outDir = mkdtempSync(join(tmpdir(), 'webmcp-production-'));
-const libraries = ['usewebmcp', '@mcp-b/react-webmcp', 'webmcp-react', 'use-webmcp-tool'];
+const libraries = [
+  'usewebmcp',
+  '@mcp-b/react-webmcp',
+  'webmcp-react',
+  'use-webmcp-tool',
+  'usewebmcp / registration only',
+  'usewebmcp / unsubscribed state',
+  'usewebmcp / passthrough',
+  'usewebmcp / OTel no-op',
+  '@mcp-b/react-webmcp / registration only',
+];
 const packages = JSON.parse(
   readFileSync(resolve(directory, 'package.json'), 'utf8')
 ).devDependencies;
@@ -49,6 +59,14 @@ try {
       alias: {
         usewebmcp: resolve(root, 'packages/usewebmcp/dist/index.js'),
         '@mcp-b/react-webmcp': resolve(root, 'packages/react-webmcp/dist/index.js'),
+        '@mcp-b/webmcp-polyfill/execution-state': resolve(
+          root,
+          'packages/webmcp-polyfill/dist/execution-state.js'
+        ),
+        '@mcp-b/webmcp-polyfill/otel': resolve(root, 'packages/webmcp-polyfill/dist/otel.js'),
+        '@opentelemetry/api': createRequire(
+          resolve(root, 'packages/webmcp-polyfill/package.json')
+        ).resolve('@opentelemetry/api'),
       },
     },
   });
@@ -93,13 +111,16 @@ try {
     }
     console.log(trial === 0 ? 'Warmup complete' : `Trial ${trial}/5 complete`);
   }
-  assert.equal(samples.length, 240);
+  assert.equal(samples.length, cases.length * libraries.length * 5);
   const report = {
     recordedAt: new Date().toISOString(),
     sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], {
       cwd: root,
       encoding: 'utf8',
     }).trim(),
+    sourceTreeDirty:
+      execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim()
+        .length > 0,
     browser: browser.version(),
     platform: `${process.platform}/${process.arch}`,
     cpu: cpus()[0]?.model,
@@ -131,7 +152,7 @@ try {
     ],
     ['Registrations per description change', (sample) => [sample.metadata.registrations]],
     ['Re-renders per description change', (sample) => [sample.metadata.renders]],
-    ['Re-renders per sequential call', (sample) => sample.calls.map((call) => call.renders)],
+    ['Owner commits per sequential call', (sample) => sample.calls.map((call) => call.renders)],
   ].map(([label, metric]) => {
     const cells = libraries.map((library) => {
       const values = samples
@@ -143,7 +164,6 @@ try {
             sample.schemaMode === 'stable'
         )
         .flatMap(metric);
-      if (values.every((value) => value === null)) return 'No execution state';
       assert(values.every(Number.isInteger));
       const min = Math.min(...values);
       const max = Math.max(...values);
@@ -161,11 +181,11 @@ try {
     ],
   ].map(
     ([title, metric]) =>
-      `## ${title}\n\n| Tools | Schema fields | Schema objects | ${libraries.join(' | ')} |\n| ---: | ---: | --- | ---: | ---: | ---: | ---: |\n${cases.map((scenario) => `| ${scenario.toolCount} | ${scenario.fields} | ${scenario.schemaMode} | ${libraries.map((library) => cell(samples.filter((sample) => sample.library === library && sample.toolCount === scenario.toolCount && sample.fields === scenario.fields && sample.schemaMode === scenario.schemaMode).map(metric))).join(' | ')} |`).join('\n')}`
+      `## ${title}\n\n| Tools | Schema fields | Schema objects | ${libraries.join(' | ')} |\n| ---: | ---: | --- | ${libraries.map(() => '---:').join(' | ')} |\n${cases.map((scenario) => `| ${scenario.toolCount} | ${scenario.fields} | ${scenario.schemaMode} | ${libraries.map((library) => cell(samples.filter((sample) => sample.library === library && sample.toolCount === scenario.toolCount && sample.fields === scenario.fields && sample.schemaMode === scenario.schemaMode).map(metric))).join(' | ')} |`).join('\n')}`
   );
   writeFileSync(
     resolve(directory, 'PRODUCTION.md'),
-    `# Production browser measurements\n\nGenerated ${report.recordedAt}. React ${packages.react}, Chrome ${report.browser}, ${report.platform}, ${report.cpu}.\nHook source: \`${report.sourceCommit}\`.\n\n## Registrations and re-renders\n\nOne tool, one-field stable schema. Ranges cover five trials; calls run ten times per trial.\nThe README chart uses these production counts.\n\n| Metric | ${libraries.join(' | ')} |\n| --- | ---: | ---: | ---: | ---: |\n${counts.join('\n')}\n\nOur hooks expose registration errors without pending/success state. MCP Cat has no separate registration state; Google's hook declares success without awaiting the native promise. The harness waits for native registration in every case.\n\n## Timing method\n\nCells below show median milliseconds (minimum–maximum) across five trials after one warmup.\nUpdate/call cells summarize each trial's ten sequential operations first. Hook order rotates.\nThese are browser completion latencies, including scheduling and native registration, not CPU or paint time.\nThe same one-task asynchronous handler runs in every hook; no network or schema validation is timed.\nNo \`act\`, \`flushSync\`, or development Profiler is used. Settlement waits are excluded from endpoint timestamps.\nCross-origin isolation enables the high-resolution clock; displayed values round to 0.01 ms.\nSee [methodology](README.md) and [raw samples](production-results.json).\n\n${tables.join('\n\n')}\n`
+    `# Production browser measurements\n\nGenerated ${report.recordedAt}. React ${packages.react}, Chrome ${report.browser}, ${report.platform}, ${report.cpu}.\nHook source: \`${report.sourceCommit}\` (${report.sourceTreeDirty ? 'working tree changes included' : 'clean checkout'}).\n\n## Registrations and re-renders\n\nOne tool, one-field stable schema. Ranges cover five trials; calls run ten times per trial.\nOwner commits count the component that registers the tool. Zero commits means the owner does not subscribe to execution state; it does not provide a loading indicator.\n\n| Metric | ${libraries.join(' | ')} |\n| --- | ${libraries.map(() => '---:').join(' | ')} |\n| Execution state | ${libraries.map((library) => samples.find((sample) => sample.library === library).executionState).join(' | ')} |\n${counts.join('\n')}\n\nOur stateful hooks expose execution state plus registration errors; registration-only hooks omit the execution subscription. The unsubscribed-state mode still records every call. Passthrough adds one middleware; OTel uses the API's no-op tracer without installing an SDK or exporter. These modes measure local overhead, not production telemetry export. MCP Cat has no separate registration state; Google's hook declares success without awaiting the native promise. The harness waits for native registration in every case.\n\n## Timing method\n\nCells below show median milliseconds (minimum–maximum) across five trials after one warmup.\nUpdate/call cells summarize each trial's ten sequential operations first. Hook order rotates.\nThese are browser completion latencies, including scheduling and native registration, not CPU or paint time.\nThe same one-task asynchronous handler runs in every hook; no network or schema validation is timed.\nNo \`act\`, \`flushSync\`, or development Profiler is used. Settlement waits are excluded from endpoint timestamps.\nCross-origin isolation enables the high-resolution clock; displayed values round to 0.01 ms.\nSee [methodology](README.md) and [raw samples](production-results.json).\n\n${tables.join('\n\n')}\n`
   );
 } finally {
   await browser?.close();

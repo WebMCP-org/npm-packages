@@ -1,25 +1,38 @@
 ---
 title: '@mcp-b/webmcp-polyfill reference'
-description: API reference for the document.modelContext WebMCP polyfill and its testing and schema adapters.
+description: Core WebMCP fallback and optional invocation, Standard Schema, consent, execution state, and OpenTelemetry APIs.
 keywords:
   - WebMCP polyfill
   - document.modelContext
   - registerTool
   - getTools
   - modelContextTesting
+  - invocation middleware
+  - Standard Schema
 ---
 
 `@mcp-b/webmcp-polyfill` installs the core WebMCP producer API when the browser
 does not provide it. It does not add MCP prompts, resources, transport, or an
 MCP server; use [`@mcp-b/global`](/packages/global/reference) for that bridge.
+The separate invocation entries wrap callbacks for native or polyfilled WebMCP.
+They are experimental and unreleased.
 
 ## Package entries
 
-| Import                          | Purpose                                    |
-| ------------------------------- | ------------------------------------------ |
-| `@mcp-b/webmcp-polyfill`        | Explicit ESM initialization and cleanup    |
-| `@mcp-b/webmcp-polyfill/iife`   | Standalone script that initializes on load |
-| `@mcp-b/webmcp-polyfill/schema` | Shared MCP-B schema and response adapters  |
+| Import suffix            | Purpose                                                      |
+| ------------------------ | ------------------------------------------------------------ |
+| `@mcp-b/webmcp-polyfill` | Explicit ESM initialization and cleanup                      |
+| `/iife`                  | Standalone fallback script, initializes on load              |
+| `/invocation`            | Shared runner, callback adapter, middleware types            |
+| `/standard-schema`       | Supplied validator and JSON Schema projection                |
+| `/execution-state`       | Optional execution observer and subscriptions                |
+| `/consent`               | Pending approvals with click or required verification policy |
+| `/otel`                  | Optional tracing with an application tracer                  |
+| `/schema`                | Existing low-level schema and browser compatibility adapters |
+
+Suffixes are relative to `@mcp-b/webmcp-polyfill`. Importing an invocation plugin does not
+initialize the fallback. Plugin registration remains outside the native-support check; see
+[runtime layering](/explanation/architecture/runtime-layering).
 
 The IIFE reads `window.__webMCPPolyfillOptions` before initialization and exposes the package exports on `window.WebMCPPolyfill`.
 
@@ -64,6 +77,172 @@ Removes polyfill registrations, detaches their abort listeners, and restores the
 previous descriptors for `window.ModelContext`, `document.modelContext`,
 `navigator.modelContext`, and `navigator.modelContextTesting`.
 
+## Invocation plugins
+
+The same explicit callback works whether initialization keeps a native context or installs
+the fallback. This example uses Zod 4.2 or newer:
+
+```ts "Validated callback"
+import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { createInvocationCallback } from '@mcp-b/webmcp-polyfill/invocation';
+import { standardSchema } from '@mcp-b/webmcp-polyfill/standard-schema';
+import { createExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
+import { z } from 'zod';
+
+initializeWebMCPPolyfill();
+const context = document.modelContext;
+if (!context) throw new Error('WebMCP is unavailable');
+
+const input = standardSchema(z.object({ count: z.string().regex(/^\d+$/).transform(Number) }));
+const state = createExecutionState<{ total: number }>();
+const registration = new AbortController();
+const tool = { instanceId: crypto.randomUUID(), name: 'calculate_total' };
+
+const execute = createInvocationCallback(() => ({
+  tool,
+  input,
+  signal: registration.signal,
+  middleware: [state.aroundInvoke],
+  execute: ({ count }) => ({ total: count + 10 }),
+}));
+
+await context.registerTool(
+  {
+    name: tool.name,
+    description: 'Add 10 to a numeric count',
+    inputSchema: input.inputSchema,
+    execute,
+  },
+  { signal: registration.signal }
+);
+
+// Retain registration.abort() for cleanup and state.getSnapshot() for your UI.
+```
+
+### `createInvocationCallback(getConfig)`
+
+Returns a WebMCP `execute` callback. Each call captures the configuration returned by
+`getConfig(input, options)` and enters the shared runner. It accepts the execution signal and
+delivers the prepared agent response. The SDK recognizes this callback through an in-process
+identity check and forwards protocol context without adding fields to tool arguments.
+
+Only explicitly wrapped callbacks are covered. Existing native registrations, declarative forms,
+and direct calls that bypass the callback are not intercepted. Required browser access, coercion,
+registration, and cancellation behavior remains in the core.
+
+### `invoke(config, input, options?)`
+
+Returns `Promise<InvocationResult<T>>`, containing the raw `value` and prepared `response`.
+Local invocations skip agent `formatOutput` and `formatError`. `unwrapInvocation(promise)`
+returns the local value; `unwrapInvocation(promise, true)` delivers the prepared response.
+
+| Config field                  | Behavior                                                            |
+| ----------------------------- | ------------------------------------------------------------------- |
+| `tool`                        | Captured `instanceId`, `name`, and optional registering-page origin |
+| `execute(input, options)`     | Receives validated input and the combined cancellation signal       |
+| `input`                       | Optional adapter with `validate()` and JSON Schema metadata         |
+| `middleware`                  | Ordered `aroundInvoke(call, next)` functions                        |
+| `signal`                      | Tool-owner lifetime, combined with the invocation signal            |
+| `binding(input)`              | Serializable approval description for non-JSON transformed values   |
+| `checkBinding()`              | Rechecks registration or connection before handler dispatch         |
+| `formatOutput`, `formatError` | Optional agent-only response formatting                             |
+
+`options.signal` cancels one invocation. `forAgent: true` enables agent response formatting.
+Protocol identity, caller provenance, and trace metadata are supplied by trusted adapters.
+The registering page's origin is not an authenticated caller; an unspecified caller is `unknown`.
+
+### Middleware ordering and outcomes
+
+The first middleware is outermost. `[otel, state.aroundInvoke, broker.aroundInvoke]`
+observes validation, approval wait, execution, and formatting. Consent calls `call.prepare()`
+to obtain immutable final arguments and the captured binding. Preparation is memoized,
+including failures. Raw input snapshots support plain data, arrays, `Date`, `Map`, and `Set`;
+custom class instances and enumerable accessors are rejected.
+
+Validator outputs pass through unchanged unless middleware calls `prepare()`. Preparation
+copies supported values before approval: `Date`, `Map`, and `Set` require a `binding()` that
+returns JSON approval data. Preparation rejects transformed custom class instances, including when a binding is supplied.
+
+`next()` takes no replacement arguments and may be called once. Middleware must await or
+return its continuation and preserve its result. Denial and cancellation cannot become success.
+Cancellation removes pending approval and blocks a later decision from starting execution;
+it does not undo an effect that already ran.
+
+`InvocationFailure.kind` is one of `denied`, `cancelled`, `invalid_input`, `tool_error`,
+`format_error`, or `middleware_error`. The envelope retains `cause` and an optional formatted
+`response`. MCP adapters classify `CallToolResult.isError` as a tool failure; local raw objects
+with an `isError` property remain data.
+
+### `standardSchema(schema)`
+
+Returns an input adapter with `inputSchema` and `validate`. The supplied schema must implement
+both [Standard Schema v1](https://standardschema.dev/) and
+[Standard JSON Schema v1](https://standardschema.dev/json-schema).
+
+Metadata conversion calls `~standard.jsonSchema.input()`, trying `draft-2020-12` and then
+`draft-07`. Invocation calls the supplied `~standard.validate()` once, awaits asynchronous
+validation, and passes the transformed value to `execute`. Input and output types follow
+the schema. No validator engine is bundled; plain JSON Schema metadata alone installs none.
+The [schema guide](/how-to/use-schemas-and-structured-output) covers schema formats.
+
+### `createExecutionState<T>(options?)`
+
+Returns `aroundInvoke`, `subscribe`, `getSnapshot`, and `reset`. Its snapshot contains
+`isExecuting`, `lastResult`, `error`, and `executionCount`. Overlapping invocations keep
+`isExecuting` true until all have settled. Only successfully completed invocations increase
+the count; formatting finishes before success is recorded.
+
+Create one store per tool owner. Attaching `aroundInvoke` records state with zero subscribers;
+omitting it creates no execution state. `reset()` clears observations without cancelling work.
+Unsubscribing preserves the store. Listener and optional `onDiagnostic` failures cannot change
+tool outcomes. [React hooks](/packages/usewebmcp/reference) subscribe separately where state is displayed.
+
+### `ConsentBroker`
+
+| Constructor option                     | Behavior                                                           |
+| -------------------------------------- | ------------------------------------------------------------------ |
+| `policy: { mode: 'click' }`            | Explicit local interaction gate                                    |
+| `policy: { mode: 'verified', verify }` | Requires `verify(request, proof, signal)` to return literal `true` |
+| `timeoutMs`                            | Approval deadline in milliseconds; defaults to `120000`            |
+| `onDiagnostic`                         | Optional sink for subscriber errors                                |
+
+`broker.aroundInvoke` waits for authorization before calling `next()`.
+`subscribe(listener)` and `getSnapshot()` expose pending requests. Each request has a unique
+`id`, `invocationId`, immutable `operation`, caller provenance, and `expiresAt`.
+`decide(id, { approved, proof? })` resolves `true` only for a live approved request;
+denial, expiry, failed verification, duplicate decisions, and replay resolve `false`.
+Abort and expiry remove pending requests and cancel outstanding verification.
+
+Verified mode requires application server verification. For passkeys, the server verifies
+the registered credential key, fresh operation-bound challenge, expected origin, RP ID,
+and required user verification. It consumes the challenge once; the protected executor
+consumes an authorization grant for that exact operation. An assertion ID alone is insufficient.
+Unsupported hardware cannot downgrade verified mode to a click. Enrollment, credentials,
+account authorization, and grant storage remain application responsibilities. See
+[SimpleWebAuthn verification](https://simplewebauthn.dev/docs/packages/server#2-verify-authentication-response)
+and the [security model](/explanation/design/security-and-human-in-the-loop).
+
+### `createOtelMiddleware(options)`
+
+| Option                | Behavior                                                              |
+| --------------------- | --------------------------------------------------------------------- |
+| `tracer`              | Required application-provided OpenTelemetry tracer                    |
+| `propagator`          | Optional configured propagator for MCP trace metadata                 |
+| `parentContext(call)` | Optional parent context; defaults to the application's active context |
+| `onDiagnostic`        | Optional sink for instrumentation errors                              |
+
+This entry requires the optional `@opentelemetry/api` peer. It installs no provider, exporter,
+or automatic flush. Local and native/polyfilled WebMCP calls create internal spans.
+Trusted MCP calls create server spans named `tools/call <name>` and follow the
+[Development MCP conventions](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/mcp.md).
+Propagation reads `traceparent`, `tracestate`, and `baggage` separately from arguments and links
+an existing ambient transport span when it differs from the MCP parent.
+
+Spans include the entire invocation and distinguish terminal outcomes. Instrumentation failures
+preserve tool results and errors. Arguments, results, approval data, and error messages are
+never captured in this implementation. Omit this middleware when enclosing instrumentation
+already owns the invocation span.
+
 ## Installed core surface
 
 ### `registerTool(tool, options?)`
@@ -88,14 +267,14 @@ await document.modelContext.registerTool(
 controller.abort();
 ```
 
-| Field         | Required | Notes                                            |
-| ------------- | -------- | ------------------------------------------------ |
-| `name`        | Yes      | 1–128 ASCII letters, digits, `_`, `-`, or `.`    |
-| `description` | Yes      | Non-empty tool description                       |
-| `execute`     | Yes      | Receives one object-or-array input value         |
-| `title`       | No       | Display label, converted to a well-formed string |
-| `inputSchema` | No       | JSON-serializable JSON Schema object             |
-| `annotations` | No       | WebMCP read-only and untrusted-content hints     |
+| Field         | Required | Notes                                                     |
+| ------------- | -------- | --------------------------------------------------------- |
+| `name`        | Yes      | 1–128 ASCII letters, digits, `_`, `-`, or `.`             |
+| `description` | Yes      | Non-empty tool description                                |
+| `execute`     | Yes      | Receives input and execution options with an abort signal |
+| `title`       | No       | Display label, converted to a well-formed string          |
+| `inputSchema` | No       | JSON-serializable JSON Schema object                      |
+| `annotations` | No       | WebMCP read-only and untrusted-content hints              |
 
 `options.signal` owns the registration. Aborting it removes the tool and emits a
 `toolchange` event. `unregisterTool()` is not exposed.
@@ -212,15 +391,16 @@ for the current browser signature.
 `~standard.validate()` as a non-enumerable property for the MCP SDK. It does not invoke the validator
 or wrap the tool's callback.
 
-| Registration/execution path                                | Schema conversion                                    | Argument validation                                                       |
-| ---------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------- |
-| `usewebmcp` or the MCP-B tool hook                         | Automatic for Standard JSON Schema                   | Supplied Standard Schema validator on local and agent calls               |
-| Standalone polyfill imperative API                         | Caller supplies JSON Schema                          | Caller validates in the handler                                           |
-| `normalizeInputSchema()` helper                            | Converts metadata and preserves a supplied validator | None; this helper does not execute tools                                  |
-| `BrowserMcpServer` through an MCP client                   | Automatic conversion                                 | Official MCP server uses a preserved validator or its JSON Schema adapter |
-| Direct `BrowserMcpServer.executeTool()` or a native mirror | Already converted metadata                           | Bypasses MCP validation; caller validates in the handler                  |
+| Registration/execution path                                        | Schema conversion                                    | Argument validation                                                       |
+| ------------------------------------------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------- |
+| `usewebmcp` or the MCP-B tool hook                                 | Automatic for Standard JSON Schema                   | Supplied Standard Schema validator on local and agent calls               |
+| Wrapped native/polyfill/SDK callback with `standardSchema`         | Adapter supplies JSON Schema                         | Supplied validator runs once inside the invocation                        |
+| Unwrapped standalone polyfill imperative API                       | Caller supplies JSON Schema                          | Caller validates in the handler                                           |
+| `normalizeInputSchema()` helper                                    | Converts metadata and preserves a supplied validator | None; this helper does not execute tools                                  |
+| `BrowserMcpServer` through an MCP client                           | Automatic conversion                                 | Official MCP server uses a preserved validator or its JSON Schema adapter |
+| Unwrapped direct `BrowserMcpServer.executeTool()` or native mirror | Already converted metadata                           | Bypasses MCP validation; caller validates in the handler                  |
 
-The [schema guide](/how-to/use-schemas-and-structured-output) includes a direct-registration example.
+The invocation adapter above replaces manual validation wrappers. The [schema guide](/how-to/use-schemas-and-structured-output) also covers direct registration.
 When that callback owns validation, `{ ...normalizeInputSchema(schema).inputSchema }` copies only
 JSON metadata. It prevents the MCP SDK from also applying the vendor transforms if the tool later
 uses the MCP-B runtime. The [React hook](/packages/usewebmcp/reference#schemas-and-inference) already

@@ -7,11 +7,13 @@ icon: 'react'
 
 import StandardSchemaExample from '/snippets/packages/usewebmcp-standard-schema.mdx';
 
+import ExecutionStateExample from '/snippets/packages/usewebmcp-execution-state.mdx';
+
 import CounterExample from '/snippets/packages/usewebmcp-quickstart.mdx';
 
 `usewebmcp` registers React-owned tools with `document.modelContext`. Its browser contracts and JSON Schema input inference come from the Community Group's [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types).
 
-The runtime comes from the browser, [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview), or [`@mcp-b/global`](/packages/global/overview). The hook does not install a runtime or MCP SDK. For MCP output metadata, prompts, resources, and clients, use [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference).
+The runtime comes from the browser, [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview), or [`@mcp-b/global`](/packages/global/overview). The hook imports the shared invocation runtime but does not initialize the browser API or install an MCP SDK. For MCP output metadata, prompts, resources, and clients, use [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference).
 
 ## Minimal example
 
@@ -25,11 +27,25 @@ pnpm add usewebmcp react
 
 React 18 and 19 are supported. The published entry point preserves `'use client'`, including production builds. Importing and server rendering do not access browser globals or register tools. Framework integration is covered in the [framework guide](/how-to/frameworks).
 
-## Hook
+## Hooks
+
+### `useWebMCPTool(config, deps?)`
+
+Registers a tool and returns `execute`, `isSupported`, and `registrationError`.
+It neither allocates an execution store nor subscribes to calls. Tool-driven state updates
+therefore add no renders to the registration owner. Application updates can still render it.
+
+### `useToolExecutionState(execution)`
+
+Subscribes to a stable `createExecutionState<TResult>()` observer using `useSyncExternalStore`.
+The observer must be attached through `middleware` to record calls. Subscription does not
+install middleware, cancel work, or reset the store. SSR and initial hydration use the idle snapshot.
+
+<ExecutionStateExample />
 
 ### `useWebMCP(config, deps?)`
 
-`deps` is an optional React dependency list for explicitly refreshing registration.
+`useWebMCP` composes registration, one execution observer, and a subscription. `deps` is an optional React dependency list for explicitly refreshing registration.
 
 | Returned field             | Type                          | Description                                             |
 | -------------------------- | ----------------------------- | ------------------------------------------------------- |
@@ -59,6 +75,35 @@ React 18 and 19 are supported. The published entry point preserves `'use client'
 
 `enabled: false` unregisters the tool while leaving local execution available. The browser enforces origin exposure; see the [Community Group draft](https://webmachinelearning.github.io/webmcp/#dictdef-modelcontextregistertooloptions).
 
+## Middleware and preparation
+
+Both tool hooks accept the same experimental invocation options:
+
+| Field                       | Description                                                          |
+| --------------------------- | -------------------------------------------------------------------- |
+| `middleware`                | Outermost-first array of `aroundInvoke(call, next)` functions        |
+| `binding(input)`            | Immutable JSON approval description for non-JSON transformed values  |
+| `checkBinding()`            | Synchronous permission/connection check immediately before execution |
+| `isErrorResponse(response)` | Protocol adapter classifier; applied only to agent responses         |
+
+`call.prepare()` validates/transforms input once and returns immutable approval data. It never
+executes the tool. Consent awaits this result before requesting approval. Cancellation dismisses
+pending consent and prevents a later decision from starting execution. Replacing a registration
+cancels its pending agent calls; local calls keep their own lifetime.
+
+`checkBinding()` runs the latest committed checker immediately before execution. Read current
+authority there; the handler and approved arguments remain captured. Include an authority
+version in `deps` when changes should revoke the registration. The protected executor must
+verify authorization for the exact approved operation.
+
+Raw arguments support snapshots of plain data, arrays, Dates, Maps, and Sets. Custom class
+inputs and accessors reject instead of losing their behavior during cloning. Vendor outputs
+remain unrestricted until approval preparation is requested; prepared outputs follow the same
+snapshot rules. Middleware cannot replace arguments or repeat `next()`. Dates, Maps, and Sets
+need a serializable `binding` for consent. These are cooperative
+application policies; protected server operations still enforce authorization.
+See [invocation plugins](/packages/webmcp-polyfill/reference#invocation-plugins) for consent and tracing.
+
 ## Execution state
 
 | Field            | Type              | Description                                |
@@ -82,7 +127,7 @@ Inline JSON Schema literals infer caller and handler inputs through upstream typ
 
 The hook calls the schema library's methods; it does not bundle a validation engine. Standard JSON Schema conversion and Standard Schema validation are separate interfaces.
 
-Validation errors skip the handler and reject local and agent calls by default. `formatError` can format agent failures. JSON Schema objects and converter-only schemas supply metadata and inference without adding runtime validation. A validator-only schema must also provide a JSON Schema converter. The [schema guide](/how-to/use-schemas-and-structured-output) covers React and direct registration. The optional [polyfill schema entry](/packages/webmcp-polyfill/reference#schema-entry) converts metadata without wrapping execution; the hook owns validation on native, polyfilled, and MCP-B runtime paths.
+Validation errors skip the handler and reject local and agent calls by default. `formatError` can format agent failures. JSON Schema objects and converter-only schemas supply metadata and inference without adding runtime validation. A validator-only schema must also provide a JSON Schema converter. The [schema guide](/how-to/use-schemas-and-structured-output) covers React and direct registration. The optional [polyfill schema entry](/packages/webmcp-polyfill/reference#schema-entry) converts metadata without wrapping execution; the shared `/standard-schema` adapter owns vendor validation on native, polyfilled, and MCP-B runtime paths. The convenience hooks select it automatically when given a Standard Schema.
 
 ## Re-registration triggers
 
@@ -108,6 +153,7 @@ Successful agent calls return the handler's value unless `formatOutput` is suppl
 | -------------------------------------------- | -------------------------------------------------------------------- |
 | `WebMCP`                                     | Upstream namespace from `webmcp-types`                               |
 | `WebMCPConfig<TInputSchema, TResult>`        | Configuration with the result type inferred from the handler         |
+| `WebMCPToolReturn<TInputSchema, TResult>`    | Registration-only controls                                           |
 | `WebMCPReturn<TInputSchema, TResult>`        | Execution state, API availability, registration errors, and controls |
 | `ToolExecutionState<TResult>`                | Execution state                                                      |
 | `ToolExecuteFunction<TInputSchema, TResult>` | Handler signature                                                    |

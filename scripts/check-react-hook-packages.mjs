@@ -50,14 +50,16 @@ try {
       const packed = JSON.parse(run('tar', ['-xOf', filename, 'package/package.json']));
       assert(
         Object.keys(packed.dependencies).every(
-          (name) => !name.startsWith('@mcp-b/') && !name.startsWith('@modelcontextprotocol/')
+          (name) =>
+            (name === '@mcp-b/webmcp-polyfill' || !name.startsWith('@mcp-b/')) &&
+            !name.startsWith('@modelcontextprotocol/')
         ),
-        'Core hooks must not install MCP-B or MCP SDK packages'
+        'Core hooks may depend on the shared invocation runtime, never the MCP bridge or SDK'
       );
       const declarations = run('tar', ['-xOf', filename, 'package/dist/index.d.ts']);
       assert(
-        !/@mcp-b\/|@modelcontextprotocol\//u.test(declarations),
-        'Core declarations must be standalone'
+        !/@mcp-b\/(?!webmcp-polyfill)|@modelcontextprotocol\//u.test(declarations),
+        'Core declarations may reference the shared invocation contract, never bridge types'
       );
     }
   }
@@ -77,6 +79,7 @@ try {
           type: 'module',
           dependencies: {
             usewebmcp: tarballs.usewebmcp,
+            '@mcp-b/webmcp-polyfill': tarballs['@mcp-b/webmcp-polyfill'],
             ...(extended
               ? {
                   '@mcp-b/react-webmcp': tarballs['@mcp-b/react-webmcp'],
@@ -170,14 +173,19 @@ export function useExtendedTypes() {
 import assert from 'node:assert/strict';
 import { createElement, StrictMode } from 'react';
 import { renderToString } from 'react-dom/server';
-import { useWebMCP } from 'usewebmcp';
+import { useWebMCP, useWebMCPTool, useToolExecutionState } from 'usewebmcp';
+import { createExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
 ${extended ? "import * as mcp from '@mcp-b/react-webmcp';" : ''}
 assert.equal(typeof document, 'undefined');
 assert.equal(typeof window, 'undefined');
 const warnings = [];
 const previousError = console.error;
 console.error = (...args) => warnings.push(args);
+const execution = createExecutionState();
 function App() {
+  const registration = useWebMCPTool({ name: 'ssr_minimal', description: 'Registration only', execute: () => 'ready' });
+  assert.equal('state' in registration, false);
+  assert.equal(useToolExecutionState(execution).isExecuting, false);
   const tool = useWebMCP({ name: 'ssr', description: 'Server rendering', execute: () => 'ready' });
   assert.equal(tool.isSupported, false);
   assert.equal('isRegistered' in tool, false);

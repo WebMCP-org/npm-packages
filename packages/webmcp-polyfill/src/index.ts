@@ -7,6 +7,7 @@ import type {
   ModelContextTestingToolInfo,
   ModelContextTool,
   RegisteredTool,
+  ToolExecuteCallbackOptions,
   WebMcpToolInput,
 } from '@mcp-b/webmcp-types';
 import {
@@ -37,7 +38,7 @@ const REGISTRATION_SIGNAL_SYMBOL = Symbol('registrationSignal');
 const REGISTRATION_ABORT_SYMBOL = Symbol('registrationAbort');
 
 interface PolyfillToolDescriptor extends Omit<ModelContextTool<WebMcpToolInput>, 'execute'> {
-  execute(input: WebMcpToolInput): unknown;
+  execute(input: WebMcpToolInput, options: ToolExecuteCallbackOptions): unknown;
   [REGISTERED_INPUT_SCHEMA_SYMBOL]?: string;
   [REGISTRATION_SIGNAL_SYMBOL]?: AbortSignal;
   [REGISTRATION_ABORT_SYMBOL]?: () => void;
@@ -286,14 +287,23 @@ class StrictWebMCPContext extends EventTarget implements ModelContext {
     if (tool[REGISTRATION_SIGNAL_SYMBOL]?.aborted) throw createUnknownError('Tool unregistered');
 
     let rawResult: unknown;
+    const controller = new AbortController();
     try {
       const registrationSignal = tool[REGISTRATION_SIGNAL_SYMBOL];
       const execution = withAbortSignal(
-        Promise.resolve(tool.execute(args)),
+        Promise.resolve(tool.execute(args, { signal: controller.signal })),
         registrationSignal,
-        () => createUnknownError('Tool unregistered')
+        () => {
+          // Keep the existing unregistration compatibility behavior while
+          // giving the callback a platform-shaped cancellation signal.
+          controller.abort();
+          return createUnknownError('Tool unregistered');
+        }
       );
-      rawResult = await withAbortSignal(execution, options?.signal);
+      rawResult = await withAbortSignal(execution, options?.signal, () => {
+        controller.abort();
+        return options?.signal?.reason;
+      });
     } catch (error) {
       if (options?.signal?.aborted && error === options.signal.reason) throw error;
       if (tool[REGISTRATION_SIGNAL_SYMBOL]?.aborted) throw error;
@@ -439,7 +449,7 @@ function normalizeToolDescriptor(
     description: coerced.description,
     ...(coerced.inputSchema === undefined ? {} : { inputSchema: coerced.inputSchema }),
     ...(coerced.annotations === undefined ? {} : { annotations: coerced.annotations }),
-    execute: (input) => Reflect.apply(coerced.execute, undefined, [input]),
+    execute: (input, options) => Reflect.apply(coerced.execute, undefined, [input, options]),
     ...(registeredInputSchema !== undefined
       ? { [REGISTERED_INPUT_SCHEMA_SYMBOL]: registeredInputSchema }
       : {}),

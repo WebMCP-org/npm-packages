@@ -45,6 +45,31 @@
     "./iife": {
       "script": "./dist/index.iife.js",
       "default": "./dist/index.iife.js"
+    },
+    "./invocation": {
+      "types": "./dist/invocation.d.ts",
+      "import": "./dist/invocation.js",
+      "default": "./dist/invocation.js"
+    },
+    "./standard-schema": {
+      "types": "./dist/standard-schema.d.ts",
+      "import": "./dist/standard-schema.js",
+      "default": "./dist/standard-schema.js"
+    },
+    "./execution-state": {
+      "types": "./dist/execution-state.d.ts",
+      "import": "./dist/execution-state.js",
+      "default": "./dist/execution-state.js"
+    },
+    "./consent": {
+      "types": "./dist/consent.d.ts",
+      "import": "./dist/consent.js",
+      "default": "./dist/consent.js"
+    },
+    "./otel": {
+      "types": "./dist/otel.d.ts",
+      "import": "./dist/otel.js",
+      "default": "./dist/otel.js"
     }
   },
   "publishConfig": {
@@ -70,11 +95,20 @@
     "@standard-schema/spec": "^1.1.0"
   },
   "devDependencies": {
+    "@opentelemetry/api": "^1.9.0",
     "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@opentelemetry/api": "^1.9.0"
+  },
+  "peerDependenciesMeta": {
+    "@opentelemetry/api": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=20"

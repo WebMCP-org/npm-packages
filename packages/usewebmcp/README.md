@@ -6,12 +6,12 @@ Expose React state and actions as WebMCP tools, with automatic registration and 
 'use client';
 
 import { useState } from 'react';
-import { useWebMCP } from 'usewebmcp';
+import { useWebMCPTool } from 'usewebmcp';
 
 export function Counter() {
   const [count, setCount] = useState(0);
 
-  useWebMCP({
+  useWebMCPTool({
     name: 'get_count',
     description: 'Get the current counter value',
     annotations: { readOnlyHint: true },
@@ -54,19 +54,14 @@ Use [`@mcp-b/global`](../global/README.md) for MCP server features. Browser type
 
 ## Performance comparison
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WebMCP-org/npm-packages/92071e32a39585fe412de3e4ed651391c47ebcf7/apps/documentation-website/images/react-hooks/performance-dark.png">
-  <img src="https://raw.githubusercontent.com/WebMCP-org/npm-packages/92071e32a39585fe412de3e4ed651391c47ebcf7/apps/documentation-website/images/react-hooks/performance-light.png" alt="Production React re-renders with one tool, five trials. One description change: usewebmcp 1, MCP-B React 1, MCP Cat 1, Google 2. One sequential call: 2, 2, 1–2; Google exposes no execution state.">
-</picture>
-
-Both hooks add no renders for successful registration. All four register once per description change and never on unrelated updates in this benchmark.
-[Benchmark details](https://github.com/WebMCP-org/npm-packages/tree/92071e32a39585fe412de3e4ed651391c47ebcf7/benchmarks/react-hooks).
+`useWebMCPTool` has no execution-state subscription. `useWebMCP` includes pending,
+result, and error updates. The [comparison harness](https://github.com/WebMCP-org/npm-packages/tree/alex/invocation-runtime/benchmarks/react-hooks)
+measures both modes, registration changes, Google, and MCP Cat using the same workloads.
 
 ## Feature comparison
 
 | Feature                         | `usewebmcp`     | `@mcp-b/react-webmcp` | MCP Cat | Google    |
 | ------------------------------- | --------------- | --------------------- | ------- | --------- |
-| Hook bundle (gzip)              | 1.7 kB          | 2.1 kB                | 24.2 kB | 0.7 kB    |
 | Schema validation               | Standard Schema | Standard Schema       | Zod     | Manual    |
 | Registration errors             | Yes             | Yes                   | Yes     | Sync only |
 | Running, result & error state   | Yes             | Yes                   | Yes     | No        |
@@ -74,9 +69,7 @@ Both hooks add no renders for successful registration. All four register once pe
 | Automatic MCP result formatting | No              | Yes                   | No      | Yes       |
 | Prompt & resource hooks         | No              | Yes                   | No      | No        |
 
-Bundle sizes exclude React and include built-in dependencies. App validators and runtimes are extra.
-
-All four accept JSON Schema. Compared: our PR #329, [MCP Cat 1.1.0](https://www.npmjs.com/package/webmcp-react/v/1.1.0), and [Google 0.2.0](https://www.npmjs.com/package/use-webmcp-tool/v/0.2.0).
+All four accept JSON Schema. Compared against pinned versions: [MCP Cat 1.1.0](https://www.npmjs.com/package/webmcp-react/v/1.1.0), and [Google 0.2.0](https://www.npmjs.com/package/use-webmcp-tool/v/0.2.0).
 
 ## Validate input with your schema library
 
@@ -112,6 +105,56 @@ inference only; validate in your handler when using it. Reuse immutable schema o
 conversion and serialization; replace the object when the schema changes.
 [Schema details](https://docs.mcp-b.ai/packages/usewebmcp/reference#schemas-and-inference).
 
+## Choose where execution state lives
+
+`useWebMCPTool` registers a tool without subscribing the component to calls.
+`useWebMCP` includes `state` and `reset()` when the same component needs them.
+To keep updates in a status child, attach an execution observer once:
+
+```tsx
+'use client';
+
+import { useState } from 'react';
+import { useWebMCPTool, useToolExecutionState } from 'usewebmcp';
+import { createExecutionState, type ExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
+
+export function ToolPanel() {
+  const [execution] = useState(() => createExecutionState<string>());
+  useWebMCPTool({
+    name: 'get_status',
+    description: 'Get the application status',
+    annotations: { readOnlyHint: true },
+    execute: () => 'ready',
+    middleware: [execution.aroundInvoke],
+  });
+  return <ToolStatus execution={execution} />;
+}
+
+function ToolStatus({ execution }: { execution: ExecutionState<string> }) {
+  const state = useToolExecutionState(execution);
+  return <output>{state.isExecuting ? 'Running' : (state.lastResult ?? 'Not called yet')}</output>;
+}
+```
+
+The observer records calls even before `ToolStatus` mounts. Removing its subscription
+keeps the recorded state; omitting the observer removes state tracking entirely.
+
+## Optional invocation middleware
+
+Both hooks accept `middleware: [tracing, consent]`. The first middleware is outermost.
+Validation runs once before consent; observers include validation, approval wait, execution,
+and formatting. `next()` cannot repeat an operation within the same call.
+
+Use `checkBinding()` to recheck current permission immediately before execution. React uses
+the latest committed checker while retaining the approved handler and arguments. Include an
+authority version in `deps` when permission changes should revoke the registration. Protected
+server operations must still authorize the exact approved operation.
+
+The shared runtime lives in explicit `@mcp-b/webmcp-polyfill` entry points:
+[`/invocation`, `/standard-schema`, `/execution-state`, `/consent`, and `/otel`](../webmcp-polyfill/README.md#invocation-plugins).
+These experimental APIs work with native WebMCP and the fallback. Importing them does not
+install `document.modelContext`, a validator engine, or an OpenTelemetry SDK.
+
 ## State and lifecycle
 
 - `state` exposes `isExecuting`, `lastResult`, `error`, and `executionCount`.
@@ -126,6 +169,13 @@ See the [reference](https://docs.mcp-b.ai/packages/usewebmcp/reference) for meta
 cancellation, late runtime discovery, and response formatting.
 
 ## Migrating from the previous hook
+
+Existing `useWebMCP` calls retain their stateful return shape. Use `useWebMCPTool` to opt out
+of call-driven renders. Standard Schema validation now delegates to the shared input adapter.
+Raw inputs are snapshotted as plain data, arrays, Dates, Maps, or Sets. Custom class inputs
+and accessors are rejected. Vendor outputs remain unrestricted without consent preparation;
+prepared outputs must support the same snapshot rules. Dates, Maps, and Sets need an explicit
+serializable `binding` for consent.
 
 The core hook now returns raw results and uses upstream WebMCP types. To keep `outputSchema`,
 MCP annotations, `InferOutput`, and automatic MCP responses, change your import:

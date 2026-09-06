@@ -9,6 +9,7 @@ export default defineConfig({
   optimizeDeps: {
     include: [
       'react-dom',
+      'react-dom/client',
       'react/jsx-dev-runtime',
       'vitest-browser-react',
       'vitest-browser-react/pure',
@@ -23,7 +24,11 @@ export default defineConfig({
     clean: true,
     treeshake: true,
     deps: {
-      neverBundle: [/^react(?:\/.*)?$/, /^react-dom(?:\/.*)?$/],
+      neverBundle: [
+        /^@mcp-b\/webmcp-polyfill(?:\/.*)?$/,
+        /^react(?:\/.*)?$/,
+        /^react-dom(?:\/.*)?$/,
+      ],
     },
     tsconfig: './tsconfig.json',
   },

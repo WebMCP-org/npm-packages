@@ -184,7 +184,7 @@ describe('useWebMCP in a browser runtime', () => {
     if (!tool) throw new Error('Tool was not registered');
     expect(tool).not.toHaveProperty('formatError');
     let response!: Promise<unknown>;
-    await hook.act(() => {
+    await hook.act(async () => {
       response = Promise.resolve(tool.execute({}, { signal: new AbortController().signal }));
       // Observe rejection immediately so a failed implementation produces no unhandled error.
       void response.catch(() => {});
@@ -258,7 +258,7 @@ describe('useWebMCP in a browser runtime', () => {
 
     const { execute, reset } = result.current;
     let pending!: Promise<unknown>;
-    await act(() => {
+    await act(async () => {
       pending = execute({});
     });
     await unmount();
@@ -480,7 +480,7 @@ describe('useWebMCP in a browser runtime', () => {
     const controller = new AbortController();
     let cancelled!: Promise<unknown>;
     let surviving!: Promise<unknown>;
-    await hook.act(() => {
+    await hook.act(async () => {
       cancelled = hook.result.current.execute({ first: true }, { signal: controller.signal });
       surviving = hook.result.current.execute({ first: false });
     });
@@ -490,7 +490,8 @@ describe('useWebMCP in a browser runtime', () => {
       await rejection;
       first.resolve('too late');
     });
-    expect(signals[0]).toBe(controller.signal);
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[0]?.reason).toBe(controller.signal.reason);
     expect(signals[1]?.aborted).toBe(false);
     expect(hook.result.current.state).toMatchObject({
       isExecuting: true,
@@ -539,12 +540,16 @@ describe('useWebMCP in a browser runtime', () => {
     );
     const tool = register.mock.calls[0]?.[0];
     if (!tool) throw new Error('Tool was not registered');
-    const signal = new AbortController().signal;
+    const controller = new AbortController();
+    const { signal } = controller;
     await hook.act(async () => {
       await tool.execute({}, { signal });
       await executeRegisteredTool('native_options');
     });
-    expect(signals[0]).toBe(signal);
+    const reason = new Error('Native caller cancelled');
+    controller.abort(reason);
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[0]?.reason).toBe(reason);
     expect(signals[1]).toBeInstanceOf(AbortSignal);
   });
 

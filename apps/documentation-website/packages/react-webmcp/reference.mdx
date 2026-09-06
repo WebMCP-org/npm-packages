@@ -41,6 +41,18 @@ For client functionality:
 pnpm add @mcp-b/transports @modelcontextprotocol/client
 ```
 
+## Registration-only tools and invocation middleware
+
+`useWebMCPTool(config, deps?)` has the MCP metadata and formatting of `useWebMCP`,
+and returns only registration status and local execution controls. It does not subscribe
+the owner to execution state. `useToolExecutionState(execution)` subscribes explicitly.
+See the [shared React API](/packages/usewebmcp/reference#hooks) for the composition example.
+
+Both hooks accept `middleware`, `binding`, and `checkBinding`. Standard Schema validation
+runs before consent; `BrowserMcpServer` places managed MCP input/output validation and response
+classification inside the same invocation. MCP error responses set `state.error` and do not
+increase `executionCount`. Local calls retain raw results, including objects with `isError`.
+
 ## Declarative form attributes
 
 Importing this package adds React JSX declarations for `toolname`, `tooltitle`,

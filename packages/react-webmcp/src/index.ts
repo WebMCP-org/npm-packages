@@ -11,7 +11,8 @@ export type {
   ToolExecutionState,
   WebMCP,
 } from 'usewebmcp';
-export { useWebMCP } from './useWebMCP.js';
+export { useToolExecutionState } from 'usewebmcp';
+export { useWebMCP, useWebMCPTool } from './useWebMCP.js';
 
 export type { ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';
 export type { McpClientProviderProps } from './client/McpClientProvider.js';
@@ -29,6 +30,7 @@ export type {
   ToolExecuteFunction,
   WebMCPConfig,
   WebMCPReturn,
+  WebMCPToolReturn,
   WebMCPPromptConfig,
   WebMCPPromptReturn,
   WebMCPResourceConfig,

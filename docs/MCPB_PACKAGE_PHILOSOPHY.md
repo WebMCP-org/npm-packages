@@ -24,15 +24,21 @@ Use when you want:
 - upstream browser contracts and input inference: `webmcp-types`
 - MCP-B input/output descriptor helpers and compatibility types: `@mcp-b/webmcp-types`
 
-### 2) `@mcp-b/webmcp-polyfill` (Canonical Core Runtime)
+### 2) `@mcp-b/webmcp-polyfill` (Core Fallback and Shared Invocation Runtime)
 
-- Strict runtime polyfill for core WebMCP behavior.
+- The default entry installs strict core WebMCP behavior only when native support is absent.
+- Optional `/invocation`, `/standard-schema`, `/execution-state`, `/consent`, and `/otel` entries
+  operate on explicitly wrapped callbacks, independently of fallback installation.
+- These experimental, unreleased entries stay useful when browsers provide native WebMCP.
+  Validation, state, and policy are opt-in; mandated browser checks remain in the core.
+- Standard Schema delegates to the supplied validator and ships no validation engine.
 - Includes the optional MCP-B `modelContextTesting` compatibility shim where applicable.
-- Built on top of `@mcp-b/webmcp-types`.
+- Built on top of `@mcp-b/webmcp-types`; browser declarations remain upstream-owned.
 
 Use when you want:
 
-- a strict core runtime implementation without MCP-B bridge features
+- a strict core fallback without MCP-B bridge features
+- shared invocation behavior for native WebMCP, React, and SDK-owned tools
 
 ### 3) `@mcp-b/global` (MCP-B Runtime Entry Point)
 
@@ -70,7 +76,7 @@ Use when you want:
 Core layering:
 
 1. `webmcp-types` -> core browser type contracts; `@mcp-b/webmcp-types` -> derived MCP-B extensions and compatibility
-2. `@mcp-b/webmcp-polyfill` -> canonical core runtime behavior
+2. `@mcp-b/webmcp-polyfill` -> core fallback plus independently imported invocation plugins
 3. `@mcp-b/global` -> MCP-B extensions/runtime built on core
 4. `@mcp-b/react-webmcp` -> React hooks for MCP-B runtime
 5. `usewebmcp` -> React hooks for strict core API
@@ -81,7 +87,13 @@ Core layering:
 2. Put the browser adapter and its extension types in `@mcp-b/webmcp-ts-sdk`; keep runtime orchestration in `@mcp-b/global`.
 3. Keep `@mcp-b/react-webmcp` aligned with the packages that own each contract. Do not use `@mcp-b/global` as a type barrel.
 4. Keep `usewebmcp` aligned with upstream `webmcp-types`. It delegates Standard Schema validation to the supplied schema; MCP formatting and output metadata belong in `@mcp-b/react-webmcp`.
-5. If a shared type crosses packages, move it to the correct canonical layer rather than duplicating.
+5. Register plugins on the shared invocation callback, outside native/polyfill selection. Importing a
+   plugin must not initialize the fallback or change the global browser contract.
+6. Keep one runner owner across React and the MCP bridge so validation and consent run once.
+   Existing native/declarative tools and bypassing direct calls require explicit integration.
+7. Consent verification and protected operation grants belong at the application's trusted server.
+   Same-page middleware does not create an authenticated caller or secure a bypassed endpoint.
+8. If a shared type crosses packages, move it to the correct canonical layer rather than duplicating.
 
 ## Quick Selection Guide
 

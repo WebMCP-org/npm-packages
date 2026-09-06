@@ -1,0 +1,24 @@
+```tsx title="Subscribe only in the status component"
+'use client';
+
+import { useState } from 'react';
+import { useWebMCPTool, useToolExecutionState } from 'usewebmcp';
+import { createExecutionState, type ExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
+
+export function ToolPanel() {
+  const [execution] = useState(() => createExecutionState<string>());
+  useWebMCPTool({
+    name: 'get_status',
+    description: 'Get the application status',
+    annotations: { readOnlyHint: true },
+    execute: () => 'ready',
+    middleware: [execution.aroundInvoke],
+  });
+  return <ToolStatus execution={execution} />;
+}
+
+function ToolStatus({ execution }: { execution: ExecutionState<string> }) {
+  const state = useToolExecutionState(execution);
+  return <output>{state.isExecuting ? 'Running' : (state.lastResult ?? 'Not called yet')}</output>;
+}
+```

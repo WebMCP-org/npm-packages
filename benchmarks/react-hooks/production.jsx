@@ -1,19 +1,67 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { useWebMCP } from 'usewebmcp';
-import { useWebMCP as useExtendedWebMCP } from '@mcp-b/react-webmcp';
+import { useWebMCP, useWebMCPTool } from 'usewebmcp';
+import {
+  useWebMCP as useExtendedWebMCP,
+  useWebMCPTool as useExtendedWebMCPTool,
+} from '@mcp-b/react-webmcp';
+import { createExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
+import { createOtelMiddleware } from '@mcp-b/webmcp-polyfill/otel';
+import { trace } from '@opentelemetry/api';
 import { useWebMCP as useGoogleWebMCP } from 'use-webmcp-tool';
 import { useMcpTool, WebMCPProvider } from 'webmcp-react';
 
+const passThrough = (_call, next) => next();
+const otel = createOtelMiddleware({ tracer: trace.getTracer('react-hooks-benchmark') });
 const libraries = [
-  { name: 'usewebmcp', hook: useWebMCP },
-  { name: '@mcp-b/react-webmcp', hook: useExtendedWebMCP },
+  { name: 'usewebmcp', hook: useWebMCP, ours: true, executionState: 'subscribed' },
+  {
+    name: '@mcp-b/react-webmcp',
+    hook: useExtendedWebMCP,
+    ours: true,
+    executionState: 'subscribed',
+  },
   {
     name: 'webmcp-react',
     hook: (config) => useMcpTool({ ...config, handler: config.execute }),
     provider: WebMCPProvider,
+    executionState: 'subscribed',
   },
-  { name: 'use-webmcp-tool', hook: useGoogleWebMCP },
+  { name: 'use-webmcp-tool', hook: useGoogleWebMCP, executionState: 'none' },
+  {
+    name: 'usewebmcp / registration only',
+    hook: useWebMCPTool,
+    ours: true,
+    executionState: 'none',
+  },
+  {
+    name: 'usewebmcp / unsubscribed state',
+    ours: true,
+    executionState: 'unsubscribed',
+    hook: (config) => {
+      const [observation] = useState(() => createExecutionState());
+      const tool = useWebMCPTool({ ...config, middleware: [observation.aroundInvoke] });
+      return { ...tool, observation };
+    },
+  },
+  {
+    name: 'usewebmcp / passthrough',
+    ours: true,
+    executionState: 'none',
+    hook: (config) => useWebMCPTool({ ...config, middleware: [passThrough] }),
+  },
+  {
+    name: 'usewebmcp / OTel no-op',
+    ours: true,
+    executionState: 'none',
+    hook: (config) => useWebMCPTool({ ...config, middleware: [otel] }),
+  },
+  {
+    name: '@mcp-b/react-webmcp / registration only',
+    hook: useExtendedWebMCPTool,
+    ours: true,
+    executionState: 'none',
+  },
 ];
 const tasks = [];
 const channel = new MessageChannel();
@@ -146,7 +194,10 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
             control.registered !== false &&
             !control.state?.isExecuting
         ) &&
-        (!controls[0]?.state || controls[0].state.executionCount === executions);
+        (!controls[0]?.state || controls[0].state.executionCount === executions) &&
+        (!controls[0]?.observation ||
+          (!controls[0].observation.getSnapshot().isExecuting &&
+            controls[0].observation.getSnapshot().executionCount === executions));
       quiet = ready && previous === version ? quiet + 1 : 0;
     }
   };
@@ -176,7 +227,7 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
     }
     const metadata = await phase(() => update({ revision: 11, metadataRevision: 1 }), 11);
     check(metadata.registrations >= toolCount, 'Metadata changes must update every tool');
-    if (name === 'usewebmcp' || name === '@mcp-b/react-webmcp') {
+    if (library.ours) {
       check(
         metadata.registrations === toolCount,
         `${name}: metadata changes must register each tool exactly once`
@@ -203,10 +254,14 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
       await settle(11, value + 1);
       const end = Math.max(callbackEnd, lastRender, lastEffect);
       check(result.content[0].text === String(11 + value), 'Execution must use current props');
+      const callRenders = renders - previousRenders;
+      if (library.ours && library.executionState !== 'subscribed') {
+        check(callRenders === 0, `${name}: a call must not render an unsubscribed owner`);
+      }
       calls.push({
         ms: end - start,
         callbackMs: callbackEnd - start,
-        renders: controls[0].state ? renders - previousRenders : null,
+        renders: callRenders,
       });
     }
     root.unmount();
@@ -214,6 +269,7 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
     check((await context.getTools()).length === 0, 'Unmount must remove every tool');
     return {
       library: name,
+      executionState: library.executionState,
       toolCount,
       fields,
       schemaMode,

@@ -11,6 +11,7 @@ import type {
   ToolExecuteFunction as CoreToolExecuteFunction,
   WebMCPConfig as CoreWebMCPConfig,
   WebMCPReturn as CoreWebMCPReturn,
+  WebMCPToolReturn as CoreWebMCPToolReturn,
 } from 'usewebmcp';
 
 /** Infers MCP-B structured output from its JSON Schema. */
@@ -39,6 +40,10 @@ export type WebMCPReturn<
   TOutput extends JsonSchemaForInference | undefined = undefined,
   TInput extends ToolInputSchema = InputSchema,
 > = CoreWebMCPReturn<TInput, InferOutput<TOutput>>;
+export type WebMCPToolReturn<
+  TOutput extends JsonSchemaForInference | undefined = undefined,
+  TInput extends ToolInputSchema = InputSchema,
+> = CoreWebMCPToolReturn<TInput, InferOutput<TOutput>>;
 
 export type {
   BrowserMcpServer as ModelContextProtocol,

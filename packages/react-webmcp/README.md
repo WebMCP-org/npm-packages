@@ -57,6 +57,19 @@ and client hooks. Both share registration, validation, execution state, and canc
 [Performance comparison](https://docs.mcp-b.ai/packages/usewebmcp/overview#performance-comparison) ·
 [Feature matrix](https://docs.mcp-b.ai/packages/usewebmcp/overview#feature-comparison)
 
+## Optional execution state and middleware
+
+`useWebMCP` retains `state` and `reset()`. Use `useWebMCPTool` for registration without
+subscribing the owner to calls; `useToolExecutionState` can subscribe a status child instead.
+Both accept `middleware`, `binding`, and `checkBinding` from the
+[shared React contract](../usewebmcp/README.md#choose-where-execution-state-lives).
+
+Consent, tracing, and validation use the same framework-free runner with native WebMCP,
+the polyfill, and `BrowserMcpServer`. The SDK validates managed calls inside middleware,
+including input/output schema failures. The state observer counts successful protocol outcomes:
+an MCP error response now sets `state.error` instead of incrementing `executionCount`.
+Local `execute()` keeps raw result objects as data and skips agent formatting.
+
 ## Schemas and results
 
 - The hook calls your schema's converter and supplied validator, including async transforms. It ships no validator.
