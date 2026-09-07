@@ -29,8 +29,9 @@ const irreversibleHighWithPresence: ConsentMetadata = {
  * requests consent, fails presence MAX_PRESENCE_ATTEMPTS times, auto-denies
  * with reason 'presence-lockout', and waits for the request to resolve.
  *
- * Used by tests that need to trigger repeated lockouts (e.g. escalation)
- * without re-deriving the same request/fail/decide sequence each time.
+ * Shared by every test that needs to trigger a lockout cycle — escalation,
+ * the escalation cap, and anything else that would otherwise re-derive the
+ * same request/fail/decide sequence.
  */
 async function lockOutTool(
   broker: ConsentBroker,
@@ -649,45 +650,18 @@ describe('ConsentBroker', () => {
 
     it('escalates the cooldown duration on repeated lockouts for the same origin+tool pair', async () => {
       const broker = new ConsentBroker();
-
-      async function lockOutOnce() {
-        let capturedId = '';
-        const unsub = broker.subscribe((pending) => {
-          const entry = pending.find((r) => r.toolName === 'rollbackDeployment');
-          if (entry && capturedId === '') capturedId = entry.id;
-        });
-        const p = broker.request({
-          toolName: 'rollbackDeployment',
-          origin: 'https://app.example.com',
-          args: { force: true },
-          consent: irreversibleHighWithPresence,
-        });
-        for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
-          broker.recordPresenceFailure(capturedId);
-        }
-        broker.decide(capturedId, false, false, 'presence-lockout');
-        await p;
-        unsub();
-      }
-
-      await lockOutOnce();
-      const firstCooldown = broker.getCooldownRemaining(
-        'https://app.example.com',
-        'rollbackDeployment'
-      );
+      const origin = 'https://app.example.com';
+      const toolName = 'rollbackDeployment';
+    
+      await lockOutTool(broker, { origin, toolName });
+      const firstCooldown = broker.getCooldownRemaining(origin, toolName);
       expect(firstCooldown).toBeGreaterThan(0);
       expect(firstCooldown).toBeLessThanOrEqual(10_000);
-
-      // Let the first cooldown fully expire, then lock out again.
+    
       vi.advanceTimersByTime(10_001);
-      await lockOutOnce();
-      const secondCooldown = broker.getCooldownRemaining(
-        'https://app.example.com',
-        'rollbackDeployment'
-      );
-
-      // Second lockout should escalate to roughly 3x the base cooldown (30s),
-      // strictly longer than the first lockout's cooldown.
+      await lockOutTool(broker, { origin, toolName });
+      const secondCooldown = broker.getCooldownRemaining(origin, toolName);
+    
       expect(secondCooldown).toBeGreaterThan(firstCooldown);
       expect(secondCooldown).toBeLessThanOrEqual(30_000);
     });
