@@ -26,7 +26,7 @@ export interface McpToolAnnotations {
  * |------------------|--------------------------------------------|-----------|
  * | `readOnlyHint`   | `riskLevel === 'low' && reversible`        | Only pure reads are both low-risk *and* inherently reversible (nothing was written). A medium-risk reversible call still mutates state, so it is not read-only. |
  * | `destructiveHint`| `!reversible`                              | MCP defines "destructive" as an action that changes or deletes state in a way that cannot be undone. This maps cleanly to `reversible === false`. |
- * | `idempotentHint` | `reversible && riskLevel !== 'high'`       | High-risk calls (e.g. forced rollback) may be reversible in theory but should never be treated as safe to repeat blindly. All other reversible calls are safe to retry if needed. |
+ * | `idempotentHint` | `consent.idempotent ?? false`              | Idempotency is caller-declared. Reversible ≠ safe to repeat (e.g. increment + decrement); irreversible ≠ non-idempotent (e.g. archive). Omitted defaults to false. |
  *
  * This is intentionally a first-draft heuristic; callers that need finer
  * control can override individual fields after calling this function.
@@ -35,6 +35,6 @@ export function toMcpAnnotations(consent: ConsentMetadata): McpToolAnnotations {
   return {
     readOnlyHint: consent.riskLevel === 'low' && consent.reversible,
     destructiveHint: !consent.reversible,
-    idempotentHint: consent.reversible && consent.riskLevel !== 'high',
+    idempotentHint: consent.idempotent ?? false,
   };
 }
