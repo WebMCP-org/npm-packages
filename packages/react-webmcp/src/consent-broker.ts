@@ -52,6 +52,12 @@ const MAX_COOLDOWN_MS = 5 * 60_000;
  * time the pair gets locked out again. This exists specifically to stop an
  * automated caller from retrying an approval prompt indefinitely — the same
  * class of defense used against MFA-fatigue/push-bombing attacks.
+ *
+ * Once a served cooldown expires, {@link request} clears the pair's attempt
+ * count via {@link clearExpiredCooldown} so the next presence failure starts a
+ * fresh 3-strike window rather than instantly relocking — the escalation
+ * counter (`lockoutCount`) is preserved separately, so repeat offenders still
+ * face longer cooldowns on each subsequent lockout.
  */
 export class ConsentBroker {
   private pending = new Map<
@@ -132,22 +138,41 @@ export class ConsentBroker {
   }
 
   /**
+   * If the cooldown for this origin+tool key has expired, clears both the
+   * cooldown expiry and the accumulated presence-attempt count for that key,
+   * so the pair starts a fresh {@link MAX_PRESENCE_ATTEMPTS}-strike window.
+   *
+   * Deliberately does NOT clear {@link lockoutCount} — escalating backoff on
+   * a repeat offender is a separate, longer-lived penalty from the attempt
+   * counter reset.
+   *
+   * This is the only place that mutates cooldown/attempt state as a side
+   * effect of time passing; {@link getCooldownRemaining} stays a pure read so
+   * callers (e.g. UI countdowns) can call it freely without changing broker
+   * state.
+   */
+  private clearExpiredCooldown(key: string): void {
+    const until = this.cooldownUntil.get(key);
+    if (until !== undefined && Date.now() >= until) {
+      this.cooldownUntil.delete(key);
+      this.presenceAttempts.delete(key);
+    }
+  }
+
+  /**
    * Milliseconds remaining on an active cooldown for this origin+tool pair,
    * or 0 if not currently locked out. Useful for the card to render a
    * countdown.
+   *
+   * Pure read — does not mutate broker state, even once the cooldown has
+   * expired. Expired-cooldown cleanup happens explicitly in {@link request}
+   * via {@link clearExpiredCooldown}.
    */
   getCooldownRemaining(origin: string, toolName: string): number {
     const key = `${origin}::${toolName}`;
     const until = this.cooldownUntil.get(key);
     if (!until) return 0;
-    const remaining = Math.max(0, until - Date.now());
-    if (remaining === 0) {
-      // The lockout penalty was served. Start a new 3-strike window without
-      // clearing lockoutCount (escalation still applies on the next lockout).
-      this.cooldownUntil.delete(key);
-      this.presenceAttempts.delete(key);
-    }
-    return remaining;
+    return Math.max(0, until - Date.now());
   }
 
   /**
@@ -160,7 +185,9 @@ export class ConsentBroker {
    * If the tool+origin pair is on an active cooldown (see "Presence-failure
    * lockout" above), the promise resolves immediately with
    * `reason: 'rate-limited'` — no pending entry is created and no card is
-   * ever shown for this call.
+   * ever shown for this call. If a previous cooldown for this pair has since
+   * expired, it is cleared here (see {@link clearExpiredCooldown}) before the
+   * check runs, so a served penalty doesn't linger.
    *
    * Otherwise, the request is added to the pending queue, subscribers are
    * notified (so the consent card can render), and the promise waits for either
@@ -179,6 +206,10 @@ export class ConsentBroker {
       this.notifyDecision({ id: crypto.randomUUID(), ...input, createdAt: Date.now() }, decision);
       return decision;
     }
+
+    // Clear a served cooldown before checking it, so an expired penalty
+    // doesn't keep relocking the pair on its next failure.
+    this.clearExpiredCooldown(sessionKey);
 
     // Reject immediately, before showing a card, if this tool is on cooldown.
     // This is what stops a caller from dodging a lockout by making a brand

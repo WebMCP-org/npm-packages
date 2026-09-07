@@ -24,6 +24,38 @@ const irreversibleHighWithPresence: ConsentMetadata = {
   requireUserPresence: true,
 };
 
+/**
+ * Drives a full presence-failure lockout cycle for one origin+tool pair:
+ * requests consent, fails presence MAX_PRESENCE_ATTEMPTS times, auto-denies
+ * with reason 'presence-lockout', and waits for the request to resolve.
+ *
+ * Used by tests that need to trigger repeated lockouts (e.g. escalation)
+ * without re-deriving the same request/fail/decide sequence each time.
+ */
+async function lockOutTool(
+  broker: ConsentBroker,
+  overrides: { origin?: string; toolName?: string; consent?: ConsentMetadata } = {}
+): Promise<void> {
+  const origin = overrides.origin ?? 'https://app.example.com';
+  const toolName = overrides.toolName ?? 'rollbackDeployment';
+  const consent = overrides.consent ?? irreversibleHighWithPresence;
+
+  let capturedId = '';
+  const unsubscribe = broker.subscribe((pending) => {
+    const entry = pending.find((r) => r.toolName === toolName && r.origin === origin);
+    if (entry) capturedId = entry.id;
+  });
+
+  const pending = broker.request({ toolName, origin, args: { force: true }, consent });
+
+  for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
+    broker.recordPresenceFailure(capturedId);
+  }
+  broker.decide(capturedId, false, false, 'presence-lockout');
+  await pending;
+  unsubscribe();
+}
+
 describe('ConsentBroker', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -202,6 +234,63 @@ describe('ConsentBroker', () => {
     vi.advanceTimersByTime(30_000);
     await Promise.all([p1, p2, p3]);
     expect(ids).toHaveLength(0);
+  });
+
+  describe('pub/sub contract', () => {
+    it('subscribe stops receiving updates after unsubscribing', () => {
+      const broker = new ConsentBroker();
+      const snapshots: number[] = [];
+      const unsubscribe = broker.subscribe((pending) => snapshots.push(pending.length));
+
+      broker.request({
+        toolName: 'toolA',
+        origin: 'https://app.example.com',
+        args: {},
+        consent: reversibleLow,
+      });
+      expect(snapshots).toEqual([1]);
+
+      unsubscribe();
+
+      broker.request({
+        toolName: 'toolB',
+        origin: 'https://app.example.com',
+        args: {},
+        consent: reversibleLow,
+      });
+      // No new snapshot recorded after unsubscribing.
+      expect(snapshots).toEqual([1]);
+    });
+
+    it('subscribeDecision stops receiving events after unsubscribing', () => {
+      const broker = new ConsentBroker();
+      const reasons: string[] = [];
+      const unsubscribe = broker.subscribeDecision((event) => reasons.push(event.reason ?? 'unknown'));
+
+      broker.recordDecision(
+        { toolName: 'toolA', origin: 'https://app.example.com', args: {}, consent: reversibleLow },
+        { approved: true, reason: 'user' }
+      );
+      expect(reasons).toEqual(['user']);
+
+      unsubscribe();
+
+      broker.recordDecision(
+        { toolName: 'toolB', origin: 'https://app.example.com', args: {}, consent: reversibleLow },
+        { approved: true, reason: 'user' }
+      );
+      // No new event recorded after unsubscribing.
+      expect(reasons).toEqual(['user']);
+    });
+
+    it('decide is a no-op for an unknown/already-resolved request id', () => {
+      const broker = new ConsentBroker();
+      const reasons: string[] = [];
+      broker.subscribeDecision((event) => reasons.push(event.reason ?? 'unknown'));
+
+      expect(() => broker.decide('does-not-exist', true)).not.toThrow();
+      expect(reasons).toEqual([]);
+    });
   });
 
   describe('presence-failure lockout', () => {
@@ -396,6 +485,34 @@ describe('ConsentBroker', () => {
       expect(decision.reason).toBe('presence-lockout');
     });
 
+    it('cooldown is active as soon as recordPresenceFailure crosses the threshold, before decide() is called', async () => {
+      const broker = new ConsentBroker();
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
+      });
+
+      const p = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
+        broker.recordPresenceFailure(capturedId);
+      }
+
+      // decide() has not been called yet — the cooldown must already be
+      // active off the back of recordPresenceFailure alone.
+      expect(
+        broker.getCooldownRemaining('https://app.example.com', 'rollbackDeployment')
+      ).toBeGreaterThan(0);
+
+      broker.decide(capturedId, false, false, 'presence-lockout');
+      await p;
+    });
+
     it('recordPresenceFailure is a no-op for an unknown/already-resolved request id', () => {
       const broker = new ConsentBroker();
       const result = broker.recordPresenceFailure('does-not-exist');
@@ -404,6 +521,11 @@ describe('ConsentBroker', () => {
   });
 
   describe('cooldown / rate limiting', () => {
+    it('getCooldownRemaining returns 0 for a pair that has never been locked out', () => {
+      const broker = new ConsentBroker();
+      expect(broker.getCooldownRemaining('https://app.example.com', 'neverLockedOut')).toBe(0);
+    });
+
     it('a fresh request for a locked-out origin+tool pair is denied with reason=rate-limited and never enters the pending queue', async () => {
       const broker = new ConsentBroker();
       let capturedId = '';
@@ -568,6 +690,22 @@ describe('ConsentBroker', () => {
       // strictly longer than the first lockout's cooldown.
       expect(secondCooldown).toBeGreaterThan(firstCooldown);
       expect(secondCooldown).toBeLessThanOrEqual(30_000);
+    });
+
+    it('escalating cooldowns cap at MAX_COOLDOWN_MS (5 minutes) instead of growing unbounded', async () => {
+      const broker = new ConsentBroker();
+      const origin = 'https://app.example.com';
+      const toolName = 'rollbackDeployment';
+
+      // BASE_COOLDOWN_MS(10s) * 3^(escalation-1), capped at 5 minutes:
+      // 10s, 30s, 90s, 270s, then capped at 300s from the 5th lockout on.
+      const expectedCooldownsMs = [10_000, 30_000, 90_000, 270_000, 300_000, 300_000];
+
+      for (const expected of expectedCooldownsMs) {
+        await lockOutTool(broker, { origin, toolName });
+        expect(broker.getCooldownRemaining(origin, toolName)).toBe(expected);
+        vi.advanceTimersByTime(expected + 1);
+      }
     });
 
     it('a successful approval clears any prior lockout escalation for that origin+tool pair', async () => {
