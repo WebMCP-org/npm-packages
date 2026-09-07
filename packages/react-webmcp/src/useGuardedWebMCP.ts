@@ -27,6 +27,8 @@ export interface GuardedToolDef<Args, Result> {
    * on-page {@link ConsentBroker} approval flow.
    */
   consent: ConsentMetadata;
+  /** Forwarded to the underlying useWebMCP call. Defaults to true. */
+  enabled?: boolean;
   /** The real tool implementation, called only after consent is granted. */
   execute: (args: Args) => Promise<Result>;
 }
@@ -69,6 +71,7 @@ export function useGuardedWebMCP<Args, Result>(def: GuardedToolDef<Args, Result>
     description: def.description,
     ...(def.inputSchema && { inputSchema: def.inputSchema }),
     ...(def.consent && { annotations: toMcpAnnotations(def.consent) }),
+    ...(def.enabled !== undefined && { enabled: def.enabled }),
     execute: (async (args: Args) => {
       const needsApproval =
         typeof def.consent.requiresApproval === 'function'

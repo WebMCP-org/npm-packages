@@ -297,6 +297,29 @@ describe('useGuardedWebMCP', () => {
     expect(result?.structuredContent).toBeUndefined();
   });
 
+  it('does not register or invoke execute when enabled is false', async () => {
+    const execute = vi.fn().mockResolvedValue({ ok: true });
+    const broker = new ConsentBroker();
+
+    await renderHook(
+      () =>
+        useGuardedWebMCP({
+          name: 'disabledGuardedTool',
+          description: 'Should stay unregistered',
+          consent: lowRiskConsent,
+          enabled: false,
+          execute,
+        }),
+      { wrapper: provider(broker) }
+    );
+
+    const listed = await client.listTools();
+    expect(listed.tools.find((tool) => tool.name === 'disabledGuardedTool')).toBeUndefined();
+
+    await expect(client.callTool({ name: 'disabledGuardedTool', arguments: {} })).rejects.toThrow();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it('evaluates a requiresApproval predicate per invocation', async () => {
     const execute = vi.fn().mockResolvedValue({ ok: true });
     const broker = new ConsentBroker();
