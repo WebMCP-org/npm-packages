@@ -233,7 +233,7 @@ describe('useGuardedWebMCP', () => {
     expect(result).toMatchObject({ structuredContent: { success: true } });
   });
 
-  it('returns a structured denial when the broker denies', async () => {
+  it('returns an MCP error result when the broker denies', async () => {
     const execute = vi.fn().mockResolvedValue({ success: true });
     const broker = new ConsentBroker();
     const pendingIds = trackPendingIds(broker);
@@ -263,14 +263,13 @@ describe('useGuardedWebMCP', () => {
 
     expect(execute).not.toHaveBeenCalled();
     expect(result).toMatchObject({
-      structuredContent: {
-        success: false,
-        error: 'Action denied by user (user).',
-      },
+      isError: true,
+      content: [{ type: 'text', text: 'Error: Action denied by user (user).' }],
     });
+    expect(result?.structuredContent).toBeUndefined();
   });
 
-  it('returns a timeout denial when the broker auto-denies', async () => {
+  it('returns an MCP error result when the broker auto-denies on timeout', async () => {
     const execute = vi.fn().mockResolvedValue({ success: true });
     const broker = new ConsentBroker(50);
 
@@ -292,11 +291,10 @@ describe('useGuardedWebMCP', () => {
 
     expect(execute).not.toHaveBeenCalled();
     expect(result).toMatchObject({
-      structuredContent: {
-        success: false,
-        error: 'Action denied by user (timeout).',
-      },
+      isError: true,
+      content: [{ type: 'text', text: 'Error: Action denied by user (timeout).' }],
     });
+    expect(result?.structuredContent).toBeUndefined();
   });
 
   it('evaluates a requiresApproval predicate per invocation', async () => {

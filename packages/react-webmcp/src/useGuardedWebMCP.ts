@@ -47,8 +47,8 @@ export interface GuardedToolDef<Args, Result> {
  *    - `true` (or predicate returns `true`): suspends in `broker.request()`
  *      until the user resolves the consent card (or a 30-second timeout
  *      auto-denies).
- * 4. On denial returns `{ success: false, error: '…' }` rather than throwing,
- *    so the MCP client receives a structured tool-error response.
+ * 4. On denial throws so `useWebMCP` records an MCP error result
+ *    (`isError: true`) rather than a successful call with denial data.
  *
  * Must be rendered inside a {@link ConsentBrokerProvider}.
  *
@@ -102,7 +102,7 @@ export function useGuardedWebMCP<Args, Result>(def: GuardedToolDef<Args, Result>
       });
 
       if (!decision.approved) {
-        return { success: false, error: `Action denied by user (${decision.reason}).` };
+        throw new Error(`Action denied by user (${decision.reason}).`);
       }
       return def.execute(args);
     }) as any,
