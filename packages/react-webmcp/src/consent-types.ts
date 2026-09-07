@@ -37,6 +37,13 @@ export interface ConsentMetadata {
    * unsupported hardware. Recommended for irreversible, high-risk tools.
    */
   requireUserPresence?: boolean;
+  /**
+   * Whether calling this tool again with the same arguments is safe
+   * (no additional effect beyond the first call). Independent of
+   * `reversible` — declare explicitly, do not infer from risk level
+   * or reversibility. Defaults to false when omitted.
+   */
+  idempotent?: boolean;
 }
 
 /** The resolution of a pending consent prompt. */
