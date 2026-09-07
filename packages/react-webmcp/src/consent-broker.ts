@@ -44,8 +44,8 @@ const MAX_COOLDOWN_MS = 5 * 60_000;
  *
  * When a tool has `consent.requireUserPresence`, the card calls
  * {@link ConsentBroker.recordPresenceFailure} each time the WebAuthn ceremony
- * fails or is cancelled. After {@link MAX_PRESENCE_ATTEMPTS} failures on the
- * same pending request, the origin+tool pair enters a cooldown — further
+ * fails or is cancelled. After {@link MAX_PRESENCE_ATTEMPTS} failures for the
+ * same origin+tool pair (across requests), that pair enters a cooldown — further
  * calls to {@link ConsentBroker.request} for that pair are auto-denied with
  * `reason: 'rate-limited'` without ever creating a new pending card, and the
  * cooldown duration escalates (10s, 30s, 90s, ... capped at 5 minutes) each
@@ -71,7 +71,7 @@ export class ConsentBroker {
    */
   private approvedThisSession = new Set<string>();
 
-  /** Failed WebAuthn attempts for a given pending request id. */
+  /** Failed WebAuthn attempts, keyed by `${origin}::${toolName}` (not request id). */
   private presenceAttempts = new Map<string, number>();
   /** Cooldown expiry (ms epoch) per `"${origin}::${toolName}"` key. */
   private cooldownUntil = new Map<string, number>();
@@ -140,7 +140,14 @@ export class ConsentBroker {
     const key = `${origin}::${toolName}`;
     const until = this.cooldownUntil.get(key);
     if (!until) return 0;
-    return Math.max(0, until - Date.now());
+    const remaining = Math.max(0, until - Date.now());
+    if (remaining === 0) {
+      // The lockout penalty was served. Start a new 3-strike window without
+      // clearing lockoutCount (escalation still applies on the next lockout).
+      this.cooldownUntil.delete(key);
+      this.presenceAttempts.delete(key);
+    }
+    return remaining;
   }
 
   /**
@@ -193,7 +200,6 @@ export class ConsentBroker {
         if (this.pending.has(id)) {
           const timedOutEntry = this.pending.get(id)!;
           this.pending.delete(id);
-          this.presenceAttempts.delete(id);
           this.notify();
           const decision: ConsentDecision = { approved: false, reason: 'timeout' };
           this.notifyDecision(timedOutEntry, decision);
@@ -216,12 +222,14 @@ export class ConsentBroker {
     const entry = this.pending.get(id);
     if (!entry) return { attempts: 0, lockedOut: false };
 
-    const attempts = (this.presenceAttempts.get(id) ?? 0) + 1;
-    this.presenceAttempts.set(id, attempts);
+    const key = `${entry.origin}::${entry.toolName}`;
+    const attempts = (this.presenceAttempts.get(key) ?? 0) + 1;
+    this.presenceAttempts.set(key, attempts);
 
     const lockedOut = attempts >= MAX_PRESENCE_ATTEMPTS;
-    if (lockedOut) {
-      const key = `${entry.origin}::${entry.toolName}`;
+    // Escalate once when crossing the threshold, not on every extra failure
+    // while already locked out.
+    if (lockedOut && attempts === MAX_PRESENCE_ATTEMPTS) {
       const escalation = (this.lockoutCount.get(key) ?? 0) + 1;
       this.lockoutCount.set(key, escalation);
       const cooldownMs = Math.min(BASE_COOLDOWN_MS * 3 ** (escalation - 1), MAX_COOLDOWN_MS);
@@ -255,7 +263,6 @@ export class ConsentBroker {
     if (!entry) return;
 
     this.pending.delete(id);
-    this.presenceAttempts.delete(id);
     this.notify();
 
     const sessionKey = `${entry.origin}::${entry.toolName}`;
@@ -265,6 +272,7 @@ export class ConsentBroker {
       // permanent penalty.
       this.lockoutCount.delete(sessionKey);
       this.cooldownUntil.delete(sessionKey);
+      this.presenceAttempts.delete(sessionKey);
       if (rememberForSession && entry.consent.reversible) {
         this.approvedThisSession.add(sessionKey);
       }
