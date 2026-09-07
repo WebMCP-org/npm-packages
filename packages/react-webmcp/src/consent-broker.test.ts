@@ -228,6 +228,144 @@ describe('ConsentBroker', () => {
       expect(second).toEqual({ attempts: 2, lockedOut: false });
     });
 
+    it('accumulates presence failures across requests for the same origin+tool pair', async () => {
+      const broker = new ConsentBroker(5_000);
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0) capturedId = pending[0]!.id;
+      });
+
+      const first = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      expect(broker.recordPresenceFailure(capturedId)).toEqual({
+        attempts: 1,
+        lockedOut: false,
+      });
+      expect(broker.recordPresenceFailure(capturedId)).toEqual({
+        attempts: 2,
+        lockedOut: false,
+      });
+
+      vi.advanceTimersByTime(5_000);
+      await first;
+
+      const second = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      expect(broker.recordPresenceFailure(capturedId)).toEqual({
+        attempts: 3,
+        lockedOut: true,
+      });
+
+      broker.decide(capturedId, false, false, 'presence-lockout');
+      await second;
+    });
+
+    it("a successful approval on a different origin+tool pair does not reset this pair's counter", async () => {
+      const broker = new ConsentBroker();
+      const pendingByTool = new Map<string, string>();
+      broker.subscribe((pending) => {
+        pendingByTool.clear();
+        for (const request of pending) {
+          pendingByTool.set(request.toolName, request.id);
+        }
+      });
+
+      const rollback = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+      const health = broker.request({
+        toolName: 'getServiceHealth',
+        origin: 'https://app.example.com',
+        args: {},
+        consent: reversibleLow,
+      });
+
+      const rollbackId = pendingByTool.get('rollbackDeployment')!;
+      const healthId = pendingByTool.get('getServiceHealth')!;
+
+      expect(broker.recordPresenceFailure(rollbackId)).toEqual({
+        attempts: 1,
+        lockedOut: false,
+      });
+      expect(broker.recordPresenceFailure(rollbackId)).toEqual({
+        attempts: 2,
+        lockedOut: false,
+      });
+
+      broker.decide(healthId, true);
+      await health;
+
+      broker.decide(rollbackId, false);
+      await rollback;
+
+      let nextId = '';
+      broker.subscribe((pending) => {
+        const entry = pending.find((request) => request.toolName === 'rollbackDeployment');
+        if (entry) nextId = entry.id;
+      });
+
+      const next = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      expect(broker.recordPresenceFailure(nextId)).toEqual({
+        attempts: 3,
+        lockedOut: true,
+      });
+      broker.decide(nextId, false, false, 'presence-lockout');
+      await next;
+    });
+
+    it('a successful approval on this origin+tool pair resets its presence-failure counter', async () => {
+      const broker = new ConsentBroker();
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0) capturedId = pending[0]!.id;
+      });
+
+      const first = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      expect(broker.recordPresenceFailure(capturedId).attempts).toBe(1);
+      expect(broker.recordPresenceFailure(capturedId).attempts).toBe(2);
+      broker.decide(capturedId, true);
+      await first;
+
+      const second = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      expect(broker.recordPresenceFailure(capturedId)).toEqual({
+        attempts: 1,
+        lockedOut: false,
+      });
+      broker.decide(capturedId, false);
+      await second;
+    });
+
     it('locks out at MAX_PRESENCE_ATTEMPTS and the card can auto-deny with reason=presence-lockout', async () => {
       const broker = new ConsentBroker();
       let capturedId = '';
