@@ -54,6 +54,41 @@ initializeWebMCPPolyfill();
 
 Install `@mcp-b/webmcp-polyfill` separately when using this fallback.
 
+## Performance
+
+The default hook adds **zero owner re-renders per tool call**.
+
+| Hook          |     Gzip | Mount registrations | Metadata-edit renders | Renders per call |
+| ------------- | -------: | ------------------: | --------------------: | ---------------: |
+| usewebmcp     |  3.58 kB |                   1 |                     1 |                0 |
+| MCP-B adapter |  3.96 kB |                   1 |                     1 |                0 |
+| MCP Cat 1.1.0 | 24.21 kB |                   2 |                     1 |              1–2 |
+| Google 0.2.0  |  0.69 kB |                   1 |                     2 |                0 |
+
+One tool, one-field schema, five production trials. Renders count the registering component;
+metadata edits include the requested parent update. MCP Cat includes execution state by default.
+React is excluded from bundle sizes. [Measurements](https://github.com/WebMCP-org/npm-packages/blob/052f451e9353ea112093973b7e14a16f7715e7c7/benchmarks/react-hooks/PRODUCTION.md) ·
+[Bundle sizes](https://github.com/WebMCP-org/npm-packages/blob/052f451e9353ea112093973b7e14a16f7715e7c7/benchmarks/react-hooks/bundle-results.json).
+
+With our state plugin, subscribing a status child measured **0 owner + 2 child renders** per call;
+subscribing the owner measured 2 owner renders. Recording state without a subscriber measured 0.
+
+## Feature comparison
+
+| Feature                    | usewebmcp       | MCP-B adapter   | MCP Cat         | Google          |
+| -------------------------- | --------------- | --------------- | --------------- | --------------- |
+| Supplied schema validation | Standard Schema | Standard Schema | Zod             | Manual          |
+| Execution state            | Opt-in plugin   | Opt-in plugin   | Built in        | None            |
+| Local execute()            | Yes             | Yes             | Yes             | No              |
+| Handler AbortSignal        | Yes             | Yes             | Yes             | Not forwarded   |
+| Consent/tracing plugin API | Yes             | Yes             | No built-in API | No built-in API |
+| MCP success formatting     | Manual          | Automatic       | Manual          | Automatic       |
+
+All four accept JSON Schema metadata. MCP Cat expects handlers to return MCP results;
+Google formats raw results. Versions and sources: [MCP Cat](https://github.com/agentcathq/webmcp-react),
+[Google](https://github.com/GoogleChromeLabs/use-webmcp-tool), and the
+[comparison harness](https://github.com/WebMCP-org/npm-packages/blob/052f451e9353ea112093973b7e14a16f7715e7c7/benchmarks/react-hooks/README.md).
+
 ## Validate input with your schema library
 
 Pass a schema with Standard JSON Schema conversion and Standard Schema validation.

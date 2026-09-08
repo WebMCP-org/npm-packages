@@ -53,6 +53,13 @@ and plain JSON Schema also work.
 Native WebMCP and the standalone polyfill do not advertise MCP `outputSchema` metadata.
 Use the MCP-B runtime to expose it to MCP clients.
 
+## Performance
+
+The tool hook measured **3.96 kB gzip**, one mount registration, and zero owner re-renders per
+call without an execution-state subscription. React is excluded. See the
+[Google/MCP Cat comparison](../usewebmcp/README.md#performance) and
+[recorded measurements](https://github.com/WebMCP-org/npm-packages/blob/052f451e9353ea112093973b7e14a16f7715e7c7/benchmarks/react-hooks/PRODUCTION.md).
+
 ## Plugins and optional state
 
 `useWebMCP` handles registration and local execution. Attach named plugins with

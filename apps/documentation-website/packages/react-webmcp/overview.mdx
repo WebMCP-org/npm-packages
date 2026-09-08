@@ -30,6 +30,13 @@ Agent failures become MCP error responses; local failures and cancellation rejec
 Execution state is opt-in. Attach an `executionState()` plugin and subscribe with
 [`useToolExecutionState()`](/packages/usewebmcp/reference#hooks) where results are displayed.
 
+## Performance
+
+The tool hook measured **3.96 kB gzip**, one mount registration, and zero owner re-renders per
+call without an execution-state subscription. React is excluded. See the
+[Google/MCP Cat comparison](/packages/usewebmcp/overview#performance) and
+[recorded measurements](https://github.com/WebMCP-org/npm-packages/blob/052f451e9353ea112093973b7e14a16f7715e7c7/benchmarks/react-hooks/PRODUCTION.md).
+
 ## Runtime requirements
 
 | Surface                       | Runtime                                                                         |
