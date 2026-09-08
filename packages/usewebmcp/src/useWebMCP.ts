@@ -1,16 +1,14 @@
 'use client';
 
+import { createInvocationCallback, invoke, unwrapInvocation } from '@mcp-b/webmcp-plugins';
 import type { DependencyList } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { WebMCP } from 'webmcp-types';
 import { toInputSchema, validateInput } from './schema.js';
-import type { ToolExecutionState, ToolInputSchema, WebMCPConfig, WebMCPReturn } from './types.js';
+import type { ToolInputSchema, WebMCPConfig, WebMCPReturn } from './types.js';
 
-const INITIAL_STATE = { isExecuting: false, lastResult: null, error: null, executionCount: 0 };
 const INITIAL_REGISTRATION = { isSupported: false, registrationError: null };
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
-
-type ExecutionOutcome<T> = { result: T; output: unknown } | { error: Error; output?: unknown };
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
@@ -25,23 +23,22 @@ function canRegister(context: unknown): context is Pick<WebMCP.ModelContext, 're
   );
 }
 
-/** Registers a React-owned tool using the upstream WebMCP contract. */
+/** Register a React-owned tool without subscribing its owner to invocation state. */
 export function useWebMCP<const TInputSchema extends ToolInputSchema = object, TResult = unknown>(
   config: WebMCPConfig<TInputSchema, TResult>,
   deps?: DependencyList
 ): WebMCPReturn<TInputSchema, TResult> {
-  const [state, setState] = useState<ToolExecutionState<TResult>>(INITIAL_STATE);
   const [registration, setRegistration] =
     useState<Pick<WebMCPReturn, 'isSupported' | 'registrationError'>>(INITIAL_REGISTRATION);
-  const pendingExecutions = useRef(0);
+  const instanceId = useRef<string | null>(null);
+  if (instanceId.current === null) instanceId.current = crypto.randomUUID();
   const schema = useMemo(() => {
     try {
       const value =
         config.inputSchema === undefined ? undefined : toInputSchema(config.inputSchema);
       const key = JSON.stringify(value);
-      if (value !== undefined && key === undefined) {
+      if (value !== undefined && key === undefined)
         throw new TypeError('inputSchema must serialize to JSON');
-      }
       return { value, key };
     } catch (error) {
       return { error: toError(error) };
@@ -51,6 +48,10 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
     execute: _execute,
     formatOutput: _formatOutput,
     formatError: _formatError,
+    isErrorResponse: _isErrorResponse,
+    plugins: _plugins,
+    binding: _binding,
+    checkBinding: _checkBinding,
     inputSchema: _inputSchema,
     enabled = true,
     exposedTo,
@@ -68,102 +69,70 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
     preparationError = toError(error);
     descriptorKey = preparationError.message;
   }
-  const committed = useRef({ config, descriptor, preparationError });
+  const registrationInputs = [
+    descriptorKey,
+    schema.key,
+    preparationError?.message,
+    enabled,
+    ...(deps ?? []),
+  ];
+  const committed = useRef({
+    config,
+    descriptor,
+    preparationError,
+    registrationInputs,
+    generation: 0,
+  });
 
   // Publish only committed renders, before external calls from later layout effects.
   useIsomorphicLayoutEffect(() => {
-    committed.current = { config, descriptor, preparationError };
+    const previous = committed.current;
+    const changed =
+      registrationInputs.length !== previous.registrationInputs.length ||
+      registrationInputs.some(
+        (value, index) => !Object.is(value, previous.registrationInputs[index])
+      );
+    committed.current = {
+      config,
+      descriptor,
+      preparationError,
+      registrationInputs,
+      generation: previous.generation + Number(changed),
+    };
   });
 
-  const run = useCallback(
-    async (
-      input: unknown,
-      options: WebMCP.ToolExecuteCallbackOptions = { signal: new AbortController().signal },
-      forAgent = false
-    ): Promise<ExecutionOutcome<TResult>> => {
-      const executionConfig = committed.current.config;
-      const { signal } = options;
-      pendingExecutions.current += 1;
-      setState((previous) =>
-        previous.isExecuting && previous.error === null
-          ? previous
-          : { ...previous, isExecuting: true, error: null }
-      );
-      let onAbort: (() => void) | undefined;
-      let outcome: ExecutionOutcome<TResult>;
-      try {
-        signal.throwIfAborted();
-        const operation = async (): Promise<ExecutionOutcome<TResult>> => {
-          try {
-            const validated = await validateInput(executionConfig.inputSchema, input);
-            signal.throwIfAborted();
-            const result = await executionConfig.execute(validated, options);
-            signal.throwIfAborted();
-            if (result instanceof Error) throw result;
-            const output =
-              forAgent && executionConfig.formatOutput
-                ? await executionConfig.formatOutput(result)
-                : result;
-            signal.throwIfAborted();
-            return { result, output };
-          } catch (cause) {
-            signal.throwIfAborted();
-            const error = toError(cause);
-            if (!forAgent || !executionConfig.formatError) return { error };
-            const output = await executionConfig.formatError(error);
-            signal.throwIfAborted();
-            return { error, output };
+  const getInvocationConfig = useCallback(
+    (registrationSignal?: AbortSignal, registrationGeneration?: number) => {
+      const captured = committed.current.config;
+      return {
+        tool: { instanceId: instanceId.current!, name: captured.name },
+        ...(registrationSignal && { signal: registrationSignal }),
+        input: { validate: (value: unknown) => validateInput(captured.inputSchema, value) },
+        execute: captured.execute,
+        ...(captured.plugins && { plugins: captured.plugins }),
+        ...(captured.binding && { binding: captured.binding }),
+        checkBinding: () => {
+          registrationSignal?.throwIfAborted();
+          if (
+            registrationGeneration !== undefined &&
+            registrationGeneration !== committed.current.generation
+          ) {
+            throw new Error('Tool registration changed before execution');
           }
-        };
-        outcome = await Promise.race([
-          new Promise<never>((_, reject) => {
-            onAbort = () => reject(signal.reason);
-            signal.addEventListener('abort', onAbort, { once: true });
-          }),
-          operation(),
-        ]);
-      } catch (error) {
-        outcome = { error: toError(error) };
-      } finally {
-        if (onAbort) signal.removeEventListener('abort', onAbort);
-        pendingExecutions.current -= 1;
-      }
-      const isExecuting = pendingExecutions.current > 0;
-      setState((previous) =>
-        'error' in outcome
-          ? { ...previous, isExecuting, error: outcome.error }
-          : {
-              isExecuting,
-              lastResult: outcome.result,
-              error: null,
-              executionCount: previous.executionCount + 1,
-            }
-      );
-      return outcome;
+          committed.current.config.checkBinding?.();
+        },
+        ...(captured.formatOutput && { formatOutput: captured.formatOutput }),
+        ...(captured.formatError && { formatError: captured.formatError }),
+        ...(captured.isErrorResponse && { isErrorResponse: captured.isErrorResponse }),
+      };
     },
     []
   );
 
   const execute = useCallback<WebMCPReturn<TInputSchema, TResult>['execute']>(
-    async (input, options) => {
-      const outcome = await run(input, options);
-      if ('error' in outcome) throw outcome.error;
-      return outcome.result;
-    },
-    [run]
+    (input, options) => unwrapInvocation(invoke(getInvocationConfig(), input, options)),
+    [getInvocationConfig]
   );
-
-  const reset = useCallback(() => {
-    const isExecuting = pendingExecutions.current > 0;
-    setState((previous) =>
-      previous.isExecuting === isExecuting &&
-      previous.lastResult === null &&
-      previous.error === null &&
-      previous.executionCount === 0
-        ? previous
-        : { ...INITIAL_STATE, isExecuting }
-    );
-  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -172,7 +141,12 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
       const context =
         document.modelContext ?? ('modelContext' in navigator ? navigator.modelContext : undefined);
       const isSupported = canRegister(context);
-      const { config: current, descriptor: tool, preparationError: error } = committed.current;
+      const {
+        config: current,
+        descriptor: tool,
+        preparationError: error,
+        generation,
+      } = committed.current;
       setRegistration((previous) =>
         previous.isSupported === isSupported && previous.registrationError === (error ?? null)
           ? previous
@@ -183,20 +157,15 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
       const failed = (cause: unknown) => {
         if (controller.signal.aborted) return;
         controller.abort();
-        setRegistration({
-          isSupported: true,
-          registrationError: toError(cause),
-        });
+        setRegistration({ isSupported: true, registrationError: toError(cause) });
       };
       try {
         const registered = context.registerTool(
           {
             ...tool,
-            execute: async (input, options) => {
-              const outcome = await run(input, options, true);
-              if ('output' in outcome) return outcome.output;
-              throw outcome.error;
-            },
+            execute: createInvocationCallback(() =>
+              getInvocationConfig(controller.signal, generation)
+            ),
           },
           { signal: controller.signal, ...(current.exposedTo && { exposedTo: current.exposedTo }) }
         );
@@ -217,9 +186,8 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
       clearInterval(timer);
       controller.abort();
     };
-    // Descriptor contents avoid churn from inline schemas; deps can explicitly refresh registration.
     // oxlint-disable-next-line react-doctor/exhaustive-deps -- Metadata is compared by value and callbacks are read after commit.
-  }, [descriptorKey, schema.key, preparationError?.message, enabled, ...(deps ?? [])]);
+  }, registrationInputs);
 
-  return { state, ...registration, execute, reset };
+  return { ...registration, execute };
 }

@@ -13,24 +13,47 @@ const aliases = {
   usewebmcp: resolve(root, 'packages/usewebmcp/dist/index.js'),
   '@mcp-b/react-webmcp': resolve(root, 'packages/react-webmcp/dist/index.js'),
 };
-const libraries = ['usewebmcp', '@mcp-b/react-webmcp', 'webmcp-react', 'use-webmcp-tool'];
+const libraries = ['usewebmcp', '@mcp-b/react-webmcp', 'webmcp-react', 'use-webmcp-tool'].map(
+  (library) => ({
+    library,
+    exportNames: [library === 'webmcp-react' ? 'useMcpTool' : 'useWebMCP'],
+  })
+);
+libraries.push(
+  ...Object.entries({
+    '': ['invoke'],
+    'standard-schema': ['standardSchema'],
+    'execution-state': ['executionState'],
+    consent: ['ConsentBroker', 'consent'],
+    otel: ['otel'],
+  }).map(([subpath, exportNames]) => ({
+    library: '@mcp-b/webmcp-plugins',
+    subpath,
+    exportNames,
+  }))
+);
 const external = (id) => /^(react|react-dom)(\/|$)/.test(id);
 const config = { target: 'es2022', format: 'es', minifier: 'oxc', gzipLevel: 9 };
 const installedDependencies = json(resolve(directory, 'package.json')).devDependencies;
 for (const [name, expected] of Object.entries(installedDependencies)) {
   assert.equal(json(resolve(directory, 'node_modules', name, 'package.json')).version, expected);
 }
+const checkOnly = process.argv.includes('--check');
 const samples = [];
-for (const library of libraries) {
+for (const { library, subpath, exportNames } of libraries) {
+  const moduleName = subpath ? `${library}/${subpath}` : library;
   const packageDirectory = aliases[library]
     ? resolve(dirname(aliases[library]), '..')
-    : resolve(directory, 'node_modules', library);
+    : library === '@mcp-b/webmcp-plugins'
+      ? resolve(root, 'packages/webmcp-plugins')
+      : resolve(directory, 'node_modules', library);
   const manifest = json(resolve(packageDirectory, 'package.json'));
+  const exported = manifest.exports[subpath ? `./${subpath}` : '.'];
+  if (library === '@mcp-b/webmcp-plugins')
+    aliases[moduleName] = resolve(packageDirectory, exported.import);
   const entry = realpathSync(
-    aliases[library] ??
-      resolve(packageDirectory, manifest.exports['.'].import ?? manifest.exports['.'].default)
+    aliases[moduleName] ?? resolve(packageDirectory, exported.import ?? exported.default)
   );
-  const exportName = library === 'webmcp-react' ? 'useMcpTool' : 'useWebMCP';
   const outputs = [];
   for (const minify of [false, config.minifier]) {
     const virtualEntry = resolve(directory, '__bundle_entry__.js');
@@ -39,13 +62,20 @@ for (const library of libraries) {
       root: directory,
       mode: 'production',
       logLevel: 'error',
-      resolve: { alias: aliases },
+      resolve: {
+        alias: Object.entries(aliases).map(([find, replacement]) => ({
+          find: new RegExp(`^${find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+          replacement,
+        })),
+      },
       plugins: [
         {
           name: 'hook-entry',
           resolveId: (id) => (id === virtualEntry ? virtualEntry : null),
           load: (id) =>
-            id === virtualEntry ? `export { ${exportName} } from '${library}';` : null,
+            id === virtualEntry
+              ? `export { ${exportNames.join(', ')} } from '${moduleName}';`
+              : null,
         },
       ],
       build: {
@@ -65,28 +95,42 @@ for (const library of libraries) {
     assert.equal(result.output.length, 1, `${library}: expected one JavaScript bundle`);
     const output = result.output[0];
     assert.equal(output.type, 'chunk');
-    assert.deepEqual(output.exports, [exportName]);
+    assert.deepEqual(output.exports.toSorted(), exportNames.toSorted());
     assert(output.moduleIds.includes(entry), `${library}: expected the ESM entry`);
     assert(!output.moduleIds.some((id) => /\/node_modules\/(react|react-dom)\//.test(id)));
     assert(output.imports.every(external), `${library}: unexpected external dependencies`);
     assert.equal(output.dynamicImports.length, 0);
+    if (library === 'usewebmcp' || (library === '@mcp-b/webmcp-plugins' && subpath !== 'otel')) {
+      assert(
+        !output.moduleIds.some((id) => /(?:opentelemetry|modelcontextprotocol)/.test(id)),
+        `${moduleName}: optional SDK leaked into base`
+      );
+      assert(
+        !output.code.includes('initializeWebMCPPolyfill'),
+        `${moduleName}: fallback initializer leaked into base`
+      );
+    }
     outputs.push(output);
   }
   samples.push({
     library,
+    ...(subpath && { subpath }),
     version: manifest.version,
-    exportName,
-    entry: manifest.exports['.'].import ?? manifest.exports['.'].default,
+    exportNames,
+    entry: exported.import ?? exported.default,
     rawBytes: Buffer.byteLength(outputs[0].code),
     minifiedBytes: Buffer.byteLength(outputs[1].code),
     gzipBytes: gzipSync(outputs[1].code, { level: config.gzipLevel }).byteLength,
     externalImports: outputs[1].imports,
   });
 }
-assert.equal(samples.length, 4);
+assert.equal(samples.length, libraries.length);
 const report = {
   recordedAt: new Date().toISOString(),
   sourceCommit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+  sourceDirty: Boolean(
+    execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim()
+  ),
   platform: `${process.platform}/${process.arch}`,
   node: process.version,
   bundler: {
@@ -100,13 +144,15 @@ const report = {
   },
   installedDependencies,
   scope:
-    'One tool-hook export; React excluded; built-in dependencies included; no app validator or runtime setup.',
+    'One hook or plugin entry (consent includes its broker); React excluded; built-in dependencies included; no app validator or runtime setup.',
   samples,
 };
-writeFileSync(resolve(directory, 'bundle-results.json'), `${JSON.stringify(report, null, 2)}\n`);
+if (!checkOnly)
+  writeFileSync(resolve(directory, 'bundle-results.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.table(
-  samples.map(({ library, rawBytes, minifiedBytes, gzipBytes }) => ({
+  samples.map(({ library, exportNames, rawBytes, minifiedBytes, gzipBytes }) => ({
     library,
+    exportNames,
     rawBytes,
     minifiedBytes,
     gzipBytes,

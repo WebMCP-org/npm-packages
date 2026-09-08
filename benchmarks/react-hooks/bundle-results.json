@@ -1,6 +1,7 @@
 {
-  "recordedAt": "2026-09-06T02:44:03.887Z",
-  "sourceCommit": "e4bc3510295d19fdd8653b47a9694b0bfe8c8819",
+  "recordedAt": "2026-09-08T01:10:06.372Z",
+  "sourceCommit": "dcd3748a4c0827824bd59e33c30d838d4de4a90f",
+  "sourceDirty": false,
   "platform": "darwin/arm64",
   "node": "v22.23.2",
   "bundler": {
@@ -22,32 +23,32 @@
     "webmcp-react": "1.1.0",
     "zod": "4.4.3"
   },
-  "scope": "One tool-hook export; React excluded; built-in dependencies included; no app validator or runtime setup.",
+  "scope": "One hook or plugin entry (consent includes its broker); React excluded; built-in dependencies included; no app validator or runtime setup.",
   "samples": [
     {
       "library": "usewebmcp",
       "version": "5.1.0",
-      "exportName": "useWebMCP",
+      "exportNames": ["useWebMCP"],
       "entry": "./dist/index.js",
-      "rawBytes": 5594,
-      "minifiedBytes": 4226,
-      "gzipBytes": 1654,
+      "rawBytes": 16760,
+      "minifiedBytes": 9633,
+      "gzipBytes": 3575,
       "externalImports": ["react"]
     },
     {
       "library": "@mcp-b/react-webmcp",
       "version": "5.1.0",
-      "exportName": "useWebMCP",
+      "exportNames": ["useWebMCP"],
       "entry": "./dist/index.js",
-      "rawBytes": 7812,
-      "minifiedBytes": 5442,
-      "gzipBytes": 2068,
+      "rawBytes": 19113,
+      "minifiedBytes": 10964,
+      "gzipBytes": 3959,
       "externalImports": ["react", "react/jsx-runtime"]
     },
     {
       "library": "webmcp-react",
       "version": "1.1.0",
-      "exportName": "useMcpTool",
+      "exportNames": ["useMcpTool"],
       "entry": "./dist/index.js",
       "rawBytes": 179387,
       "minifiedBytes": 96847,
@@ -57,12 +58,66 @@
     {
       "library": "use-webmcp-tool",
       "version": "0.2.0",
-      "exportName": "useWebMCP",
+      "exportNames": ["useWebMCP"],
       "entry": "./useWebMCP.js",
       "rawBytes": 3753,
       "minifiedBytes": 1569,
       "gzipBytes": 689,
       "externalImports": ["react"]
+    },
+    {
+      "library": "@mcp-b/webmcp-plugins",
+      "version": "5.1.0",
+      "exportNames": ["invoke"],
+      "entry": "./dist/index.js",
+      "rawBytes": 10347,
+      "minifiedBytes": 5383,
+      "gzipBytes": 2160,
+      "externalImports": []
+    },
+    {
+      "library": "@mcp-b/webmcp-plugins",
+      "subpath": "standard-schema",
+      "version": "5.1.0",
+      "exportNames": ["standardSchema"],
+      "entry": "./dist/standard-schema.js",
+      "rawBytes": 1667,
+      "minifiedBytes": 1027,
+      "gzipBytes": 468,
+      "externalImports": []
+    },
+    {
+      "library": "@mcp-b/webmcp-plugins",
+      "subpath": "execution-state",
+      "version": "5.1.0",
+      "exportNames": ["executionState"],
+      "entry": "./dist/execution-state.js",
+      "rawBytes": 2261,
+      "minifiedBytes": 984,
+      "gzipBytes": 518,
+      "externalImports": []
+    },
+    {
+      "library": "@mcp-b/webmcp-plugins",
+      "subpath": "consent",
+      "version": "5.1.0",
+      "exportNames": ["ConsentBroker", "consent"],
+      "entry": "./dist/consent.js",
+      "rawBytes": 6317,
+      "minifiedBytes": 3660,
+      "gzipBytes": 1520,
+      "externalImports": []
+    },
+    {
+      "library": "@mcp-b/webmcp-plugins",
+      "subpath": "otel",
+      "version": "5.1.0",
+      "exportNames": ["otel"],
+      "entry": "./dist/otel.js",
+      "rawBytes": 30598,
+      "minifiedBytes": 9144,
+      "gzipBytes": 3400,
+      "externalImports": []
     }
   ]
 }

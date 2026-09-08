@@ -214,16 +214,17 @@ Any website running `@mcp-b/global` becomes callable from your desktop AI agent.
 
 ## Which Package?
 
-| I want to…                        | Package                                                                        |
-| --------------------------------- | ------------------------------------------------------------------------------ |
-| Add tools to my site (simplest)   | [`@mcp-b/global`](./packages/global)                                           |
-| Just the polyfill, no MCP bridge  | [`@mcp-b/webmcp-polyfill`](./packages/webmcp-polyfill)                         |
-| Register browser tools from React | [`usewebmcp`](./packages/usewebmcp)                                            |
-| React tools with MCP extensions   | [`@mcp-b/react-webmcp`](./packages/react-webmcp)                               |
-| Add WebMCP from an extension      | [`@mcp-b/webmcp-extension`](./packages/webmcp-extension)                       |
-| Forward tools to local AI agents  | [`@mcp-b/webmcp-local-relay`](./packages/webmcp-local-relay)                   |
-| Control Chrome from an AI agent   | [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) |
-| Just the TypeScript types         | [`@mcp-b/webmcp-types`](./packages/webmcp-types)                               |
+| I want to…                          | Package                                                                        |
+| ----------------------------------- | ------------------------------------------------------------------------------ |
+| Add tools to my site (simplest)     | [`@mcp-b/global`](./packages/global)                                           |
+| Just the polyfill, no MCP bridge    | [`@mcp-b/webmcp-polyfill`](./packages/webmcp-polyfill)                         |
+| Add validation, consent, or tracing | [`@mcp-b/webmcp-plugins`](./packages/webmcp-plugins)                           |
+| Register browser tools from React   | [`usewebmcp`](./packages/usewebmcp)                                            |
+| React tools with MCP extensions     | [`@mcp-b/react-webmcp`](./packages/react-webmcp)                               |
+| Add WebMCP from an extension        | [`@mcp-b/webmcp-extension`](./packages/webmcp-extension)                       |
+| Forward tools to local AI agents    | [`@mcp-b/webmcp-local-relay`](./packages/webmcp-local-relay)                   |
+| Control Chrome from an AI agent     | [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) |
+| Just the TypeScript types           | [`@mcp-b/webmcp-types`](./packages/webmcp-types)                               |
 
 Chrome DevTools integration now lives entirely upstream; its WebMCP changes have all landed there.
 
@@ -240,6 +241,9 @@ pnpm add @mcp-b/webmcp-polyfill
 
 # TypeScript definitions (dev dependency)
 pnpm add -D @mcp-b/webmcp-types
+
+# Shared invocation plugins (does not install a browser runtime)
+pnpm add @mcp-b/webmcp-plugins
 
 # React hooks for full runtime
 pnpm add @mcp-b/react-webmcp
@@ -267,6 +271,10 @@ pnpm add @mcp-b/smart-dom-reader
 | [@mcp-b/webmcp-types](./packages/webmcp-types)       | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-types)](https://www.npmjs.com/package/@mcp-b/webmcp-types)       | TypeScript definitions for the WebMCP core API                       |
 | [@mcp-b/global](./packages/global)                   | [![npm](https://img.shields.io/npm/v/@mcp-b/global)](https://www.npmjs.com/package/@mcp-b/global)                   | Full runtime — polyfill + MCP bridge (prompts, resources, transport) |
 | [@mcp-b/webmcp-ts-sdk](./packages/webmcp-ts-sdk)     | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)     | Browser-adapted MCP TypeScript SDK with dynamic tool registration    |
+
+[`@mcp-b/webmcp-plugins`](./packages/webmcp-plugins) provides framework-independent validation,
+consent, execution state, and tracing. React hooks and the MCP bridge share its runner; the
+polyfill remains a separate browser fallback.
 
 ### Transports & Composition
 
@@ -323,20 +331,22 @@ pnpm add @mcp-b/smart-dom-reader
    (extension, tab)          (Claude Desktop, Cursor)
 ```
 
-### Dependency Graph
+### Dependency graph
 
+```text
+webmcp-types                  Upstream browser contracts
+@mcp-b/webmcp-types            MCP-B extensions and compatibility
+@mcp-b/webmcp-polyfill         Browser fallback and compatibility helpers
+@mcp-b/webmcp-plugins          Invocation runner and optional plugins
+  ├── usewebmcp               React registration and explicit state subscription
+  └── webmcp-ts-sdk           MCP bridge; also uses polyfill compatibility helpers
+      ├── global              Runtime initialization and transports
+      ├── mcp-iframe          Iframe element and transports
+      └── react-webmcp        MCP React integration; also uses usewebmcp
 ```
-webmcp-types          (canonical type definitions)
-└── webmcp-polyfill   (canonical runtime polyfill)
-    ├── webmcp-ts-sdk (TypeScript SDK adapter)
-    │   ├── global    (full runtime; also uses transports)
-    │   ├── mcp-iframe (iframe element; also uses transports)
-    │   └── react-webmcp (also uses usewebmcp; pair with global at app level)
-    └── usewebmcp     (React hooks for strict core)
 
-transports            (browser transports shared by integrations)
-└── webmcp-extension  (MV3 template and isolated content-script client)
-```
+`useWebMCP` registers tools without implicit execution state. Add an `executionState()` plugin
+and subscribe through `useToolExecutionState()` where the UI needs progress or results.
 
 Standalone packages: `smart-dom-reader`, `webmcp-local-relay`.
 

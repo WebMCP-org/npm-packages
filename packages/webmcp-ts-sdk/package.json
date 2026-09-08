@@ -71,6 +71,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@mcp-b/webmcp-plugins": "workspace:*",
     "@mcp-b/webmcp-polyfill": "workspace:*",
     "@mcp-b/webmcp-types": "workspace:*",
     "@modelcontextprotocol/server": "catalog:"

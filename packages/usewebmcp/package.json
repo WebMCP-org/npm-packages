@@ -58,6 +58,7 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit"
   },
   "dependencies": {
+    "@mcp-b/webmcp-plugins": "workspace:*",
     "@standard-schema/spec": "^1.1.0",
     "webmcp-types": "^0.1.6"
   },

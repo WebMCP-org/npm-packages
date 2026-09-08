@@ -1,59 +1,65 @@
 ---
 title: 'usewebmcp overview'
-description: 'Register React state and actions as WebMCP tools, with upstream types and optional Standard Schema validation.'
-keywords: ['usewebmcp', 'overview', 'react', 'standard schema', 'useWebMCP']
+description: 'Register React-owned WebMCP tools with inferred inputs and optional execution state.'
+keywords: ['usewebmcp', 'useWebMCP', 'react', 'standard schema']
 icon: 'react'
 ---
 
 import CounterExample from '/snippets/packages/usewebmcp-quickstart.mdx';
 
-`usewebmcp` exposes a component's current state and actions through WebMCP tools:
+Expose current React state and actions through WebMCP tools:
 
 <CounterExample />
 
-Each call reads the latest committed counter. Registration and cleanup follow the component lifecycle.
+Each call reads the latest committed counter. Registration and cleanup follow the component
+lifecycle. `useWebMCP` returns local execution and registration status. Attach an
+[`executionState()` plugin](https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-plugins#execution-state)
+and subscribe only in the component that displays progress or results.
 
-## Performance comparison
+## Performance
 
-<Frame>
-  <img
-    className="block dark:hidden"
-    src="/images/react-hooks/performance-light.png"
-    alt="Production React re-renders with one tool, five trials. One description change: usewebmcp 1, MCP-B React 1, MCP Cat 1, Google 2. One sequential call: 2, 2, 1–2; Google exposes no execution state."
-  />
-  <img
-    className="hidden dark:block"
-    src="/images/react-hooks/performance-dark.png"
-    alt="Production React re-renders with one tool, five trials. One description change: usewebmcp 1, MCP-B React 1, MCP Cat 1, Google 2. One sequential call: 2, 2, 1–2; Google exposes no execution state."
-  />
-</Frame>
+The default hook adds **zero owner re-renders per tool call**.
 
-Both hooks add no renders for successful registration. All four register once per description change and never on unrelated updates in this benchmark.
-[Benchmark details](https://github.com/WebMCP-org/npm-packages/tree/92071e32a39585fe412de3e4ed651391c47ebcf7/benchmarks/react-hooks).
+| Hook          |     Gzip | Mount registrations | Metadata-edit renders | Renders per call |
+| ------------- | -------: | ------------------: | --------------------: | ---------------: |
+| usewebmcp     |  3.58 kB |                   1 |                     1 |                0 |
+| MCP-B adapter |  3.96 kB |                   1 |                     1 |                0 |
+| MCP Cat 1.1.0 | 24.21 kB |                   2 |                     1 |              1–2 |
+| Google 0.2.0  |  0.69 kB |                   1 |                     2 |                0 |
+
+One tool, one-field schema, five production trials. Renders count the registering component;
+metadata edits include the requested parent update. MCP Cat includes execution state by default.
+React is excluded from bundle sizes. [Measurements](https://github.com/WebMCP-org/npm-packages/blob/052f451e9353ea112093973b7e14a16f7715e7c7/benchmarks/react-hooks/PRODUCTION.md) ·
+[Bundle sizes](https://github.com/WebMCP-org/npm-packages/blob/052f451e9353ea112093973b7e14a16f7715e7c7/benchmarks/react-hooks/bundle-results.json).
+
+With our state plugin, subscribing a status child measured **0 owner + 2 child renders** per call;
+subscribing the owner measured 2 owner renders. Recording state without a subscriber measured 0.
 
 ## Feature comparison
 
-| Feature                         | `usewebmcp`     | `@mcp-b/react-webmcp` | MCP Cat | Google    |
-| ------------------------------- | --------------- | --------------------- | ------- | --------- |
-| Hook bundle (gzip)              | 1.7 kB          | 2.1 kB                | 24.2 kB | 0.7 kB    |
-| Schema validation               | Standard Schema | Standard Schema       | Zod     | Manual    |
-| Registration errors             | Yes             | Yes                   | Yes     | Sync only |
-| Running, result & error state   | Yes             | Yes                   | Yes     | No        |
-| Call tools from React           | Yes             | Yes                   | Yes     | No        |
-| Automatic MCP result formatting | No              | Yes                   | No      | Yes       |
-| Prompt & resource hooks         | No              | Yes                   | No      | No        |
+| Feature                    | usewebmcp       | MCP-B adapter   | MCP Cat         | Google          |
+| -------------------------- | --------------- | --------------- | --------------- | --------------- |
+| Supplied schema validation | Standard Schema | Standard Schema | Zod             | Manual          |
+| Execution state            | Opt-in plugin   | Opt-in plugin   | Built in        | None            |
+| Local execute()            | Yes             | Yes             | Yes             | No              |
+| Handler AbortSignal        | Yes             | Yes             | Yes             | Not forwarded   |
+| Consent/tracing plugin API | Yes             | Yes             | No built-in API | No built-in API |
+| MCP success formatting     | Manual          | Automatic       | Manual          | Automatic       |
 
-Bundle sizes exclude React and include built-in dependencies. App validators and runtimes are extra.
-
-All four accept JSON Schema. Compared: our PR #329, [MCP Cat 1.1.0](https://www.npmjs.com/package/webmcp-react/v/1.1.0), and [Google 0.2.0](https://www.npmjs.com/package/use-webmcp-tool/v/0.2.0).
+All four accept JSON Schema metadata. MCP Cat expects handlers to return MCP results;
+Google formats raw results. Versions and sources: [MCP Cat](https://github.com/agentcathq/webmcp-react),
+[Google](https://github.com/GoogleChromeLabs/use-webmcp-tool), and the
+[comparison harness](https://github.com/WebMCP-org/npm-packages/blob/052f451e9353ea112093973b7e14a16f7715e7c7/benchmarks/react-hooks/README.md).
 
 ## Package boundary
 
-The hook uses Community Group [types](https://github.com/webmachinelearning/webmcp-types)
-and calls your schema's validator. Supply native WebMCP, the
-[polyfill](/packages/webmcp-polyfill/overview), or [MCP-B runtime](/packages/global/overview).
-React 18/19 and `'use client'` are supported. Failures reject by default;
-[`formatError`](/packages/usewebmcp/reference#tool-responses) customizes agent responses.
+The hook uses Community Group [types](https://github.com/webmachinelearning/webmcp-types).
+Standard Schema validation, consent, and tracing share the framework-independent
+[`@mcp-b/webmcp-plugins` runtime](https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-plugins).
+Supply native WebMCP, the [polyfill](/packages/webmcp-polyfill/overview), or
+[MCP-B runtime](/packages/global/overview). React 18/19 and `'use client'` are supported.
 
-[Framework setup](/how-to/frameworks) · [API reference](/packages/usewebmcp/reference) ·
-[Schema guide](/how-to/use-schemas-and-structured-output)
+For MCP response formatting, prompts, resources, and clients, use
+[`@mcp-b/react-webmcp`](/packages/react-webmcp/overview).
+[Framework setup](/how-to/frameworks) and the [API reference](/packages/usewebmcp/reference)
+cover installation, schemas, and optional state.

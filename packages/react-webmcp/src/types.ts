@@ -26,7 +26,8 @@ export type InferOutput<T extends JsonSchemaForInference | undefined = undefined
 export interface WebMCPConfig<
   TInput extends ToolInputSchema = InputSchema,
   TOutput extends JsonSchemaForInference | undefined = undefined,
-> extends Omit<CoreWebMCPConfig<TInput, InferOutput<TOutput>>, 'annotations'> {
+  TResult extends InferOutput<TOutput> = InferOutput<TOutput>,
+> extends Omit<CoreWebMCPConfig<TInput, TResult>, 'annotations'> {
   outputSchema?: TOutput;
   annotations?: ToolAnnotations;
 }
@@ -38,7 +39,8 @@ export type ToolExecuteFunction<
 export type WebMCPReturn<
   TOutput extends JsonSchemaForInference | undefined = undefined,
   TInput extends ToolInputSchema = InputSchema,
-> = CoreWebMCPReturn<TInput, InferOutput<TOutput>>;
+  TResult extends InferOutput<TOutput> = InferOutput<TOutput>,
+> = CoreWebMCPReturn<TInput, TResult>;
 
 export type {
   BrowserMcpServer as ModelContextProtocol,

@@ -1,5 +1,5 @@
 import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
-import type { ModelContext } from '@mcp-b/webmcp-types';
+import type { ModelContext, ModelContextTool } from '@mcp-b/webmcp-types';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { inputRequired } from '@modelcontextprotocol/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -46,6 +46,28 @@ describe('BrowserMcpServer', () => {
     expect(isBrowserMcpServer(undefined)).toBe(false);
   });
 
+  it('provides a fresh callback signal for each browser execution', async () => {
+    server = new BrowserMcpServer({ name: 'callback-signals', version: '1.0.0' });
+    const signals: (AbortSignal | undefined)[] = [];
+    await server.registerTool({
+      name: 'callback_signal',
+      description: 'Captures callback signals',
+      execute: (_input, options) => {
+        signals.push(options?.signal);
+        return 'done';
+      },
+    });
+    await executeRegisteredTool(server, 'callback_signal');
+    await executeRegisteredTool(server, 'callback_signal');
+
+    expect(signals).toHaveLength(2);
+    for (const signal of signals) {
+      expect(signal).toBeInstanceOf(AbortSignal);
+      expect(signal?.aborted).toBe(false);
+    }
+    expect(signals[0]).not.toBe(signals[1]);
+  });
+
   it('uses Web IDL callback semantics and preserves execution errors', async () => {
     server = new BrowserMcpServer({ name: 'execution-test', version: '1.0.0' });
     await server.registerTool({
@@ -84,6 +106,104 @@ describe('BrowserMcpServer', () => {
     });
     controller.abort(reason);
     await expect(execution).rejects.toBe(reason);
+  });
+
+  it.each([
+    ['browser', 'caller'],
+    ['browser', 'registration'],
+    ['MCP', 'caller'],
+    ['MCP', 'registration'],
+  ] as const)('forwards %s %s cancellation to the callback', async (entry, source) => {
+    server = new BrowserMcpServer({ name: 'cancel-callback', version: '1.0.0' });
+    const caller = new AbortController();
+    const registration = new AbortController();
+    const started = Promise.withResolvers<void>();
+    let callbackSignal: AbortSignal | undefined;
+    await server.registerTool(
+      {
+        name: 'cancel_callback',
+        description: 'Resolves after cancellation',
+        execute: (_input, options) => {
+          callbackSignal = options?.signal;
+          started.resolve();
+          return new Promise((resolve) => {
+            callbackSignal?.addEventListener('abort', () => resolve('late'), { once: true });
+          });
+        },
+      },
+      { signal: registration.signal }
+    );
+    if (entry === 'MCP') {
+      client = new Client(
+        { name: 'cancel-client', version: '1.0.0' },
+        { versionNegotiation: { mode: 'auto' } }
+      );
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+    }
+    const [tool] = await server.getTools();
+    const execution =
+      entry === 'MCP'
+        ? client!.callTool({ name: 'cancel_callback', arguments: {} }, { signal: caller.signal })
+        : server.executeTool(tool!, '{}', { signal: caller.signal });
+    const outcome = execution.then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error })
+    );
+    await started.promise;
+    const reason = new Error('Caller cancelled');
+    (source === 'caller' ? caller : registration).abort(reason);
+
+    await vi.waitFor(() => expect(callbackSignal?.aborted).toBe(true));
+    if (source === 'caller') {
+      if (entry === 'browser') {
+        expect(await outcome).toEqual({ error: reason });
+        expect(callbackSignal?.reason).toBe(reason);
+      } else {
+        expect(await outcome).toMatchObject({ error: { name: 'SdkError' } });
+      }
+    } else {
+      // Preserve MCP-B's existing browser unregistration cancellation;
+      // the newer draft permits pending calls to finish after unregistration.
+      expect(callbackSignal?.reason).toMatchObject({ name: 'AbortError' });
+      if (entry === 'browser') {
+        expect(await outcome).toMatchObject({ error: { name: 'UnknownError' } });
+      } else {
+        expect(await outcome).toMatchObject({ value: { isError: true } });
+      }
+    }
+  });
+
+  it('forwards native callback cancellation through the registered mirror', async () => {
+    const nativeRegister = vi.fn(async (_tool: ModelContextTool) => {});
+    const native = Object.assign(new EventTarget(), {
+      registerTool: nativeRegister,
+      getTools: async () => [],
+    }) as unknown as ModelContext;
+    server = new BrowserMcpServer({ name: 'native-callback', version: '1.0.0' }, { native });
+    const started = Promise.withResolvers<void>();
+    let callbackSignal: AbortSignal | undefined;
+    await server.registerTool({
+      name: 'native_callback',
+      description: 'Waits for native cancellation',
+      execute: (_input, options) => {
+        callbackSignal = options?.signal;
+        started.resolve();
+        return new Promise(() => {});
+      },
+    });
+    const mirrored = nativeRegister.mock.calls[0]![0];
+    const controller = new AbortController();
+    const execution = Promise.resolve(mirrored.execute({}, { signal: controller.signal }));
+    const outcome = execution.catch((error: unknown) => error);
+    await started.promise;
+    const reason = new DOMException('Native cancellation', 'AbortError');
+    controller.abort(reason);
+
+    await vi.waitFor(() => expect(callbackSignal?.aborted).toBe(true));
+    expect(callbackSignal?.reason).toBe(reason);
+    expect(await outcome).toBe(reason);
   });
 
   it('preserves known annotations and returns detached tool metadata', async () => {

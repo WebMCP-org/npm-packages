@@ -2,8 +2,6 @@ name: E2E Tests
 
 on:
   pull_request:
-    branches:
-      - main
   push:
     branches:
       - main
@@ -217,6 +215,14 @@ jobs:
           PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: ${{ steps.chrome_canary.outputs.chrome-path }}
           PLAYWRIGHT_ENABLE_WEBMCP_FLAGS: '1'
         run: pnpm --filter mcp-e2e-tests run test:native-contract:default
+
+      - name: Install pinned React comparison dependencies
+        run: pnpm --dir benchmarks/react-hooks install --frozen-lockfile --ignore-scripts
+
+      - name: Evaluate production hook registrations, renders, and bundle boundaries
+        env:
+          CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
+        run: pnpm --filter usewebmcp --filter @mcp-b/react-webmcp build:prod && pnpm test:hooks:eval
 
       - name: Run native React hook tests
         env:

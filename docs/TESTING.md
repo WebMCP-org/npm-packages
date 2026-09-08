@@ -127,7 +127,7 @@ After `pnpm build`, run `pnpm test:hooks` for browser integration tests and pack
 `pnpm test:hooks:package` builds minified hook packages, verifies their client directives, and installs
 tarballs into isolated React 18 and React 19 consumers. It checks server rendering without browser
 globals and declarations with `skipLibCheck: false`, with strict null checking enabled and disabled.
-The React 18 consumer installs core hooks only; React 19 also checks MCP-B/upstream type coexistence.
+The React 18 consumer installs core hooks and their shared invocation runtime, without the MCP bridge; React 19 also checks MCP-B/upstream type coexistence.
 
 Browser tests cover StrictMode, suspended renders, metadata updates, duplicate and delayed
 registrations, late runtime injection, Standard Schema validation/transforms, and cancellation.
@@ -149,6 +149,30 @@ and [Standard Schema](https://standardschema.dev/).
 `pnpm --filter mcp-e2e-tests test:integration:frameworks`
 
 This lane covers framework-level integrations such as React hooks and validation matrices.
+
+### Invocation plugin contracts
+
+The plugin package's browser tests cover validation/approval ordering, immutable snapshots,
+continuation reuse, cancellation, protocol outcomes, consent verification ports, and observer
+failures. `browser-server.invocation.test.ts` exercises managed native/MCP callbacks with the real
+SDK, including validation inside middleware and one vendor transform per call.
+
+`useWebMCP.registration.test.tsx` checks zero owner renders for local and agent calls, independent status
+subscriptions, late subscribers, and the layout-before-passive-cleanup registration window.
+The production benchmark reports the core and MCP adapter hooks, state subscribed in the owner
+or a child, unsubscribed state, passthrough, and OTel modes separately. Child commits are counted
+separately from registration-owner commits. Optional plugin bundle entries are measured individually; they must
+not bring an MCP SDK or fallback initializer into the core hook bundle.
+
+The native production evaluation also runs in CI:
+
+```bash
+pnpm --dir benchmarks/react-hooks install --frozen-lockfile --ignore-scripts
+CHROME_BIN=/path/to/chrome-canary pnpm test:hooks:eval
+```
+
+It checks deterministic registration and commit counts without timing thresholds or rewriting
+recorded benchmark artifacts. The full production report uses the same harness.
 
 ### React hook render regressions
 

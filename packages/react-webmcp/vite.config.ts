@@ -14,7 +14,12 @@ export default defineConfig({
     clean: true,
     treeshake: true,
     deps: {
-      neverBundle: [/^react(?:\/.*)?$/, /^react-dom(?:\/.*)?$/, /^usewebmcp$/],
+      neverBundle: [
+        /^@mcp-b\/webmcp-plugins(?:\/.*)?$/,
+        /^react(?:\/.*)?$/,
+        /^react-dom(?:\/.*)?$/,
+        /^usewebmcp$/,
+      ],
     },
     tsconfig: './tsconfig.json',
   },

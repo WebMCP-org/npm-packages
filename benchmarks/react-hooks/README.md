@@ -1,199 +1,112 @@
 # React hook comparison
 
-Measure production browser behavior, bundle size, and React commits around WebMCP tools.
-Render the chart with D3 and the shared
-[design system](https://github.com/WebMCP-org/design-system).
+Measure native registrations, React commits, callback latency, and bundle size in a production
+browser. [Report](PRODUCTION.md) · [Raw samples](production-results.json) ·
+[Bundle sizes](bundle-results.json)
 
-[Production results](PRODUCTION.md) · [Bundle sizes](bundle-results.json) · [Development fixture](RESULTS.md)
+Results belong to the source commit and environment recorded in each artifact. Regenerate them
+after source changes. This production harness is the comparison source; package tests own
+[lifecycle correctness](../../docs/TESTING.md#react-hook-harness).
 
-## Performance comparison
+## Reproduce
 
-The README chart uses the production build: one tool with a stable one-field JSON Schema,
-five trials, excluding mount.
-Bars show medians; labels show observed ranges.
-
-- **Change its description once:** our hooks and MCP Cat produce 1 re-render, Google 2.
-- **Run one asynchronous call:** our hooks produce 2 re-renders, MCP Cat 1–2.
-  Google exposes no execution state.
-
-All four register once per description change and never on unrelated updates. MCP Cat's
-provider makes two registrations per tool on mount; the others make one.
-
-Our metadata count is the requested parent update. Successful registration adds no render;
-registration errors remain observable. MCP Cat reports registration failures in execution state.
-Google declares success without awaiting the native registration promise. The harness waits
-for native registration in every case.
-
-With 100 tools and 100 fields per schema, the core's unrelated updates measured 0.18 ms
-with stable schema objects versus 1.92 ms with inline objects in the recorded run.
-Define large schemas outside the component when possible.
-
-## Reproduce the measurements
-
-From the repository root, install and build the workspace, then install the isolated
-benchmark dependencies:
+From the repository root, with a Chrome build that provides native WebMCP:
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm build
 pnpm --filter usewebmcp --filter @mcp-b/react-webmcp build:prod
 pnpm --dir benchmarks/react-hooks install --frozen-lockfile --ignore-scripts
-CHROME_BIN=/path/to/chrome-canary node benchmarks/react-hooks/run.mjs
 CHROME_BIN=/path/to/chrome-canary node benchmarks/react-hooks/production.mjs
 node benchmarks/react-hooks/bundle.mjs
-pnpm exec vp check --fix benchmarks/react-hooks
 ```
 
-The runner enables native WebMCP in Chrome and rejects a missing or polyfilled registry.
-Use a Chrome build with the native API available. The checked-in run used Chrome
-155.0.8043.0 on macOS arm64; the exact browser, React version, date, and hook source commit
-are recorded in each result file. Build from the recorded source commit to reproduce that
-revision's hooks. Run timing measurements without concurrent builds or tests.
+The runners consume these built production entries. Run timings from a clean checkout without
+concurrent builds or tests. The runner enables native
+WebMCP and rejects a missing/polyfilled registry. Artifacts record source commit, dirty-tree status,
+browser, platform, and toolchain versions.
 
-The separate package and lockfile pin React 19.2.8,
-[`webmcp-react` 1.1.0](https://www.npmjs.com/package/webmcp-react/v/1.1.0),
-[`use-webmcp-tool` 0.2.0](https://www.npmjs.com/package/use-webmcp-tool/v/0.2.0),
-and Zod 4.4.3. Our hooks are built from this checkout; the checked-in results use the
-unreleased implementation in [PR #329](https://github.com/WebMCP-org/npm-packages/pull/329).
-Competitor packages stay outside the main workspace and published package dependencies.
+To check deterministic behavior without rewriting artifacts:
 
-## Production method
+```bash
+CHROME_BIN=/path/to/chrome-canary pnpm test:hooks:eval
+```
 
-Each hook gets a fresh React root and the same native Chrome registry. MCP Cat uses its
-documented provider, which preserves this native registry. No runtime is installed by
-the other hooks. All hooks receive the same plain JSON Schema, annotations, delayed
-handler, and arguments. Schema validation is outside this measurement.
+CI runs this same production evaluation. Registration and commit assertions are gates;
+hardware-dependent durations have no pass/fail threshold.
 
-The [production runner](production.mjs) builds and serves minified JavaScript with Vite.
-It measures 1, 10, and 100 tools, each with 1 or 100 schema fields, using both stable
-schema objects and equivalent objects created on each render. Each tool has its own schema.
-One warmup and five measured trials per hook/scenario produce 240 recorded samples.
-Hook order rotates to reduce order bias.
+The isolated benchmark lockfile pins React 19.2.8, MCP Cat's `webmcp-react` 1.1.0,
+Google's `use-webmcp-tool` 0.2.0, and Zod 4.4.3. Our packages come from the checkout.
+Competitor dependencies are excluded from the main workspace and published packages.
 
-Each case mounts the tools, makes ten unrelated parent updates, changes every description,
-then runs ten calls sequentially on the first tool. Every handler yields one MessageChannel
-task before returning. The harness checks tool inventory, current metadata and handlers,
-completed calls, and registration cleanup on unmount. Expected aborted setup registrations
-are counted; other native registration or browser errors fail the run.
+## Production modes
 
-A consumer layout effect counts committed renders. Completion waits for native registration
-promises, exposed registration/execution state, the expected render and passive effect, and
-two quiet task turns. This observed quiet period is not a browser idle guarantee.
-Timestamps end at the last observed consumer commit, passive effect, or native registration completion;
-call timing also includes callback completion. The subsequent observation wait is excluded.
-Raw samples retain callback-only latency, render counts, registrations, and aborted attempts.
+The [fixture](production.jsx) and [runner](production.mjs) compare nine modes:
 
-The report gives medians and ranges across five trials, summarizing each trial's ten
-update/call timings first. These are browser completion latencies on one machine,
-including scheduling and native registration, rather than CPU or paint time.
-Times round to 0.01 ms; a displayed 0.00 means less than 0.005 ms, not zero work.
-Cross-origin isolation enables a higher-resolution clock. No network, transport,
-schema validation, retained-heap measurement, or timing threshold is included.
+| Mode                      | Execution-state subscription | Added plugins                |
+| ------------------------- | ---------------------------- | ---------------------------- |
+| `usewebmcp`               | None                         | None                         |
+| `@mcp-b/react-webmcp`     | None                         | None                         |
+| MCP Cat                   | Owner, package behavior      | Package behavior             |
+| Google                    | None                         | Package behavior             |
+| Core + state in owner     | Registration owner           | Execution state              |
+| Core + state in child     | Status child                 | Execution state              |
+| Core + unsubscribed state | Recorded, no subscriber      | Execution state              |
+| Core + passthrough        | None                         | One named passthrough plugin |
+| Core + OTel no-op         | None                         | OTel with a no-op tracer     |
 
-Production uses no React test batching or profiling build. See
+Owner commits count the component registering the tool. Status-child commits are counted
+separately. A zero owner count does not imply that no child updates, or that a loading indicator
+exists. The unsubscribed-state mode verifies that its store records every call. OTel measures
+local instrumentation overhead without a provider or exporter.
+
+Each mode runs with 1, 10, and 100 tools; 1 or 100 schema fields; and stable or equivalent inline
+schema objects. Twelve scenarios × nine modes × five trials produce **540 samples**, after one
+warmup per scenario/mode. Mode order rotates.
+
+Each sample mounts a fresh root, performs ten unrelated parent updates, changes every description,
+and calls the first tool ten times sequentially. All modes use the same JSON Schema and handler,
+which yields one MessageChannel task. MCP Cat uses its documented provider and native registry.
+
+## Metrics and checks
+
+| Metric             | Meaning                                                                        |
+| ------------------ | ------------------------------------------------------------------------------ |
+| Registrations      | Native `registerTool` attempts during mount and updates                        |
+| Owner commits      | Committed renders in the registration component's layout effect                |
+| Child commits      | Committed renders in the optional status child                                 |
+| Completion latency | Time through callback, required React work, and native registration completion |
+| Callback latency   | Time until the registered callback resolves, before waiting for React          |
+
+The harness awaits native registration promises, verifies metadata and current handler closures,
+checks completed results and exposed state, and confirms unmount removes tools. Expected aborted
+setup attempts are recorded; other browser errors fail. Two quiet task turns confirm settlement
+but are excluded from endpoint timestamps.
+
+Counts show observed ranges. Timing summaries report medians and ranges across five trials;
+each trial's ten updates/calls is summarized first. These are browser completion latencies,
+including scheduling, not CPU or paint time. Values round to 0.01 ms. No network, transport,
+application schema validator, retained-heap measurement, or timing threshold is included.
+
+Production uses no `act()`, `flushSync()`, or profiling build. See
 [Vite production builds](https://vite.dev/guide/build),
-[React's profiling caveats](https://react.dev/reference/react/Profiler#caveats), and
+[React profiling caveats](https://react.dev/reference/react/Profiler#caveats), and
 [clock precision](https://developer.mozilla.org/en-US/docs/Web/API/Performance/now#security_requirements).
-
-## Development fixture
-
-The original [development results](RESULTS.md) remain available as a deterministic
-regression fixture. They are not the README chart: test batching changes the render counts.
-For ten description changes, our hooks and MCP Cat commit ten times and Google twenty.
-For ten overlapping calls, our hooks commit eleven times and MCP Cat twenty.
-Those counts do not predict sequential production calls.
-
-A React `Profiler` inside the component counts committed updates, excluding initial
-mount and registration. Native registration promises settle before a scenario starts.
-The harness observes the expected aborted setup in StrictMode and fails on other browser
-errors. Each operation runs in a separate `act()` scope so React cannot batch the whole
-scenario into one update.
-
-1. **Parent updates:** ten renders with new handler closures and equivalent inline schema
-   and metadata. Ten commits are the requested baseline; additional registrations count
-   as churn.
-2. **Metadata updates:** ten changes to the description. Counts include registration
-   status updates when the hook exposes them.
-3. **Start calls:** invoke the callback passed to native `registerTool` ten times,
-   keeping all handlers pending. The registry's transport and serialization are excluded.
-4. **Settle calls:** resolve those handlers one at a time, allowing each update to commit.
-
-Five trials run with StrictMode disabled and five with it enabled for every hook,
-producing forty samples. The development table reports observed ranges.
-Every range collapsed to a single value in the recorded run.
-
-The harness also checks that exactly one tool remains registered, each call uses the
-latest committed props, all ten calls complete, exposed execution state returns to idle,
-and unmount removes the tool. These assertions keep an inactive or broken hook from
-appearing efficient. This fixture does not replace the
-[lifecycle and package tests](../../docs/TESTING.md#react-hook-harness).
 
 ## Bundle method
 
-The [bundle runner](bundle.mjs) imports only each package's tool hook from its production
-ESM entry and tree-shakes it with Vite+, targeting ES2022. Build the workspace hooks with
-`build:prod` first, as shown above, to match their published entry points. It records raw, Oxc-minified,
-and gzip level 9 sizes. React is external; built-in dependencies remain included.
-Application validators, providers, runtime setup, and the rest of the application are
-outside this measurement. The runner checks entry resolution, the expected export,
-and that no unexpected dependency was externalized.
+The [bundle runner](bundle.mjs) measures four tool hooks and five plugin entries:
+runner, Standard Schema, execution state, consent, and OTel. Each entry is tree-shaken
+from production ESM with Vite+, targeting ES2022. Artifacts include raw, Oxc-minified, and gzip
+level 9 sizes.
 
-These are reproducible hook bundle sizes for this toolchain, not total application
-download sizes. Results and exact toolchain versions are in [bundle-results.json](bundle-results.json).
+React and React DOM are external; other imported dependencies remain included. Each entry measures
+one export, except consent, which measures the usable `ConsentBroker` + `consent` pair. Sizes do
+not represent a complete application or the incremental cost of combining plugins. Application
+validators and browser setup are excluded. Assertions check exports, dependency resolution, and
+unexpected MCP SDK/polyfill initializer code in the core bundle.
 
-## Feature comparison
-
-| Feature                         | `usewebmcp`     | `@mcp-b/react-webmcp` | MCP Cat | Google    |
-| ------------------------------- | --------------- | --------------------- | ------- | --------- |
-| Hook bundle (gzip)              | 1.7 kB          | 2.1 kB                | 24.2 kB | 0.7 kB    |
-| Schema validation               | Standard Schema | Standard Schema       | Zod     | Manual    |
-| Registration errors             | Yes             | Yes                   | Yes     | Sync only |
-| Running, result & error state   | Yes             | Yes                   | Yes     | No        |
-| Call tools from React           | Yes             | Yes                   | Yes     | No        |
-| Automatic MCP result formatting | No              | Yes                   | No      | Yes       |
-| Prompt & resource hooks         | No              | Yes                   | No      | No        |
-
-All four accept JSON Schema. Compared: our PR #329, [MCP Cat 1.1.0](https://www.npmjs.com/package/webmcp-react/v/1.1.0), and [Google 0.2.0](https://www.npmjs.com/package/use-webmcp-tool/v/0.2.0).
-
-"Yes" means the hook supplies the feature. "Manual" validation runs in your handler.
-Automatic MCP result formatting means the hook wraps a successful handler result in MCP content.
-The core hook and MCP Cat can return MCP responses supplied by your handler.
-
-Standard Schema support needs both Standard JSON Schema conversion and Standard Schema
-validation. The hook calls your schema library; it ships no validation engine.
-MCP Cat stores registration failures in its execution error state. Google's registration error
-state catches synchronous failures only; execution errors have an `onError` callback.
-
-First-party sources:
-
-- [MCP Cat source and documentation](https://github.com/agentcathq/webmcp-react)
-  and [published 1.1.0 package](https://www.npmjs.com/package/webmcp-react/v/1.1.0).
-- [GoogleChromeLabs/use-webmcp-tool](https://github.com/GoogleChromeLabs/use-webmcp-tool),
-  created by Sarah Drasner, and its
-  [published 0.2.0 package](https://www.npmjs.com/package/use-webmcp-tool/v/0.2.0).
-- [Core hook](../../packages/usewebmcp/README.md) and
-  [MCP adapter](../../packages/react-webmcp/README.md).
-
-## Regenerate the README images
-
-The report imports `@mcp-b/design-tokens` CSS, `sigvelo-chart-card`, and D3 scales from
-a sibling design-system checkout. Both chart panels count component re-renders on a shared
-scale. Build its
-`@mcp-b/viz-components` package and workspace dependencies first. The images in this
-revision use design-system commit `75442b31fc8e8f7dc963c799951786c02d799f33`.
-
-```bash
-DESIGN_SYSTEM_DIR=../design-system \
-  CHROME_BIN=/path/to/chrome-canary \
-  node benchmarks/react-hooks/run.mjs --render
-```
-
-This reads the recorded production results without rerunning measurements. It captures the chart
-in light and dark themes at 2× resolution and writes them to
-[`apps/documentation-website/images/react-hooks`](../../apps/documentation-website/images/react-hooks).
-The adjacent `provenance.json` records the design-system commit, result-file hash, and
-capture settings. The report source is [report.html](report.html).
-
-The docs use local image paths. Package READMEs use permanent GitHub asset URLs so the
-images also load on npm. After changing the report, rerender it and update both theme
-URLs to the commit containing the new images.
+Primary comparison sources: [MCP Cat](https://github.com/agentcathq/webmcp-react),
+[GoogleChromeLabs/use-webmcp-tool](https://github.com/GoogleChromeLabs/use-webmcp-tool),
+[usewebmcp](../../packages/usewebmcp/README.md), and
+[the MCP-B adapter](../../packages/react-webmcp/README.md).

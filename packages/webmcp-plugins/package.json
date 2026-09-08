@@ -1,0 +1,98 @@
+{
+  "name": "@mcp-b/webmcp-plugins",
+  "version": "5.1.0",
+  "description": "Framework-independent invocation plugins for WebMCP tools",
+  "keywords": [
+    "consent",
+    "opentelemetry",
+    "plugins",
+    "standard-schema",
+    "webmcp"
+  ],
+  "homepage": "https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-plugins",
+  "bugs": {
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "packages/webmcp-plugins"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./standard-schema": {
+      "types": "./dist/standard-schema.d.ts",
+      "import": "./dist/standard-schema.js",
+      "default": "./dist/standard-schema.js"
+    },
+    "./execution-state": {
+      "types": "./dist/execution-state.d.ts",
+      "import": "./dist/execution-state.js",
+      "default": "./dist/execution-state.js"
+    },
+    "./consent": {
+      "types": "./dist/consent.d.ts",
+      "import": "./dist/consent.js",
+      "default": "./dist/consent.js"
+    },
+    "./otel": {
+      "types": "./dist/otel.d.ts",
+      "import": "./dist/otel.js",
+      "default": "./dist/otel.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "check": "vp check --fix",
+    "clean": "rm -rf dist",
+    "format": "vp fmt --write",
+    "lint": "vp lint --fix",
+    "prepublishOnly": "node ../../scripts/validate-publish.js && pnpm run build",
+    "publish:dry": "pnpm publish --access public --dry-run",
+    "publish:npm": "pnpm publish --access public",
+    "test": "vp test run",
+    "test:coverage": "vp test run --coverage",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit"
+  },
+  "dependencies": {
+    "@standard-schema/spec": "^1.1.0",
+    "webmcp-types": "^0.1.6"
+  },
+  "devDependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@vitest/coverage-v8": "catalog:",
+    "playwright": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@opentelemetry/api": "^1.9.0"
+  },
+  "peerDependenciesMeta": {
+    "@opentelemetry/api": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -11,6 +11,7 @@ export type {
   ToolExecutionState,
   WebMCP,
 } from 'usewebmcp';
+export { useToolExecutionState } from 'usewebmcp';
 export { useWebMCP } from './useWebMCP.js';
 
 export type { ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';

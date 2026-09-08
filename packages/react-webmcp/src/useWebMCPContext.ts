@@ -1,3 +1,4 @@
+import type { InputSchema } from '@mcp-b/webmcp-types';
 import type { WebMCPConfig, WebMCPReturn } from './types.js';
 import { useWebMCP } from './useWebMCP.js';
 
@@ -17,7 +18,7 @@ import { useWebMCP } from './useWebMCP.js';
  * @param description - Human-readable description of the context for AI assistants
  * @param getValue - Function that returns the current context value
  * @param options - Registration options; enabled defaults to true
- * @returns Tool execution state and control methods
+ * @returns Registration status and local execution
  *
  * @public
  *
@@ -69,8 +70,8 @@ export function useWebMCPContext<T>(
   name: string,
   description: string,
   getValue: () => T,
-  options: Pick<WebMCPConfig, 'enabled'> = {}
-): WebMCPReturn {
+  options: Pick<WebMCPConfig<InputSchema, undefined, T>, 'enabled' | 'plugins'> = {}
+): WebMCPReturn<undefined, InputSchema, T> {
   return useWebMCP({
     ...options,
     name,

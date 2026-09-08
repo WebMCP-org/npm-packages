@@ -1,25 +1,32 @@
 ---
 title: '@mcp-b/webmcp-polyfill reference'
-description: API reference for the document.modelContext WebMCP polyfill and its testing and schema adapters.
+description: Core WebMCP fallback, initialization, declarative forms, and browser compatibility helpers.
 keywords:
   - WebMCP polyfill
   - document.modelContext
   - registerTool
   - getTools
   - modelContextTesting
+  - Standard Schema
 ---
 
 `@mcp-b/webmcp-polyfill` installs the core WebMCP producer API when the browser
 does not provide it. It does not add MCP prompts, resources, transport, or an
 MCP server; use [`@mcp-b/global`](/packages/global/reference) for that bridge.
+Validation, consent, state, and tracing belong to
+[`@mcp-b/webmcp-plugins`](https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-plugins).
 
 ## Package entries
 
-| Import                          | Purpose                                    |
-| ------------------------------- | ------------------------------------------ |
-| `@mcp-b/webmcp-polyfill`        | Explicit ESM initialization and cleanup    |
-| `@mcp-b/webmcp-polyfill/iife`   | Standalone script that initializes on load |
-| `@mcp-b/webmcp-polyfill/schema` | Shared MCP-B schema and response adapters  |
+| Import                   | Purpose                                                     |
+| ------------------------ | ----------------------------------------------------------- |
+| `@mcp-b/webmcp-polyfill` | Explicit ESM initialization and cleanup                     |
+| `/iife`                  | Standalone fallback script, initializes on load             |
+| `/schema`                | Low-level schema metadata and browser compatibility helpers |
+
+Suffixes are relative to `@mcp-b/webmcp-polyfill`. The former invocation/plugin entries are
+removed; use the separate plugin package. Plugin configuration applies to callbacks independently
+of native/fallback selection; see [runtime layering](/explanation/architecture/runtime-layering).
 
 The IIFE reads `window.__webMCPPolyfillOptions` before initialization and exposes the package exports on `window.WebMCPPolyfill`.
 
@@ -88,14 +95,14 @@ await document.modelContext.registerTool(
 controller.abort();
 ```
 
-| Field         | Required | Notes                                            |
-| ------------- | -------- | ------------------------------------------------ |
-| `name`        | Yes      | 1–128 ASCII letters, digits, `_`, `-`, or `.`    |
-| `description` | Yes      | Non-empty tool description                       |
-| `execute`     | Yes      | Receives one object-or-array input value         |
-| `title`       | No       | Display label, converted to a well-formed string |
-| `inputSchema` | No       | JSON-serializable JSON Schema object             |
-| `annotations` | No       | WebMCP read-only and untrusted-content hints     |
+| Field         | Required | Notes                                                     |
+| ------------- | -------- | --------------------------------------------------------- |
+| `name`        | Yes      | 1–128 ASCII letters, digits, `_`, `-`, or `.`             |
+| `description` | Yes      | Non-empty tool description                                |
+| `execute`     | Yes      | Receives input and execution options with an abort signal |
+| `title`       | No       | Display label, converted to a well-formed string          |
+| `inputSchema` | No       | JSON-serializable JSON Schema object                      |
+| `annotations` | No       | WebMCP read-only and untrusted-content hints              |
 
 `options.signal` owns the registration. Aborting it removes the tool and emits a
 `toolchange` event. `unregisterTool()` is not exposed.
@@ -212,15 +219,16 @@ for the current browser signature.
 `~standard.validate()` as a non-enumerable property for the MCP SDK. It does not invoke the validator
 or wrap the tool's callback.
 
-| Registration/execution path                                | Schema conversion                                    | Argument validation                                                       |
-| ---------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------- |
-| `usewebmcp` or the MCP-B tool hook                         | Automatic for Standard JSON Schema                   | Supplied Standard Schema validator on local and agent calls               |
-| Standalone polyfill imperative API                         | Caller supplies JSON Schema                          | Caller validates in the handler                                           |
-| `normalizeInputSchema()` helper                            | Converts metadata and preserves a supplied validator | None; this helper does not execute tools                                  |
-| `BrowserMcpServer` through an MCP client                   | Automatic conversion                                 | Official MCP server uses a preserved validator or its JSON Schema adapter |
-| Direct `BrowserMcpServer.executeTool()` or a native mirror | Already converted metadata                           | Bypasses MCP validation; caller validates in the handler                  |
+| Registration/execution path                                        | Schema conversion                                    | Argument validation                                                       |
+| ------------------------------------------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------- |
+| `usewebmcp` or the MCP-B tool hook                                 | Automatic for Standard JSON Schema                   | Supplied Standard Schema validator on local and agent calls               |
+| Wrapped native/polyfill/SDK callback with `standardSchema`         | Adapter supplies JSON Schema                         | Supplied validator runs once inside the invocation                        |
+| Unwrapped standalone polyfill imperative API                       | Caller supplies JSON Schema                          | Caller validates in the handler                                           |
+| `normalizeInputSchema()` helper                                    | Converts metadata and preserves a supplied validator | None; this helper does not execute tools                                  |
+| `BrowserMcpServer` through an MCP client                           | Automatic conversion                                 | Official MCP server uses a preserved validator or its JSON Schema adapter |
+| Unwrapped direct `BrowserMcpServer.executeTool()` or native mirror | Already converted metadata                           | Bypasses MCP validation; caller validates in the handler                  |
 
-The [schema guide](/how-to/use-schemas-and-structured-output) includes a direct-registration example.
+The [plugin input adapter](https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-plugins#standard-schema) replaces manual validation wrappers. The [schema guide](/how-to/use-schemas-and-structured-output) also covers direct registration.
 When that callback owns validation, `{ ...normalizeInputSchema(schema).inputSchema }` copies only
 JSON metadata. It prevents the MCP SDK from also applying the vendor transforms if the tool later
 uses the MCP-B runtime. The [React hook](/packages/usewebmcp/reference#schemas-and-inference) already

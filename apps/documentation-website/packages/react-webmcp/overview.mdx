@@ -19,7 +19,7 @@ import CalculatorExample from '/snippets/packages/react-webmcp-quickstart.mdx';
 
 <CalculatorExample />
 
-For `{ left: 3, right: 4 }`, React state holds `{ total: 7 }`; the agent receives MCP text and `structuredContent`.
+For `{ left: 3, right: 4 }`, local execution returns `{ total: 7 }`; the agent receives MCP text and `structuredContent`.
 
 ## Package boundary
 
@@ -27,8 +27,15 @@ Both hooks share lifecycle, Standard Schema validation, and React 18/19 support,
 `'use client'`. This package adds MCP responses, prompts, resources, and client hooks.
 Agent failures become MCP error responses; local failures and cancellation reject.
 
-[Performance comparison](/packages/usewebmcp/overview#performance-comparison) ·
-[Feature matrix](/packages/usewebmcp/overview#feature-comparison)
+Execution state is opt-in. Attach an `executionState()` plugin and subscribe with
+[`useToolExecutionState()`](/packages/usewebmcp/reference#hooks) where results are displayed.
+
+## Performance
+
+The tool hook measured **3.96 kB gzip**, one mount registration, and zero owner re-renders per
+call without an execution-state subscription. React is excluded. See the
+[Google/MCP Cat comparison](/packages/usewebmcp/overview#performance) and
+[recorded measurements](https://github.com/WebMCP-org/npm-packages/blob/052f451e9353ea112093973b7e14a16f7715e7c7/benchmarks/react-hooks/PRODUCTION.md).
 
 ## Runtime requirements
 

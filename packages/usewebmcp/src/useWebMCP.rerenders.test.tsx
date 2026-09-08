@@ -1,3 +1,5 @@
+import { useToolExecutionState } from './useToolExecutionState.js';
+import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
 import { cleanupWebMCPPolyfill, initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { act, Profiler, type ProfilerOnRenderCallback, type PropsWithChildren } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -28,13 +30,16 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
   beforeEach(() => configure({ reactStrictMode: strict }));
 
   it('adds no extra commits or registrations for equivalent inline definitions', async () => {
+    const execution = executionState();
     const onRender = vi.fn<ProfilerOnRenderCallback>();
     const modelContext = document.modelContext;
     if (!modelContext) throw new Error('WebMCP polyfill is unavailable');
     const register = vi.spyOn(modelContext, 'registerTool');
     const hook = await renderHook(
-      ({ revision }: { revision: number } = { revision: 1 }) =>
-        useWebMCP({
+      ({ revision }: { revision: number } = { revision: 1 }) => {
+        useToolExecutionState(execution);
+        return useWebMCP({
+          plugins: [execution],
           name: 'render_stable_tool',
           description: 'Uses the latest committed callback',
           inputSchema: {
@@ -44,12 +49,15 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
           } as const,
           annotations: { readOnlyHint: true },
           execute: ({ value }) => revision + value,
-        }),
+        });
+      },
       { initialProps: { revision: 1 }, wrapper: withProfiler(onRender) }
     );
     expect(onRender).toHaveBeenCalled();
     expect(register).toHaveBeenCalledTimes(strict ? 2 : 1);
-    const { execute, reset, state } = hook.result.current;
+    const { execute } = hook.result.current;
+    const { reset } = execution;
+    const state = execution.getSnapshot();
     const registrations = register.mock.calls.length;
     onRender.mockClear();
 
@@ -57,9 +65,9 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
 
     expect(onRender).toHaveBeenCalledTimes(1); // The requested parent render only.
     expect(register).toHaveBeenCalledTimes(registrations);
-    expect(hook.result.current.state).toBe(state);
+    expect(execution.getSnapshot()).toBe(state);
     expect(hook.result.current.execute).toBe(execute);
-    expect(hook.result.current.reset).toBe(reset);
+    expect(execution.reset).toBe(reset);
     await hook.act(async () => {
       await expect(execute({ value: 3 })).resolves.toBe(5);
     });
@@ -145,6 +153,7 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
   });
 
   it('bounds registration commits without resetting execution state', async () => {
+    const execution = executionState();
     const onRender = vi.fn<ProfilerOnRenderCallback>();
     const modelContext = document.modelContext;
     if (!modelContext) throw new Error('WebMCP polyfill is unavailable');
@@ -155,8 +164,10 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
           enabled: false,
           revision: 1,
         }
-      ) =>
-        useWebMCP({
+      ) => {
+        useToolExecutionState(execution);
+        return useWebMCP({
+          plugins: [execution],
           name: `render_enabled_${revision}`,
           description: 'Registers only while enabled',
           enabled,
@@ -165,7 +176,8 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
             properties: { query: { type: 'string', description: `Revision ${revision}` } },
           } as const,
           execute: () => revision,
-        }),
+        });
+      },
       { initialProps: { enabled: false, revision: 1 }, wrapper: withProfiler(onRender) }
     );
     expect(onRender).toHaveBeenCalled();
@@ -176,7 +188,9 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
     await hook.act(async () => {
       await expect(hook.result.current.execute({})).resolves.toBe(1);
     });
-    const { state, execute, reset } = hook.result.current;
+    const { execute } = hook.result.current;
+    const { reset } = execution;
+    const state = execution.getSnapshot();
     for (const props of [
       { enabled: false, revision: 2 },
       { enabled: true, revision: 2 },
@@ -187,9 +201,9 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
       onRender.mockClear();
       await hook.rerender(props);
       expect(onRender).toHaveBeenCalledTimes(1);
-      expect(hook.result.current.state).toBe(state);
+      expect(execution.getSnapshot()).toBe(state);
       expect(hook.result.current.execute).toBe(execute);
-      expect(hook.result.current.reset).toBe(reset);
+      expect(execution.reset).toBe(reset);
       const tools = await modelContext.getTools();
       expect(tools.map(({ name }) => name)).toEqual(
         props.enabled ? [`render_enabled_${props.revision}`] : []
@@ -204,29 +218,39 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
     await hook.act(async () => {
       await expect(execute({})).resolves.toBe(3);
     });
-    expect(hook.result.current.state.executionCount).toBe(2);
+    expect(execution.getSnapshot().executionCount).toBe(2);
     await hook.unmount();
     expect(await modelContext.getTools()).toEqual([]);
   });
 
   it('preserves an already idle state when resetting', async () => {
+    const execution = executionState();
     const onRender = vi.fn<ProfilerOnRenderCallback>();
     const hook = await renderHook(
-      () => useWebMCP({ name: 'render_reset', description: 'Resets state', execute: () => 'done' }),
+      () => {
+        useToolExecutionState(execution);
+        return useWebMCP({
+          plugins: [execution],
+          name: 'render_reset',
+          description: 'Resets state',
+          execute: () => 'done',
+        });
+      },
       { wrapper: withProfiler(onRender) }
     );
     expect(onRender).toHaveBeenCalled();
-    const state = hook.result.current.state;
+    const state = execution.getSnapshot();
     onRender.mockClear();
 
-    await hook.act(async () => hook.result.current.reset());
+    await hook.act(async () => execution.reset());
 
     // React may report one empty Profiler commit after a same-state bailout.
     expect(onRender.mock.calls.length).toBeLessThanOrEqual(1);
-    expect(hook.result.current.state).toBe(state);
+    expect(execution.getSnapshot()).toBe(state);
   });
 
   it('bounds commits for overlapping work and observable state transitions', async () => {
+    const execution = executionState();
     const onRender = vi.fn<ProfilerOnRenderCallback>();
     const first = Promise.withResolvers<string>();
     const second = Promise.withResolvers<string>();
@@ -237,11 +261,20 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
       .mockReturnValueOnce(second.promise)
       .mockReturnValueOnce(third.promise);
     const hook = await renderHook(
-      () => useWebMCP({ name: 'render_execution', description: 'Tracks pending work', execute }),
+      () => {
+        useToolExecutionState(execution);
+        return useWebMCP({
+          plugins: [execution],
+          name: 'render_execution',
+          description: 'Tracks pending work',
+          execute,
+        });
+      },
       { wrapper: withProfiler(onRender) }
     );
     expect(onRender).toHaveBeenCalled();
     const controls = hook.result.current;
+    const reset = execution.reset;
     let firstRun!: Promise<unknown>;
     let secondRun!: Promise<unknown>;
     let thirdRun!: Promise<unknown>;
@@ -252,14 +285,14 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
       firstRun = controls.execute({});
     });
     expect(onRender).toHaveBeenCalledTimes(1);
-    expect(hook.result.current.state.isExecuting).toBe(true);
-    const pendingState = hook.result.current.state;
+    expect(execution.getSnapshot().isExecuting).toBe(true);
+    const pendingState = execution.getSnapshot();
     onRender.mockClear();
 
     await hook.act(async () => {
       secondRun = controls.execute({});
     });
-    expect(hook.result.current.state).toBe(pendingState);
+    expect(execution.getSnapshot()).toBe(pendingState);
     // React can commit an outer Profiler after a same-state bailout. State identity
     // catches needless allocation without relying on the scheduler skipping work.
     expect(onRender.mock.calls.length).toBeLessThanOrEqual(1);
@@ -271,7 +304,7 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
       await expect(firstRun).rejects.toThrow(failure);
     });
     expect(onRender).toHaveBeenCalledTimes(1);
-    expect(hook.result.current.state).toMatchObject({
+    expect(execution.getSnapshot()).toMatchObject({
       isExecuting: true,
       error: failure,
       executionCount: 0,
@@ -283,7 +316,7 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
       thirdRun = controls.execute({});
     });
     expect(onRender).toHaveBeenCalledTimes(1);
-    expect(hook.result.current.state.error).toBeNull();
+    expect(execution.getSnapshot().error).toBeNull();
     onRender.mockClear();
 
     await hook.act(async () => {
@@ -291,7 +324,7 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
       await secondRun;
     });
     expect(onRender).toHaveBeenCalledTimes(1);
-    expect(hook.result.current.state).toMatchObject({
+    expect(execution.getSnapshot()).toMatchObject({
       isExecuting: true,
       lastResult: 'second',
       executionCount: 1,
@@ -303,19 +336,19 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
       await thirdRun;
     });
     expect(onRender).toHaveBeenCalledTimes(1);
-    expect(hook.result.current.state).toEqual({
+    expect(execution.getSnapshot()).toEqual({
       isExecuting: false,
       lastResult: 'third',
       error: null,
       executionCount: 2,
     });
     expect(hook.result.current.execute).toBe(controls.execute);
-    expect(hook.result.current.reset).toBe(controls.reset);
+    expect(execution.reset).toBe(reset);
     onRender.mockClear();
 
-    await hook.act(async () => controls.reset());
+    await hook.act(async () => reset());
     expect(onRender).toHaveBeenCalledTimes(1);
-    expect(hook.result.current.state).toEqual({
+    expect(execution.getSnapshot()).toEqual({
       isExecuting: false,
       lastResult: null,
       error: null,
