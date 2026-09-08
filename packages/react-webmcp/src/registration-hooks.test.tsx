@@ -1,3 +1,5 @@
+import { useToolExecutionState } from 'usewebmcp';
+import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
 import { cleanupWebModelContext, initializeWebModelContext } from '@mcp-b/global';
 import { TabClientTransport } from '@mcp-b/transports';
 import { cleanupWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
@@ -269,13 +271,20 @@ it('toggles resource templates through the same enabled option', async () => {
 });
 
 it('forwards context enabled options with bounded commits and stable local controls', async () => {
+  const execution = executionState();
   const register = vi.spyOn(server, 'registerTool');
   const warn = vi.spyOn(console, 'warn');
   const onRender = vi.fn();
   const hook = await renderHook(
     (
       { enabled, value }: { enabled: boolean; value: string } = { enabled: false, value: 'first' }
-    ) => useWebMCPContext('test_context', 'Current value', () => value, { enabled }),
+    ) => {
+      useToolExecutionState(execution);
+      return useWebMCPContext('test_context', 'Current value', () => value, {
+        plugins: [execution],
+        enabled,
+      });
+    },
     {
       initialProps: { enabled: false, value: 'first' },
       wrapper: ({ children }) => (
@@ -289,7 +298,9 @@ it('forwards context enabled options with bounded commits and stable local contr
   expect(warn).not.toHaveBeenCalled();
   expect(register).not.toHaveBeenCalled();
   expect((await client.listTools()).tools).toEqual([]);
-  const { execute, reset, state } = hook.result.current;
+  const { execute } = hook.result.current;
+  const { reset } = execution;
+  const state = execution.getSnapshot();
 
   for (const enabled of [true, false, true]) {
     onRender.mockClear();
@@ -298,9 +309,9 @@ it('forwards context enabled options with bounded commits and stable local contr
     expect((await client.listTools()).tools).toHaveLength(enabled ? 1 : 0);
     expect(onRender).toHaveBeenCalled();
     expect(onRender).toHaveBeenCalledTimes(1); // The requested parent update only.
-    expect(hook.result.current.state).toBe(state);
+    expect(execution.getSnapshot()).toBe(state);
     expect(hook.result.current.execute).toBe(execute);
-    expect(hook.result.current.reset).toBe(reset);
+    expect(execution.reset).toBe(reset);
   }
   expect(register).toHaveBeenCalledTimes(2);
 
@@ -309,17 +320,17 @@ it('forwards context enabled options with bounded commits and stable local contr
       content: [{ type: 'text', text: 'latest' }],
     });
   });
-  expect(hook.result.current.state.executionCount).toBe(1);
+  expect(execution.getSnapshot().executionCount).toBe(1);
 
   await hook.rerender({ enabled: false, value: 'local' });
-  expect(hook.result.current.state.executionCount).toBe(1);
+  expect(execution.getSnapshot().executionCount).toBe(1);
   expect((await client.listTools()).tools).toEqual([]);
   await hook.act(async () => {
     expect(await execute({})).toBe('local');
   });
-  expect(hook.result.current.state.executionCount).toBe(2);
+  expect(execution.getSnapshot().executionCount).toBe(2);
   await hook.act(() => {
     reset();
   });
-  expect(hook.result.current.state.executionCount).toBe(0);
+  expect(execution.getSnapshot().executionCount).toBe(0);
 });

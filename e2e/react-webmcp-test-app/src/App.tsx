@@ -1,6 +1,8 @@
+import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
 import {
   useMcpClient,
   useWebMCP,
+  useToolExecutionState,
   useWebMCPContext,
   useWebMCPPrompt,
   useWebMCPResource,
@@ -125,7 +127,10 @@ function App() {
   };
 
   // Tool 1: Counter Increment (Mutation)
+  const [incrementExecution] = useState(() => executionState());
+  const incrementState = useToolExecutionState(incrementExecution);
   const incrementTool = useWebMCP({
+    plugins: [incrementExecution],
     name: 'counter_increment',
     description: 'Increment the counter by a specified amount',
     inputSchema: COUNTER_AMOUNT_INPUT_SCHEMA,
@@ -139,7 +144,10 @@ function App() {
   });
 
   // Tool 2: Counter Decrement (Mutation)
+  const [decrementExecution] = useState(() => executionState());
+  const decrementState = useToolExecutionState(decrementExecution);
   const decrementTool = useWebMCP({
+    plugins: [decrementExecution],
     name: 'counter_decrement',
     description: 'Decrement the counter by a specified amount',
     inputSchema: COUNTER_AMOUNT_INPUT_SCHEMA,
@@ -153,7 +161,10 @@ function App() {
   });
 
   // Tool 3: Counter Reset (Destructive)
+  const [resetExecution] = useState(() => executionState());
+  const resetState = useToolExecutionState(resetExecution);
   const resetTool = useWebMCP({
+    plugins: [resetExecution],
     name: 'counter_reset',
     description: 'Reset the counter to zero. This action cannot be undone.',
     annotations: RESET_ANNOTATIONS,
@@ -166,7 +177,10 @@ function App() {
   });
 
   // Tool 4: Get Counter (Read-only query with outputSchema for structuredContent testing)
+  const [getCounterExecution] = useState(() => executionState());
+  const getCounterState = useToolExecutionState(getCounterExecution);
   const getCounterTool = useWebMCP({
+    plugins: [getCounterExecution],
     name: 'counter_get',
     description: 'Get the current counter value',
     outputSchema: GET_COUNTER_OUTPUT_SCHEMA,
@@ -179,7 +193,10 @@ function App() {
   });
 
   // Tool 5: Like Post
+  const [likePostExecution] = useState(() => executionState());
+  const likePostState = useToolExecutionState(likePostExecution);
   const likePostTool = useWebMCP({
+    plugins: [likePostExecution],
     name: 'posts_like',
     description: 'Like a post by ID. Increments the like count.',
     inputSchema: LIKE_POST_INPUT_SCHEMA,
@@ -199,7 +216,10 @@ function App() {
   });
 
   // Tool 6: Search Posts
+  const [searchPostsExecution] = useState(() => executionState());
+  const searchPostsState = useToolExecutionState(searchPostsExecution);
   const searchPostsTool = useWebMCP({
+    plugins: [searchPostsExecution],
     name: 'posts_search',
     description: 'Search posts by keyword',
     inputSchema: SEARCH_POSTS_INPUT_SCHEMA,
@@ -425,20 +445,20 @@ function App() {
 
   // Calculate total executions
   const totalExecutions =
-    incrementTool.state.executionCount +
-    decrementTool.state.executionCount +
-    resetTool.state.executionCount +
-    getCounterTool.state.executionCount +
-    likePostTool.state.executionCount +
-    searchPostsTool.state.executionCount;
+    incrementState.executionCount +
+    decrementState.executionCount +
+    resetState.executionCount +
+    getCounterState.executionCount +
+    likePostState.executionCount +
+    searchPostsState.executionCount;
 
   const isAnyExecuting =
-    incrementTool.state.isExecuting ||
-    decrementTool.state.isExecuting ||
-    resetTool.state.isExecuting ||
-    getCounterTool.state.isExecuting ||
-    likePostTool.state.isExecuting ||
-    searchPostsTool.state.isExecuting;
+    incrementState.isExecuting ||
+    decrementState.isExecuting ||
+    resetState.isExecuting ||
+    getCounterState.isExecuting ||
+    likePostState.isExecuting ||
+    searchPostsState.isExecuting;
 
   return (
     <div className="app-container">
@@ -469,49 +489,49 @@ function App() {
             type="button"
             className="primary"
             onClick={handleIncrement}
-            disabled={incrementTool.state.isExecuting}
+            disabled={incrementState.isExecuting}
             data-testid="increment-btn"
           >
-            {incrementTool.state.isExecuting && <span className="spinner" />}
+            {incrementState.isExecuting && <span className="spinner" />}
             Increment (+1)
           </button>
           <button
             type="button"
             className="primary"
             onClick={handleDecrement}
-            disabled={decrementTool.state.isExecuting}
+            disabled={decrementState.isExecuting}
             data-testid="decrement-btn"
           >
-            {decrementTool.state.isExecuting && <span className="spinner" />}
+            {decrementState.isExecuting && <span className="spinner" />}
             Decrement (-1)
           </button>
           <button
             type="button"
             className="danger"
             onClick={handleReset}
-            disabled={resetTool.state.isExecuting}
+            disabled={resetState.isExecuting}
             data-testid="reset-btn"
           >
-            {resetTool.state.isExecuting && <span className="spinner" />}
+            {resetState.isExecuting && <span className="spinner" />}
             Reset
           </button>
           <button
             type="button"
             className="secondary"
             onClick={handleGet}
-            disabled={getCounterTool.state.isExecuting}
+            disabled={getCounterState.isExecuting}
             data-testid="get-counter-btn"
           >
-            {getCounterTool.state.isExecuting && <span className="spinner" />}
+            {getCounterState.isExecuting && <span className="spinner" />}
             Get Value
           </button>
         </div>
 
-        {(incrementTool.state.error || decrementTool.state.error || resetTool.state.error) && (
+        {(incrementState.error || decrementState.error || resetState.error) && (
           <div className="error-message" data-testid="counter-error">
-            {incrementTool.state.error?.message ||
-              decrementTool.state.error?.message ||
-              resetTool.state.error?.message}
+            {incrementState.error?.message ||
+              decrementState.error?.message ||
+              resetState.error?.message}
           </div>
         )}
       </div>
@@ -545,7 +565,7 @@ function App() {
                 type="button"
                 className="secondary"
                 onClick={() => handleLikePost(post.id)}
-                disabled={likePostTool.state.isExecuting}
+                disabled={likePostState.isExecuting}
                 data-testid={`like-post-${post.id}`}
               >
                 Like
@@ -559,10 +579,10 @@ function App() {
             type="button"
             className="primary"
             onClick={handleSearch}
-            disabled={searchPostsTool.state.isExecuting}
+            disabled={searchPostsState.isExecuting}
             data-testid="search-posts-btn"
           >
-            {searchPostsTool.state.isExecuting && <span className="spinner" />}
+            {searchPostsState.isExecuting && <span className="spinner" />}
             Search "post"
           </button>
         </div>
@@ -574,9 +594,9 @@ function App() {
           </div>
         )}
 
-        {likePostTool.state.error && (
+        {likePostState.error && (
           <div className="error-message" data-testid="posts-error">
-            {likePostTool.state.error.message}
+            {likePostState.error.message}
           </div>
         )}
       </div>
@@ -711,16 +731,16 @@ function App() {
           <div className="stat-card">
             <div className="label">Counter Ops</div>
             <div className="value" data-testid="counter-executions">
-              {incrementTool.state.executionCount +
-                decrementTool.state.executionCount +
-                resetTool.state.executionCount +
-                getCounterTool.state.executionCount}
+              {incrementState.executionCount +
+                decrementState.executionCount +
+                resetState.executionCount +
+                getCounterState.executionCount}
             </div>
           </div>
           <div className="stat-card">
             <div className="label">Post Ops</div>
             <div className="value" data-testid="post-executions">
-              {likePostTool.state.executionCount + searchPostsTool.state.executionCount}
+              {likePostState.executionCount + searchPostsState.executionCount}
             </div>
           </div>
           <div className="stat-card">

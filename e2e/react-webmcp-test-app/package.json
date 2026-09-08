@@ -13,6 +13,7 @@
     "@mcp-b/global": "workspace:*",
     "@mcp-b/react-webmcp": "workspace:*",
     "@mcp-b/transports": "workspace:*",
+    "@mcp-b/webmcp-plugins": "workspace:*",
     "@modelcontextprotocol/client": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"

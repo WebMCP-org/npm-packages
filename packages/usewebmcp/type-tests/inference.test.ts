@@ -1,8 +1,10 @@
 import { z } from 'zod';
-import { createExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
+import type { WebMCPPlugin } from '@mcp-b/webmcp-plugins';
+import { ConsentBroker, consent } from '@mcp-b/webmcp-plugins/consent';
+import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
+import { useState } from 'react';
 import {
   useWebMCP,
-  useWebMCPTool,
   useToolExecutionState,
   type InferToolInput,
   type InferValidatedToolInput,
@@ -25,15 +27,17 @@ export type InferenceAssertions = [
   Assert<Equal<InferToolInput<Input>, { query: string; limit?: number }>>,
   Assert<Equal<InferToolInput<typeof schema>, z.input<typeof schema>>>,
   Assert<Equal<InferValidatedToolInput<typeof schema>, z.output<typeof schema>>>,
-  Assert<Equal<WebMCPReturn['state']['lastResult'], unknown>>,
+  Assert<Equal<Extract<keyof WebMCPReturn, 'state' | 'reset'>, never>>,
   Assert<Equal<Extract<keyof WebMCPReturn, 'isRegistered'>, never>>,
   Assert<Equal<WebMCPConfig['annotations'], WebMCP.ToolAnnotations | undefined>>,
   Assert<Equal<Document['modelContext'], WebMCP.ModelContext | undefined>>,
 ];
 
 export function useInferenceExamples() {
+  const [searchExecution] = useState(() => executionState<{ length: number }>());
   const tool = useWebMCP({
     name: 'search',
+    plugins: [searchExecution],
     description: 'Search items',
     inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
     execute: ({ query }, { signal }) => {
@@ -44,7 +48,7 @@ export function useInferenceExamples() {
     },
   });
   const result: Promise<{ length: number }> = tool.execute({ query: 'text' });
-  const lastResult: { length: number } | null = tool.state.lastResult;
+  const lastResult: { length: number } | null = useToolExecutionState(searchExecution).lastResult;
   // @ts-expect-error - query is required, inferred without as const
   void tool.execute({});
   // @ts-expect-error - query must be a string
@@ -62,16 +66,69 @@ export function useInferenceExamples() {
   const parsed: Promise<number> = transformed.execute({ count: '2' });
   // @ts-expect-error - callers supply the input type, not the transformed type
   void transformed.execute({ count: 2 });
-  const execution = createExecutionState<number>();
-  const registrationOnly = useWebMCPTool({
+  const [execution] = useState(() => executionState<number>());
+  const registrationOnly = useWebMCP({
     name: 'observed_parse',
     description: 'Separate registration and observation',
     inputSchema: schema,
     execute: ({ count, limit }) => count + limit,
     binding: ({ count, limit }) => ({ total: count + limit }),
-    middleware: [execution.aroundInvoke],
+    plugins: [execution],
   });
   const observed: number | null = useToolExecutionState(execution).lastResult;
+  const [untypedExecution] = useState(() => executionState());
+  const inferred = useWebMCP({
+    name: 'inferred_result',
+    description: 'Observers do not erase result inference',
+    plugins: [untypedExecution],
+    execute: () => 42,
+  });
+  const inferredResult: Promise<number> = inferred.execute({});
+  const observer: WebMCPPlugin<unknown> = {
+    name: 'custom-observer',
+    aroundInvoke: (_call, next) => next(),
+  };
+  const custom = useWebMCP({
+    name: 'custom_observer',
+    description: 'Custom observers retain result inference',
+    plugins: [observer],
+    inputSchema: schema,
+    execute: ({ count, limit }) => count + limit,
+  });
+  const customResult: Promise<number> = custom.execute({ count: '2' });
+  const gated = useWebMCP({
+    name: 'consent_observer',
+    description: 'Consent does not erase handler result inference',
+    plugins: [consent({ broker: new ConsentBroker({ policy: { mode: 'click' } }) })],
+    inputSchema: schema,
+    execute: ({ count, limit }) => count + limit,
+  });
+  const gatedResult: Promise<number> = gated.execute({ count: '2' });
+
+  const untypedBeforeSchema = useWebMCP({
+    name: 'untyped_before_schema',
+    description: 'Plugin order does not erase transformed result inference',
+    plugins: [untypedExecution],
+    inputSchema: schema,
+    execute: ({ count, limit }) => count + limit,
+  });
+  const untypedAfterSchema = useWebMCP({
+    name: 'untyped_after_schema',
+    description: 'Schema result inference survives observers in either position',
+    inputSchema: schema,
+    execute: ({ count, limit }) => count + limit,
+    plugins: [untypedExecution],
+  });
+  const untypedBeforeResult: Promise<number> = untypedBeforeSchema.execute({ count: '2' });
+  const untypedAfterResult: Promise<number> = untypedAfterSchema.execute({ count: '2' });
+  useWebMCP({
+    name: 'wrong_observer_type',
+    description: 'Typed observers must accept the handler result',
+    plugins: [executionState<string>()],
+    // @ts-expect-error - a string observer cannot consume a number result
+    execute: () => 42,
+  });
+
   const separateParsed: Promise<number> = registrationOnly.execute({ count: '2' });
   // @ts-expect-error - registration-only tools do not subscribe to state
   void registrationOnly.state;
@@ -91,5 +148,16 @@ export function useInferenceExamples() {
     annotations: { destructiveHint: true },
     execute: () => 1,
   });
-  return { result, lastResult, parsed, observed, separateParsed };
+  return {
+    result,
+    lastResult,
+    parsed,
+    observed,
+    separateParsed,
+    inferredResult,
+    customResult,
+    gatedResult,
+    untypedBeforeResult,
+    untypedAfterResult,
+  };
 }

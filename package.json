@@ -50,7 +50,8 @@
     "test:wpt:idl": "pnpm --filter @mcp-b/webmcp-polyfill build && node ./scripts/run-webmcp-wpt.mjs --idl",
     "typecheck": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/landing-page' run typecheck",
     "validate:docs": "pnpm --filter @mcp-b/documentation-website validate",
-    "validate:publish": "node ./scripts/validate-publish.js"
+    "validate:publish": "node ./scripts/validate-publish.js",
+    "test:hooks:eval": "node benchmarks/react-hooks/production.mjs --check && node benchmarks/react-hooks/bundle.mjs --check"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",

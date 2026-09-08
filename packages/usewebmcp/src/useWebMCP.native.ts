@@ -1,3 +1,4 @@
+import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
 import type { ChromeModelContext, ModelContext } from '@mcp-b/webmcp-types';
 import { createElement, StrictMode } from 'react';
 import { beforeAll, expect, it } from 'vitest';
@@ -19,10 +20,12 @@ beforeAll(() => {
 });
 
 it('registers, validates, executes, and cleans up through native WebMCP in StrictMode', async () => {
+  const execution = executionState();
   const failure = new Error('Count must be nonnegative');
   const hook = await renderHook(
     () =>
       useWebMCP({
+        plugins: [execution],
         name: 'native_validated',
         description: 'Native validation',
         inputSchema: z.object({ count: z.string().transform(Number) }),
@@ -53,23 +56,25 @@ it('registers, validates, executes, and cleans up through native WebMCP in Stric
       name: 'UnknownError',
     });
   });
-  expect(hook.result.current.state.error).toBeInstanceOf(TypeError);
+  expect(execution.getSnapshot().error).toBeInstanceOf(TypeError);
   await hook.act(async () => {
     await expect(context.executeTool(tool, JSON.stringify({ count: '-1' }))).rejects.toMatchObject({
       name: 'UnknownError',
     });
   });
-  expect(hook.result.current.state.error).toBe(failure);
-  expect(hook.result.current.state.isExecuting).toBe(false);
-  expect(hook.result.current.state.executionCount).toBe(1);
+  expect(execution.getSnapshot().error).toBe(failure);
+  expect(execution.getSnapshot().isExecuting).toBe(false);
+  expect(execution.getSnapshot().executionCount).toBe(1);
   await hook.unmount();
   expect((await context.getTools()).some((tool) => tool.name === 'native_validated')).toBe(false);
 });
 
 it('forwards native cancellation to the handler and clears pending state', async () => {
+  const execution = executionState();
   const started = Promise.withResolvers<AbortSignal>();
   const hook = await renderHook(() =>
     useWebMCP({
+      plugins: [execution],
       name: 'native_cancelled',
       description: 'Native cancellation',
       execute: (_, { signal }) => {
@@ -97,6 +102,6 @@ it('forwards native cancellation to the handler and clears pending state', async
     await rejection;
     await expect.poll(() => signal.aborted).toBe(true);
   });
-  expect(hook.result.current.state).toMatchObject({ isExecuting: false, executionCount: 0 });
+  expect(execution.getSnapshot()).toMatchObject({ isExecuting: false, executionCount: 0 });
   await hook.unmount();
 });

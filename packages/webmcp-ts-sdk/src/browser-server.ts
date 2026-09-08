@@ -20,7 +20,7 @@ import {
   invokeCallback,
   isInvocationCallback,
   type InvocationAdapterContext,
-} from '@mcp-b/webmcp-polyfill/invocation';
+} from '@mcp-b/webmcp-plugins';
 import type {
   ChromeModelContextExecuteToolOptions,
   ChromeModelContextExtensions,

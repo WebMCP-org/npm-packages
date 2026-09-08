@@ -1,3 +1,4 @@
+import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
 import { initializeWebModelContext } from '@mcp-b/global';
 import type { CallToolResult, ChromeModelContext, ModelContext } from '@mcp-b/webmcp-types';
 import { StrictMode, createElement } from 'react';
@@ -53,9 +54,11 @@ describe('useWebMCP in a browser runtime', () => {
   });
 
   it('registers, executes, and unregisters a real WebMCP tool', async () => {
-    const { act, result, unmount } = await renderHook(
+    const execution = executionState();
+    const { act, unmount } = await renderHook(
       () =>
         useWebMCP({
+          plugins: [execution],
           name: 'browser_greet',
           description: 'Greets a person',
           inputSchema: {
@@ -81,8 +84,8 @@ describe('useWebMCP in a browser runtime', () => {
       response = await executeRegisteredTool('browser_greet', { name: 'Ada' });
     });
     expect(response?.content[0]).toMatchObject({ type: 'text', text: 'Hello, Ada' });
-    expect(result.current.state.lastResult).toBe('Hello, Ada');
-    expect(result.current.state.executionCount).toBe(1);
+    expect(execution.getSnapshot().lastResult).toBe('Hello, Ada');
+    expect(execution.getSnapshot().executionCount).toBe(1);
 
     await unmount();
     expect(await findTool('browser_greet')).toBeUndefined();
@@ -118,10 +121,12 @@ describe('useWebMCP in a browser runtime', () => {
   });
 
   it('records non-serializable schema output as an execution error', async () => {
+    const execution = executionState();
     const cyclic: { self?: unknown } = {};
     cyclic.self = cyclic;
-    const { act, result } = await renderHook(() =>
+    const { act } = await renderHook(() =>
       useWebMCP({
+        plugins: [execution],
         name: 'browser_invalid_output',
         description: 'Returns invalid structured output',
         outputSchema: { type: 'object', properties: { ok: { type: 'boolean' } } } as const,
@@ -134,13 +139,14 @@ describe('useWebMCP in a browser runtime', () => {
       response = await executeRegisteredTool('browser_invalid_output');
     });
     expect(response?.isError).toBe(true);
-    expect(result.current.state.executionCount).toBe(0);
-    expect(result.current.state.error?.message).toContain('JSON-serializable');
+    expect(execution.getSnapshot().executionCount).toBe(0);
+    expect(execution.getSnapshot().error?.message).toContain('JSON-serializable');
   });
 
   it.each(['default', 'custom'] as const)(
     'formats agent failures as MCP errors while local calls reject (%s)',
     async (formatter) => {
+      const execution = executionState();
       const register = vi.spyOn(document.modelContext, 'registerTool');
       try {
         const failure = new Error('Handler failed');
@@ -153,6 +159,7 @@ describe('useWebMCP in a browser runtime', () => {
             : undefined;
         const hook = await renderHook(() =>
           useWebMCP({
+            plugins: [execution],
             name: 'mcp_agent_failure',
             description: 'Preserves agent and local error contracts',
             ...(formatError && { formatError }),
@@ -175,7 +182,7 @@ describe('useWebMCP in a browser runtime', () => {
           );
           await expect(hook.result.current.execute({})).rejects.toBe(failure);
         });
-        expect(hook.result.current.state).toEqual({
+        expect(execution.getSnapshot()).toEqual({
           isExecuting: false,
           lastResult: null,
           error: failure,
@@ -189,11 +196,13 @@ describe('useWebMCP in a browser runtime', () => {
   );
 
   it('formats Standard Schema failures before the handler runs', async () => {
+    const execution = executionState();
     const register = vi.spyOn(document.modelContext, 'registerTool');
     try {
       const execute = vi.fn(() => 'unexpected');
       const hook = await renderHook(() =>
         useWebMCP({
+          plugins: [execution],
           name: 'mcp_validation_failure',
           description: 'Formats invalid input for agents',
           inputSchema: z.object({ count: z.string().regex(/^\d+$/, 'Use digits') }),
@@ -217,7 +226,7 @@ describe('useWebMCP in a browser runtime', () => {
         );
       });
       expect(execute).not.toHaveBeenCalled();
-      expect(hook.result.current.state).toEqual({
+      expect(execution.getSnapshot()).toEqual({
         isExecuting: false,
         lastResult: null,
         error: new TypeError('Invalid tool input: Use digits'),
@@ -229,11 +238,13 @@ describe('useWebMCP in a browser runtime', () => {
   });
 
   it('keeps cancelled agent calls rejected instead of formatting an MCP error', async () => {
+    const execution = executionState();
     const register = vi.spyOn(document.modelContext, 'registerTool');
     try {
       const started = Promise.withResolvers<void>();
       const hook = await renderHook(() =>
         useWebMCP({
+          plugins: [execution],
           name: 'mcp_agent_cancellation',
           description: 'Preserves cancellation through error formatting',
           execute: () => {
@@ -256,7 +267,7 @@ describe('useWebMCP in a browser runtime', () => {
         controller.abort(reason);
         await rejection;
       });
-      expect(hook.result.current.state).toEqual({
+      expect(execution.getSnapshot()).toEqual({
         isExecuting: false,
         lastResult: null,
         error: reason,
@@ -355,10 +366,12 @@ describe('useWebMCP in a browser runtime', () => {
     });
   });
   it('validates and transforms input once while preserving MCP output metadata', async () => {
+    const execution = executionState();
     const inputSchema = z.object({ count: z.string().transform(Number) });
     const validate = vi.spyOn(inputSchema['~standard'], 'validate');
     const hook = await renderHook(() =>
       useWebMCP({
+        plugins: [execution],
         name: 'mcp_validated',
         description: 'Validates MCP input',
         inputSchema,
@@ -376,7 +389,7 @@ describe('useWebMCP in a browser runtime', () => {
       });
     });
     expect(validate).toHaveBeenCalledTimes(1);
-    expect(hook.result.current.state.lastResult).toEqual({ total: 3 });
+    expect(execution.getSnapshot().lastResult).toEqual({ total: 3 });
     validate.mockRestore();
   });
 });

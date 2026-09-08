@@ -1,7 +1,7 @@
-import { createInvocationCallback, InvocationFailure } from '@mcp-b/webmcp-polyfill/invocation';
+import { createInvocationCallback, InvocationFailure } from '@mcp-b/webmcp-plugins';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
-import { standardSchema } from '@mcp-b/webmcp-polyfill/standard-schema';
+import { standardSchema } from '@mcp-b/webmcp-plugins/standard-schema';
 import {
   BAGGAGE_META_KEY,
   TRACEPARENT_META_KEY,
@@ -46,15 +46,18 @@ it('runs managed MCP input validation inside invocation middleware', async () =>
     execute: createInvocationCallback(() => ({
       tool: { name: 'managed_input', instanceId: 'managed-input-1' },
       execute,
-      middleware: [
-        async (call, next) => {
-          observed.push(call.protocol);
-          try {
-            return await next();
-          } catch (error) {
-            observed.push(error instanceof InvocationFailure ? error.kind : error);
-            throw error;
-          }
+      plugins: [
+        {
+          name: 'test-plugin',
+          aroundInvoke: async (call, next) => {
+            observed.push(call.protocol);
+            try {
+              return await next();
+            } catch (error) {
+              observed.push(error instanceof InvocationFailure ? error.kind : error);
+              throw error;
+            }
+          },
         },
       ],
     })),
@@ -96,11 +99,14 @@ it('validates the JSON projection before applying a vendor transform once', asyn
       tool: { name: 'managed_transform', instanceId: 'managed-transform-1' },
       input: standardSchema(schema),
       execute,
-      middleware: [
-        async (call, next) => {
-          prepared.push((await call.prepare()).arguments);
-          prepared.push((await call.prepare()).arguments);
-          return next();
+      plugins: [
+        {
+          name: 'test-plugin',
+          aroundInvoke: async (call, next) => {
+            prepared.push((await call.prepare()).arguments);
+            prepared.push((await call.prepare()).arguments);
+            return next();
+          },
         },
       ],
     })),
@@ -129,17 +135,20 @@ it.each(['webmcp', 'mcp'] as const)(
       execute: createInvocationCallback(() => ({
         tool: { name: 'managed_error', instanceId: 'managed-error-1' },
         execute: () => response,
-        middleware: [
-          async (call, next) => {
-            observed.push(call.protocol);
-            try {
-              const result = await next();
-              observed.push('success');
-              return result;
-            } catch (error) {
-              observed.push(error instanceof InvocationFailure ? error.kind : error);
-              throw error;
-            }
+        plugins: [
+          {
+            name: 'test-plugin',
+            aroundInvoke: async (call, next) => {
+              observed.push(call.protocol);
+              try {
+                const result = await next();
+                observed.push('success');
+                return result;
+              } catch (error) {
+                observed.push(error instanceof InvocationFailure ? error.kind : error);
+                throw error;
+              }
+            },
           },
         ],
       })),
@@ -166,15 +175,18 @@ it('passes MCP request context and string trace fields from request metadata', a
     execute: createInvocationCallback(() => ({
       tool: { name: 'managed_context', instanceId: 'managed-context-1' },
       execute: () => 'done',
-      middleware: [
-        async (call, next) => {
-          observed.push({
-            protocol: call.protocol,
-            mcp: call.mcp,
-            caller: call.caller,
-            traceContext: call.traceContext,
-          });
-          return next();
+      plugins: [
+        {
+          name: 'test-plugin',
+          aroundInvoke: async (call, next) => {
+            observed.push({
+              protocol: call.protocol,
+              mcp: call.mcp,
+              caller: call.caller,
+              traceContext: call.traceContext,
+            });
+            return next();
+          },
         },
       ],
     })),
@@ -217,16 +229,19 @@ it('validates managed output before middleware observes completion', async () =>
     execute: createInvocationCallback(() => ({
       tool: { name: 'managed_output', instanceId: 'managed-output-1' },
       execute: () => ({ count: 'invalid' }),
-      middleware: [
-        async (_call, next) => {
-          try {
-            const result = await next();
-            observed.push('success');
-            return result;
-          } catch (error) {
-            observed.push(error instanceof InvocationFailure ? error.kind : error);
-            throw error;
-          }
+      plugins: [
+        {
+          name: 'test-plugin',
+          aroundInvoke: async (_call, next) => {
+            try {
+              const result = await next();
+              observed.push('success');
+              return result;
+            } catch (error) {
+              observed.push(error instanceof InvocationFailure ? error.kind : error);
+              throw error;
+            }
+          },
         },
       ],
     })),
@@ -248,11 +263,14 @@ it('keeps a raw isError property as data and exposes the normalized response to 
     execute: createInvocationCallback(() => ({
       tool: { name: 'raw_error_property', instanceId: 'raw-error-1' },
       execute: () => value,
-      middleware: [
-        async (_call, next) => {
-          const result = await next();
-          observed.push(result);
-          return result;
+      plugins: [
+        {
+          name: 'test-plugin',
+          aroundInvoke: async (_call, next) => {
+            const result = await next();
+            observed.push(result);
+            return result;
+          },
         },
       ],
     })),
@@ -272,16 +290,19 @@ it('rejects malformed MCP content before middleware observes success', async () 
     execute: createInvocationCallback(() => ({
       tool: { name: 'malformed_content', instanceId: 'malformed-content-1' },
       execute: () => ({ content: [{ type: 'text', text: 5 }], isError: true }),
-      middleware: [
-        async (_call, next) => {
-          try {
-            const result = await next();
-            observed.push('success');
-            return result;
-          } catch (error) {
-            observed.push(error instanceof InvocationFailure ? error.kind : error);
-            throw error;
-          }
+      plugins: [
+        {
+          name: 'test-plugin',
+          aroundInvoke: async (_call, next) => {
+            try {
+              const result = await next();
+              observed.push('success');
+              return result;
+            } catch (error) {
+              observed.push(error instanceof InvocationFailure ? error.kind : error);
+              throw error;
+            }
+          },
         },
       ],
     })),
@@ -314,14 +335,17 @@ it.each(['caller', 'registration'] as const)(
             },
           },
           execute,
-          middleware: [
-            async (_call, next) => {
-              try {
-                return await next();
-              } catch (error) {
-                observed.push(error instanceof InvocationFailure ? error.kind : error);
-                throw error;
-              }
+          plugins: [
+            {
+              name: 'test-plugin',
+              aroundInvoke: async (_call, next) => {
+                try {
+                  return await next();
+                } catch (error) {
+                  observed.push(error instanceof InvocationFailure ? error.kind : error);
+                  throw error;
+                }
+              },
             },
           ],
         })),

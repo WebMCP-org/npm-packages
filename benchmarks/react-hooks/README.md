@@ -1,16 +1,16 @@
 # React hook comparison
 
-Measure native registrations, React owner commits, callback latency, and bundle size.
-
-[Production report](PRODUCTION.md) · [Raw samples](production-results.json) ·
+Measure native registrations, React commits, callback latency, and bundle size in a production
+browser. [Report](PRODUCTION.md) · [Raw samples](production-results.json) ·
 [Bundle sizes](bundle-results.json)
 
-Results belong to the source commit and environment recorded in each artifact. Regenerate
-them after source changes. Public package READMEs use tables; this README documents the harness.
+Results belong to the source commit and environment recorded in each artifact. Regenerate them
+after source changes. This production harness is the comparison source; package tests own
+[lifecycle correctness](../../docs/TESTING.md#react-hook-harness).
 
 ## Reproduce
 
-Run from the repository root with a Chrome build that provides native WebMCP:
+From the repository root, with a Chrome build that provides native WebMCP:
 
 ```bash
 pnpm install --frozen-lockfile
@@ -21,63 +21,73 @@ CHROME_BIN=/path/to/chrome-canary node benchmarks/react-hooks/production.mjs
 node benchmarks/react-hooks/bundle.mjs
 ```
 
-Use a clean source checkout and run timings without concurrent builds or tests. The runner
-enables native WebMCP and rejects a missing or polyfilled registry. Artifacts record the
-source commit, dirty-tree flag, browser, platform, and toolchain versions.
+The runners consume these built production entries. Run timings from a clean checkout without
+concurrent builds or tests. The runner enables native
+WebMCP and rejects a missing/polyfilled registry. Artifacts record source commit, dirty-tree status,
+browser, platform, and toolchain versions.
+
+To check deterministic behavior without rewriting artifacts:
+
+```bash
+CHROME_BIN=/path/to/chrome-canary pnpm test:hooks:eval
+```
+
+CI runs this same production evaluation. Registration and commit assertions are gates;
+hardware-dependent durations have no pass/fail threshold.
 
 The isolated benchmark lockfile pins React 19.2.8, MCP Cat's `webmcp-react` 1.1.0,
-Google's `use-webmcp-tool` 0.2.0, and Zod 4.4.3. Our packages come from this checkout.
+Google's `use-webmcp-tool` 0.2.0, and Zod 4.4.3. Our packages come from the checkout.
 Competitor dependencies are excluded from the main workspace and published packages.
 
 ## Production modes
 
-The [browser fixture](production.jsx) and [runner](production.mjs) compare nine modes:
+The [fixture](production.jsx) and [runner](production.mjs) compare nine modes:
 
-| Mode                                      | Execution state         | Added middleware         |
-| ----------------------------------------- | ----------------------- | ------------------------ |
-| `usewebmcp`                               | Owner subscribes        | Built-in state observer  |
-| `@mcp-b/react-webmcp`                     | Owner subscribes        | Built-in state observer  |
-| MCP Cat                                   | Owner subscribes        | Package behavior         |
-| Google                                    | None                    | Package behavior         |
-| `usewebmcp / registration only`           | None                    | None                     |
-| `usewebmcp / unsubscribed state`          | Recorded, no subscriber | State observer           |
-| `usewebmcp / passthrough`                 | None                    | One passthrough function |
-| `usewebmcp / OTel no-op`                  | None                    | OTel with a no-op tracer |
-| `@mcp-b/react-webmcp / registration only` | None                    | None                     |
+| Mode                      | Execution-state subscription | Added plugins                |
+| ------------------------- | ---------------------------- | ---------------------------- |
+| `usewebmcp`               | None                         | None                         |
+| `@mcp-b/react-webmcp`     | None                         | None                         |
+| MCP Cat                   | Owner, package behavior      | Package behavior             |
+| Google                    | None                         | Package behavior             |
+| Core + state in owner     | Registration owner           | Execution state              |
+| Core + state in child     | Status child                 | Execution state              |
+| Core + unsubscribed state | Recorded, no subscriber      | Execution state              |
+| Core + passthrough        | None                         | One named passthrough plugin |
+| Core + OTel no-op         | None                         | OTel with a no-op tracer     |
 
-Owner commits count the component that registers the tool. Zero is a valid result, including for
-Google; the separate execution-state row says whether that hook
-provides state. Zero commits do not imply a loading indicator. The unsubscribed-state mode
-verifies that its store records every call. OTel measures local instrumentation overhead
-without a provider or exporter.
+Owner commits count the component registering the tool. Status-child commits are counted
+separately. A zero owner count does not imply that no child updates, or that a loading indicator
+exists. The unsubscribed-state mode verifies that its store records every call. OTel measures
+local instrumentation overhead without a provider or exporter.
 
-Each mode runs with 1, 10, and 100 tools; 1 or 100 schema fields; and stable or equivalent
-inline schema objects. Twelve scenarios × nine modes × five measured trials produce
-**540 samples**, after one warmup trial per scenario and mode. Mode order rotates.
+Each mode runs with 1, 10, and 100 tools; 1 or 100 schema fields; and stable or equivalent inline
+schema objects. Twelve scenarios × nine modes × five trials produce **540 samples**, after one
+warmup per scenario/mode. Mode order rotates.
 
-Each sample mounts a fresh React root, performs ten unrelated parent updates, changes every
-tool description, and executes ten sequential calls on the first tool. All modes use the
-same JSON Schema and handler, which yields one MessageChannel task before returning.
-MCP Cat uses its documented provider and preserves the native registry.
+Each sample mounts a fresh root, performs ten unrelated parent updates, changes every description,
+and calls the first tool ten times sequentially. All modes use the same JSON Schema and handler,
+which yields one MessageChannel task. MCP Cat uses its documented provider and native registry.
 
 ## Metrics and checks
 
-| Metric             | Meaning                                                                          |
-| ------------------ | -------------------------------------------------------------------------------- |
-| Registrations      | Native `registerTool` attempts on mount, unrelated updates, and metadata changes |
-| Owner commits      | Committed renders counted by a consumer layout effect                            |
-| Completion latency | Time through callback, required React work, and native registration completion   |
-| Callback latency   | Time until the registered callback resolves, before waiting for React            |
+| Metric             | Meaning                                                                        |
+| ------------------ | ------------------------------------------------------------------------------ |
+| Registrations      | Native `registerTool` attempts during mount and updates                        |
+| Owner commits      | Committed renders in the registration component's layout effect                |
+| Child commits      | Committed renders in the optional status child                                 |
+| Completion latency | Time through callback, required React work, and native registration completion |
+| Callback latency   | Time until the registered callback resolves, before waiting for React          |
 
-The harness waits for native registration promises, checks current tool metadata and handler
-closures, verifies completed calls and exposed state, and confirms unmount removes every tool.
-Expected aborted setup registrations are recorded; other browser errors fail the run.
-Two quiet task turns confirm observed settlement but are excluded from endpoint timestamps.
+The harness awaits native registration promises, verifies metadata and current handler closures,
+checks completed results and exposed state, and confirms unmount removes tools. Expected aborted
+setup attempts are recorded; other browser errors fail. Two quiet task turns confirm settlement
+but are excluded from endpoint timestamps.
 
-Report counts show observed ranges. Timings show medians and ranges across five trials;
-each trial's ten updates or calls is summarized first. These are browser completion latencies,
-including scheduling, rather than CPU or paint time. Values round to 0.01 ms. No network,
-transport, supplied schema validator, retained-heap measurement, or timing threshold is included.
+Counts show observed ranges. Timing summaries report medians and ranges across five trials;
+each trial's ten updates/calls is summarized first. These are browser completion latencies,
+including scheduling, not CPU or paint time. Values round to 0.01 ms. No network, transport,
+application schema validator, retained-heap measurement, or timing threshold is included.
+
 Production uses no `act()`, `flushSync()`, or profiling build. See
 [Vite production builds](https://vite.dev/guide/build),
 [React profiling caveats](https://react.dev/reference/react/Profiler#caveats), and
@@ -85,28 +95,18 @@ Production uses no `act()`, `flushSync()`, or profiling build. See
 
 ## Bundle method
 
-The [bundle runner](bundle.mjs) measures **11 individual exports**: four existing tool
-hooks, our two registration-only hooks, and the five invocation, Standard Schema, execution-state,
-consent, and OTel entries. Each export is tree-shaken from its production ESM entry using
-Vite+, targeting ES2022, with raw, Oxc-minified, and gzip level 9 sizes recorded.
+The [bundle runner](bundle.mjs) measures four tool hooks and five plugin entries:
+runner, Standard Schema, execution state, consent, and OTel. Each entry is tree-shaken
+from production ESM with Vite+, targeting ES2022. Artifacts include raw, Oxc-minified, and gzip
+level 9 sizes.
 
-React and React DOM are external; other imported dependencies remain included. Each sample
-measures one export, not a whole application or the incremental cost of combining exports.
-Application validators and runtime setup are excluded. Assertions check entry resolution,
-exports, unexpected external dependencies, and optional SDK/fallback leakage into core entries.
-
-## Historical fixtures
-
-[RESULTS.md](RESULTS.md) and [results.json](results.json) preserve the development fixture,
-which uses `act()` and overlapping calls. Its counts do not predict sequential production
-behavior. Run it separately with `CHROME_BIN=/path/to/chrome-canary node benchmarks/react-hooks/run.mjs`.
-The [package tests](../../docs/TESTING.md#react-hook-harness) remain the lifecycle correctness suite.
-
-[report.html](report.html) and the older light/dark chart images are historical presentations
-of earlier results, not the current README comparison. They require the separate design-system
-checkout; they are not needed to reproduce current measurements.
+React and React DOM are external; other imported dependencies remain included. Each entry measures
+one export, except consent, which measures the usable `ConsentBroker` + `consent` pair. Sizes do
+not represent a complete application or the incremental cost of combining plugins. Application
+validators and browser setup are excluded. Assertions check exports, dependency resolution, and
+unexpected MCP SDK/polyfill initializer code in the core bundle.
 
 Primary comparison sources: [MCP Cat](https://github.com/agentcathq/webmcp-react),
 [GoogleChromeLabs/use-webmcp-tool](https://github.com/GoogleChromeLabs/use-webmcp-tool),
 [usewebmcp](../../packages/usewebmcp/README.md), and
-[the MCP-B React adapter](../../packages/react-webmcp/README.md).
+[the MCP-B adapter](../../packages/react-webmcp/README.md).

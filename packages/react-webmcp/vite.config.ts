@@ -15,7 +15,7 @@ export default defineConfig({
     treeshake: true,
     deps: {
       neverBundle: [
-        /^@mcp-b\/webmcp-polyfill(?:\/.*)?$/,
+        /^@mcp-b\/webmcp-plugins(?:\/.*)?$/,
         /^react(?:\/.*)?$/,
         /^react-dom(?:\/.*)?$/,
         /^usewebmcp$/,

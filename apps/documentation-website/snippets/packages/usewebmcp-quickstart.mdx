@@ -2,12 +2,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useWebMCPTool } from 'usewebmcp';
+import { useWebMCP } from 'usewebmcp';
 
 export function Counter() {
   const [count, setCount] = useState(0);
 
-  useWebMCPTool({
+  useWebMCP({
     name: 'get_count',
     description: 'Get the current counter value',
     annotations: { readOnlyHint: true },

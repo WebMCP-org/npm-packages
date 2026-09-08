@@ -2,17 +2,17 @@
 'use client';
 
 import { useState } from 'react';
-import { useWebMCPTool, useToolExecutionState } from 'usewebmcp';
-import { createExecutionState, type ExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
+import { useWebMCP, useToolExecutionState } from 'usewebmcp';
+import { executionState, type ExecutionState } from '@mcp-b/webmcp-plugins/execution-state';
 
 export function ToolPanel() {
-  const [execution] = useState(() => createExecutionState<string>());
-  useWebMCPTool({
+  const [execution] = useState(() => executionState<string>());
+  useWebMCP({
     name: 'get_status',
     description: 'Get the application status',
     annotations: { readOnlyHint: true },
     execute: () => 'ready',
-    middleware: [execution.aroundInvoke],
+    plugins: [execution],
   });
   return <ToolStatus execution={execution} />;
 }

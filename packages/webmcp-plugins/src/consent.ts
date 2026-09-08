@@ -6,6 +6,7 @@ import {
   type InvocationResult,
   type PreparedOperation,
   type ToolIdentity,
+  type WebMCPPlugin,
 } from './invocation.js';
 
 export interface PendingConsentRequest {
@@ -202,19 +203,24 @@ export class ConsentBroker {
     entry.settle();
     return true;
   }
+}
 
-  readonly aroundInvoke = async <T>(
-    call: InvocationContext,
-    next: () => Promise<InvocationResult<T>>
-  ): Promise<InvocationResult<T>> => {
-    const operation = await call.prepare();
-    await this.authorize({
-      invocationId: call.id,
-      operation,
-      signal: call.signal,
-      caller: call.caller,
-    });
-    call.signal.throwIfAborted();
-    return next();
+export function consent({ broker }: { broker: ConsentBroker }): WebMCPPlugin {
+  return {
+    name: 'consent',
+    aroundInvoke: async <T>(
+      call: InvocationContext,
+      next: () => Promise<InvocationResult<T>>
+    ): Promise<InvocationResult<T>> => {
+      const operation = await call.prepare();
+      await broker.authorize({
+        invocationId: call.id,
+        operation,
+        signal: call.signal,
+        caller: call.caller,
+      });
+      call.signal.throwIfAborted();
+      return next();
+    },
   };
 }

@@ -1,5 +1,5 @@
 import { cleanupWebMCPPolyfill, initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
-import { createExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
+import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
 import {
   Profiler,
   useLayoutEffect,
@@ -10,7 +10,7 @@ import {
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, configure, renderHook } from 'vitest-browser-react/pure';
-import { useWebMCPTool } from './useWebMCPTool.js';
+import { useWebMCP } from './useWebMCP.js';
 import { useToolExecutionState } from './useToolExecutionState.js';
 
 beforeEach(() => initializeWebMCPPolyfill());
@@ -27,7 +27,7 @@ it('rejects changed registration metadata before passive cleanup while handler-o
   const execute = vi.fn((revision: number) => revision);
   let registered: (typeof register.mock.calls)[number][0] | undefined;
   function Tool({ revision, description }: { revision: number; description: string }) {
-    useWebMCPTool({ name: 'layout_binding', description, execute: () => execute(revision) });
+    useWebMCP({ name: 'layout_binding', description, execute: () => execute(revision) });
     useLayoutEffect(() => {
       if (!registered) return;
       const call = Promise.resolve(
@@ -72,7 +72,7 @@ describe.each([false, true])('registration-only hook (StrictMode: %s)', (strict)
     const pending = Promise.withResolvers<number>();
     const hook = await renderHook(
       () =>
-        useWebMCPTool({
+        useWebMCP({
           name: 'registration_only',
           description: 'Run without observing execution state',
           execute: () => pending.promise,
@@ -106,12 +106,12 @@ describe.each([false, true])('registration-only hook (StrictMode: %s)', (strict)
     const pending = Promise.withResolvers<number>();
     const owner = await renderHook(
       () => {
-        const [execution] = useState(() => createExecutionState<number>());
-        const tool = useWebMCPTool({
+        const [execution] = useState(() => executionState<number>());
+        const tool = useWebMCP({
           name: 'isolated_status',
           description: 'Only status consumers update',
           execute: () => pending.promise,
-          middleware: [execution.aroundInvoke],
+          plugins: [execution],
         });
         return { tool, execution };
       },
@@ -155,16 +155,19 @@ describe.each([false, true])('registration-only hook (StrictMode: %s)', (strict)
     const execute = vi.fn(() => 'done');
     const hook = await renderHook(
       ({ revision }) =>
-        useWebMCPTool({
+        useWebMCP({
           name: 'approval_lifetime',
           description: `Revision ${revision}`,
           execute,
-          middleware: [
-            async (call, next) => {
-              await call.prepare();
-              entered.resolve();
-              await approval.promise;
-              return next();
+          plugins: [
+            {
+              name: 'test-approval',
+              aroundInvoke: async (call, next) => {
+                await call.prepare();
+                entered.resolve();
+                await approval.promise;
+                return next();
+              },
             },
           ],
         }),
@@ -191,19 +194,22 @@ describe.each([false, true])('registration-only hook (StrictMode: %s)', (strict)
     const execute = vi.fn(() => 'done');
     const hook = await renderHook(
       ({ authorized }) =>
-        useWebMCPTool({
+        useWebMCP({
           name: 'current_authority',
           description: 'Rechecks permission before side effects',
           execute,
           checkBinding: () => {
             if (!authorized) throw new Error('Tool permission revoked');
           },
-          middleware: [
-            async (call, next) => {
-              await call.prepare();
-              started.resolve();
-              await approval.promise;
-              return next();
+          plugins: [
+            {
+              name: 'test-approval',
+              aroundInvoke: async (call, next) => {
+                await call.prepare();
+                started.resolve();
+                await approval.promise;
+                return next();
+              },
             },
           ],
         }),

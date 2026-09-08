@@ -38,10 +38,13 @@ it.each(['raw', 'transformed'] as const)(
               input: { validate: () => new Count(2) },
               execute,
               binding: (value) => ({ value: value.value }),
-              middleware: [
-                async (call, next) => {
-                  await call.prepare();
-                  return next();
+              plugins: [
+                {
+                  name: 'test-plugin',
+                  aroundInvoke: async (call, next) => {
+                    await call.prepare();
+                    return next();
+                  },
                 },
               ],
             },
@@ -64,10 +67,13 @@ it.each(['sparse', 'extra-property'] as const)(
         {
           tool: { name: 'array', instanceId: 'array-1' },
           execute,
-          middleware: [
-            async (call, next) => {
-              await call.prepare();
-              return next();
+          plugins: [
+            {
+              name: 'test-plugin',
+              aroundInvoke: async (call, next) => {
+                await call.prepare();
+                return next();
+              },
             },
           ],
         },
@@ -101,14 +107,17 @@ it('privately snapshots Date, Map, and Set before approval and isolates binding 
         bindingInput = value;
         return summarize(value);
       },
-      middleware: [
-        async (call, next) => {
-          const operation = await call.prepare();
-          expect(operation.binding).toEqual(expected);
-          expect(operation.arguments).toBeUndefined();
-          waiting.resolve();
-          await approved.promise;
-          return next();
+      plugins: [
+        {
+          name: 'test-plugin',
+          aroundInvoke: async (call, next) => {
+            const operation = await call.prepare();
+            expect(operation.binding).toEqual(expected);
+            expect(operation.arguments).toBeUndefined();
+            waiting.resolve();
+            await approved.promise;
+            return next();
+          },
         },
       ],
       execute: summarize,
@@ -132,12 +141,15 @@ it('accepts an explicit complete binding for an array with custom data', async (
     {
       tool: { name: 'bound_array', instanceId: 'bound-array-1' },
       binding: (value: typeof input) => ({ items: [...value], extra: value.extra }),
-      middleware: [
-        async (call, next) => {
-          const operation = await call.prepare();
-          expect(operation.arguments).toBeUndefined();
-          expect(operation.binding).toEqual({ items: [1], extra: 'visible in binding' });
-          return next();
+      plugins: [
+        {
+          name: 'test-plugin',
+          aroundInvoke: async (call, next) => {
+            const operation = await call.prepare();
+            expect(operation.arguments).toBeUndefined();
+            expect(operation.binding).toEqual({ items: [1], extra: 'visible in binding' });
+            return next();
+          },
         },
       ],
       execute: (value: typeof input) => value.extra,
@@ -162,10 +174,13 @@ it.each(['non-enumerable', 'symbol'] as const)(
           tool: { name: 'hidden_fields', instanceId: 'hidden-fields-1' },
           input: { validate: () => input },
           execute,
-          middleware: [
-            async (call, next) => {
-              await call.prepare();
-              return next();
+          plugins: [
+            {
+              name: 'test-plugin',
+              aroundInvoke: async (call, next) => {
+                await call.prepare();
+                return next();
+              },
             },
           ],
         },

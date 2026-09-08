@@ -16,22 +16,20 @@ const aliases = {
 const libraries = ['usewebmcp', '@mcp-b/react-webmcp', 'webmcp-react', 'use-webmcp-tool'].map(
   (library) => ({
     library,
-    exportName: library === 'webmcp-react' ? 'useMcpTool' : 'useWebMCP',
+    exportNames: [library === 'webmcp-react' ? 'useMcpTool' : 'useWebMCP'],
   })
 );
 libraries.push(
-  { library: 'usewebmcp', exportName: 'useWebMCPTool' },
-  { library: '@mcp-b/react-webmcp', exportName: 'useWebMCPTool' },
   ...Object.entries({
-    invocation: 'invoke',
-    'standard-schema': 'standardSchema',
-    'execution-state': 'createExecutionState',
-    consent: 'ConsentBroker',
-    otel: 'createOtelMiddleware',
-  }).map(([subpath, exportName]) => ({
-    library: '@mcp-b/webmcp-polyfill',
+    '': ['invoke'],
+    'standard-schema': ['standardSchema'],
+    'execution-state': ['executionState'],
+    consent: ['ConsentBroker', 'consent'],
+    otel: ['otel'],
+  }).map(([subpath, exportNames]) => ({
+    library: '@mcp-b/webmcp-plugins',
     subpath,
-    exportName,
+    exportNames,
   }))
 );
 const external = (id) => /^(react|react-dom)(\/|$)/.test(id);
@@ -40,17 +38,19 @@ const installedDependencies = json(resolve(directory, 'package.json')).devDepend
 for (const [name, expected] of Object.entries(installedDependencies)) {
   assert.equal(json(resolve(directory, 'node_modules', name, 'package.json')).version, expected);
 }
+const checkOnly = process.argv.includes('--check');
 const samples = [];
-for (const { library, subpath, exportName } of libraries) {
+for (const { library, subpath, exportNames } of libraries) {
   const moduleName = subpath ? `${library}/${subpath}` : library;
   const packageDirectory = aliases[library]
     ? resolve(dirname(aliases[library]), '..')
-    : library === '@mcp-b/webmcp-polyfill'
-      ? resolve(root, 'packages/webmcp-polyfill')
+    : library === '@mcp-b/webmcp-plugins'
+      ? resolve(root, 'packages/webmcp-plugins')
       : resolve(directory, 'node_modules', library);
   const manifest = json(resolve(packageDirectory, 'package.json'));
   const exported = manifest.exports[subpath ? `./${subpath}` : '.'];
-  if (subpath) aliases[moduleName] = resolve(packageDirectory, exported.import);
+  if (library === '@mcp-b/webmcp-plugins')
+    aliases[moduleName] = resolve(packageDirectory, exported.import);
   const entry = realpathSync(
     aliases[moduleName] ?? resolve(packageDirectory, exported.import ?? exported.default)
   );
@@ -62,13 +62,20 @@ for (const { library, subpath, exportName } of libraries) {
       root: directory,
       mode: 'production',
       logLevel: 'error',
-      resolve: { alias: aliases },
+      resolve: {
+        alias: Object.entries(aliases).map(([find, replacement]) => ({
+          find: new RegExp(`^${find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+          replacement,
+        })),
+      },
       plugins: [
         {
           name: 'hook-entry',
           resolveId: (id) => (id === virtualEntry ? virtualEntry : null),
           load: (id) =>
-            id === virtualEntry ? `export { ${exportName} } from '${moduleName}';` : null,
+            id === virtualEntry
+              ? `export { ${exportNames.join(', ')} } from '${moduleName}';`
+              : null,
         },
       ],
       build: {
@@ -88,12 +95,12 @@ for (const { library, subpath, exportName } of libraries) {
     assert.equal(result.output.length, 1, `${library}: expected one JavaScript bundle`);
     const output = result.output[0];
     assert.equal(output.type, 'chunk');
-    assert.deepEqual(output.exports, [exportName]);
+    assert.deepEqual(output.exports.toSorted(), exportNames.toSorted());
     assert(output.moduleIds.includes(entry), `${library}: expected the ESM entry`);
     assert(!output.moduleIds.some((id) => /\/node_modules\/(react|react-dom)\//.test(id)));
     assert(output.imports.every(external), `${library}: unexpected external dependencies`);
     assert.equal(output.dynamicImports.length, 0);
-    if (library === 'usewebmcp' || (library === '@mcp-b/webmcp-polyfill' && subpath !== 'otel')) {
+    if (library === 'usewebmcp' || (library === '@mcp-b/webmcp-plugins' && subpath !== 'otel')) {
       assert(
         !output.moduleIds.some((id) => /(?:opentelemetry|modelcontextprotocol)/.test(id)),
         `${moduleName}: optional SDK leaked into base`
@@ -109,7 +116,7 @@ for (const { library, subpath, exportName } of libraries) {
     library,
     ...(subpath && { subpath }),
     version: manifest.version,
-    exportName,
+    exportNames,
     entry: exported.import ?? exported.default,
     rawBytes: Buffer.byteLength(outputs[0].code),
     minifiedBytes: Buffer.byteLength(outputs[1].code),
@@ -137,14 +144,15 @@ const report = {
   },
   installedDependencies,
   scope:
-    'One tool-hook export; React excluded; built-in dependencies included; no app validator or runtime setup.',
+    'One hook or plugin entry (consent includes its broker); React excluded; built-in dependencies included; no app validator or runtime setup.',
   samples,
 };
-writeFileSync(resolve(directory, 'bundle-results.json'), `${JSON.stringify(report, null, 2)}\n`);
+if (!checkOnly)
+  writeFileSync(resolve(directory, 'bundle-results.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.table(
-  samples.map(({ library, exportName, rawBytes, minifiedBytes, gzipBytes }) => ({
+  samples.map(({ library, exportNames, rawBytes, minifiedBytes, gzipBytes }) => ({
     library,
-    exportName,
+    exportNames,
     rawBytes,
     minifiedBytes,
     gzipBytes,

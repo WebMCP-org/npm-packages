@@ -1,3 +1,4 @@
+import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
 import { cleanupWebMCPPolyfill, initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, renderHook } from 'vitest-browser-react';
@@ -13,6 +14,7 @@ afterEach(async () => {
 it.each(['output', 'error'] as const)(
   'cancels asynchronous %s formatting without disturbing another call or accepting late completion',
   async (stage) => {
+    const execution = executionState();
     const formatting = Promise.withResolvers<string>();
     const started = Promise.withResolvers<void>();
     const survivor = Promise.withResolvers<string>();
@@ -30,6 +32,7 @@ it.each(['output', 'error'] as const)(
     const register = vi.spyOn(document.modelContext, 'registerTool');
     const hook = await renderHook(() =>
       useWebMCP({
+        plugins: [execution],
         name: `cancel_${stage}_formatting`,
         description: 'Cancels formatting independently of other calls',
         execute,
@@ -52,7 +55,7 @@ it.each(['output', 'error'] as const)(
       controller.abort(reason);
       await rejection;
     });
-    expect(hook.result.current.state).toEqual({
+    expect(execution.getSnapshot()).toEqual({
       isExecuting: true,
       lastResult: null,
       error: reason,
@@ -62,24 +65,25 @@ it.each(['output', 'error'] as const)(
       survivor.resolve('success');
       await expect(surviving).resolves.toBe('success');
     });
-    expect(hook.result.current.state).toEqual({
+    expect(execution.getSnapshot()).toEqual({
       isExecuting: false,
       lastResult: 'success',
       error: null,
       executionCount: 1,
     });
-    const settled = hook.result.current.state;
+    const settled = execution.getSnapshot();
     await hook.act(async () => {
       if (stage === 'output') formatting.resolve('too late');
       else formatting.reject(new Error('Late formatter failure'));
       await Promise.allSettled([formatting.promise]);
     });
-    expect(hook.result.current.state).toBe(settled);
+    expect(execution.getSnapshot()).toBe(settled);
     expect(format).toHaveBeenCalledTimes(1);
   }
 );
 
 it('preserves completed results and counts when overlapping calls settle in one batch', async () => {
+  const execution = executionState();
   const first = Promise.withResolvers<string>();
   const second = Promise.withResolvers<string>();
   const failed = Promise.withResolvers<string>();
@@ -90,7 +94,12 @@ it('preserves completed results and counts when overlapping calls settle in one 
     .mockReturnValueOnce(second.promise)
     .mockReturnValueOnce(failed.promise);
   const hook = await renderHook(() =>
-    useWebMCP({ name: 'same_batch_calls', description: 'Combines completion updates', execute })
+    useWebMCP({
+      plugins: [execution],
+      name: 'same_batch_calls',
+      description: 'Combines completion updates',
+      execute,
+    })
   );
   let calls!: Promise<string>[];
   await hook.act(async () => {
@@ -100,7 +109,7 @@ it('preserves completed results and counts when overlapping calls settle in one 
       hook.result.current.execute({}),
     ];
   });
-  expect(hook.result.current.state.isExecuting).toBe(true);
+  expect(execution.getSnapshot().isExecuting).toBe(true);
   await hook.act(async () => {
     const outcomes = Promise.allSettled(calls);
     second.resolve('second');
@@ -112,7 +121,7 @@ it('preserves completed results and counts when overlapping calls settle in one 
       { status: 'rejected', reason: failure },
     ]);
   });
-  expect(hook.result.current.state).toEqual({
+  expect(execution.getSnapshot()).toEqual({
     isExecuting: false,
     lastResult: 'first',
     error: failure,
@@ -123,12 +132,14 @@ it('preserves completed results and counts when overlapping calls settle in one 
 it.each(['output', 'error'] as const)(
   'uses the committed %s formatter from each call start across a configuration update',
   async (stage) => {
+    const execution = executionState();
     const pending = Promise.withResolvers<string>();
     const failure = new Error('Handler failed');
     const register = vi.spyOn(document.modelContext, 'registerTool');
     const hook = await renderHook(
       ({ revision }) =>
         useWebMCP({
+          plugins: [execution],
           name: `snapshot_${stage}_formatter`,
           description: 'Keeps each execution configuration consistent',
           execute: () => {
@@ -157,7 +168,7 @@ it.each(['output', 'error'] as const)(
         stage === 'output' ? 'B:next' : 'B:Handler failed'
       );
     });
-    expect(hook.result.current.state).toEqual({
+    expect(execution.getSnapshot()).toEqual({
       isExecuting: false,
       lastResult: stage === 'output' ? 'next' : null,
       error: stage === 'output' ? null : failure,

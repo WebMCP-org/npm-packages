@@ -9,11 +9,6 @@ const esmConfig: Options = {
   entry: {
     index: 'src/index.ts',
     schema: 'src/schema.ts',
-    invocation: 'src/invocation.ts',
-    'standard-schema': 'src/standard-schema.ts',
-    'execution-state': 'src/execution-state.ts',
-    consent: 'src/consent.ts',
-    otel: 'src/otel.ts',
   },
   format: ['esm'],
   dts: true,

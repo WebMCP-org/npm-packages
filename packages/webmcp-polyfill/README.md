@@ -24,87 +24,15 @@ Initialization preserves an existing native context. The ESM import has no initi
 side effect. [WebMCP](https://webmachinelearning.github.io/webmcp/) is a Community Group
 proposal; MCP prompts, resources, and transport belong to [`@mcp-b/global`](../global/README.md).
 
-## Invocation plugins
+## Validation and plugins
 
-Experimental, unreleased entry points add validation, consent, tracing, and execution state
-to callbacks you explicitly wrap. They work with both native WebMCP and the fallback.
+[`@mcp-b/webmcp-plugins`](../webmcp-plugins/README.md) adds Standard Schema validation,
+consent, execution state, and tracing to explicitly wrapped callbacks. It works with native
+WebMCP and the fallback. Importing a plugin does not initialize this polyfill.
 
-```ts
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
-import { createInvocationCallback } from '@mcp-b/webmcp-polyfill/invocation';
-import { standardSchema } from '@mcp-b/webmcp-polyfill/standard-schema';
-import { createExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
-import { z } from 'zod';
-
-initializeWebMCPPolyfill();
-const context = document.modelContext;
-if (!context) throw new Error('WebMCP is unavailable');
-
-const input = standardSchema(z.object({ count: z.string().regex(/^\d+$/).transform(Number) }));
-const state = createExecutionState<{ total: number }>();
-const registration = new AbortController();
-const tool = { instanceId: crypto.randomUUID(), name: 'calculate_total' };
-
-const execute = createInvocationCallback(() => ({
-  tool,
-  input,
-  signal: registration.signal,
-  middleware: [state.aroundInvoke],
-  execute: ({ count }) => ({ total: count + 10 }),
-}));
-
-await context.registerTool(
-  {
-    name: tool.name,
-    description: 'Add 10 to a numeric count',
-    inputSchema: input.inputSchema,
-    execute,
-  },
-  { signal: registration.signal }
-);
-
-// Retain registration.abort() for cleanup and state.getSnapshot() for your UI.
-```
-
-This example uses Zod 4.2 or newer. `standardSchema()` calls the supplied
-`~standard.validate()` once per invocation and passes its transformed value to the handler.
-It uses `~standard.jsonSchema.input()` for metadata. No validation engine ships with the plugin;
-plain JSON Schema metadata alone does not install validation.
-
-Raw inputs support plain data, arrays, `Date`, `Map`, and `Set`; custom class instances and
-enumerable accessors are rejected. Validator outputs pass through unchanged until middleware
-calls `prepare()`. Consent preparation requires a JSON `binding` for `Date`, `Map`, and `Set`
-and rejects transformed custom class instances.
-
-| Entry after `@mcp-b/webmcp-polyfill` | Exports and purpose                                                        |
-| ------------------------------------ | -------------------------------------------------------------------------- |
-| `/invocation`                        | `invoke`, `createInvocationCallback`, `unwrapInvocation`, middleware types |
-| `/standard-schema`                   | `standardSchema` input validation and metadata adapter                     |
-| `/execution-state`                   | `createExecutionState` with optional subscribers                           |
-| `/consent`                           | `ConsentBroker` with explicit click or required verification policy        |
-| `/otel`                              | `createOtelMiddleware` using your OpenTelemetry tracer                     |
-| `/schema`                            | Existing low-level schema and browser compatibility helpers                |
-
-The first middleware is outermost. For `[otel, state.aroundInvoke, broker.aroundInvoke]`,
-observers include validation, consent wait, execution, and agent response formatting.
-Consent sees an immutable snapshot of final validated arguments. `next()` takes no replacement
-arguments and can run only once. An omitted state plugin allocates no execution state;
-an attached state plugin records calls even without subscribers.
-
-`ConsentBroker` owns pending requests, cancellation, expiry, and one-use decisions.
-Your UI subscribes to `getSnapshot()` and calls `decide()`. A `mode: 'verified'` policy
-requires your verification callback; passkey verification and operation-bound grants remain
-server responsibilities. An assertion ID or unsupported hardware cannot substitute for
-verification. See the [consent reference](https://docs.mcp-b.ai/packages/webmcp-polyfill/reference#consentbroker).
-
-The OTel plugin requires the optional `@opentelemetry/api` peer and an application tracer.
-It installs no provider or exporter and captures no arguments, results, approval data,
-or error messages. It emits MCP spans only for calls identified by the trusted MCP adapter.
-
-These plugins cover wrapped callbacks. They do not intercept existing native registrations,
-declarative forms, or direct application calls that bypass the wrapper. Browser-required access,
-coercion, registration, and cancellation checks remain in the core. The
-[React hooks](../usewebmcp/README.md) use this same invocation runtime.
+The old `/invocation`, `/standard-schema`, `/execution-state`, `/consent`, and `/otel` entries
+are removed. Use the separate plugin package. `/schema` remains available for low-level metadata
+and browser compatibility helpers; it does not install callback validation.
 
 ## Script tags and forms
 

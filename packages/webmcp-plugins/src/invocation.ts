@@ -1,5 +1,6 @@
-import type { ToolExecuteCallbackOptions } from '@mcp-b/webmcp-types';
-import { withAbortSignal } from './schema.js';
+import type { WebMCP } from 'webmcp-types';
+
+type ToolExecuteCallbackOptions = WebMCP.ToolExecuteCallbackOptions;
 
 export interface ToolIdentity {
   readonly instanceId: string;
@@ -63,10 +64,19 @@ export class InvocationFailure extends Error {
   }
 }
 
-export type AroundInvoke<T = unknown> = (
+/**
+ * A plugin reads typed results from next(). The runner verifies that its returned value is
+ * that exact result before restoring the result type; observers do not determine tool output.
+ */
+export type AroundInvoke<in T = unknown> = (
   call: InvocationContext,
   next: () => Promise<InvocationResult<T>>
-) => Promise<InvocationResult<T>>;
+) => Promise<InvocationResult<unknown>>;
+
+export interface WebMCPPlugin<T = unknown> {
+  readonly name: string;
+  readonly aroundInvoke: AroundInvoke<T>;
+}
 
 /** Optional preparation plugin. JSON Schema metadata alone does not install a validator. */
 export interface InputAdapter<TInput, TValidated> {
@@ -79,7 +89,7 @@ interface InvocationDefinition<TValidated, TResult> {
   signal?: AbortSignal;
   tool: ToolIdentity;
   execute: (input: TValidated, options: ToolExecuteCallbackOptions) => TResult | Promise<TResult>;
-  middleware?: readonly AroundInvoke<TResult>[];
+  plugins?: readonly WebMCPPlugin<TResult>[];
   /** Serializable approval description for schemas producing non-JSON values. */
   binding?: (input: TValidated) => unknown;
   /** Recheck the captured registration/connection immediately before execution. */
@@ -189,7 +199,11 @@ export async function invoke<TInput, TValidated = TInput, TResult = unknown>(
   config = {
     ...config,
     tool: Object.freeze({ ...config.tool }),
-    middleware: [...(config.middleware ?? [])],
+    plugins:
+      config.plugins?.map((plugin) => ({
+        name: plugin.name,
+        aroundInvoke: plugin.aroundInvoke.bind(plugin),
+      })) ?? [],
   };
   let captured: { value: TInput } | { error: unknown };
   const validate = config.input?.validate.bind(config.input);
@@ -308,7 +322,7 @@ export async function invoke<TInput, TValidated = TInput, TResult = unknown>(
   const dispatch = async (index: number): Promise<InvocationResult<TResult>> => {
     try {
       check();
-      const middleware = config.middleware?.[index];
+      const middleware = config.plugins?.[index]?.aroundInvoke;
       if (middleware) {
         let called = false;
         let closed = false;
@@ -354,7 +368,7 @@ export async function invoke<TInput, TValidated = TInput, TResult = unknown>(
               'middleware_error',
               new Error('Middleware must preserve the invocation result')
             );
-          return result;
+          return outcome.value;
         } catch (cause) {
           if (called && !outcome) lifetime.abort(failure(cause, 'middleware_error'));
           throw cause;
@@ -498,4 +512,32 @@ export async function unwrapInvocation<T>(
     if (error.kind === 'cancelled') throw error.cause;
     throw error.cause instanceof Error ? error.cause : new Error(String(error.cause));
   }
+}
+
+function withAbortSignal<T>(
+  operation: Promise<T>,
+  signal?: AbortSignal,
+  getAbortReason: () => unknown = () => signal?.reason
+): Promise<T> {
+  if (!signal) return operation;
+  if (signal.aborted) return Promise.reject(getAbortReason());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      cleanup();
+      reject(getAbortReason());
+    };
+    const cleanup = () => signal.removeEventListener('abort', onAbort);
+
+    signal.addEventListener('abort', onAbort, { once: true });
+    operation.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error: unknown) => {
+        cleanup();
+        reject(error);
+      }
+    );
+  });
 }

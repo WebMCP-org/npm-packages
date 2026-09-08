@@ -38,7 +38,7 @@ expectTypeOf<WebMCPResourceConfig>().toEqualTypeOf<
 >();
 expectTypeOf<WebMCPResourceReturn>().toEqualTypeOf<WebMCPPromptReturn>();
 expectTypeOf<Parameters<typeof useWebMCPContext>[3]>().toEqualTypeOf<
-  Pick<WebMCPConfig, 'enabled'> | undefined
+  Pick<WebMCPConfig, 'enabled' | 'plugins'> | undefined
 >();
 
 const disabledTool = {

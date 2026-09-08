@@ -80,7 +80,7 @@ the Diataxis framework.
 
 ### Commit Scopes
 
-Package scopes: `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-extension`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`, `webmcp-types`
+Package scopes: `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-extension`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-plugins`, `webmcp-ts-sdk`, `webmcp-types`
 
 Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
@@ -120,6 +120,21 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 │  document.modelContext provided by the browser.      │
 └─────────────────────────────────────────────────────┘
 ```
+
+### Invocation plugins and React
+
+- `@mcp-b/webmcp-plugins` owns the framework-independent invocation runner and optional
+  Standard Schema, consent, execution-state, and OTel entries. It does not install the polyfill.
+- `usewebmcp` exposes one registration hook, `useWebMCP`. It returns `execute`, `isSupported`,
+  and `registrationError`; state is explicitly attached with `plugins: [executionState()]`
+  and subscribed through `useToolExecutionState`. Create a stable store per owner.
+- React accepts `inputSchema: vendorSchema`; direct runner calls use `input: standardSchema(schema)`.
+  Validation/transforms are memoized before consent preparation, never arbitrary ordered middleware.
+- Plugins are named `{ name, aroundInvoke }` objects. The old `middleware` option,
+  `useWebMCPTool`, implicit hook `state`/`reset`, and polyfill plugin subpaths are removed.
+- Keep one externalized plugin runtime shared by hooks and `BrowserMcpServer`. Trusted callback
+  ownership/context are module-local; duplicated bundled runtimes break that integration.
+- The polyfill retains browser semantics and `/schema` compatibility helpers. It has no plugin dependency.
 
 ### Initialization Flow (`@mcp-b/global`)
 

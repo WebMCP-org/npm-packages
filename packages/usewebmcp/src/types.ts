@@ -1,9 +1,8 @@
 import type { StandardJSONSchemaV1, StandardSchemaV1 } from '@standard-schema/spec';
-import type { ToolExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
-import type { AroundInvoke } from '@mcp-b/webmcp-polyfill/invocation';
+import type { WebMCPPlugin } from '@mcp-b/webmcp-plugins';
 import type { WebMCP } from 'webmcp-types';
 
-export type { ToolExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
+export type { ToolExecutionState } from '@mcp-b/webmcp-plugins/execution-state';
 
 /** JSON Schema, or a schema implementing Standard JSON Schema v1. */
 export type ToolInputSchema = NonNullable<WebMCP.ModelContextTool['inputSchema']>;
@@ -45,7 +44,7 @@ export interface WebMCPConfig<
   /** Protocol adapter seam: classify an agent response as a failed execution. */
   isErrorResponse?: (response: unknown) => boolean;
   /** Optional invocation observers and gates, in outermost-first order. */
-  middleware?: readonly AroundInvoke<TResult>[];
+  plugins?: readonly WebMCPPlugin<TResult>[];
   /** Serializable approval description when validated inputs contain non-JSON values. */
   binding?: (input: InferValidatedToolInput<TInputSchema>) => unknown;
   /** Recheck current authority before execution, using the latest committed checker. */
@@ -53,24 +52,11 @@ export interface WebMCPConfig<
 }
 
 /** Registration and local execution, without an execution-state subscription. */
-export interface WebMCPToolReturn<
-  TInputSchema extends ToolInputSchema = object,
-  TResult = unknown,
-> {
+export interface WebMCPReturn<TInputSchema extends ToolInputSchema = object, TResult = unknown> {
   isSupported: boolean;
   registrationError: Error | null;
   execute: (
     input: InferToolInput<TInputSchema>,
     options?: WebMCP.ToolExecuteCallbackOptions
   ) => Promise<TResult>;
-}
-
-/** State and controls returned by useWebMCP. */
-export interface WebMCPReturn<
-  TInputSchema extends ToolInputSchema = object,
-  TResult = unknown,
-> extends WebMCPToolReturn<TInputSchema, TResult> {
-  state: ToolExecutionState<TResult>;
-  /** Clears observed execution state without cancelling pending work. */
-  reset: () => void;
 }

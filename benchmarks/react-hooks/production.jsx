@@ -1,68 +1,60 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { useWebMCP, useWebMCPTool } from 'usewebmcp';
-import {
-  useWebMCP as useExtendedWebMCP,
-  useWebMCPTool as useExtendedWebMCPTool,
-} from '@mcp-b/react-webmcp';
-import { createExecutionState } from '@mcp-b/webmcp-polyfill/execution-state';
-import { createOtelMiddleware } from '@mcp-b/webmcp-polyfill/otel';
+import { useWebMCP, useToolExecutionState } from 'usewebmcp';
+import { useWebMCP as useExtendedWebMCP } from '@mcp-b/react-webmcp';
+import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
+import { otel } from '@mcp-b/webmcp-plugins/otel';
 import { trace } from '@opentelemetry/api';
 import { useWebMCP as useGoogleWebMCP } from 'use-webmcp-tool';
 import { useMcpTool, WebMCPProvider } from 'webmcp-react';
 
-const passThrough = (_call, next) => next();
-const otel = createOtelMiddleware({ tracer: trace.getTracer('react-hooks-benchmark') });
+const passThrough = { name: 'benchmark:passthrough', aroundInvoke: (_call, next) => next() };
+const tracing = otel({ tracer: trace.getTracer('react-hooks-benchmark') });
 const libraries = [
-  { name: 'usewebmcp', hook: useWebMCP, ours: true, executionState: 'subscribed' },
-  {
-    name: '@mcp-b/react-webmcp',
-    hook: useExtendedWebMCP,
-    ours: true,
-    executionState: 'subscribed',
-  },
+  { name: 'usewebmcp', hook: useWebMCP, ours: true, executionState: 'none' },
+  { name: '@mcp-b/react-webmcp', hook: useExtendedWebMCP, ours: true, executionState: 'none' },
   {
     name: 'webmcp-react',
     hook: (config) => useMcpTool({ ...config, handler: config.execute }),
     provider: WebMCPProvider,
-    executionState: 'subscribed',
+    executionState: 'owner',
   },
   { name: 'use-webmcp-tool', hook: useGoogleWebMCP, executionState: 'none' },
   {
-    name: 'usewebmcp / registration only',
-    hook: useWebMCPTool,
+    name: 'usewebmcp / state in owner',
     ours: true,
-    executionState: 'none',
-  },
-  {
-    name: 'usewebmcp / unsubscribed state',
-    ours: true,
-    executionState: 'unsubscribed',
+    executionState: 'owner',
     hook: (config) => {
-      const [observation] = useState(() => createExecutionState());
-      const tool = useWebMCPTool({ ...config, middleware: [observation.aroundInvoke] });
-      return { ...tool, observation };
+      const [observation] = useState(() => executionState());
+      const tool = useWebMCP({ ...config, plugins: [observation] });
+      const state = useToolExecutionState(observation);
+      return { ...tool, state, observation };
     },
   },
+  ...['child', 'unsubscribed'].map((location) => ({
+    name: `usewebmcp / state ${location === 'child' ? 'in child' : 'unsubscribed'}`,
+    ours: true,
+    executionState: location,
+    hook: (config) => {
+      const [observation] = useState(() => executionState());
+      const tool = useWebMCP({ ...config, plugins: [observation] });
+      return { ...tool, observation };
+    },
+  })),
   {
     name: 'usewebmcp / passthrough',
     ours: true,
     executionState: 'none',
-    hook: (config) => useWebMCPTool({ ...config, middleware: [passThrough] }),
+    hook: (config) => useWebMCP({ ...config, plugins: [passThrough] }),
   },
   {
     name: 'usewebmcp / OTel no-op',
     ours: true,
     executionState: 'none',
-    hook: (config) => useWebMCPTool({ ...config, middleware: [otel] }),
-  },
-  {
-    name: '@mcp-b/react-webmcp / registration only',
-    hook: useExtendedWebMCPTool,
-    ours: true,
-    executionState: 'none',
+    hook: (config) => useWebMCP({ ...config, plugins: [tracing] }),
   },
 ];
+window.productionLibraries = libraries.map(({ name }) => name);
 const tasks = [];
 const channel = new MessageChannel();
 channel.port1.onmessage = () => tasks.shift()();
@@ -101,6 +93,9 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
   let abortedRegistrations = 0;
   let renders = 0;
   let passiveRenders = 0;
+  let statusRenders = 0;
+  let passiveStatusRenders = 0;
+  const displayedStatus = [];
   let version = 0;
   let lastRender = 0;
   let lastEffect = 0;
@@ -132,6 +127,21 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
   const controls = [];
   const committed = [];
   let update;
+  function Status({ observation, index }) {
+    const state = useToolExecutionState(observation);
+    useLayoutEffect(() => {
+      displayedStatus[index] = state;
+      statusRenders += 1;
+      version += 1;
+      lastRender = performance.now();
+    });
+    useEffect(() => {
+      passiveStatusRenders += 1;
+      version += 1;
+      lastEffect = performance.now();
+    });
+    return <output>{state.isExecuting ? 'running' : 'idle'}</output>;
+  }
   function Tool({ index, revision, metadataRevision }) {
     const control = library.hook({
       name: `production_tool_${index}`,
@@ -156,7 +166,11 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
       version += 1;
       lastEffect = performance.now();
     });
-    return <output>{control.state?.isExecuting ? 'running' : 'idle'}</output>;
+    return library.executionState === 'child' ? (
+      <Status observation={control.observation} index={index} />
+    ) : (
+      <output>{control.state?.isExecuting ? 'running' : 'idle'}</output>
+    );
   }
   function App() {
     const [props, setProps] = useState({ revision: 0, metadataRevision: 0 });
@@ -188,6 +202,11 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
         committed.length === toolCount &&
         committed.every((value) => value === revision) &&
         passiveRenders === renders &&
+        passiveStatusRenders === statusRenders &&
+        (library.executionState !== 'child' ||
+          (displayedStatus.length === toolCount &&
+            displayedStatus.every((state) => !state.isExecuting) &&
+            displayedStatus[0].executionCount === executions)) &&
         controls.every(
           (control) =>
             control.isSupported !== false &&
@@ -203,6 +222,7 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
   };
   const phase = async (trigger, revision, executions = 0) => {
     const previousRenders = renders;
+    const previousStatusRenders = statusRenders;
     const previousRegistrations = registrations;
     const start = performance.now();
     trigger();
@@ -210,6 +230,7 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
     return {
       ms: Math.max(start, lastRender, lastEffect, lastRegistration) - start,
       renders: renders - previousRenders,
+      statusRenders: statusRenders - previousStatusRenders,
       registrations: registrations - previousRegistrations,
     };
   };
@@ -220,9 +241,15 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
       `${name}: mount registered ${mount.registrations}/${toolCount} tools`
     );
     check((await context.getTools()).length === toolCount, 'Every tool must be discoverable');
+    if (library.ours)
+      check(mount.registrations === toolCount, 'Mount must register each tool once');
     const updates = [];
     for (let revision = 1; revision <= 10; revision += 1) {
       const measurement = await phase(() => update({ revision, metadataRevision: 0 }), revision);
+      if (library.ours) {
+        check(measurement.registrations === 0, 'Unrelated updates must not re-register');
+        check(measurement.renders === toolCount, 'Unrelated updates must add no hook renders');
+      }
       updates.push(measurement);
     }
     const metadata = await phase(() => update({ revision: 11, metadataRevision: 1 }), 11);
@@ -246,6 +273,8 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
     const calls = [];
     for (let value = 0; value < 10; value += 1) {
       const previousRenders = renders;
+      const previousStatusRenders = statusRenders;
+      const previousRegistrations = registrations;
       const start = performance.now();
       const result = await tools
         .get('production_tool_0')
@@ -255,13 +284,20 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
       const end = Math.max(callbackEnd, lastRender, lastEffect);
       check(result.content[0].text === String(11 + value), 'Execution must use current props');
       const callRenders = renders - previousRenders;
-      if (library.ours && library.executionState !== 'subscribed') {
+      if (library.ours && library.executionState !== 'owner') {
         check(callRenders === 0, `${name}: a call must not render an unsubscribed owner`);
+      }
+      if (library.ours)
+        check(registrations === previousRegistrations, 'Calls must not re-register tools');
+      if (library.executionState === 'child') {
+        check(statusRenders > previousStatusRenders, 'Status child must display completed calls');
       }
       calls.push({
         ms: end - start,
         callbackMs: callbackEnd - start,
         renders: callRenders,
+        statusRenders: statusRenders - previousStatusRenders,
+        registrations: registrations - previousRegistrations,
       });
     }
     root.unmount();

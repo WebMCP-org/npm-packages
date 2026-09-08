@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { createExecutionState } from './execution-state.js';
+import { executionState } from './execution-state.js';
 import { invoke, unwrapInvocation } from './invocation.js';
 
 const tool = { instanceId: 'state-owner', name: 'state_tool' };
@@ -17,7 +17,7 @@ it('isolates subscriber and diagnostic failures from execution and other subscri
   const diagnostic = vi.fn(() => {
     throw new Error('Diagnostic failed');
   });
-  const state = createExecutionState<number>({ onDiagnostic: diagnostic });
+  const state = executionState<number>({ onDiagnostic: diagnostic });
   state.subscribe(() => {
     throw new Error('Subscriber failed');
   });
@@ -33,7 +33,7 @@ it('isolates subscriber and diagnostic failures from execution and other subscri
 });
 
 it('keeps idle snapshots stable and does not notify for an empty reset', () => {
-  const state = createExecutionState<number>();
+  const state = executionState<number>();
   const listener = vi.fn();
   const unsubscribe = state.subscribe(listener);
   const snapshot = state.getSnapshot();
@@ -50,7 +50,7 @@ it('keeps idle snapshots stable and does not notify for an empty reset', () => {
 });
 
 it('does not revisit a listener that resubscribes while being notified', async () => {
-  const state = createExecutionState<number>();
+  const state = executionState<number>();
   let resubscribed = false;
   const listener = vi.fn(() => {
     if (resubscribed) return;
@@ -65,7 +65,7 @@ it('does not revisit a listener that resubscribes while being notified', async (
 });
 
 it('records running and successful raw values without any subscriber', async () => {
-  const state = createExecutionState<number>();
+  const state = executionState<number>();
   const pending = Promise.withResolvers<{ value: number; response: unknown }>();
   const run = state.aroundInvoke(call, () => pending.promise);
   expect(state.getSnapshot().isExecuting).toBe(true);
@@ -81,7 +81,7 @@ it('records running and successful raw values without any subscriber', async () 
 });
 
 it('retains overlapping work when a call fails or observations reset', async () => {
-  const state = createExecutionState<number>();
+  const state = executionState<number>();
   const first = Promise.withResolvers<{ value: number; response: unknown }>();
   const second = Promise.withResolvers<{ value: number; response: unknown }>();
   const firstRun = state.aroundInvoke(call, () => first.promise);
@@ -111,7 +111,7 @@ it('retains overlapping work when a call fails or observations reset', async () 
 });
 
 it('observes the original failure after async agent formatting, never a successful envelope', async () => {
-  const state = createExecutionState<number>();
+  const state = executionState<number>();
   const failure = new Error('Denied by handler');
   const formatting = Promise.withResolvers<unknown>();
   const formatStarted = Promise.withResolvers<void>();
@@ -122,7 +122,7 @@ it('observes the original failure after async agent formatting, never a successf
         execute: () => {
           throw failure;
         },
-        middleware: [state.aroundInvoke],
+        plugins: [state],
         formatError: () => {
           formatStarted.resolve();
           return formatting.promise;
@@ -147,7 +147,7 @@ it('observes the original failure after async agent formatting, never a successf
 });
 
 it('settles cancellation and ignores a late completion without a subscriber', async () => {
-  const state = createExecutionState<number>();
+  const state = executionState<number>();
   const started = Promise.withResolvers<void>();
   const pending = Promise.withResolvers<number>();
   const controller = new AbortController();
@@ -159,7 +159,7 @@ it('settles cancellation and ignores a late completion without a subscriber', as
           started.resolve();
           return pending.promise;
         },
-        middleware: [state.aroundInvoke],
+        plugins: [state],
       },
       {},
       { signal: controller.signal }
@@ -181,7 +181,7 @@ it('settles cancellation and ignores a late completion without a subscriber', as
 });
 
 it('retains a completed success when its observer aborts the caller during notification', async () => {
-  const state = createExecutionState<number>();
+  const state = executionState<number>();
   const controller = new AbortController();
   state.subscribe(() => {
     if (state.getSnapshot().executionCount === 1) controller.abort(new Error('Too late'));
@@ -191,7 +191,7 @@ it('retains a completed success when its observer aborts the caller during notif
       {
         tool,
         execute: () => 42,
-        middleware: [state.aroundInvoke],
+        plugins: [state],
       },
       {},
       { signal: controller.signal }

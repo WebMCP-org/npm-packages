@@ -1,3 +1,4 @@
+import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
 import { initializeWebModelContext } from '@mcp-b/global';
 import type { CallToolResult, ChromeModelContext, ModelContext } from '@mcp-b/webmcp-types';
 import { Suspense, createElement } from 'react';
@@ -71,8 +72,12 @@ describe('useWebMCPContext in a browser runtime', () => {
   });
 
   it('uses the latest getter and exposes the canonical execution state', async () => {
+    const execution = executionState();
     const hook = await renderHook(
-      ({ value }) => useWebMCPContext('context_latest', 'Get latest value', () => value),
+      ({ value }) =>
+        useWebMCPContext('context_latest', 'Get latest value', () => value, {
+          plugins: [execution],
+        }),
       { initialProps: { value: 'first' } }
     );
 
@@ -85,7 +90,7 @@ describe('useWebMCPContext in a browser runtime', () => {
     await hook.act(async () => {
       await hook.result.current.execute({});
     });
-    expect(hook.result.current.state).toMatchObject({
+    expect(execution.getSnapshot()).toMatchObject({
       isExecuting: false,
       lastResult: 'second',
       error: null,
@@ -93,9 +98,9 @@ describe('useWebMCPContext in a browser runtime', () => {
     });
 
     await hook.act(() => {
-      hook.result.current.reset();
+      execution.reset();
     });
-    expect(hook.result.current.state).toEqual({
+    expect(execution.getSnapshot()).toEqual({
       isExecuting: false,
       lastResult: null,
       error: null,

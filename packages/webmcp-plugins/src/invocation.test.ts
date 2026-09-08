@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createExecutionState } from './execution-state.js';
+import { executionState } from './execution-state.js';
 import {
   invoke,
   InvocationFailure,
@@ -10,7 +10,7 @@ import {
 describe('invocation middleware', () => {
   it('preserves completed success when a state listener cancels during notification', async () => {
     const controller = new AbortController();
-    const state = createExecutionState<number>();
+    const state = executionState<number>();
     state.subscribe(() => {
       if (state.getSnapshot().executionCount === 1) controller.abort('after completion');
     });
@@ -19,18 +19,21 @@ describe('invocation middleware', () => {
       {
         tool: { instanceId: 'settled', name: 'write' },
         execute: () => 7,
-        middleware: [
-          async (_call, next) => {
-            try {
-              const result = await next();
-              outcomes.push('success');
-              return result;
-            } catch (error) {
-              outcomes.push('failure');
-              throw error;
-            }
+        plugins: [
+          {
+            name: 'test-plugin',
+            aroundInvoke: async (_call, next) => {
+              try {
+                const result = await next();
+                outcomes.push('success');
+                return result;
+              } catch (error) {
+                outcomes.push('failure');
+                throw error;
+              }
+            },
           },
-          state.aroundInvoke,
+          state,
         ],
       },
       {},
@@ -56,12 +59,15 @@ describe('invocation middleware', () => {
           return { amount: input.amount };
         },
         execute: (input) => input.amount,
-        middleware: [
-          async (call, next) => {
-            await call.prepare();
-            waiting.resolve();
-            await resume.promise;
-            return next();
+        plugins: [
+          {
+            name: 'test-plugin',
+            aroundInvoke: async (call, next) => {
+              await call.prepare();
+              waiting.resolve();
+              await resume.promise;
+              return next();
+            },
           },
         ],
       },
@@ -87,20 +93,23 @@ describe('invocation middleware', () => {
             },
           },
           execute: () => ++executions,
-          middleware: [
-            async (call, next) => {
-              const results = await Promise.allSettled([call.prepare(), call.prepare()]);
-              expect(results).toEqual([
-                {
-                  status: 'rejected',
-                  reason: expect.objectContaining({ kind: 'invalid_input', cause: invalid }),
-                },
-                {
-                  status: 'rejected',
-                  reason: expect.objectContaining({ kind: 'invalid_input', cause: invalid }),
-                },
-              ]);
-              return next();
+          plugins: [
+            {
+              name: 'test-plugin',
+              aroundInvoke: async (call, next) => {
+                const results = await Promise.allSettled([call.prepare(), call.prepare()]);
+                expect(results).toEqual([
+                  {
+                    status: 'rejected',
+                    reason: expect.objectContaining({ kind: 'invalid_input', cause: invalid }),
+                  },
+                  {
+                    status: 'rejected',
+                    reason: expect.objectContaining({ kind: 'invalid_input', cause: invalid }),
+                  },
+                ]);
+                return next();
+              },
             },
           ],
         },
@@ -114,16 +123,22 @@ describe('invocation middleware', () => {
         {
           tool: { instanceId: 'denied', name: 'write' },
           execute: () => ++executions,
-          middleware: [
-            async (_call, next) => {
-              try {
-                return await next();
-              } catch {
-                return { value: 1, response: 1 };
-              }
+          plugins: [
+            {
+              name: 'test-plugin',
+              aroundInvoke: async (_call, next) => {
+                try {
+                  return await next();
+                } catch {
+                  return { value: 1, response: 1 };
+                }
+              },
             },
-            async () => {
-              throw new InvocationFailure('denied', new Error('denied'));
+            {
+              name: 'test-plugin',
+              aroundInvoke: async () => {
+                throw new InvocationFailure('denied', new Error('denied'));
+              },
             },
           ],
         },
@@ -142,13 +157,17 @@ describe('invocation middleware', () => {
       await call.prepare();
       return next();
     };
-    await expect(invoke({ ...config, middleware: [consent] }, {})).rejects.toThrow(
-      'explicit approval binding'
-    );
+    await expect(
+      invoke({ ...config, plugins: [{ name: 'test-plugin', aroundInvoke: consent }] }, {})
+    ).rejects.toThrow('explicit approval binding');
     expect(
       (
         await invoke(
-          { ...config, middleware: [consent], binding: (date) => ({ date: date.toISOString() }) },
+          {
+            ...config,
+            plugins: [{ name: 'test-plugin', aroundInvoke: consent }],
+            binding: (date) => ({ date: date.toISOString() }),
+          },
           {}
         )
       ).value
@@ -167,11 +186,14 @@ describe('invocation middleware', () => {
         attempts++;
         throw formattingError;
       },
-      middleware: [
-        async (
-          _call: import('./invocation.js').InvocationContext,
-          next: () => Promise<InvocationResult<never>>
-        ) => next(),
+      plugins: [
+        {
+          name: 'test-plugin',
+          aroundInvoke: async (
+            _call: import('./invocation.js').InvocationContext,
+            next: () => Promise<InvocationResult<never>>
+          ) => next(),
+        },
       ],
     };
     await expect(invoke(config, {}, { forAgent: true })).rejects.toMatchObject({
@@ -223,12 +245,15 @@ describe('invocation middleware', () => {
         tool: { instanceId: 'transformed', name: 'write' },
         input: { validate: () => value },
         execute: (input) => input.destination.name,
-        middleware: [
-          async (call, next) => {
-            await call.prepare();
-            approved.resolve();
-            await resume.promise;
-            return next();
+        plugins: [
+          {
+            name: 'test-plugin',
+            aroundInvoke: async (call, next) => {
+              await call.prepare();
+              approved.resolve();
+              await resume.promise;
+              return next();
+            },
           },
         ],
       },
@@ -247,10 +272,13 @@ describe('invocation middleware', () => {
         tool: { instanceId: 'abandoned', name: 'write' },
         input: { validate: () => validation.promise },
         execute: () => ++executions,
-        middleware: [
-          async (_call, next) => {
-            void next();
-            throw new Error('plugin failed');
+        plugins: [
+          {
+            name: 'test-plugin',
+            aroundInvoke: async (_call, next) => {
+              void next();
+              throw new Error('plugin failed');
+            },
           },
         ],
       },
@@ -287,17 +315,20 @@ describe('invocation middleware', () => {
         formats++;
         return undefined;
       },
-      middleware: [
-        async (
-          _call: import('./invocation.js').InvocationContext,
-          next: () => Promise<InvocationResult<never>>
-        ) => {
-          try {
-            return await next();
-          } catch (failure) {
-            observed.push(failure);
-            throw failure;
-          }
+      plugins: [
+        {
+          name: 'test-plugin',
+          aroundInvoke: async (
+            _call: import('./invocation.js').InvocationContext,
+            next: () => Promise<InvocationResult<never>>
+          ) => {
+            try {
+              return await next();
+            } catch (failure) {
+              observed.push(failure);
+              throw failure;
+            }
+          },
         },
       ],
     };
@@ -317,19 +348,22 @@ describe('invocation middleware', () => {
     const config = {
       tool: { instanceId: 'snapshot', name: 'write' },
       execute: (value: typeof input) => value.destination.name,
-      middleware: [
-        async (
-          call: import('./invocation.js').InvocationContext,
-          next: () => Promise<InvocationResult<string>>
-        ) => {
-          const operation = await call.prepare();
-          expect(Object.isFrozen(operation.arguments)).toBe(true);
-          expect(Object.isFrozen(Reflect.get(Object(operation.arguments), 'destination'))).toBe(
-            true
-          );
-          waiting.resolve();
-          await approval.promise;
-          return next();
+      plugins: [
+        {
+          name: 'test-plugin',
+          aroundInvoke: async (
+            call: import('./invocation.js').InvocationContext,
+            next: () => Promise<InvocationResult<string>>
+          ) => {
+            const operation = await call.prepare();
+            expect(Object.isFrozen(operation.arguments)).toBe(true);
+            expect(Object.isFrozen(Reflect.get(Object(operation.arguments), 'destination'))).toBe(
+              true
+            );
+            waiting.resolve();
+            await approval.promise;
+            return next();
+          },
         },
       ],
     };
@@ -349,12 +383,15 @@ describe('invocation middleware', () => {
       {
         tool: { instanceId: 'cancel', name: 'write' },
         execute: () => ++executions,
-        middleware: [
-          async (call, next) => {
-            await call.prepare();
-            waiting.resolve();
-            await approve.promise;
-            return next();
+        plugins: [
+          {
+            name: 'test-plugin',
+            aroundInvoke: async (call, next) => {
+              await call.prepare();
+              waiting.resolve();
+              await approve.promise;
+              return next();
+            },
           },
         ],
       },
@@ -379,11 +416,14 @@ describe('invocation middleware', () => {
           started.resolve();
           return work.promise;
         },
-        middleware: [
-          async (_call, next) => {
-            void next();
-            await started.promise;
-            return { value: 2, response: 2 };
+        plugins: [
+          {
+            name: 'test-plugin',
+            aroundInvoke: async (_call, next) => {
+              void next();
+              await started.promise;
+              return { value: 2, response: 2 };
+            },
           },
         ],
       },
@@ -399,12 +439,15 @@ describe('invocation middleware', () => {
       {
         tool: { instanceId: 'once', name: 'write' },
         execute: () => ++executions,
-        middleware: [
-          async (_call, next) => {
-            saved = next;
-            const first = next();
-            await expect(next()).rejects.toMatchObject({ kind: 'middleware_error' });
-            return first;
+        plugins: [
+          {
+            name: 'test-plugin',
+            aroundInvoke: async (_call, next) => {
+              saved = next;
+              const first = next();
+              await expect(next()).rejects.toMatchObject({ kind: 'middleware_error' });
+              return first;
+            },
           },
         ],
       },
@@ -424,19 +467,25 @@ describe('invocation middleware', () => {
             return { revision: input.revision.trim() };
           },
         },
-        middleware: [
-          async (_call, next) => {
-            events.push('observe');
-            const value = await next();
-            events.push('observed');
-            return value;
+        plugins: [
+          {
+            name: 'test-plugin',
+            aroundInvoke: async (_call, next) => {
+              events.push('observe');
+              const value = await next();
+              events.push('observed');
+              return value;
+            },
           },
-          async (call, next) => {
-            const [first, second] = await Promise.all([call.prepare(), call.prepare()]);
-            expect(first).toBe(second);
-            expect(first.arguments).toEqual({ revision: 'abc' });
-            events.push('consent');
-            return next();
+          {
+            name: 'test-plugin',
+            aroundInvoke: async (call, next) => {
+              const [first, second] = await Promise.all([call.prepare(), call.prepare()]);
+              expect(first).toBe(second);
+              expect(first.arguments).toEqual({ revision: 'abc' });
+              events.push('consent');
+              return next();
+            },
           },
         ],
         execute: (input) => {

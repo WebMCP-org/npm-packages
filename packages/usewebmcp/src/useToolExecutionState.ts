@@ -4,7 +4,7 @@ import {
   INITIAL_EXECUTION_STATE,
   type ExecutionState,
   type ToolExecutionState,
-} from '@mcp-b/webmcp-polyfill/execution-state';
+} from '@mcp-b/webmcp-plugins/execution-state';
 import { useSyncExternalStore } from 'react';
 
 const getServerSnapshot = () => INITIAL_EXECUTION_STATE;

@@ -37,7 +37,7 @@ cd my-webmcp-react
 Install the WebMCP dependencies:
 
 ```bash title="Install the hook and polyfill"
-pnpm add @mcp-b/webmcp-polyfill usewebmcp
+pnpm add @mcp-b/webmcp-polyfill @mcp-b/webmcp-plugins usewebmcp
 ```
 
 `@mcp-b/webmcp-polyfill` provides the `document.modelContext` runtime. `usewebmcp` provides the React hook for tool registration.
@@ -74,7 +74,9 @@ Replace the contents of `src/App.tsx` with:
 ```tsx title="src/App.tsx"
 'use client';
 
-import { useWebMCP } from 'usewebmcp';
+import { useState } from 'react';
+import { useWebMCP, useToolExecutionState } from 'usewebmcp';
+import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
 
 const INPUT_SCHEMA = {
   type: 'object',
@@ -84,10 +86,13 @@ const INPUT_SCHEMA = {
 } as const;
 
 export function App() {
+  const [execution] = useState(() => executionState<{ message: string }>());
+  const state = useToolExecutionState(execution);
   const helloTool = useWebMCP({
     name: 'say_hello',
     description: 'Returns a hello message',
     inputSchema: INPUT_SCHEMA,
+    plugins: [execution],
     execute: async (args) => ({
       message: `Hello ${args.name ?? 'world'}!`,
     }),
@@ -97,14 +102,9 @@ export function App() {
     <div>
       <h1>My First React WebMCP Tool</h1>
       <p>Browser tool: "say_hello"</p>
-      <p>Executions: {helloTool.state.executionCount}</p>
-      <p>
-        Last result:{' '}
-        {helloTool.state.lastResult ? JSON.stringify(helloTool.state.lastResult) : 'none'}
-      </p>
-      {helloTool.state.error && (
-        <p style={{ color: 'red' }}>Error: {helloTool.state.error.message}</p>
-      )}
+      <p>Executions: {state.executionCount}</p>
+      <p>Last result: {state.lastResult ? JSON.stringify(state.lastResult) : 'none'}</p>
+      {state.error && <p style={{ color: 'red' }}>Error: {state.error.message}</p>}
       <button onClick={() => helloTool.execute({ name: 'React' })}>Run Tool Locally</button>
     </div>
   );
@@ -189,7 +189,7 @@ Notice that the execution count in the UI also incremented, because the same und
 - `initializeWebMCPPolyfill()` should be called once at app startup, before components mount
 - `useWebMCP` registers a tool on mount and unregisters on unmount
 - Metadata changes update registration automatically; equivalent inline schemas do not cause re-registration
-- The hook returns `state` (with `executionCount`, `lastResult`, `error`, `isExecuting`) and an `execute` function for local invocation
+- The hook returns `execute` for local calls; the `executionState()` plugin records calls and `useToolExecutionState()` subscribes the UI
 - Tools registered via the hook are discoverable with `document.modelContext.getTools()` and callable when the runtime exposes its serialized-JSON `executeTool()` signature
 
 ## Next steps

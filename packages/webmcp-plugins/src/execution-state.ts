@@ -1,4 +1,9 @@
-import { InvocationFailure, type AroundInvoke, type InvocationResult } from './invocation.js';
+import {
+  InvocationFailure,
+  type InvocationContext,
+  type AroundInvoke,
+  type InvocationResult,
+} from './invocation.js';
 
 /** Observable state for successful, failed, and overlapping invocations. */
 export interface ToolExecutionState<T = unknown> {
@@ -17,14 +22,15 @@ export const INITIAL_EXECUTION_STATE = Object.freeze({
 });
 
 export interface ExecutionState<T = unknown> {
-  aroundInvoke: AroundInvoke<T>;
+  readonly name: 'execution-state';
+  readonly aroundInvoke: AroundInvoke<T>;
   subscribe(listener: () => void): () => void;
   getSnapshot(): ToolExecutionState<T>;
   reset(): void;
 }
 
 /** Create once per tool owner; subscribing never changes its lifetime. */
-export function createExecutionState<T = unknown>(
+export function executionState<T = unknown>(
   options: { onDiagnostic?: (error: unknown) => void } = {}
 ): ExecutionState<T> {
   const listeners = new Set<() => void>();
@@ -54,10 +60,14 @@ export function createExecutionState<T = unknown>(
     }
   };
   return {
-    async aroundInvoke(_call, next) {
+    name: 'execution-state',
+    async aroundInvoke<TResult extends T>(
+      _call: InvocationContext,
+      next: () => Promise<InvocationResult<TResult>>
+    ) {
       pending++;
       publish({ ...snapshot, isExecuting: true, error: null });
-      let result: InvocationResult<T>;
+      let result: InvocationResult<TResult>;
       try {
         result = await next();
       } catch (failure) {

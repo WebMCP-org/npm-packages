@@ -5,11 +5,13 @@ import '@mcp-b/global';
 import { useWebMCP } from '@mcp-b/react-webmcp';
 import { z } from 'zod';
 
+const calculatorInput = z.object({ left: z.number(), right: z.number() });
+
 export function CalculatorTool() {
-  const tool = useWebMCP({
+  useWebMCP({
     name: 'add_numbers',
     description: 'Add two numbers',
-    inputSchema: z.object({ left: z.number(), right: z.number() }),
+    inputSchema: calculatorInput,
     outputSchema: {
       type: 'object',
       properties: { total: { type: 'number' } },
@@ -19,6 +21,6 @@ export function CalculatorTool() {
     execute: ({ left, right }) => ({ total: left + right }),
   });
 
-  return <output>Last total: {tool.state.lastResult?.total ?? 'Not called yet'}</output>;
+  return <p>The add_numbers tool is available to agents.</p>;
 }
 ```

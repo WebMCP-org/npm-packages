@@ -9,8 +9,8 @@ import {
 } from '@opentelemetry/api';
 import { describe, expect, it, vi } from 'vitest';
 import { InvocationFailure, invoke } from './invocation.js';
-import { ConsentBroker } from './consent.js';
-import { createOtelMiddleware } from './otel.js';
+import { ConsentBroker, consent } from './consent.js';
+import { otel } from './otel.js';
 
 const tool = { instanceId: 'lookup-1', name: 'lookup' };
 
@@ -25,14 +25,14 @@ function telemetry() {
   return { span, tracer };
 }
 
-describe('createOtelMiddleware', () => {
+describe('otel', () => {
   it('spans the whole local invocation without capturing private payloads or inventing MCP traffic', async () => {
     const { tracer, span } = telemetry();
     let finish!: (value: string) => void;
     const result = invoke(
       {
         tool,
-        middleware: [createOtelMiddleware({ tracer: tracer as unknown as Tracer })],
+        plugins: [otel({ tracer: tracer as unknown as Tracer })],
         execute: () =>
           new Promise<string>((resolve) => {
             finish = resolve;
@@ -82,8 +82,8 @@ describe('createOtelMiddleware', () => {
           {
             tool,
             execute,
-            middleware: [
-              createOtelMiddleware({
+            plugins: [
+              otel({
                 tracer: tracer as unknown as Tracer,
                 onDiagnostic: diagnostic,
               }),
@@ -116,10 +116,13 @@ describe('createOtelMiddleware', () => {
           {
             tool,
             execute,
-            middleware: [
-              createOtelMiddleware({ tracer: tracer as unknown as Tracer }),
-              async () => {
-                throw failure;
+            plugins: [
+              otel({ tracer: tracer as unknown as Tracer }),
+              {
+                name: 'test-plugin',
+                aroundInvoke: async () => {
+                  throw failure;
+                },
               },
             ],
           },
@@ -161,7 +164,7 @@ describe('createOtelMiddleware', () => {
       {
         tool,
         execute,
-        middleware: [createOtelMiddleware({ tracer: tracer as unknown as Tracer, propagator })],
+        plugins: [otel({ tracer: tracer as unknown as Tracer, propagator })],
       },
       { query: 'abc' },
       {
@@ -204,7 +207,7 @@ describe('createOtelMiddleware', () => {
           {
             tool,
             execute,
-            middleware: [createOtelMiddleware({ tracer: tracer as unknown as Tracer })],
+            plugins: [otel({ tracer: tracer as unknown as Tracer })],
           },
           {}
         )
@@ -241,8 +244,8 @@ describe('createOtelMiddleware', () => {
       {
         tool,
         execute: () => 'done',
-        middleware: [
-          createOtelMiddleware({
+        plugins: [
+          otel({
             tracer: tracer as unknown as Tracer,
             propagator,
             parentContext: () => ambient,
@@ -279,10 +282,7 @@ describe('createOtelMiddleware', () => {
           new Promise<string>((resolve) => {
             format = resolve;
           }),
-        middleware: [
-          createOtelMiddleware({ tracer: tracer as unknown as Tracer }),
-          broker.aroundInvoke,
-        ],
+        plugins: [otel({ tracer: tracer as unknown as Tracer }), consent({ broker })],
       },
       '2',
       { forAgent: true }
@@ -308,10 +308,7 @@ describe('createOtelMiddleware', () => {
       {
         tool,
         execute,
-        middleware: [
-          createOtelMiddleware({ tracer: tracer as unknown as Tracer }),
-          broker.aroundInvoke,
-        ],
+        plugins: [otel({ tracer: tracer as unknown as Tracer }), consent({ broker })],
       },
       {},
       { signal: abort.signal }

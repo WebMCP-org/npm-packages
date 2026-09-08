@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ConsentBroker, type ConsentBrokerOptions } from './consent.js';
+import { ConsentBroker, consent, type ConsentBrokerOptions } from './consent.js';
 import { InvocationFailure, invoke } from './invocation.js';
 
 const tool = { instanceId: 'rollback-1', name: 'rollback' };
@@ -8,10 +8,7 @@ describe('ConsentBroker', () => {
   it('waits for explicit approval of the prepared operation before executing', async () => {
     const broker = new ConsentBroker({ policy: { mode: 'click' } });
     const execute = vi.fn(() => 'rolled back');
-    const result = invoke(
-      { tool, execute, middleware: [broker.aroundInvoke] },
-      { revision: 'abc' }
-    );
+    const result = invoke({ tool, execute, plugins: [consent({ broker })] }, { revision: 'abc' });
     await vi.waitFor(() => expect(broker.getSnapshot()).toHaveLength(1));
     const request = broker.getSnapshot()[0]!;
     expect(request.operation.arguments).toEqual({ revision: 'abc' });
@@ -48,7 +45,7 @@ describe('ConsentBroker', () => {
     const broker = new ConsentBroker({ policy: { mode: 'verified', verify } });
     const execute = vi.fn(() => 'must not run');
     const outcome = invoke(
-      { tool, execute, middleware: [broker.aroundInvoke] },
+      { tool, execute, plugins: [consent({ broker })] },
       { revision: 'abc' }
     ).catch((error: unknown) => error);
     await vi.waitFor(() => expect(broker.getSnapshot()).toHaveLength(1));

@@ -1,15 +1,15 @@
 {
-  "name": "@mcp-b/webmcp-polyfill",
+  "name": "@mcp-b/webmcp-plugins",
   "version": "5.1.0",
-  "description": "Strict WebMCP core runtime polyfill for document.modelContext (with deprecated navigator.modelContext alias)",
+  "description": "Framework-independent invocation plugins for WebMCP tools",
   "keywords": [
-    "browser",
-    "model-context",
-    "navigator-modelcontext",
-    "polyfill",
+    "consent",
+    "opentelemetry",
+    "plugins",
+    "standard-schema",
     "webmcp"
   ],
-  "homepage": "https://docs.mcp-b.ai/packages/webmcp-polyfill/reference",
+  "homepage": "https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-plugins",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
   },
@@ -18,18 +18,15 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebMCP-org/npm-packages.git",
-    "directory": "packages/webmcp-polyfill"
+    "directory": "packages/webmcp-plugins"
   },
   "files": [
     "dist"
   ],
   "type": "module",
-  "sideEffects": [
-    "./dist/index.iife.js"
-  ],
+  "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.js",
-  "browser": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -37,14 +34,25 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./schema": {
-      "types": "./dist/schema.d.ts",
-      "import": "./dist/schema.js",
-      "default": "./dist/schema.js"
+    "./standard-schema": {
+      "types": "./dist/standard-schema.d.ts",
+      "import": "./dist/standard-schema.js",
+      "default": "./dist/standard-schema.js"
     },
-    "./iife": {
-      "script": "./dist/index.iife.js",
-      "default": "./dist/index.iife.js"
+    "./execution-state": {
+      "types": "./dist/execution-state.d.ts",
+      "import": "./dist/execution-state.js",
+      "default": "./dist/execution-state.js"
+    },
+    "./consent": {
+      "types": "./dist/consent.d.ts",
+      "import": "./dist/consent.js",
+      "default": "./dist/consent.js"
+    },
+    "./otel": {
+      "types": "./dist/otel.d.ts",
+      "import": "./dist/otel.js",
+      "default": "./dist/otel.js"
     }
   },
   "publishConfig": {
@@ -61,20 +69,28 @@
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
-    "test:conformance": "vp test run conformance/polyfill-runtime.e2e.test.ts --browser.headless",
     "test:coverage": "vp test run --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit"
   },
   "dependencies": {
-    "@mcp-b/webmcp-types": "workspace:*",
-    "@standard-schema/spec": "^1.1.0"
+    "@standard-schema/spec": "^1.1.0",
+    "webmcp-types": "^0.1.6"
   },
   "devDependencies": {
+    "@opentelemetry/api": "^1.9.0",
     "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@opentelemetry/api": "^1.9.0"
+  },
+  "peerDependenciesMeta": {
+    "@opentelemetry/api": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=20"
