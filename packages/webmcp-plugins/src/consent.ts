@@ -1,3 +1,5 @@
+import { ConsentGuard } from './consent-guard.js';
+import type { ConsentMetadata } from './consent-types.js';
 import {
   InvocationFailure,
   immutableJson,
@@ -9,7 +11,12 @@ import {
   type WebMCPPlugin,
 } from './invocation.js';
 
-export interface PendingConsentRequest {
+export * from './consent-types.js';
+export * from './consent-annotations.js';
+export { ConsentGuard, type ConsentDecisionEvent, MAX_PRESENCE_ATTEMPTS } from './consent-guard.js';
+export * from './consent-presence.js';
+
+export interface BrokerPendingOperation {
   readonly id: string;
   readonly invocationId: string;
   readonly operation: PreparedOperation;
@@ -32,7 +39,7 @@ export interface ConsentBrokerOptions {
          * operation; enrollment, account authorization, and grant storage belong to the app.
          */
         verify(
-          request: PendingConsentRequest,
+          request: BrokerPendingOperation,
           proof: unknown,
           signal: AbortSignal
         ): boolean | Promise<boolean>;
@@ -44,14 +51,14 @@ export class ConsentBroker {
   private readonly pending = new Map<
     string,
     {
-      request: PendingConsentRequest;
+      request: BrokerPendingOperation;
       signal: AbortSignal;
       deciding: boolean;
       settle(error?: InvocationFailure): void;
     }
   >();
   private readonly listeners = new Set<() => void>();
-  private snapshot: readonly PendingConsentRequest[] = Object.freeze([]);
+  private snapshot: readonly BrokerPendingOperation[] = Object.freeze([]);
 
   private readonly timeoutMs: number;
 
@@ -73,7 +80,7 @@ export class ConsentBroker {
     }
   }
 
-  readonly getSnapshot = (): readonly PendingConsentRequest[] => this.snapshot;
+  readonly getSnapshot = (): readonly BrokerPendingOperation[] => this.snapshot;
 
   readonly subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -205,22 +212,75 @@ export class ConsentBroker {
   }
 }
 
-export function consent({ broker }: { broker: ConsentBroker }): WebMCPPlugin {
+export function consent(options: { broker: ConsentBroker }): WebMCPPlugin;
+export function consent(guard: ConsentGuard, metadata: ConsentMetadata): WebMCPPlugin;
+export function consent(
+  guardOrOptions: { broker: ConsentBroker } | ConsentGuard,
+  metadata?: ConsentMetadata
+): WebMCPPlugin {
+  if (!(guardOrOptions instanceof ConsentGuard)) {
+    const { broker } = guardOrOptions as { broker: ConsentBroker };
+    return {
+      name: 'consent',
+      aroundInvoke: async <T>(
+        call: InvocationContext,
+        next: () => Promise<InvocationResult<T>>
+      ): Promise<InvocationResult<T>> => {
+        const operation = await call.prepare();
+        await broker.authorize({
+          invocationId: call.id,
+          operation,
+          signal: call.signal,
+          caller: call.caller,
+        });
+        call.signal.throwIfAborted();
+        return next();
+      },
+    };
+  }
+
+  const guard = guardOrOptions;
+  const meta = metadata!;
   return {
     name: 'consent',
     aroundInvoke: async <T>(
       call: InvocationContext,
       next: () => Promise<InvocationResult<T>>
-    ): Promise<InvocationResult<T>> => {
+    ): Promise<InvocationResult<unknown>> => {
+      const origin =
+        call.tool.registeringOrigin ?? (globalThis as any).location?.origin ?? 'unknown';
+      const toolName = call.tool.name;
+
       const operation = await call.prepare();
-      await broker.authorize({
-        invocationId: call.id,
-        operation,
-        signal: call.signal,
-        caller: call.caller,
+      const needsApproval =
+        typeof meta.requiresApproval === 'function'
+          ? meta.requiresApproval(operation.arguments)
+          : meta.requiresApproval;
+
+      if (!needsApproval) {
+        guard.recordDecision(
+          { toolName, origin, args: operation.arguments, consent: meta },
+          { approved: true, reason: 'user' }
+        );
+        return next();
+      }
+
+      const decision = await guard.request({
+        toolName,
+        origin,
+        args: operation.arguments,
+        consent: meta,
       });
-      call.signal.throwIfAborted();
-      return next();
+
+      if (decision.approved) {
+        return next();
+      }
+
+      if (decision.reason === 'rate-limited') {
+        throw new Error(`Action rate-limited for ${toolName}.`);
+      }
+
+      throw new Error(`Action denied by user (${decision.reason}).`);
     },
   };
 }

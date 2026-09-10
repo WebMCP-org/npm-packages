@@ -1,17 +1,22 @@
 ---
+'@mcp-b/webmcp-plugins': minor
 '@mcp-b/react-webmcp': minor
 ---
 
-Add useGuardedWebMCP hook and ConsentBroker for opt-in consent flow.
+Migrate consent middleware logic from `@mcp-b/react-webmcp` into `@mcp-b/webmcp-plugins`.
 
-Two behavior notes for existing callers of related APIs:
+### Note: Consent Classes in `@mcp-b/webmcp-plugins`
 
-- `idempotentHint` is now driven by a new, explicit
-  `ConsentMetadata.idempotent` field instead of being inferred from
-  `reversible`/`riskLevel`. Callers relying on the old inferred
-  behavior should set `idempotent` explicitly.
-- A denied or timed-out guarded tool call now resolves as an MCP
-  error result (`isError: true`) instead of a successful call with
-  `structuredContent: { success: false }`. Any code inspecting
-  `result.structuredContent.success` to detect a denial should check
-  `result.isError` instead.
+`@mcp-b/webmcp-plugins` now has two distinct consent-related classes designed for different operational models:
+
+- **`ConsentBroker` (pre-existing, `authorize()`-based)**: The original RFC-style authorization coordinator. Use for programmatic or server-verified authorization flows.
+- **`ConsentGuard` (migrated from #328)**: An interactive on-page gate managing tool request queues, WebAuthn presence ceremonies, session pre-approval, and UI subscription listeners via `guard.request()` and `guard.decide()`. Use when protecting browser tool invocations with interactive on-page approval UX (and when using `@mcp-b/react-webmcp`'s `useGuardedWebMCP`).
+
+In `@mcp-b/react-webmcp`, `consent-broker.ts` now re-exports `ConsentGuard` directly.
+
+### Structural Migration & Annotations
+
+- `@mcp-b/webmcp-plugins` is the shared home of the consent middleware, consumed via `plugins: [consent(guard, metadata)]`.
+- `useGuardedWebMCP` continues as a thin wrapper in `@mcp-b/react-webmcp` forwarding to `useWebMCP` and the shared consent plugin.
+- `ConsentMetadata` adds an explicit `readOnly?: boolean` field alongside `idempotent?: boolean`, with fallback inference preserved for backwards compatibility.
+- Denied or timed-out tool calls surface as native MCP error results (`isError: true`).

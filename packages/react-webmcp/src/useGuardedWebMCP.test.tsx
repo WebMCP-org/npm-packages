@@ -6,7 +6,7 @@ import { Client } from '@modelcontextprotocol/client';
 import { Component, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, renderHook } from 'vitest-browser-react';
-import { ConsentBroker } from './consent-broker.js';
+import { ConsentGuard } from './consent-broker.js';
 import { ConsentBrokerProvider } from './ConsentBrokerProvider.js';
 import type { ConsentMetadata } from './consent-types.js';
 import { getBrowserMcpServer } from './model-context.js';
@@ -50,6 +50,7 @@ const lowRiskConsent: ConsentMetadata = {
   reversible: true,
   riskLevel: 'low',
   requiresApproval: false,
+  idempotent: true,
 };
 
 const highRiskConsent: ConsentMetadata = {
@@ -59,13 +60,13 @@ const highRiskConsent: ConsentMetadata = {
   requiresApproval: true,
 };
 
-function provider(broker: ConsentBroker) {
+function provider(broker: ConsentGuard) {
   return function Provider({ children }: { children: ReactNode }) {
     return <ConsentBrokerProvider broker={broker}>{children}</ConsentBrokerProvider>;
   };
 }
 
-function trackPendingIds(broker: ConsentBroker) {
+function trackPendingIds(broker: ConsentGuard) {
   const ids: string[] = [];
   broker.subscribe((pending) => {
     ids.length = 0;
@@ -126,7 +127,7 @@ describe('useGuardedWebMCP', () => {
 
   it('auto-approves when requiresApproval is false, records the decision, and skips broker.request', async () => {
     const execute = vi.fn().mockResolvedValue({ status: 'healthy' });
-    const broker = new ConsentBroker();
+    const broker = new ConsentGuard();
     const requestSpy = vi.spyOn(broker, 'request');
     const recordSpy = vi.spyOn(broker, 'recordDecision');
 
@@ -165,7 +166,7 @@ describe('useGuardedWebMCP', () => {
   });
 
   it('omits inputSchema when none is provided and still maps consent annotations', async () => {
-    const broker = new ConsentBroker();
+    const broker = new ConsentGuard();
     await renderHook(
       () =>
         useGuardedWebMCP({
@@ -191,7 +192,7 @@ describe('useGuardedWebMCP', () => {
 
   it('registers high-risk annotations and only calls execute after approval', async () => {
     const execute = vi.fn().mockResolvedValue({ success: true });
-    const broker = new ConsentBroker();
+    const broker = new ConsentGuard();
     const pendingIds = trackPendingIds(broker);
 
     await renderHook(
@@ -225,7 +226,7 @@ describe('useGuardedWebMCP', () => {
     expect(execute).not.toHaveBeenCalled();
     await vi.waitFor(() => expect(pendingIds).toHaveLength(1));
 
-    broker.decide(pendingIds[0]!, true);
+    await broker.decide(pendingIds[0]!, true);
     const result = await resultPromise;
 
     expect(execute).toHaveBeenCalledOnce();
@@ -235,7 +236,7 @@ describe('useGuardedWebMCP', () => {
 
   it('returns an MCP error result when the broker denies', async () => {
     const execute = vi.fn().mockResolvedValue({ success: true });
-    const broker = new ConsentBroker();
+    const broker = new ConsentGuard();
     const pendingIds = trackPendingIds(broker);
 
     await renderHook(
@@ -258,20 +259,20 @@ describe('useGuardedWebMCP', () => {
       });
 
     await vi.waitFor(() => expect(pendingIds).toHaveLength(1));
-    broker.decide(pendingIds[0]!, false);
+    await broker.decide(pendingIds[0]!, false);
     await resultPromise;
 
     expect(execute).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       isError: true,
-      content: [{ type: 'text', text: 'Error: Action denied by user (user).' }],
+      content: [{ type: 'text', text: 'Action denied by user (user).' }],
     });
     expect(result?.structuredContent).toBeUndefined();
   });
 
   it('returns an MCP error result when the broker auto-denies on timeout', async () => {
     const execute = vi.fn().mockResolvedValue({ success: true });
-    const broker = new ConsentBroker(50);
+    const broker = new ConsentGuard(50);
 
     const hook = await renderHook(
       () =>
@@ -292,14 +293,14 @@ describe('useGuardedWebMCP', () => {
     expect(execute).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       isError: true,
-      content: [{ type: 'text', text: 'Error: Action denied by user (timeout).' }],
+      content: [{ type: 'text', text: 'Action denied by user (timeout).' }],
     });
     expect(result?.structuredContent).toBeUndefined();
   });
 
   it('does not register or invoke execute when enabled is false', async () => {
     const execute = vi.fn().mockResolvedValue({ ok: true });
-    const broker = new ConsentBroker();
+    const broker = new ConsentGuard();
 
     await renderHook(
       () =>
@@ -322,7 +323,7 @@ describe('useGuardedWebMCP', () => {
 
   it('evaluates a requiresApproval predicate per invocation', async () => {
     const execute = vi.fn().mockResolvedValue({ ok: true });
-    const broker = new ConsentBroker();
+    const broker = new ConsentGuard();
     const pendingIds = trackPendingIds(broker);
     const requestSpy = vi.spyOn(broker, 'request');
     const consent: ConsentMetadata = {
@@ -358,11 +359,50 @@ describe('useGuardedWebMCP', () => {
       arguments: { force: true },
     });
     await vi.waitFor(() => expect(pendingIds).toHaveLength(1));
-    broker.decide(pendingIds[0]!, true);
+    await broker.decide(pendingIds[0]!, true);
     await forced;
 
     expect(requestSpy).toHaveBeenCalledOnce();
     expect(execute).toHaveBeenCalledTimes(2);
     expect(execute).toHaveBeenLastCalledWith({ force: true });
+  });
+
+  it('does not re-register the tool when re-rendered without changing consent contents', async () => {
+    const execute = vi.fn().mockResolvedValue({ ok: true });
+    const broker = new ConsentGuard();
+    const registerSpy = vi.spyOn(server, 'registerTool');
+
+    const hook = await renderHook(
+      ({ consent }: { consent: ConsentMetadata }) =>
+        useGuardedWebMCP({
+          name: 'stableGuardedTool',
+          description: 'A tool that stays stable across re-renders',
+          consent,
+          execute,
+        }),
+      {
+        initialProps: { consent: lowRiskConsent },
+        wrapper: provider(broker),
+      }
+    );
+
+    const initialCalls = registerSpy.mock.calls.filter(
+      ([tool]) => tool.name === 'stableGuardedTool'
+    ).length;
+    expect(initialCalls).toBe(1);
+
+    // Re-rendering with identical reference should not re-register
+    await hook.rerender({ consent: lowRiskConsent });
+    const afterSameRef = registerSpy.mock.calls.filter(
+      ([tool]) => tool.name === 'stableGuardedTool'
+    ).length;
+    expect(afterSameRef).toBe(1);
+
+    // Re-rendering with a new object containing identical contents should not re-register
+    await hook.rerender({ consent: { ...lowRiskConsent } });
+    const afterNewRefSameContent = registerSpy.mock.calls.filter(
+      ([tool]) => tool.name === 'stableGuardedTool'
+    ).length;
+    expect(afterNewRefSameContent).toBe(1);
   });
 });

@@ -1,16 +1,21 @@
 'use client';
 
 import { createContext, useContext, useMemo, useState, useEffect, type ReactNode } from 'react';
-import { ConsentBroker } from './consent-broker.js';
+import { ConsentGuard } from './consent-broker.js';
 import type { PendingConsentRequest } from './consent-types.js';
 
-const BrokerContext = createContext<ConsentBroker | null>(null);
+/**
+ * Note: "Broker" in ConsentBrokerProvider and useConsentBroker refers to the
+ * React-facing UI coordinator backed by ConsentGuard, not to @mcp-b/webmcp-plugins's
+ * server/policy-oriented ConsentBroker.
+ */
+const BrokerContext = createContext<ConsentGuard | null>(null);
 
 /**
- * Provides a {@link ConsentBroker} instance to the component subtree.
+ * Provides a {@link ConsentGuard} instance to the component subtree.
  *
  * Place this near the root of your application, above any component that uses
- * {@link useGuardedWebMCP}. A single broker instance is created per provider
+ * {@link useGuardedWebMCP}. A single guard instance is created per provider
  * mount and shared across all guarded tools in the tree.
  *
  * @example
@@ -32,15 +37,15 @@ export function ConsentBrokerProvider({
   broker: providedBroker,
 }: {
   children: ReactNode;
-  broker?: ConsentBroker;
+  broker?: ConsentGuard;
 }) {
-  const defaultBroker = useMemo(() => new ConsentBroker(), []);
+  const defaultBroker = useMemo(() => new ConsentGuard(), []);
   const broker = providedBroker ?? defaultBroker;
   return <BrokerContext.Provider value={broker}>{children}</BrokerContext.Provider>;
 }
 
 /**
- * Returns the nearest {@link ConsentBroker} from context.
+ * Returns the nearest {@link ConsentGuard} from context.
  *
  * Used internally by {@link useGuardedWebMCP} to call `broker.request()` on
  * each guarded invocation. Consuming apps that build custom consent card UIs
@@ -50,7 +55,7 @@ export function ConsentBrokerProvider({
  *
  * @public
  */
-export function useConsentBroker(): ConsentBroker {
+export function useConsentBroker(): ConsentGuard {
   const broker = useContext(BrokerContext);
   if (!broker) throw new Error('useConsentBroker must be used within ConsentBrokerProvider');
   return broker;
@@ -75,8 +80,8 @@ export function useConsentBroker(): ConsentBroker {
  *     <ConsentCard
  *       key={req.id}
  *       request={req}
- *       onApprove={() => broker.decide(req.id, true)}
- *       onDeny={() => broker.decide(req.id, false)}
+ *       onApprove={async () => { await broker.decide(req.id, true); }}
+ *       onDeny={async () => { await broker.decide(req.id, false); }}
  *     />
  *   ));
  * }

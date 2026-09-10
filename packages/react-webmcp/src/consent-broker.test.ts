@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConsentBroker, MAX_PRESENCE_ATTEMPTS } from './consent-broker.js';
+import { ConsentGuard, MAX_PRESENCE_ATTEMPTS } from './consent-broker.js';
 import type { ConsentMetadata } from './consent-types.js';
+
+vi.mock('@mcp-b/webmcp-plugins/consent-presence', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@mcp-b/webmcp-plugins/consent-presence')>();
+  return {
+    ...mod,
+    verifyUserPresence: vi.fn().mockResolvedValue(true),
+  };
+});
 
 /** Minimal reversible low-risk metadata reused across most tests. */
 const reversibleLow: ConsentMetadata = {
@@ -34,7 +42,7 @@ const irreversibleHighWithPresence: ConsentMetadata = {
  * same request/fail/decide sequence.
  */
 async function lockOutTool(
-  broker: ConsentBroker,
+  broker: ConsentGuard,
   overrides: { origin?: string; toolName?: string; consent?: ConsentMetadata } = {}
 ): Promise<void> {
   const origin = overrides.origin ?? 'https://app.example.com';
@@ -52,12 +60,12 @@ async function lockOutTool(
   for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
     broker.recordPresenceFailure(capturedId);
   }
-  broker.decide(capturedId, false, false, 'presence-lockout');
+  await broker.decide(capturedId, false, false, 'presence-lockout');
   await pending;
   unsubscribe();
 }
 
-describe('ConsentBroker', () => {
+describe('ConsentGuard', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -67,7 +75,7 @@ describe('ConsentBroker', () => {
   });
 
   it('approve resolves with approved=true and reason=user', async () => {
-    const broker = new ConsentBroker();
+    const broker = new ConsentGuard();
     let capturedId = '';
     broker.subscribe((pending) => {
       if (pending.length > 0 && capturedId === '') {
@@ -83,7 +91,7 @@ describe('ConsentBroker', () => {
     });
 
     expect(capturedId).not.toBe('');
-    broker.decide(capturedId, true);
+    await broker.decide(capturedId, true);
 
     const decision = await p;
     expect(decision.approved).toBe(true);
@@ -91,7 +99,7 @@ describe('ConsentBroker', () => {
   });
 
   it('deny resolves with approved=false and reason=user', async () => {
-    const broker = new ConsentBroker();
+    const broker = new ConsentGuard();
     let capturedId = '';
     broker.subscribe((pending) => {
       if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
@@ -105,7 +113,7 @@ describe('ConsentBroker', () => {
     });
 
     expect(capturedId).not.toBe('');
-    broker.decide(capturedId, false);
+    await broker.decide(capturedId, false);
 
     const decision = await p;
     expect(decision.approved).toBe(false);
@@ -113,7 +121,7 @@ describe('ConsentBroker', () => {
   });
 
   it('timeout auto-denies after the configured milliseconds', async () => {
-    const broker = new ConsentBroker(5_000);
+    const broker = new ConsentGuard(5_000);
 
     const p = broker.request({
       toolName: 'getServiceHealth',
@@ -130,7 +138,7 @@ describe('ConsentBroker', () => {
   });
 
   it('session-preapproval works for reversible tools', async () => {
-    const broker = new ConsentBroker();
+    const broker = new ConsentGuard();
     let capturedId = '';
     broker.subscribe((pending) => {
       if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
@@ -143,7 +151,7 @@ describe('ConsentBroker', () => {
       args: {},
       consent: reversibleLow,
     });
-    broker.decide(capturedId, true, /* rememberForSession */ true);
+    await broker.decide(capturedId, true, /* rememberForSession */ true);
     const d1 = await p1;
     expect(d1.approved).toBe(true);
     expect(d1.reason).toBe('user');
@@ -160,7 +168,7 @@ describe('ConsentBroker', () => {
   });
 
   it('session-preapproval is refused for irreversible tools', async () => {
-    const broker = new ConsentBroker();
+    const broker = new ConsentGuard();
     let capturedId = '';
     broker.subscribe((pending) => {
       if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
@@ -173,7 +181,7 @@ describe('ConsentBroker', () => {
       args: { force: true },
       consent: irreversibleHigh,
     });
-    broker.decide(capturedId, true, /* rememberForSession */ true);
+    await broker.decide(capturedId, true, /* rememberForSession */ true);
     await p1;
 
     // Second call — must NOT be auto-approved; should enter pending queue
@@ -201,7 +209,7 @@ describe('ConsentBroker', () => {
   });
 
   it('concurrent requests each get independent IDs', async () => {
-    const broker = new ConsentBroker();
+    const broker = new ConsentGuard();
     const ids: string[] = [];
     broker.subscribe((pending) => {
       ids.length = 0;
@@ -239,7 +247,7 @@ describe('ConsentBroker', () => {
 
   describe('pub/sub contract', () => {
     it('subscribe stops receiving updates after unsubscribing', () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       const snapshots: number[] = [];
       const unsubscribe = broker.subscribe((pending) => snapshots.push(pending.length));
 
@@ -264,9 +272,11 @@ describe('ConsentBroker', () => {
     });
 
     it('subscribeDecision stops receiving events after unsubscribing', () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       const reasons: string[] = [];
-      const unsubscribe = broker.subscribeDecision((event) => reasons.push(event.reason ?? 'unknown'));
+      const unsubscribe = broker.subscribeDecision((event) =>
+        reasons.push(event.reason ?? 'unknown')
+      );
 
       broker.recordDecision(
         { toolName: 'toolA', origin: 'https://app.example.com', args: {}, consent: reversibleLow },
@@ -284,19 +294,20 @@ describe('ConsentBroker', () => {
       expect(reasons).toEqual(['user']);
     });
 
-    it('decide is a no-op for an unknown/already-resolved request id', () => {
-      const broker = new ConsentBroker();
+    it('decide is a no-op for an unknown/already-resolved request id', async () => {
+      const broker = new ConsentGuard();
       const reasons: string[] = [];
       broker.subscribeDecision((event) => reasons.push(event.reason ?? 'unknown'));
 
-      expect(() => broker.decide('does-not-exist', true)).not.toThrow();
+      const result = await broker.decide('does-not-exist', true);
+      expect(result).toEqual({ success: false, retryable: false, reason: 'denied' });
       expect(reasons).toEqual([]);
     });
   });
 
   describe('presence-failure lockout', () => {
     it('recordPresenceFailure increments attempts and reports lockedOut=false below the max', async () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       let capturedId = '';
       broker.subscribe((pending) => {
         if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
@@ -319,7 +330,7 @@ describe('ConsentBroker', () => {
     });
 
     it('accumulates presence failures across requests for the same origin+tool pair', async () => {
-      const broker = new ConsentBroker(5_000);
+      const broker = new ConsentGuard(5_000);
       let capturedId = '';
       broker.subscribe((pending) => {
         if (pending.length > 0) capturedId = pending[0]!.id;
@@ -356,12 +367,12 @@ describe('ConsentBroker', () => {
         lockedOut: true,
       });
 
-      broker.decide(capturedId, false, false, 'presence-lockout');
+      await broker.decide(capturedId, false, false, 'presence-lockout');
       await second;
     });
 
     it("a successful approval on a different origin+tool pair does not reset this pair's counter", async () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       const pendingByTool = new Map<string, string>();
       broker.subscribe((pending) => {
         pendingByTool.clear();
@@ -395,10 +406,10 @@ describe('ConsentBroker', () => {
         lockedOut: false,
       });
 
-      broker.decide(healthId, true);
+      await broker.decide(healthId, true);
       await health;
 
-      broker.decide(rollbackId, false);
+      await broker.decide(rollbackId, false);
       await rollback;
 
       let nextId = '';
@@ -418,12 +429,12 @@ describe('ConsentBroker', () => {
         attempts: 3,
         lockedOut: true,
       });
-      broker.decide(nextId, false, false, 'presence-lockout');
+      await broker.decide(nextId, false, false, 'presence-lockout');
       await next;
     });
 
     it('a successful approval on this origin+tool pair resets its presence-failure counter', async () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       let capturedId = '';
       broker.subscribe((pending) => {
         if (pending.length > 0) capturedId = pending[0]!.id;
@@ -438,7 +449,7 @@ describe('ConsentBroker', () => {
 
       expect(broker.recordPresenceFailure(capturedId).attempts).toBe(1);
       expect(broker.recordPresenceFailure(capturedId).attempts).toBe(2);
-      broker.decide(capturedId, true);
+      await broker.decide(capturedId, true);
       await first;
 
       const second = broker.request({
@@ -452,12 +463,12 @@ describe('ConsentBroker', () => {
         attempts: 1,
         lockedOut: false,
       });
-      broker.decide(capturedId, false);
+      await broker.decide(capturedId, false);
       await second;
     });
 
     it('locks out at MAX_PRESENCE_ATTEMPTS and the card can auto-deny with reason=presence-lockout', async () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       let capturedId = '';
       broker.subscribe((pending) => {
         if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
@@ -479,7 +490,7 @@ describe('ConsentBroker', () => {
 
       // The request is still pending — recordPresenceFailure never resolves
       // it on its own. The card is responsible for calling decide().
-      broker.decide(capturedId, false, false, 'presence-lockout');
+      await broker.decide(capturedId, false, false, 'presence-lockout');
 
       const decision = await p;
       expect(decision.approved).toBe(false);
@@ -487,7 +498,7 @@ describe('ConsentBroker', () => {
     });
 
     it('cooldown is active as soon as recordPresenceFailure crosses the threshold, before decide() is called', async () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       let capturedId = '';
       broker.subscribe((pending) => {
         if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
@@ -510,12 +521,12 @@ describe('ConsentBroker', () => {
         broker.getCooldownRemaining('https://app.example.com', 'rollbackDeployment')
       ).toBeGreaterThan(0);
 
-      broker.decide(capturedId, false, false, 'presence-lockout');
+      await broker.decide(capturedId, false, false, 'presence-lockout');
       await p;
     });
 
     it('recordPresenceFailure is a no-op for an unknown/already-resolved request id', () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       const result = broker.recordPresenceFailure('does-not-exist');
       expect(result).toEqual({ attempts: 0, lockedOut: false });
     });
@@ -523,12 +534,12 @@ describe('ConsentBroker', () => {
 
   describe('cooldown / rate limiting', () => {
     it('getCooldownRemaining returns 0 for a pair that has never been locked out', () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       expect(broker.getCooldownRemaining('https://app.example.com', 'neverLockedOut')).toBe(0);
     });
 
     it('a fresh request for a locked-out origin+tool pair is denied with reason=rate-limited and never enters the pending queue', async () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       let capturedId = '';
       const seenPendingToolNames: string[] = [];
       broker.subscribe((pending) => {
@@ -546,7 +557,7 @@ describe('ConsentBroker', () => {
       for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
         broker.recordPresenceFailure(capturedId);
       }
-      broker.decide(capturedId, false, false, 'presence-lockout');
+      await broker.decide(capturedId, false, false, 'presence-lockout');
       await p1;
 
       // A brand new call for the same origin+tool, made immediately after,
@@ -564,8 +575,74 @@ describe('ConsentBroker', () => {
       expect(seenPendingToolNames.every((name) => name === 'rollbackDeployment')).toBe(true);
     });
 
+    it('an active cooldown overrides cached session pre-approval', async () => {
+      const broker = new ConsentGuard(30_000, async () => true);
+      const reversibleWithPresence: ConsentMetadata = {
+        scope: ['deploy'],
+        reversible: true,
+        riskLevel: 'high',
+        requiresApproval: true,
+        requireUserPresence: true,
+      };
+
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0) capturedId = pending[0]!.id;
+      });
+
+      // 1. Initial request with rememberForSession = true
+      const p1 = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: reversibleWithPresence,
+      });
+      await broker.decide(capturedId, true, true);
+      const d1 = await p1;
+      expect(d1.approved).toBe(true);
+      expect(d1.reason).toBe('user');
+
+      // 2. Second request hits session pre-approval
+      const d2 = await broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: reversibleWithPresence,
+      });
+      expect(d2.approved).toBe(true);
+      expect(d2.reason).toBe('session-preapproval');
+
+      // 3. Lock out tool via presence failures on an irreversible request
+      capturedId = '';
+      const p3 = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+      for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
+        broker.recordPresenceFailure(capturedId);
+      }
+      await broker.decide(capturedId, false, false, 'presence-lockout');
+      await p3;
+
+      expect(
+        broker.getCooldownRemaining('https://app.example.com', 'rollbackDeployment')
+      ).toBeGreaterThan(0);
+
+      // 4. Calling request() on the reversible tool must be rate-limited, overriding cached pre-approval
+      const d4 = await broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: reversibleWithPresence,
+      });
+      expect(d4.approved).toBe(false);
+      expect(d4.reason).toBe('rate-limited');
+    });
+
     it("a different tool on the same origin is unaffected by another tool's cooldown", async () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       let capturedId = '';
       broker.subscribe((pending) => {
         if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
@@ -580,7 +657,7 @@ describe('ConsentBroker', () => {
       for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
         broker.recordPresenceFailure(capturedId);
       }
-      broker.decide(capturedId, false, false, 'presence-lockout');
+      await broker.decide(capturedId, false, false, 'presence-lockout');
       await p1;
 
       let secondCapturedId = '';
@@ -599,14 +676,14 @@ describe('ConsentBroker', () => {
       // Not rate-limited — different tool key — so it should enter the
       // pending queue normally rather than resolving immediately.
       expect(secondCapturedId).not.toBe('');
-      broker.decide(secondCapturedId, true);
+      await broker.decide(secondCapturedId, true);
       const d2 = await p2;
       expect(d2.approved).toBe(true);
       expect(d2.reason).toBe('user');
     });
 
     it('cooldown expires after its duration and the tool can be requested normally again', async () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       let capturedId = '';
       broker.subscribe((pending) => {
         if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
@@ -621,7 +698,7 @@ describe('ConsentBroker', () => {
       for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
         broker.recordPresenceFailure(capturedId);
       }
-      broker.decide(capturedId, false, false, 'presence-lockout');
+      await broker.decide(capturedId, false, false, 'presence-lockout');
       await p1;
 
       // Base cooldown is 10s — advance past it.
@@ -643,31 +720,31 @@ describe('ConsentBroker', () => {
       });
 
       expect(secondCapturedId).not.toBe('');
-      broker.decide(secondCapturedId, true);
+      await broker.decide(secondCapturedId, true);
       const d2 = await p2;
       expect(d2.approved).toBe(true);
     });
 
     it('escalates the cooldown duration on repeated lockouts for the same origin+tool pair', async () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       const origin = 'https://app.example.com';
       const toolName = 'rollbackDeployment';
-    
+
       await lockOutTool(broker, { origin, toolName });
       const firstCooldown = broker.getCooldownRemaining(origin, toolName);
       expect(firstCooldown).toBeGreaterThan(0);
       expect(firstCooldown).toBeLessThanOrEqual(10_000);
-    
+
       vi.advanceTimersByTime(10_001);
       await lockOutTool(broker, { origin, toolName });
       const secondCooldown = broker.getCooldownRemaining(origin, toolName);
-    
+
       expect(secondCooldown).toBeGreaterThan(firstCooldown);
       expect(secondCooldown).toBeLessThanOrEqual(30_000);
     });
 
     it('escalating cooldowns cap at MAX_COOLDOWN_MS (5 minutes) instead of growing unbounded', async () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       const origin = 'https://app.example.com';
       const toolName = 'rollbackDeployment';
 
@@ -683,7 +760,7 @@ describe('ConsentBroker', () => {
     });
 
     it('a successful approval clears any prior lockout escalation for that origin+tool pair', async () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       let capturedId = '';
       broker.subscribe((pending) => {
         if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
@@ -699,7 +776,7 @@ describe('ConsentBroker', () => {
       for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
         broker.recordPresenceFailure(capturedId);
       }
-      broker.decide(capturedId, false, false, 'presence-lockout');
+      await broker.decide(capturedId, false, false, 'presence-lockout');
       await p1;
 
       // Wait out the cooldown, then approve successfully.
@@ -718,7 +795,7 @@ describe('ConsentBroker', () => {
         args: { force: true },
         consent: irreversibleHighWithPresence,
       });
-      broker.decide(secondCapturedId, true);
+      await broker.decide(secondCapturedId, true);
       await p2;
 
       expect(broker.getCooldownRemaining('https://app.example.com', 'rollbackDeployment')).toBe(0);
@@ -740,7 +817,7 @@ describe('ConsentBroker', () => {
       for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
         broker.recordPresenceFailure(thirdCapturedId);
       }
-      broker.decide(thirdCapturedId, false, false, 'presence-lockout');
+      await broker.decide(thirdCapturedId, false, false, 'presence-lockout');
       await p3;
 
       const thirdCooldown = broker.getCooldownRemaining(
@@ -754,7 +831,7 @@ describe('ConsentBroker', () => {
 
   describe('decision events', () => {
     it('fires a decision event with reason=rate-limited for a cooldown-blocked request, without a pending entry', async () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       let capturedId = '';
       broker.subscribe((pending) => {
         if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
@@ -769,7 +846,7 @@ describe('ConsentBroker', () => {
       for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
         broker.recordPresenceFailure(capturedId);
       }
-      broker.decide(capturedId, false, false, 'presence-lockout');
+      await broker.decide(capturedId, false, false, 'presence-lockout');
       await p1;
 
       const events: string[] = [];
@@ -788,7 +865,7 @@ describe('ConsentBroker', () => {
     });
 
     it('fires a decision event with reason=presence-lockout when the card auto-denies', async () => {
-      const broker = new ConsentBroker();
+      const broker = new ConsentGuard();
       let capturedId = '';
       broker.subscribe((pending) => {
         if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
@@ -808,7 +885,7 @@ describe('ConsentBroker', () => {
       for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
         broker.recordPresenceFailure(capturedId);
       }
-      broker.decide(capturedId, false, false, 'presence-lockout');
+      await broker.decide(capturedId, false, false, 'presence-lockout');
       await p;
 
       expect(events).toContain('presence-lockout');

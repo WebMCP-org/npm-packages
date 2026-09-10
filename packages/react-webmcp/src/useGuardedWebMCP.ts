@@ -1,9 +1,9 @@
 'use client';
 
+import { useMemo } from 'react';
 import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';
+import { consent, toMcpAnnotations, type ConsentMetadata } from '@mcp-b/webmcp-plugins/consent';
 import { useWebMCP } from 'usewebmcp';
-import { toMcpAnnotations } from './consent-annotations.js';
-import type { ConsentMetadata } from './consent-types.js';
 import { useConsentBroker } from './ConsentBrokerProvider.js';
 
 /**
@@ -24,7 +24,7 @@ export interface GuardedToolDef<Args, Result> {
   inputSchema?: ToolInputSchema;
   /**
    * Consent metadata that drives both the MCP annotation hints and the
-   * on-page {@link ConsentBroker} approval flow.
+   * on-page {@link ConsentGuard} approval flow.
    */
   consent: ConsentMetadata;
   /** Forwarded to the underlying useWebMCP call. Defaults to true. */
@@ -37,20 +37,8 @@ export interface GuardedToolDef<Args, Result> {
  * Drop-in replacement for `useWebMCP` that gates every tool invocation behind
  * an in-page consent prompt when `consent.requiresApproval` evaluates to true.
  *
- * ### How it works
- *
- * 1. Registers the tool via the existing `useWebMCP` hook (no changes to MCP
- *    registration behaviour).
- * 2. Maps `ConsentMetadata` to MCP `ToolAnnotations` so native agent runtimes
- *    already equipped with approval UI (e.g. the MCP-B Agent extension) receive
- *    real signal rather than empty hints.
- * 3. On each invocation, evaluates `consent.requiresApproval`:
- *    - `false` (or predicate returns `false`): calls `execute` directly.
- *    - `true` (or predicate returns `true`): suspends in `broker.request()`
- *      until the user resolves the consent card (or a 30-second timeout
- *      auto-denies).
- * 4. On denial throws so `useWebMCP` records an MCP error result
- *    (`isError: true`) rather than a successful call with denial data.
+ * Internally, this hook acts as a thin translator that wires the consent
+ * policy plugin from `@mcp-b/webmcp-plugins/consent` into `useWebMCP`.
  *
  * Must be rendered inside a {@link ConsentBrokerProvider}.
  *
@@ -62,52 +50,29 @@ export interface GuardedToolDef<Args, Result> {
 export function useGuardedWebMCP<Args, Result>(def: GuardedToolDef<Args, Result>) {
   const broker = useConsentBroker();
 
-  // NOTE: useWebMCP's real config field is `execute`, not `handler` — confirmed
-  // in NOTES.md against usewebmcp's actual WebMCPConfig type. `def.execute` (the
-  // caller's real handler) and the `execute:` field below (passed to useWebMCP)
-  // are two different functions with the same name — this one wraps that one.
+  // Investigation of usewebmcp's useWebMCP implementation:
+  // useWebMCP destructures `plugins: _plugins` out of config and does not include
+  // it in `registrationInputs` or `descriptorKey` (which only tracks serialized metadata,
+  // schema, preparation error, enabled, and explicit deps). During tool execution,
+  // invocation plugins are read from the latest committed config ref via `getInvocationConfig`.
+  // Therefore, useWebMCP does not re-register the tool on plugins referential changes (neither
+  // shallow/deep nor strict reference comparison triggers registration).
+  //
+  // However, memoizing the plugin array ensures referential stability, avoids allocating
+  // new plugin objects and arrays on every render (advancing #332's zero owner re-render
+  // overhead goal), and protects against re-registration if downstream consumers or future
+  // versions perform referential-equality checks.
+  // Note: Callers are expected to pass a stable `def.consent` object reference (or memoize
+  // dynamic consent metadata) across renders.
+  const plugins = useMemo(() => [consent(broker, def.consent)], [broker, def.consent]);
+
   return useWebMCP({
     name: def.name,
     description: def.description,
     ...(def.inputSchema && { inputSchema: def.inputSchema }),
     ...(def.consent && { annotations: toMcpAnnotations(def.consent) }),
     ...(def.enabled !== undefined && { enabled: def.enabled }),
-    execute: (async (args: Args) => {
-      const needsApproval =
-        typeof def.consent.requiresApproval === 'function'
-          ? def.consent.requiresApproval(args)
-          : def.consent.requiresApproval;
-
-      if (!needsApproval) {
-        broker.recordDecision(
-          {
-            toolName: def.name,
-            // NOTE: reflects the registering page's origin, not the verified sender.
-            // The MCP tabServer transport receives the real caller's origin in the MessageEvent
-            // but discards it before the tool's execute callback is invoked. See NOTES.md.
-            origin: window.location.origin,
-            args,
-            consent: def.consent,
-          },
-          { approved: true, reason: 'user' }
-        );
-        return def.execute(args);
-      }
-
-      const decision = await broker.request({
-        toolName: def.name,
-        // NOTE: reflects the registering page's origin, not the verified sender.
-        // The MCP tabServer transport receives the real caller's origin in the MessageEvent
-        // but discards it before the tool's execute callback is invoked. See NOTES.md.
-        origin: window.location.origin,
-        args,
-        consent: def.consent,
-      });
-
-      if (!decision.approved) {
-        throw new Error(`Action denied by user (${decision.reason}).`);
-      }
-      return def.execute(args);
-    }) as any,
+    plugins,
+    execute: ((args: Args) => def.execute(args)) as any,
   });
 }

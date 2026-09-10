@@ -43,13 +43,14 @@ export { useWebMCPResource } from './useWebMCPResource.js';
 export type {
   ConsentDecision,
   ConsentMetadata,
+  DecideResult,
   PendingConsentRequest,
   RiskLevel,
 } from './consent-types.js';
 export type { McpToolAnnotations } from './consent-annotations.js';
 export { toMcpAnnotations } from './consent-annotations.js';
 export type { ConsentDecisionEvent } from './consent-broker.js';
-export { ConsentBroker, MAX_PRESENCE_ATTEMPTS } from './consent-broker.js';
+export { ConsentGuard, MAX_PRESENCE_ATTEMPTS } from './consent-broker.js';
 export type { GuardedToolDef } from './useGuardedWebMCP.js';
 export { useGuardedWebMCP } from './useGuardedWebMCP.js';
 export {
