@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ConsentBroker, consent, type ConsentBrokerOptions } from './consent.js';
+import {
+  ConsentBroker,
+  ConsentGuard,
+  consent,
+  type ConsentBrokerOptions,
+  type ConsentMetadata,
+} from './consent.js';
 import { InvocationFailure, invoke } from './invocation.js';
 
 const tool = { instanceId: 'rollback-1', name: 'rollback' };
@@ -242,5 +248,353 @@ describe('ConsentBroker', () => {
     expect(Object.isFrozen(request.operation.arguments)).toBe(true);
     await broker.decide(request.id, { approved: true });
     await outcome;
+  });
+});
+
+describe('consent plugin with legacy ConsentBroker options', () => {
+  it('runs authorize()-based flow: prepares operation, calls broker.authorize with expected shape, and executes next() only after approval', async () => {
+    const broker = new ConsentBroker({ policy: { mode: 'click' } });
+    const authorizeSpy = vi.spyOn(broker, 'authorize');
+    const bindingSpy = vi.fn((input: { revision: string }) => ({ bound: input.revision }));
+    const execute = vi.fn(() => 'rolled back');
+
+    const plugin = consent({ broker });
+    expect(plugin.name).toBe('consent');
+
+    const caller = { kind: 'reported' as const, name: 'client-test' };
+    const invocation = invoke(
+      {
+        tool,
+        binding: bindingSpy,
+        execute,
+        plugins: [plugin],
+      },
+      { revision: 'abc' },
+      { caller }
+    );
+
+    await vi.waitFor(() => expect(broker.getSnapshot()).toHaveLength(1));
+    const request = broker.getSnapshot()[0]!;
+
+    // call.prepare() was invoked (proven by binding execution and operation structure)
+    expect(bindingSpy).toHaveBeenCalledWith({ revision: 'abc' });
+    expect(authorizeSpy).toHaveBeenCalledWith({
+      invocationId: request.invocationId,
+      operation: {
+        tool,
+        arguments: { revision: 'abc' },
+        binding: { bound: 'abc' },
+      },
+      signal: expect.any(AbortSignal),
+      caller,
+    });
+
+    // next() only runs after authorization succeeds
+    expect(execute).not.toHaveBeenCalled();
+
+    expect(await broker.decide(request.id, { approved: true })).toBe(true);
+    const result = await invocation;
+    expect(result).toEqual({ value: 'rolled back', response: 'rolled back' });
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls call.prepare() and passes operation to broker.authorize', async () => {
+    const broker = new ConsentBroker({ policy: { mode: 'click' } });
+    const authorizeSpy = vi.spyOn(broker, 'authorize');
+    const plugin = consent({ broker });
+
+    const preparedOperation = {
+      tool,
+      arguments: { test: 123 },
+      binding: undefined,
+    };
+    const prepareSpy = vi.fn(async () => preparedOperation);
+    const nextSpy = vi.fn(async () => ({ value: 'ok', response: 'ok' }));
+    const controller = new AbortController();
+    const mockCall = {
+      protocol: 'local' as const,
+      id: 'inv-legacy',
+      tool,
+      signal: controller.signal,
+      caller: { kind: 'unknown' as const },
+      traceContext: {},
+      prepare: prepareSpy,
+    };
+
+    const runPromise = plugin.aroundInvoke(mockCall, nextSpy);
+    await vi.waitFor(() => expect(broker.getSnapshot()).toHaveLength(1));
+
+    expect(prepareSpy).toHaveBeenCalledTimes(1);
+    expect(authorizeSpy).toHaveBeenCalledWith({
+      invocationId: 'inv-legacy',
+      operation: preparedOperation,
+      signal: controller.signal,
+      caller: { kind: 'unknown' },
+    });
+    expect(nextSpy).not.toHaveBeenCalled();
+
+    await broker.decide(broker.getSnapshot()[0]!.id, { approved: true });
+    const result = await runPromise;
+    expect(result).toEqual({ value: 'ok', response: 'ok' });
+    expect(nextSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks next() and rejects when authorization is denied', async () => {
+    const broker = new ConsentBroker({ policy: { mode: 'click' } });
+    const execute = vi.fn(() => 'must not run');
+    const plugin = consent({ broker });
+
+    const outcome = invoke({ tool, execute, plugins: [plugin] }, { revision: 'denied-rev' }).catch(
+      (error: unknown) => error
+    );
+
+    await vi.waitFor(() => expect(broker.getSnapshot()).toHaveLength(1));
+    const request = broker.getSnapshot()[0]!;
+
+    expect(execute).not.toHaveBeenCalled();
+    expect(await broker.decide(request.id, { approved: false })).toBe(false);
+
+    expect(await outcome).toMatchObject({ kind: 'denied' });
+    expect(execute).not.toHaveBeenCalled();
+  });
+});
+
+describe('consent plugin with ConsentGuard', () => {
+  const origin = 'https://app.example.com';
+  const guardedTool = { instanceId: 'guard-1', name: 'restartService', registeringOrigin: origin };
+
+  it('invokes next() and records decision for auto-approved calls', async () => {
+    const guard = new ConsentGuard();
+    const recordSpy = vi.spyOn(guard, 'recordDecision');
+    const requestSpy = vi.spyOn(guard, 'request');
+    const execute = vi.fn(() => 'ok');
+
+    const metadata: ConsentMetadata = {
+      scope: ['read:service'],
+      reversible: true,
+      riskLevel: 'low',
+      requiresApproval: false,
+    };
+
+    const result = await invoke(
+      { tool: guardedTool, execute, plugins: [consent(guard, metadata)] },
+      { id: 1 }
+    );
+
+    expect(execute).toHaveBeenCalledOnce();
+    expect(requestSpy).not.toHaveBeenCalled();
+    expect(recordSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'restartService',
+        origin,
+        args: { id: 1 },
+        consent: metadata,
+      }),
+      { approved: true, reason: 'user' }
+    );
+    expect(result.value).toBe('ok');
+  });
+
+  it('waits for interactive approval and then invokes next()', async () => {
+    const guard = new ConsentGuard();
+    const execute = vi.fn(() => 'restarted');
+
+    const metadata: ConsentMetadata = {
+      scope: ['write:service'],
+      reversible: true,
+      riskLevel: 'high',
+      requiresApproval: true,
+    };
+
+    let pendingId: string | undefined;
+    guard.subscribe((pending) => {
+      if (pending[0]) pendingId = pending[0].id;
+    });
+
+    const invocation = invoke(
+      { tool: guardedTool, execute, plugins: [consent(guard, metadata)] },
+      { id: 2 }
+    );
+
+    await vi.waitFor(() => expect(pendingId).toBeDefined());
+    expect(execute).not.toHaveBeenCalled();
+
+    await guard.decide(pendingId!, true);
+    const result = await invocation;
+
+    expect(execute).toHaveBeenCalledOnce();
+    expect(result.value).toBe('restarted');
+  });
+
+  it('invokes next() and records decision on session-preapproved path for reversible tools', async () => {
+    const guard = new ConsentGuard();
+    const decisionSpy = vi.fn();
+    guard.subscribeDecision(decisionSpy);
+    const execute = vi.fn(() => 'done');
+
+    const metadata: ConsentMetadata = {
+      scope: ['write:service'],
+      reversible: true,
+      riskLevel: 'medium',
+      requiresApproval: true,
+    };
+
+    let pendingId: string | undefined;
+    guard.subscribe((pending) => {
+      if (pending[0]) pendingId = pending[0].id;
+    });
+
+    // First call: approve with rememberForSession = true
+    const firstCall = invoke(
+      { tool: guardedTool, execute, plugins: [consent(guard, metadata)] },
+      { id: 10 }
+    );
+    await vi.waitFor(() => expect(pendingId).toBeDefined());
+    await guard.decide(pendingId!, true, true);
+    await firstCall;
+
+    decisionSpy.mockClear();
+
+    // Second call: resolves from session preapproval without pending prompt
+    pendingId = undefined;
+    const secondCall = await invoke(
+      { tool: guardedTool, execute, plugins: [consent(guard, metadata)] },
+      { id: 11 }
+    );
+
+    expect(pendingId).toBeUndefined();
+    expect(decisionSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'restartService',
+        origin,
+        args: { id: 11 },
+        consent: metadata,
+        approved: true,
+        reason: 'session-preapproval',
+      })
+    );
+    expect(secondCall.value).toBe('done');
+  });
+
+  it('throws on user denial without calling execute', async () => {
+    const guard = new ConsentGuard();
+    const execute = vi.fn(() => 'should not run');
+
+    const metadata: ConsentMetadata = {
+      scope: ['write:service'],
+      reversible: false,
+      riskLevel: 'high',
+      requiresApproval: true,
+    };
+
+    let pendingId: string | undefined;
+    guard.subscribe((pending) => {
+      if (pending[0]) pendingId = pending[0].id;
+    });
+
+    const invocation = invoke(
+      { tool: guardedTool, execute, plugins: [consent(guard, metadata)] },
+      {}
+    );
+    await vi.waitFor(() => expect(pendingId).toBeDefined());
+
+    await guard.decide(pendingId!, false);
+    await expect(invocation).rejects.toThrow('Action denied by user (user).');
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('immediately throws rate-limited when tool is on active cooldown without calling next()', async () => {
+    const guard = new ConsentGuard();
+    const execute = vi.fn(() => 'should not run');
+
+    const metadata: ConsentMetadata = {
+      scope: ['write:service'],
+      reversible: false,
+      riskLevel: 'high',
+      requiresApproval: true,
+      requireUserPresence: true,
+    };
+
+    let pendingId: string | undefined;
+    guard.subscribe((pending) => {
+      if (pending[0]) pendingId = pending[0].id;
+    });
+
+    const first = invoke({ tool: guardedTool, execute, plugins: [consent(guard, metadata)] }, {});
+    await vi.waitFor(() => expect(pendingId).toBeDefined());
+
+    // Out-of-band verification: drive lockout via the lower-level primitives, not decide()'s automatic ceremony.
+    // Fail presence MAX_PRESENCE_ATTEMPTS times
+    guard.recordPresenceFailure(pendingId!);
+    guard.recordPresenceFailure(pendingId!);
+    const lockout = guard.recordPresenceFailure(pendingId!);
+    expect(lockout.lockedOut).toBe(true);
+
+    await guard.decide(pendingId!, false, false, 'presence-lockout');
+    await expect(first).rejects.toThrow();
+
+    // Verify cooldown is active
+    expect(guard.getCooldownRemaining(origin, 'restartService')).toBeGreaterThan(0);
+
+    // Subsequent call fails immediately at cooldown check
+    execute.mockClear();
+    await expect(
+      invoke({ tool: guardedTool, execute, plugins: [consent(guard, metadata)] }, {})
+    ).rejects.toThrow('Action rate-limited for restartService.');
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('ensures active cooldown overrides session pre-approval', async () => {
+    const guard = new ConsentGuard(30_000, vi.fn().mockResolvedValue(true));
+    const execute = vi.fn(() => 'result');
+
+    const metadata: ConsentMetadata = {
+      scope: ['write:service'],
+      reversible: true,
+      riskLevel: 'medium',
+      requiresApproval: true,
+      requireUserPresence: true,
+    };
+
+    let pendingId: string | undefined;
+    guard.subscribe((pending) => {
+      if (pending[0]) pendingId = pending[0].id;
+    });
+
+    // Step 1: Pre-approve session
+    const first = invoke({ tool: guardedTool, execute, plugins: [consent(guard, metadata)] }, {});
+    await vi.waitFor(() => expect(pendingId).toBeDefined());
+    await guard.decide(pendingId!, true, true);
+    await first;
+
+    // Step 2: Simulate lockout by triggering presence failures on an irreversible request
+    let secondPendingId: string | undefined;
+    guard.subscribe((pending) => {
+      if (pending[0]) secondPendingId = pending[0].id;
+    });
+
+    const secondReqPromise = guard.request({
+      toolName: 'restartService',
+      origin,
+      args: {},
+      consent: { ...metadata, reversible: false },
+    });
+    expect(secondPendingId).toBeDefined();
+
+    // Out-of-band verification: drive lockout via the lower-level primitives, not decide()'s automatic ceremony.
+    guard.recordPresenceFailure(secondPendingId!);
+    guard.recordPresenceFailure(secondPendingId!);
+    guard.recordPresenceFailure(secondPendingId!);
+    await guard.decide(secondPendingId!, false, false, 'presence-lockout');
+    await secondReqPromise;
+
+    // Step 3: Now try to invoke the reversible tool again. Cooldown check must override session approval!
+    execute.mockClear();
+    await expect(
+      invoke({ tool: guardedTool, execute, plugins: [consent(guard, metadata)] }, {})
+    ).rejects.toThrow('Action rate-limited for restartService.');
+
+    expect(execute).not.toHaveBeenCalled();
   });
 });

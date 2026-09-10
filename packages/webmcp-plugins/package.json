@@ -49,6 +49,26 @@
       "import": "./dist/consent.js",
       "default": "./dist/consent.js"
     },
+    "./consent-guard": {
+      "types": "./dist/consent-guard.d.ts",
+      "import": "./dist/consent-guard.js",
+      "default": "./dist/consent-guard.js"
+    },
+    "./consent-presence": {
+      "types": "./dist/consent-presence.d.ts",
+      "import": "./dist/consent-presence.js",
+      "default": "./dist/consent-presence.js"
+    },
+    "./consent-types": {
+      "types": "./dist/consent-types.d.ts",
+      "import": "./dist/consent-types.js",
+      "default": "./dist/consent-types.js"
+    },
+    "./consent-annotations": {
+      "types": "./dist/consent-annotations.d.ts",
+      "import": "./dist/consent-annotations.js",
+      "default": "./dist/consent-annotations.js"
+    },
     "./otel": {
       "types": "./dist/otel.d.ts",
       "import": "./dist/otel.js",
@@ -73,6 +93,7 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "catalog:",
     "@standard-schema/spec": "^1.1.0",
     "webmcp-types": "^0.1.6"
   },
