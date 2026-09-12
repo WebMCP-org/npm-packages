@@ -1,10 +1,39 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';
 import { consent, toMcpAnnotations, type ConsentMetadata } from '@mcp-b/webmcp-plugins/consent';
 import { useWebMCP } from 'usewebmcp';
 import { useConsentBroker } from './ConsentBrokerProvider.js';
+
+/**
+ * Dev-mode-only guard against the documented "callers must pass a stable
+ * `def.consent` reference" contract below. `useWebMCP` doesn't re-register on
+ * plugin identity changes, so a caller who passes a fresh object literal each
+ * render silently keeps whatever consent policy was captured on the first
+ * render — with no error, just a stale policy applied forever after. This
+ * makes that failure mode visible instead of silent.
+ */
+function useWarnOnUnstableConsent(name: string, value: ConsentMetadata): void {
+  const previous = useRef<{ ref: ConsentMetadata; serialized: string } | null>(null);
+
+  if (process.env.NODE_ENV !== 'production') {
+    const serialized = JSON.stringify(value);
+    const prev = previous.current;
+    if (prev && prev.ref !== value && prev.serialized === serialized) {
+      // Different object identity, same contents: almost certainly an
+      // unmemoized object literal, not a genuine content change.
+      console.warn(
+        `useGuardedWebMCP("${name}"): \`consent\` was passed as a new object ` +
+          'reference with unchanged contents. useWebMCP will NOT re-register ' +
+          'the tool or refresh the consent policy in this case, so the ' +
+          'previous policy silently keeps being used. Memoize `consent` ' +
+          '(e.g. with useMemo) or pass a stable module-level constant.'
+      );
+    }
+    previous.current = { ref: value, serialized };
+  }
+}
 
 /**
  * Definition for a guarded tool that requires consent before execution.
@@ -49,6 +78,7 @@ export interface GuardedToolDef<Args, Result> {
  */
 export function useGuardedWebMCP<Args, Result>(def: GuardedToolDef<Args, Result>) {
   const broker = useConsentBroker();
+  useWarnOnUnstableConsent(def.name, def.consent);
 
   // Investigation of usewebmcp's useWebMCP implementation:
   // useWebMCP destructures `plugins: _plugins` out of config and does not include
@@ -66,6 +96,15 @@ export function useGuardedWebMCP<Args, Result>(def: GuardedToolDef<Args, Result>
   // dynamic consent metadata) across renders.
   const plugins = useMemo(() => [consent(broker, def.consent)], [broker, def.consent]);
 
+  // `useWebMCP`'s `execute` type is derived from its own schema-inference
+  // generics, which don't know about `GuardedToolDef`'s independent `Args`/
+  // `Result` type parameters — the two can't be unified structurally. Rather
+  // than opting out of checking entirely with `as any`, anchor the cast to
+  // `useWebMCP`'s own declared parameter type, so a future signature change
+  // in `useWebMCP` still surfaces as a type error here instead of silently
+  // continuing to compile.
+  type UseWebMCPConfig = Parameters<typeof useWebMCP>[0];
+
   return useWebMCP({
     name: def.name,
     description: def.description,
@@ -73,6 +112,6 @@ export function useGuardedWebMCP<Args, Result>(def: GuardedToolDef<Args, Result>
     ...(def.consent && { annotations: toMcpAnnotations(def.consent) }),
     ...(def.enabled !== undefined && { enabled: def.enabled }),
     plugins,
-    execute: ((args: Args) => def.execute(args)) as any,
+    execute: ((args: Args) => def.execute(args)) as unknown as UseWebMCPConfig['execute'],
   });
 }

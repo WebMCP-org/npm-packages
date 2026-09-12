@@ -367,6 +367,36 @@ describe('useGuardedWebMCP', () => {
     expect(execute).toHaveBeenLastCalledWith({ force: true });
   });
 
+  it('warns in development when consent is passed as an unmemoized object literal', async () => {
+    const execute = vi.fn().mockResolvedValue({ ok: true });
+    const broker = new ConsentGuard();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const hook = await renderHook(
+      ({ consent }: { consent: ConsentMetadata }) =>
+        useGuardedWebMCP({
+          name: 'unstableConsentTool',
+          description: 'A tool whose consent object is a fresh literal each render',
+          consent,
+          execute,
+        }),
+      {
+        initialProps: { consent: { ...lowRiskConsent } },
+        wrapper: provider(broker),
+      }
+    );
+
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    // Re-render with a brand-new object of identical contents — the exact
+    // footgun the warning exists to catch.
+    await hook.rerender({ consent: { ...lowRiskConsent } });
+
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('unstableConsentTool');
+    expect(warnSpy.mock.calls[0]?.[0]).toContain('new object');
+  });
+
   it('does not re-register the tool when re-rendered without changing consent contents', async () => {
     const execute = vi.fn().mockResolvedValue({ ok: true });
     const broker = new ConsentGuard();
