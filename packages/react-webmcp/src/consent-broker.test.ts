@@ -1,0 +1,894 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ConsentGuard, MAX_PRESENCE_ATTEMPTS } from './consent-broker.js';
+import type { ConsentMetadata } from './consent-types.js';
+
+vi.mock('@mcp-b/webmcp-plugins/consent-presence', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@mcp-b/webmcp-plugins/consent-presence')>();
+  return {
+    ...mod,
+    verifyUserPresence: vi.fn().mockResolvedValue(true),
+  };
+});
+
+/** Minimal reversible low-risk metadata reused across most tests. */
+const reversibleLow: ConsentMetadata = {
+  scope: ['read:deployments'],
+  reversible: true,
+  riskLevel: 'low',
+  requiresApproval: true,
+};
+
+/** Irreversible high-risk metadata. */
+const irreversibleHigh: ConsentMetadata = {
+  scope: ['write:rollback'],
+  reversible: false,
+  riskLevel: 'high',
+  requiresApproval: true,
+};
+
+/** Irreversible high-risk metadata that also requires a WebAuthn presence ceremony. */
+const irreversibleHighWithPresence: ConsentMetadata = {
+  ...irreversibleHigh,
+  requireUserPresence: true,
+};
+
+/**
+ * Drives a full presence-failure lockout cycle for one origin+tool pair:
+ * requests consent, fails presence MAX_PRESENCE_ATTEMPTS times, auto-denies
+ * with reason 'presence-lockout', and waits for the request to resolve.
+ *
+ * Shared by every test that needs to trigger a lockout cycle — escalation,
+ * the escalation cap, and anything else that would otherwise re-derive the
+ * same request/fail/decide sequence.
+ */
+async function lockOutTool(
+  broker: ConsentGuard,
+  overrides: { origin?: string; toolName?: string; consent?: ConsentMetadata } = {}
+): Promise<void> {
+  const origin = overrides.origin ?? 'https://app.example.com';
+  const toolName = overrides.toolName ?? 'rollbackDeployment';
+  const consent = overrides.consent ?? irreversibleHighWithPresence;
+
+  let capturedId = '';
+  const unsubscribe = broker.subscribe((pending) => {
+    const entry = pending.find((r) => r.toolName === toolName && r.origin === origin);
+    if (entry) capturedId = entry.id;
+  });
+
+  const pending = broker.request({ toolName, origin, args: { force: true }, consent });
+
+  for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
+    broker.recordPresenceFailure(capturedId);
+  }
+  await broker.decide(capturedId, false, false, 'presence-lockout');
+  await pending;
+  unsubscribe();
+}
+
+describe('ConsentGuard', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('approve resolves with approved=true and reason=user', async () => {
+    const broker = new ConsentGuard();
+    let capturedId = '';
+    broker.subscribe((pending) => {
+      if (pending.length > 0 && capturedId === '') {
+        capturedId = pending[0]!.id;
+      }
+    });
+
+    const p = broker.request({
+      toolName: 'getServiceHealth',
+      origin: 'https://app.example.com',
+      args: {},
+      consent: reversibleLow,
+    });
+
+    expect(capturedId).not.toBe('');
+    await broker.decide(capturedId, true);
+
+    const decision = await p;
+    expect(decision.approved).toBe(true);
+    expect(decision.reason).toBe('user');
+  });
+
+  it('deny resolves with approved=false and reason=user', async () => {
+    const broker = new ConsentGuard();
+    let capturedId = '';
+    broker.subscribe((pending) => {
+      if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
+    });
+
+    const p = broker.request({
+      toolName: 'rollbackDeployment',
+      origin: 'https://app.example.com',
+      args: { force: true },
+      consent: irreversibleHigh,
+    });
+
+    expect(capturedId).not.toBe('');
+    await broker.decide(capturedId, false);
+
+    const decision = await p;
+    expect(decision.approved).toBe(false);
+    expect(decision.reason).toBe('user');
+  });
+
+  it('timeout auto-denies after the configured milliseconds', async () => {
+    const broker = new ConsentGuard(5_000);
+
+    const p = broker.request({
+      toolName: 'getServiceHealth',
+      origin: 'https://app.example.com',
+      args: {},
+      consent: reversibleLow,
+    });
+
+    vi.advanceTimersByTime(5_000);
+    const decision = await p;
+
+    expect(decision.approved).toBe(false);
+    expect(decision.reason).toBe('timeout');
+  });
+
+  it('session-preapproval works for reversible tools', async () => {
+    const broker = new ConsentGuard();
+    let capturedId = '';
+    broker.subscribe((pending) => {
+      if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
+    });
+
+    // First call — user approves and remembers for session
+    const p1 = broker.request({
+      toolName: 'getServiceHealth',
+      origin: 'https://app.example.com',
+      args: {},
+      consent: reversibleLow,
+    });
+    await broker.decide(capturedId, true, /* rememberForSession */ true);
+    const d1 = await p1;
+    expect(d1.approved).toBe(true);
+    expect(d1.reason).toBe('user');
+
+    // Second call — should be auto-approved from cache
+    const d2 = await broker.request({
+      toolName: 'getServiceHealth',
+      origin: 'https://app.example.com',
+      args: {},
+      consent: reversibleLow,
+    });
+    expect(d2.approved).toBe(true);
+    expect(d2.reason).toBe('session-preapproval');
+  });
+
+  it('session-preapproval is refused for irreversible tools', async () => {
+    const broker = new ConsentGuard();
+    let capturedId = '';
+    broker.subscribe((pending) => {
+      if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
+    });
+
+    // First call — user approves with rememberForSession=true, but tool is irreversible
+    const p1 = broker.request({
+      toolName: 'rollbackDeployment',
+      origin: 'https://app.example.com',
+      args: { force: true },
+      consent: irreversibleHigh,
+    });
+    await broker.decide(capturedId, true, /* rememberForSession */ true);
+    await p1;
+
+    // Second call — must NOT be auto-approved; should enter pending queue
+    let secondCallEntered = false;
+    broker.subscribe((pending) => {
+      if (pending.some((r) => r.toolName === 'rollbackDeployment' && r.id !== capturedId)) {
+        secondCallEntered = true;
+      }
+    });
+
+    const p2 = broker.request({
+      toolName: 'rollbackDeployment',
+      origin: 'https://app.example.com',
+      args: { force: true },
+      consent: irreversibleHigh,
+    });
+
+    expect(secondCallEntered).toBe(true);
+
+    // Time out the second call so the promise resolves
+    vi.advanceTimersByTime(30_000);
+    const d2 = await p2;
+    expect(d2.reason).toBe('timeout');
+    expect(d2.approved).toBe(false);
+  });
+
+  it('concurrent requests each get independent IDs', async () => {
+    const broker = new ConsentGuard();
+    const ids: string[] = [];
+    broker.subscribe((pending) => {
+      ids.length = 0;
+      ids.push(...pending.map((r) => r.id));
+    });
+
+    const p1 = broker.request({
+      toolName: 'toolA',
+      origin: 'https://app.example.com',
+      args: {},
+      consent: reversibleLow,
+    });
+    const p2 = broker.request({
+      toolName: 'toolB',
+      origin: 'https://app.example.com',
+      args: {},
+      consent: reversibleLow,
+    });
+    const p3 = broker.request({
+      toolName: 'toolC',
+      origin: 'https://app.example.com',
+      args: {},
+      consent: reversibleLow,
+    });
+
+    // All three should be pending with unique IDs
+    expect(ids).toHaveLength(3);
+    expect(new Set(ids).size).toBe(3);
+
+    // Resolve all via timeout
+    vi.advanceTimersByTime(30_000);
+    await Promise.all([p1, p2, p3]);
+    expect(ids).toHaveLength(0);
+  });
+
+  describe('pub/sub contract', () => {
+    it('subscribe stops receiving updates after unsubscribing', () => {
+      const broker = new ConsentGuard();
+      const snapshots: number[] = [];
+      const unsubscribe = broker.subscribe((pending) => snapshots.push(pending.length));
+
+      broker.request({
+        toolName: 'toolA',
+        origin: 'https://app.example.com',
+        args: {},
+        consent: reversibleLow,
+      });
+      expect(snapshots).toEqual([1]);
+
+      unsubscribe();
+
+      broker.request({
+        toolName: 'toolB',
+        origin: 'https://app.example.com',
+        args: {},
+        consent: reversibleLow,
+      });
+      // No new snapshot recorded after unsubscribing.
+      expect(snapshots).toEqual([1]);
+    });
+
+    it('subscribeDecision stops receiving events after unsubscribing', () => {
+      const broker = new ConsentGuard();
+      const reasons: string[] = [];
+      const unsubscribe = broker.subscribeDecision((event) =>
+        reasons.push(event.reason ?? 'unknown')
+      );
+
+      broker.recordDecision(
+        { toolName: 'toolA', origin: 'https://app.example.com', args: {}, consent: reversibleLow },
+        { approved: true, reason: 'user' }
+      );
+      expect(reasons).toEqual(['user']);
+
+      unsubscribe();
+
+      broker.recordDecision(
+        { toolName: 'toolB', origin: 'https://app.example.com', args: {}, consent: reversibleLow },
+        { approved: true, reason: 'user' }
+      );
+      // No new event recorded after unsubscribing.
+      expect(reasons).toEqual(['user']);
+    });
+
+    it('decide is a no-op for an unknown/already-resolved request id', async () => {
+      const broker = new ConsentGuard();
+      const reasons: string[] = [];
+      broker.subscribeDecision((event) => reasons.push(event.reason ?? 'unknown'));
+
+      const result = await broker.decide('does-not-exist', true);
+      expect(result).toEqual({ success: false, retryable: false, reason: 'denied' });
+      expect(reasons).toEqual([]);
+    });
+  });
+
+  describe('presence-failure lockout', () => {
+    it('recordPresenceFailure increments attempts and reports lockedOut=false below the max', async () => {
+      const broker = new ConsentGuard();
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
+      });
+
+      broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      expect(capturedId).not.toBe('');
+
+      const first = broker.recordPresenceFailure(capturedId);
+      expect(first).toEqual({ attempts: 1, lockedOut: false });
+
+      const second = broker.recordPresenceFailure(capturedId);
+      expect(second).toEqual({ attempts: 2, lockedOut: false });
+    });
+
+    it('accumulates presence failures across requests for the same origin+tool pair', async () => {
+      const broker = new ConsentGuard(5_000);
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0) capturedId = pending[0]!.id;
+      });
+
+      const first = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      expect(broker.recordPresenceFailure(capturedId)).toEqual({
+        attempts: 1,
+        lockedOut: false,
+      });
+      expect(broker.recordPresenceFailure(capturedId)).toEqual({
+        attempts: 2,
+        lockedOut: false,
+      });
+
+      vi.advanceTimersByTime(5_000);
+      await first;
+
+      const second = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      expect(broker.recordPresenceFailure(capturedId)).toEqual({
+        attempts: 3,
+        lockedOut: true,
+      });
+
+      await broker.decide(capturedId, false, false, 'presence-lockout');
+      await second;
+    });
+
+    it("a successful approval on a different origin+tool pair does not reset this pair's counter", async () => {
+      const broker = new ConsentGuard();
+      const pendingByTool = new Map<string, string>();
+      broker.subscribe((pending) => {
+        pendingByTool.clear();
+        for (const request of pending) {
+          pendingByTool.set(request.toolName, request.id);
+        }
+      });
+
+      const rollback = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+      const health = broker.request({
+        toolName: 'getServiceHealth',
+        origin: 'https://app.example.com',
+        args: {},
+        consent: reversibleLow,
+      });
+
+      const rollbackId = pendingByTool.get('rollbackDeployment')!;
+      const healthId = pendingByTool.get('getServiceHealth')!;
+
+      expect(broker.recordPresenceFailure(rollbackId)).toEqual({
+        attempts: 1,
+        lockedOut: false,
+      });
+      expect(broker.recordPresenceFailure(rollbackId)).toEqual({
+        attempts: 2,
+        lockedOut: false,
+      });
+
+      await broker.decide(healthId, true);
+      await health;
+
+      await broker.decide(rollbackId, false);
+      await rollback;
+
+      let nextId = '';
+      broker.subscribe((pending) => {
+        const entry = pending.find((request) => request.toolName === 'rollbackDeployment');
+        if (entry) nextId = entry.id;
+      });
+
+      const next = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      expect(broker.recordPresenceFailure(nextId)).toEqual({
+        attempts: 3,
+        lockedOut: true,
+      });
+      await broker.decide(nextId, false, false, 'presence-lockout');
+      await next;
+    });
+
+    it('a successful approval on this origin+tool pair resets its presence-failure counter', async () => {
+      const broker = new ConsentGuard();
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0) capturedId = pending[0]!.id;
+      });
+
+      const first = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      expect(broker.recordPresenceFailure(capturedId).attempts).toBe(1);
+      expect(broker.recordPresenceFailure(capturedId).attempts).toBe(2);
+      await broker.decide(capturedId, true);
+      await first;
+
+      const second = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      expect(broker.recordPresenceFailure(capturedId)).toEqual({
+        attempts: 1,
+        lockedOut: false,
+      });
+      await broker.decide(capturedId, false);
+      await second;
+    });
+
+    it('locks out at MAX_PRESENCE_ATTEMPTS and the card can auto-deny with reason=presence-lockout', async () => {
+      const broker = new ConsentGuard();
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
+      });
+
+      const p = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      let lastResult: { attempts: number; lockedOut: boolean } = { attempts: 0, lockedOut: false };
+      for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
+        lastResult = broker.recordPresenceFailure(capturedId);
+      }
+
+      expect(lastResult).toEqual({ attempts: MAX_PRESENCE_ATTEMPTS, lockedOut: true });
+
+      // The request is still pending — recordPresenceFailure never resolves
+      // it on its own. The card is responsible for calling decide().
+      await broker.decide(capturedId, false, false, 'presence-lockout');
+
+      const decision = await p;
+      expect(decision.approved).toBe(false);
+      expect(decision.reason).toBe('presence-lockout');
+    });
+
+    it('cooldown is active as soon as recordPresenceFailure crosses the threshold, before decide() is called', async () => {
+      const broker = new ConsentGuard();
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
+      });
+
+      const p = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
+        broker.recordPresenceFailure(capturedId);
+      }
+
+      // decide() has not been called yet — the cooldown must already be
+      // active off the back of recordPresenceFailure alone.
+      expect(
+        broker.getCooldownRemaining('https://app.example.com', 'rollbackDeployment')
+      ).toBeGreaterThan(0);
+
+      await broker.decide(capturedId, false, false, 'presence-lockout');
+      await p;
+    });
+
+    it('recordPresenceFailure is a no-op for an unknown/already-resolved request id', () => {
+      const broker = new ConsentGuard();
+      const result = broker.recordPresenceFailure('does-not-exist');
+      expect(result).toEqual({ attempts: 0, lockedOut: false });
+    });
+  });
+
+  describe('cooldown / rate limiting', () => {
+    it('getCooldownRemaining returns 0 for a pair that has never been locked out', () => {
+      const broker = new ConsentGuard();
+      expect(broker.getCooldownRemaining('https://app.example.com', 'neverLockedOut')).toBe(0);
+    });
+
+    it('a fresh request for a locked-out origin+tool pair is denied with reason=rate-limited and never enters the pending queue', async () => {
+      const broker = new ConsentGuard();
+      let capturedId = '';
+      const seenPendingToolNames: string[] = [];
+      broker.subscribe((pending) => {
+        if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
+        pending.forEach((r) => seenPendingToolNames.push(r.toolName));
+      });
+
+      const p1 = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
+        broker.recordPresenceFailure(capturedId);
+      }
+      await broker.decide(capturedId, false, false, 'presence-lockout');
+      await p1;
+
+      // A brand new call for the same origin+tool, made immediately after,
+      // must be blocked before a card is ever shown.
+      const d2 = await broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      expect(d2.approved).toBe(false);
+      expect(d2.reason).toBe('rate-limited');
+      // Only the first request's id should ever have appeared as pending.
+      expect(seenPendingToolNames.every((name) => name === 'rollbackDeployment')).toBe(true);
+    });
+
+    it('an active cooldown overrides cached session pre-approval', async () => {
+      const broker = new ConsentGuard(30_000, async () => true);
+      const reversibleWithPresence: ConsentMetadata = {
+        scope: ['deploy'],
+        reversible: true,
+        riskLevel: 'high',
+        requiresApproval: true,
+        requireUserPresence: true,
+      };
+
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0) capturedId = pending[0]!.id;
+      });
+
+      // 1. Initial request with rememberForSession = true
+      const p1 = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: reversibleWithPresence,
+      });
+      await broker.decide(capturedId, true, true);
+      const d1 = await p1;
+      expect(d1.approved).toBe(true);
+      expect(d1.reason).toBe('user');
+
+      // 2. Second request hits session pre-approval
+      const d2 = await broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: reversibleWithPresence,
+      });
+      expect(d2.approved).toBe(true);
+      expect(d2.reason).toBe('session-preapproval');
+
+      // 3. Lock out tool via presence failures on an irreversible request
+      capturedId = '';
+      const p3 = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+      for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
+        broker.recordPresenceFailure(capturedId);
+      }
+      await broker.decide(capturedId, false, false, 'presence-lockout');
+      await p3;
+
+      expect(
+        broker.getCooldownRemaining('https://app.example.com', 'rollbackDeployment')
+      ).toBeGreaterThan(0);
+
+      // 4. Calling request() on the reversible tool must be rate-limited, overriding cached pre-approval
+      const d4 = await broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: reversibleWithPresence,
+      });
+      expect(d4.approved).toBe(false);
+      expect(d4.reason).toBe('rate-limited');
+    });
+
+    it("a different tool on the same origin is unaffected by another tool's cooldown", async () => {
+      const broker = new ConsentGuard();
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
+      });
+
+      const p1 = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+      for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
+        broker.recordPresenceFailure(capturedId);
+      }
+      await broker.decide(capturedId, false, false, 'presence-lockout');
+      await p1;
+
+      let secondCapturedId = '';
+      broker.subscribe((pending) => {
+        const entry = pending.find((r) => r.toolName === 'getRecentDeployments');
+        if (entry && secondCapturedId === '') secondCapturedId = entry.id;
+      });
+
+      const p2 = broker.request({
+        toolName: 'getRecentDeployments',
+        origin: 'https://app.example.com',
+        args: {},
+        consent: reversibleLow,
+      });
+
+      // Not rate-limited — different tool key — so it should enter the
+      // pending queue normally rather than resolving immediately.
+      expect(secondCapturedId).not.toBe('');
+      await broker.decide(secondCapturedId, true);
+      const d2 = await p2;
+      expect(d2.approved).toBe(true);
+      expect(d2.reason).toBe('user');
+    });
+
+    it('cooldown expires after its duration and the tool can be requested normally again', async () => {
+      const broker = new ConsentGuard();
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
+      });
+
+      const p1 = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+      for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
+        broker.recordPresenceFailure(capturedId);
+      }
+      await broker.decide(capturedId, false, false, 'presence-lockout');
+      await p1;
+
+      // Base cooldown is 10s — advance past it.
+      vi.advanceTimersByTime(10_001);
+
+      let secondCapturedId = '';
+      broker.subscribe((pending) => {
+        const entry = pending.find(
+          (r) => r.toolName === 'rollbackDeployment' && r.id !== capturedId
+        );
+        if (entry && secondCapturedId === '') secondCapturedId = entry.id;
+      });
+
+      const p2 = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      expect(secondCapturedId).not.toBe('');
+      await broker.decide(secondCapturedId, true);
+      const d2 = await p2;
+      expect(d2.approved).toBe(true);
+    });
+
+    it('escalates the cooldown duration on repeated lockouts for the same origin+tool pair', async () => {
+      const broker = new ConsentGuard();
+      const origin = 'https://app.example.com';
+      const toolName = 'rollbackDeployment';
+
+      await lockOutTool(broker, { origin, toolName });
+      const firstCooldown = broker.getCooldownRemaining(origin, toolName);
+      expect(firstCooldown).toBeGreaterThan(0);
+      expect(firstCooldown).toBeLessThanOrEqual(10_000);
+
+      vi.advanceTimersByTime(10_001);
+      await lockOutTool(broker, { origin, toolName });
+      const secondCooldown = broker.getCooldownRemaining(origin, toolName);
+
+      expect(secondCooldown).toBeGreaterThan(firstCooldown);
+      expect(secondCooldown).toBeLessThanOrEqual(30_000);
+    });
+
+    it('escalating cooldowns cap at MAX_COOLDOWN_MS (5 minutes) instead of growing unbounded', async () => {
+      const broker = new ConsentGuard();
+      const origin = 'https://app.example.com';
+      const toolName = 'rollbackDeployment';
+
+      // BASE_COOLDOWN_MS(10s) * 3^(escalation-1), capped at 5 minutes:
+      // 10s, 30s, 90s, 270s, then capped at 300s from the 5th lockout on.
+      const expectedCooldownsMs = [10_000, 30_000, 90_000, 270_000, 300_000, 300_000];
+
+      for (const expected of expectedCooldownsMs) {
+        await lockOutTool(broker, { origin, toolName });
+        expect(broker.getCooldownRemaining(origin, toolName)).toBe(expected);
+        vi.advanceTimersByTime(expected + 1);
+      }
+    });
+
+    it('a successful approval clears any prior lockout escalation for that origin+tool pair', async () => {
+      const broker = new ConsentGuard();
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
+      });
+
+      // Lock out once.
+      const p1 = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+      for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
+        broker.recordPresenceFailure(capturedId);
+      }
+      await broker.decide(capturedId, false, false, 'presence-lockout');
+      await p1;
+
+      // Wait out the cooldown, then approve successfully.
+      vi.advanceTimersByTime(10_001);
+
+      let secondCapturedId = '';
+      broker.subscribe((pending) => {
+        const entry = pending.find(
+          (r) => r.toolName === 'rollbackDeployment' && r.id !== capturedId
+        );
+        if (entry && secondCapturedId === '') secondCapturedId = entry.id;
+      });
+      const p2 = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+      await broker.decide(secondCapturedId, true);
+      await p2;
+
+      expect(broker.getCooldownRemaining('https://app.example.com', 'rollbackDeployment')).toBe(0);
+
+      // Lock out a third time — if escalation had NOT been cleared by the
+      // approval, this cooldown would be ~90s (3rd escalation). It should
+      // instead be back to the base ~10s.
+      let thirdCapturedId = '';
+      broker.subscribe((pending) => {
+        const entry = pending.find((r) => r.toolName === 'rollbackDeployment');
+        if (entry && thirdCapturedId === '') thirdCapturedId = entry.id;
+      });
+      const p3 = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+      for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
+        broker.recordPresenceFailure(thirdCapturedId);
+      }
+      await broker.decide(thirdCapturedId, false, false, 'presence-lockout');
+      await p3;
+
+      const thirdCooldown = broker.getCooldownRemaining(
+        'https://app.example.com',
+        'rollbackDeployment'
+      );
+      expect(thirdCooldown).toBeGreaterThan(0);
+      expect(thirdCooldown).toBeLessThanOrEqual(10_000);
+    });
+  });
+
+  describe('decision events', () => {
+    it('fires a decision event with reason=rate-limited for a cooldown-blocked request, without a pending entry', async () => {
+      const broker = new ConsentGuard();
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
+      });
+
+      const p1 = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+      for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
+        broker.recordPresenceFailure(capturedId);
+      }
+      await broker.decide(capturedId, false, false, 'presence-lockout');
+      await p1;
+
+      const events: string[] = [];
+      broker.subscribeDecision((event) => {
+        events.push(event.reason ?? 'unknown');
+      });
+
+      await broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+
+      expect(events).toContain('rate-limited');
+    });
+
+    it('fires a decision event with reason=presence-lockout when the card auto-denies', async () => {
+      const broker = new ConsentGuard();
+      let capturedId = '';
+      broker.subscribe((pending) => {
+        if (pending.length > 0 && capturedId === '') capturedId = pending[0]!.id;
+      });
+
+      const events: string[] = [];
+      broker.subscribeDecision((event) => {
+        events.push(event.reason ?? 'unknown');
+      });
+
+      const p = broker.request({
+        toolName: 'rollbackDeployment',
+        origin: 'https://app.example.com',
+        args: { force: true },
+        consent: irreversibleHighWithPresence,
+      });
+      for (let i = 0; i < MAX_PRESENCE_ATTEMPTS; i++) {
+        broker.recordPresenceFailure(capturedId);
+      }
+      await broker.decide(capturedId, false, false, 'presence-lockout');
+      await p;
+
+      expect(events).toContain('presence-lockout');
+    });
+  });
+});

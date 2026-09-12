@@ -223,6 +223,8 @@ npm-packages/
 │   ├── smart-dom-reader/        # DOM extraction for AI
 │   ├── transports/              # Core transport implementations
 │   ├── webmcp-extension/         # MV3 extension template and content-script client
+│   ├── webmcp-local-relay/      # Local relay bridging an embedded page to a native/WS host
+│   ├── webmcp-plugins/          # Framework-independent invocation plugins (consent, otel, execution-state)
 │   ├── webmcp-polyfill/         # Strict core WebMCP runtime polyfill
 │   ├── webmcp-types/            # Strict core WebMCP type definitions
 │   ├── usewebmcp/               # React hooks for strict core WebMCP API
@@ -269,6 +271,28 @@ When contributing to a specific package:
 - Add proper TypeScript types for hooks
 - Support both provider and client use cases
 - Test with React StrictMode
+
+### @mcp-b/webmcp-plugins
+
+- Give each independent module its own `package.json` `exports` subpath and
+  matching `vite.config.ts` entry (see `otel`, `execution-state`,
+  `standard-schema`, `consent`) — this is the established convention for this
+  package, not something to add speculatively per-PR. A subpath earns this
+  treatment when it's a module someone could plausibly import on its own
+  without the rest of the package (e.g. OTel instrumentation without
+  consent); a file that's just an internal piece of a larger feature (e.g. a
+  single type-only submodule of `consent`) generally shouldn't get one unless
+  there's a concrete standalone consumer.
+- `consent.ts` is this package's public barrel for the consent feature —
+  keep its own re-exports (`export * from './consent-types.js'`, etc.)
+  clearly separated from its own implementation (`ConsentBroker`,
+  `consent()`, `consentBroker()`), so a reader can tell at a glance which
+  lines are passthrough and which are this file's actual code.
+- `ConsentBroker` and `ConsentGuard` are two distinct classes for two
+  distinct operational models (see the class-level JSDoc on each). Their
+  `decide()` methods intentionally have different return shapes
+  (`Promise<boolean>` vs `Promise<DecideResult>`) — never assume one based on
+  the other, and never merge them into a single overloaded function.
 
 ### @mcp-b/smart-dom-reader
 

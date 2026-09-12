@@ -1,5 +1,11 @@
 import type { Tracer } from '@opentelemetry/api';
-import { ConsentBroker, consent } from '../src/consent.js';
+import {
+  ConsentBroker,
+  consent,
+  consentBroker,
+  type ConsentMetadata,
+  type PendingConsentRequest,
+} from '../src/consent.js';
 import { executionState } from '../src/execution-state.js';
 import {
   invoke,
@@ -19,7 +25,7 @@ export function inferPluginResults(broker: ConsentBroker, tracer: Tracer) {
     {
       tool,
       input,
-      plugins: [consent({ broker })],
+      plugins: [consentBroker({ broker })],
       execute: ({ count }) => count * 2,
     },
     { count: '3' }
@@ -54,3 +60,46 @@ export function inferPluginResults(broker: ConsentBroker, tracer: Tracer) {
   );
   return { approved, traced, observed, customObserved };
 }
+
+/**
+ * PendingConsentRequest from the consent entry must be the Guard shape
+ * (lastError, attemptsRemaining, toolName), not the legacy broker snapshot.
+ */
+export function pendingConsentRequestIsGuardShape(req: PendingConsentRequest) {
+  const lastError: string | undefined = req.lastError;
+  const attemptsRemaining: number | undefined = req.attemptsRemaining;
+  const toolName: string = req.toolName;
+  return { lastError, attemptsRemaining, toolName };
+}
+
+const consentMetadata: ConsentMetadata = {
+  scope: ['read:deployments'],
+  reversible: true,
+  riskLevel: 'low',
+  requiresApproval: true,
+};
+
+export const guardShapedPending: PendingConsentRequest = {
+  id: 'id',
+  toolName: 'rollback',
+  origin: 'https://app.example.com',
+  args: { revision: 'abc' },
+  consent: consentMetadata,
+  createdAt: 0,
+  lastError: 'presence failed',
+  attemptsRemaining: 2,
+};
+
+export type AssertTrue<T extends true> = T;
+export type PendingHasToolName = AssertTrue<
+  'toolName' extends keyof PendingConsentRequest ? true : false
+>;
+export type PendingHasLastError = AssertTrue<
+  'lastError' extends keyof PendingConsentRequest ? true : false
+>;
+export type PendingHasAttemptsRemaining = AssertTrue<
+  'attemptsRemaining' extends keyof PendingConsentRequest ? true : false
+>;
+export type PendingRejectsInvocationId = AssertTrue<
+  'invocationId' extends keyof PendingConsentRequest ? false : true
+>;
