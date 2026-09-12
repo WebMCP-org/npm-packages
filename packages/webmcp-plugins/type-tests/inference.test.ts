@@ -2,6 +2,7 @@ import type { Tracer } from '@opentelemetry/api';
 import {
   ConsentBroker,
   consent,
+  consentBroker,
   type ConsentMetadata,
   type PendingConsentRequest,
 } from '../src/consent.js';
@@ -24,7 +25,7 @@ export function inferPluginResults(broker: ConsentBroker, tracer: Tracer) {
     {
       tool,
       input,
-      plugins: [consent({ broker })],
+      plugins: [consentBroker({ broker })],
       execute: ({ count }) => count * 2,
     },
     { count: '3' }

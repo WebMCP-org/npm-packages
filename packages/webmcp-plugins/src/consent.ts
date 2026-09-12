@@ -11,6 +11,12 @@ import {
   type WebMCPPlugin,
 } from './invocation.js';
 
+// ---------------------------------------------------------------------------
+// Barrel re-exports — this file is the public `@mcp-b/webmcp-plugins/consent`
+// entry point. Everything below this block is this module's own
+// implementation (ConsentBroker + the consent()/consentBroker() plugin
+// factories); everything above is passthrough from sibling modules.
+// ---------------------------------------------------------------------------
 export * from './consent-types.js';
 export * from './consent-annotations.js';
 export { ConsentGuard, type ConsentDecisionEvent, MAX_PRESENCE_ATTEMPTS } from './consent-guard.js';
@@ -212,35 +218,43 @@ export class ConsentBroker {
   }
 }
 
-export function consent(options: { broker: ConsentBroker }): WebMCPPlugin;
-export function consent(guard: ConsentGuard, metadata: ConsentMetadata): WebMCPPlugin;
-export function consent(
-  guardOrOptions: { broker: ConsentBroker } | ConsentGuard,
-  metadata?: ConsentMetadata
-): WebMCPPlugin {
-  if (!(guardOrOptions instanceof ConsentGuard)) {
-    const { broker } = guardOrOptions as { broker: ConsentBroker };
-    return {
-      name: 'consent',
-      aroundInvoke: async <T>(
-        call: InvocationContext,
-        next: () => Promise<InvocationResult<T>>
-      ): Promise<InvocationResult<T>> => {
-        const operation = await call.prepare();
-        await broker.authorize({
-          invocationId: call.id,
-          operation,
-          signal: call.signal,
-          caller: call.caller,
-        });
-        call.signal.throwIfAborted();
-        return next();
-      },
-    };
-  }
+/**
+ * Consent plugin backed by the legacy, RFC-style {@link ConsentBroker}
+ * (`authorize()`-based, programmatic or server-verified authorization flows).
+ *
+ * For interactive on-page approval UX, use {@link consent} (the
+ * {@link ConsentGuard}-backed plugin) instead — the two are intentionally
+ * separate functions so a caller can never accidentally construct one with
+ * the other's arguments.
+ */
+export function consentBroker({ broker }: { broker: ConsentBroker }): WebMCPPlugin {
+  return {
+    name: 'consent',
+    aroundInvoke: async <T>(
+      call: InvocationContext,
+      next: () => Promise<InvocationResult<T>>
+    ): Promise<InvocationResult<T>> => {
+      const operation = await call.prepare();
+      await broker.authorize({
+        invocationId: call.id,
+        operation,
+        signal: call.signal,
+        caller: call.caller,
+      });
+      call.signal.throwIfAborted();
+      return next();
+    },
+  };
+}
 
-  const guard = guardOrOptions;
-  const meta = metadata!;
+/**
+ * Consent plugin backed by the interactive on-page {@link ConsentGuard}
+ * (request queues, WebAuthn presence ceremonies, session pre-approval).
+ *
+ * For programmatic or server-verified authorization flows, use
+ * {@link consentBroker} instead.
+ */
+export function consent(guard: ConsentGuard, meta: ConsentMetadata): WebMCPPlugin {
   return {
     name: 'consent',
     aroundInvoke: async <T>(
@@ -276,11 +290,18 @@ export function consent(
         return next();
       }
 
+      // Typed InvocationFailure (not a plain Error) so callers can branch on
+      // `.kind` instead of parsing message text. `rate-limited` is surfaced
+      // as `kind: 'denied'` with the specific reason preserved in `cause`,
+      // since InvocationFailureKind has no dedicated rate-limit variant today.
       if (decision.reason === 'rate-limited') {
-        throw new Error(`Action rate-limited for ${toolName}.`);
+        throw new InvocationFailure('denied', new Error(`Action rate-limited for ${toolName}.`));
       }
 
-      throw new Error(`Action denied by user (${decision.reason}).`);
+      throw new InvocationFailure(
+        'denied',
+        new Error(`Action denied by user (${decision.reason}).`)
+      );
     },
   };
 }

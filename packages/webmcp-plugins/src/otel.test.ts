@@ -9,7 +9,7 @@ import {
 } from '@opentelemetry/api';
 import { describe, expect, it, vi } from 'vitest';
 import { InvocationFailure, invoke } from './invocation.js';
-import { ConsentBroker, consent } from './consent.js';
+import { ConsentBroker, consentBroker } from './consent.js';
 import { otel } from './otel.js';
 
 const tool = { instanceId: 'lookup-1', name: 'lookup' };
@@ -282,7 +282,7 @@ describe('otel', () => {
           new Promise<string>((resolve) => {
             format = resolve;
           }),
-        plugins: [otel({ tracer: tracer as unknown as Tracer }), consent({ broker })],
+        plugins: [otel({ tracer: tracer as unknown as Tracer }), consentBroker({ broker })],
       },
       '2',
       { forAgent: true }
@@ -308,7 +308,7 @@ describe('otel', () => {
       {
         tool,
         execute,
-        plugins: [otel({ tracer: tracer as unknown as Tracer }), consent({ broker })],
+        plugins: [otel({ tracer: tracer as unknown as Tracer }), consentBroker({ broker })],
       },
       {},
       { signal: abort.signal }

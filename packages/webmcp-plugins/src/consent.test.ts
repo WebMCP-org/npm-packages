@@ -3,6 +3,7 @@ import {
   ConsentBroker,
   ConsentGuard,
   consent,
+  consentBroker,
   type ConsentBrokerOptions,
   type ConsentMetadata,
 } from './consent.js';
@@ -14,7 +15,10 @@ describe('ConsentBroker', () => {
   it('waits for explicit approval of the prepared operation before executing', async () => {
     const broker = new ConsentBroker({ policy: { mode: 'click' } });
     const execute = vi.fn(() => 'rolled back');
-    const result = invoke({ tool, execute, plugins: [consent({ broker })] }, { revision: 'abc' });
+    const result = invoke(
+      { tool, execute, plugins: [consentBroker({ broker })] },
+      { revision: 'abc' }
+    );
     await vi.waitFor(() => expect(broker.getSnapshot()).toHaveLength(1));
     const request = broker.getSnapshot()[0]!;
     expect(request.operation.arguments).toEqual({ revision: 'abc' });
@@ -51,7 +55,7 @@ describe('ConsentBroker', () => {
     const broker = new ConsentBroker({ policy: { mode: 'verified', verify } });
     const execute = vi.fn(() => 'must not run');
     const outcome = invoke(
-      { tool, execute, plugins: [consent({ broker })] },
+      { tool, execute, plugins: [consentBroker({ broker })] },
       { revision: 'abc' }
     ).catch((error: unknown) => error);
     await vi.waitFor(() => expect(broker.getSnapshot()).toHaveLength(1));
@@ -258,7 +262,7 @@ describe('consent plugin with legacy ConsentBroker options', () => {
     const bindingSpy = vi.fn((input: { revision: string }) => ({ bound: input.revision }));
     const execute = vi.fn(() => 'rolled back');
 
-    const plugin = consent({ broker });
+    const plugin = consentBroker({ broker });
     expect(plugin.name).toBe('consent');
 
     const caller = { kind: 'reported' as const, name: 'client-test' };
@@ -301,7 +305,7 @@ describe('consent plugin with legacy ConsentBroker options', () => {
   it('calls call.prepare() and passes operation to broker.authorize', async () => {
     const broker = new ConsentBroker({ policy: { mode: 'click' } });
     const authorizeSpy = vi.spyOn(broker, 'authorize');
-    const plugin = consent({ broker });
+    const plugin = consentBroker({ broker });
 
     const preparedOperation = {
       tool,
@@ -342,7 +346,7 @@ describe('consent plugin with legacy ConsentBroker options', () => {
   it('blocks next() and rejects when authorization is denied', async () => {
     const broker = new ConsentBroker({ policy: { mode: 'click' } });
     const execute = vi.fn(() => 'must not run');
-    const plugin = consent({ broker });
+    const plugin = consentBroker({ broker });
 
     const outcome = invoke({ tool, execute, plugins: [plugin] }, { revision: 'denied-rev' }).catch(
       (error: unknown) => error
@@ -499,7 +503,10 @@ describe('consent plugin with ConsentGuard', () => {
     await vi.waitFor(() => expect(pendingId).toBeDefined());
 
     await guard.decide(pendingId!, false);
-    await expect(invocation).rejects.toThrow('Action denied by user (user).');
+    await expect(invocation).rejects.toMatchObject({
+      kind: 'denied',
+      message: expect.stringContaining('Action denied by user (user).'),
+    });
     expect(execute).not.toHaveBeenCalled();
   });
 
@@ -540,7 +547,10 @@ describe('consent plugin with ConsentGuard', () => {
     execute.mockClear();
     await expect(
       invoke({ tool: guardedTool, execute, plugins: [consent(guard, metadata)] }, {})
-    ).rejects.toThrow('Action rate-limited for restartService.');
+    ).rejects.toMatchObject({
+      kind: 'denied',
+      message: expect.stringContaining('Action rate-limited for restartService.'),
+    });
 
     expect(execute).not.toHaveBeenCalled();
   });
@@ -593,7 +603,10 @@ describe('consent plugin with ConsentGuard', () => {
     execute.mockClear();
     await expect(
       invoke({ tool: guardedTool, execute, plugins: [consent(guard, metadata)] }, {})
-    ).rejects.toThrow('Action rate-limited for restartService.');
+    ).rejects.toMatchObject({
+      kind: 'denied',
+      message: expect.stringContaining('Action rate-limited for restartService.'),
+    });
 
     expect(execute).not.toHaveBeenCalled();
   });
