@@ -1,5 +1,6 @@
 export {
   browserSupportsWebAuthn,
+  clearPresenceCredential,
   ensurePresenceCredential,
   ensurePresenceCredential as registerUserPresenceCredential,
   platformAuthenticatorIsAvailable,
