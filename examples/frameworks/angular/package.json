@@ -7,20 +7,20 @@
     "start": "ng serve"
   },
   "dependencies": {
-    "@angular/common": "^21.2.22",
-    "@angular/compiler": "^21.2.22",
-    "@angular/core": "^21.2.22",
-    "@angular/platform-browser": "^21.2.22",
+    "@angular/common": "^21.2.23",
+    "@angular/compiler": "^21.2.23",
+    "@angular/core": "^21.2.23",
+    "@angular/platform-browser": "^21.2.23",
     "@mcp-b/webmcp-polyfill": "workspace:*",
     "rxjs": "^7.8.0",
     "tslib": "^2.3.0"
   },
   "devDependencies": {
-    "@angular/build": "^21.2.22",
-    "@angular/cli": "^21.2.22",
-    "@angular/compiler-cli": "^21.2.22",
-    "@typescript-eslint/parser": "^8.68.0",
-    "baseline-browser-mapping": "^2.11.20",
+    "@angular/build": "^21.2.24",
+    "@angular/cli": "^21.2.24",
+    "@angular/compiler-cli": "^21.2.23",
+    "@typescript-eslint/parser": "^8.70.0",
+    "baseline-browser-mapping": "^2.11.24",
     "typescript": "~5.9.3"
   }
 }
