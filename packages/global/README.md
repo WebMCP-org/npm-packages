@@ -5,7 +5,6 @@
 [![npm version](https://img.shields.io/npm/v/@mcp-b/global?style=flat-square)](https://www.npmjs.com/package/@mcp-b/global)
 [![npm downloads](https://img.shields.io/npm/dm/@mcp-b/global?style=flat-square)](https://www.npmjs.com/package/@mcp-b/global)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Bundle Size](https://img.shields.io/badge/IIFE-285KB-blue?style=flat-square)](https://bundlephobia.com/package/@mcp-b/global)
 [![W3C](https://img.shields.io/badge/W3C-Web_Model_Context-005A9C?style=flat-square)](https://webmachinelearning.github.io/webmcp/)
 
 **[Reference](https://docs.mcp-b.ai/packages/global/reference)** | **[First Tool Tutorial](https://docs.mcp-b.ai/tutorials/first-tool)** | **[Add Tools to an App](https://docs.mcp-b.ai/how-to/add-tools-to-an-existing-app)**
@@ -103,7 +102,7 @@ strings, set `nativeExecuteToolInput: 'json'` before automatic initialization:
 </script>
 ```
 
-The ESM version is smaller (~16KB) but doesn't bundle dependencies.
+The ESM entry keeps MCP-B dependencies external and bundles the official polyfill.
 
 ### Via NPM
 
