@@ -61,6 +61,6 @@ choice instead of a registration side effect.
 
 The former polyfill plugin entries, `middleware` option, `useWebMCPTool`, and implicit hook
 `state`/`reset` are removed without aliases. Use named `plugins`, `executionState()`,
-`consent({ broker })`, and `otel(options)`. The
+`consentBroker({ broker })`, and `otel(options)`. The
 [plugin reference](../packages/webmcp-plugins/README.md) and
 [React migration](../packages/usewebmcp/README.md#migration) describe the supported API.

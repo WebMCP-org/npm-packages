@@ -12,13 +12,10 @@ vi.mock('@simplewebauthn/browser', () => ({
   platformAuthenticatorIsAvailable: () => Promise.resolve(true),
 }));
 
-async function importFreshModule() {
-  vi.resetModules();
-  return import('./consent-presence.js');
-}
-
 describe('consent-presence', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    const { clearPresenceCredential } = await import('./consent-presence.js');
+    clearPresenceCredential();
     localStorage.clear();
     startRegistration.mockReset();
     startAuthentication.mockReset();
@@ -29,7 +26,8 @@ describe('consent-presence', () => {
   });
 
   it('clearPresenceCredential removes the stored credential', async () => {
-    const { ensurePresenceCredential, clearPresenceCredential } = await importFreshModule();
+    const { ensurePresenceCredential, clearPresenceCredential } =
+      await import('./consent-presence.js');
     startRegistration.mockResolvedValue({ id: 'cred-1' });
 
     await ensurePresenceCredential();
@@ -40,7 +38,8 @@ describe('consent-presence', () => {
   });
 
   it('re-enrolls a fresh credential after clearPresenceCredential', async () => {
-    const { ensurePresenceCredential, clearPresenceCredential } = await importFreshModule();
+    const { ensurePresenceCredential, clearPresenceCredential } =
+      await import('./consent-presence.js');
     startRegistration.mockResolvedValueOnce({ id: 'cred-1' });
     startRegistration.mockResolvedValueOnce({ id: 'cred-2' });
 
@@ -55,7 +54,7 @@ describe('consent-presence', () => {
   });
 
   it('verifyUserPresence resolves true on a successful ceremony', async () => {
-    const { verifyUserPresence } = await importFreshModule();
+    const { verifyUserPresence } = await import('./consent-presence.js');
     startRegistration.mockResolvedValue({ id: 'cred-1' });
     startAuthentication.mockResolvedValue({ id: 'cred-1' });
 
@@ -63,7 +62,7 @@ describe('consent-presence', () => {
   });
 
   it('verifyUserPresence resolves false on a single failed ceremony without clearing the credential', async () => {
-    const { verifyUserPresence } = await importFreshModule();
+    const { verifyUserPresence } = await import('./consent-presence.js');
     startRegistration.mockResolvedValue({ id: 'cred-1' });
     startAuthentication.mockRejectedValue(new Error('NotAllowedError'));
 
@@ -72,7 +71,7 @@ describe('consent-presence', () => {
   });
 
   it('auto-clears and re-enrolls after repeated consecutive failures (stale-credential heuristic)', async () => {
-    const { verifyUserPresence, ensurePresenceCredential } = await importFreshModule();
+    const { verifyUserPresence, ensurePresenceCredential } = await import('./consent-presence.js');
     startRegistration.mockResolvedValueOnce({ id: 'cred-stale' });
     startAuthentication.mockRejectedValue(new Error('NotAllowedError'));
 
@@ -93,7 +92,7 @@ describe('consent-presence', () => {
   });
 
   it('a successful verification resets the consecutive-failure counter', async () => {
-    const { verifyUserPresence, ensurePresenceCredential } = await importFreshModule();
+    const { verifyUserPresence, ensurePresenceCredential } = await import('./consent-presence.js');
     startRegistration.mockResolvedValue({ id: 'cred-1' });
     await ensurePresenceCredential();
 

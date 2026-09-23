@@ -66,6 +66,9 @@ In `@mcp-b/react-webmcp`, `consent-broker.ts` now re-exports `ConsentGuard` dire
 
 ### New Features & UX Improvements
 
+- Required user presence is checked on every invocation, including reversible tools with session preapproval. Unsupported or failed presence ceremonies fail closed.
+- Guarded hooks read updated consent policies without re-registering the tool.
+
 - **Asynchronous Presence Verification & Retry UX**:
   - `ConsentGuard.decide()` returns a `DecideResult` object:
     - `{ success: true, reason: 'approved' }`: The request was approved (and presence verified if required).

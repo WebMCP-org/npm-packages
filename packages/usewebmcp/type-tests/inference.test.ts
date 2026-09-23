@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { WebMCPPlugin } from '@mcp-b/webmcp-plugins';
-import { ConsentBroker, consent } from '@mcp-b/webmcp-plugins/consent';
+import { ConsentBroker, consentBroker } from '@mcp-b/webmcp-plugins/consent';
 import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
 import { useState } from 'react';
 import {
@@ -99,7 +99,7 @@ export function useInferenceExamples() {
   const gated = useWebMCP({
     name: 'consent_observer',
     description: 'Consent does not erase handler result inference',
-    plugins: [consent({ broker: new ConsentBroker({ policy: { mode: 'click' } }) })],
+    plugins: [consentBroker({ broker: new ConsentBroker({ policy: { mode: 'click' } }) })],
     inputSchema: schema,
     execute: ({ count, limit }) => count + limit,
   });

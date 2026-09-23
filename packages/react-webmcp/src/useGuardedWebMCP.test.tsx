@@ -367,34 +367,34 @@ describe('useGuardedWebMCP', () => {
     expect(execute).toHaveBeenLastCalledWith({ force: true });
   });
 
-  it('warns in development when consent is passed as an unmemoized object literal', async () => {
+  it('applies updated consent policy without re-registering the tool', async () => {
     const execute = vi.fn().mockResolvedValue({ ok: true });
     const broker = new ConsentGuard();
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
+    const pendingIds = trackPendingIds(broker);
+    const registerSpy = vi.spyOn(server, 'registerTool');
     const hook = await renderHook(
       ({ consent }: { consent: ConsentMetadata }) =>
         useGuardedWebMCP({
-          name: 'unstableConsentTool',
-          description: 'A tool whose consent object is a fresh literal each render',
+          name: 'updatedConsentTool',
+          description: 'Uses the current consent policy',
           consent,
           execute,
         }),
-      {
-        initialProps: { consent: { ...lowRiskConsent } },
-        wrapper: provider(broker),
-      }
+      { initialProps: { consent: lowRiskConsent }, wrapper: provider(broker) }
     );
 
-    expect(warnSpy).not.toHaveBeenCalled();
-
-    // Re-render with a brand-new object of identical contents — the exact
-    // footgun the warning exists to catch.
-    await hook.rerender({ consent: { ...lowRiskConsent } });
-
-    expect(warnSpy).toHaveBeenCalledOnce();
-    expect(warnSpy.mock.calls[0]?.[0]).toContain('unstableConsentTool');
-    expect(warnSpy.mock.calls[0]?.[0]).toContain('new object');
+    await client.callTool({ name: 'updatedConsentTool', arguments: {} });
+    expect(execute).toHaveBeenCalledOnce();
+    await hook.rerender({ consent: { ...lowRiskConsent, requiresApproval: true } });
+    const invocation = client.callTool({ name: 'updatedConsentTool', arguments: {} });
+    await vi.waitFor(() => expect(pendingIds).toHaveLength(1));
+    expect(execute).toHaveBeenCalledOnce();
+    await broker.decide(pendingIds[0]!, false);
+    await expect(invocation).resolves.toMatchObject({ isError: true });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(
+      registerSpy.mock.calls.filter(([tool]) => tool.name === 'updatedConsentTool')
+    ).toHaveLength(1);
   });
 
   it('does not re-register the tool when re-rendered without changing consent contents', async () => {

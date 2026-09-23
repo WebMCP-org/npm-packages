@@ -53,7 +53,8 @@ const MAX_COOLDOWN_MS = 5 * 60_000;
  * instance. Subsequent calls for the same pair skip the prompt and resolve
  * immediately with `reason: 'session-preapproval'` — **but only when
  * `consent.reversible` is `true`**. Irreversible actions always prompt the
- * user, no matter how many times they have been approved before.
+ * user, no matter how many times they have been approved before. Tools requiring
+ * user presence also always prompt and verify presence for each invocation.
  *
  * ### Presence-failure lockout
  *
@@ -211,7 +212,7 @@ export class ConsentGuard {
    * so a served penalty doesn't linger.
    *
    * If the tool+origin pair is in the session-preapproval cache **and**
-   * `consent.reversible` is `true`, the promise resolves synchronously with
+   * `consent.reversible` is `true` without required user presence, the promise resolves synchronously with
    * `reason: 'session-preapproval'`.
    *
    * Otherwise, the request is added to the pending queue, subscribers are
@@ -240,7 +241,11 @@ export class ConsentGuard {
     }
 
     // 3. Only then check session pre-approval.
-    if (input.consent.reversible && this.approvedThisSession.has(sessionKey)) {
+    if (
+      input.consent.reversible &&
+      !input.consent.requireUserPresence &&
+      this.approvedThisSession.has(sessionKey)
+    ) {
       const decision: ConsentDecision = { approved: true, reason: 'session-preapproval' };
       this.notifyDecision({ id: crypto.randomUUID(), ...input, createdAt: Date.now() }, decision);
       return decision;

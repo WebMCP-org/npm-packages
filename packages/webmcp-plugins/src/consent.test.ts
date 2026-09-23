@@ -950,62 +950,38 @@ describe('ConsentGuard async decide & retry UX flow', () => {
     }
   });
 
-  it('edge case: session pre-approval cache hit for one call does not corrupt active presence-retry state for concurrent call', async () => {
-    const verifyPresence = vi.fn().mockResolvedValue(false);
+  it('requires fresh presence even after a reversible tool has session preapproval', async () => {
+    const verifyPresence = vi.fn().mockResolvedValue(true);
     const guard = new ConsentGuard(30_000, verifyPresence);
-
-    const origin = 'https://app.example.com';
-    const toolName = 'reversibleAction';
-    const consentMeta: ConsentMetadata = {
-      scope: ['action'],
-      reversible: true,
-      riskLevel: 'medium',
-      requiresApproval: true,
-      requireUserPresence: true,
+    const input = {
+      origin: 'https://app.example.com',
+      toolName: 'reversibleAction',
+      args: {},
+      consent: {
+        scope: ['action'],
+        reversible: true,
+        riskLevel: 'medium' as const,
+        requiresApproval: true,
+      },
     };
-
-    let pendingList: any[] = [];
+    let pendingId = '';
     guard.subscribe((pending) => {
-      pendingList = pending;
+      pendingId = pending[0]?.id ?? '';
     });
+    const first = guard.request(input);
+    await guard.decide(pendingId, true, true);
+    await expect(first).resolves.toMatchObject({ approved: true });
 
-    // Call 1: starts request
-    const req1Promise = guard.request({ toolName, origin, args: { id: 1 }, consent: consentMeta });
-    const req1Id = pendingList[0].id;
-
-    // Call 1 fails presence once
-    const res1 = await guard.decide(req1Id, true);
-    expect(res1.attemptsRemaining).toBe(2);
-    expect(pendingList[0].attemptsRemaining).toBe(2);
-
-    // Call 2: pre-approved call for another session or pre-approval cache hit
-    // Manually prime the session cache for this origin::toolName
-    (guard as any).approvedThisSession.add(`${origin}::${toolName}`);
-
-    // Call 3: requests consent, hits session-preapproval cache immediately
-    const req3Decision = await guard.request({
-      toolName,
-      origin,
-      args: { id: 3 },
-      consent: consentMeta,
-    });
-    expect(req3Decision).toEqual({ approved: true, reason: 'session-preapproval' });
-
-    // Verify Call 1 retry state was NOT corrupted
-    expect(pendingList).toHaveLength(1);
-    expect(pendingList[0].id).toBe(req1Id);
-    expect(pendingList[0].attemptsRemaining).toBe(2);
-
-    // Call 1 fails presence a second time
-    const res2 = await guard.decide(req1Id, true);
-    expect(res2.attemptsRemaining).toBe(1);
-    expect(pendingList[0].attemptsRemaining).toBe(1);
-
-    // Call 1 fails presence a third time -> locks out
-    const res3 = await guard.decide(req1Id, true);
-    expect(res3.reason).toBe('presence-lockout');
-    const finalReq1Decision = await req1Promise;
-    expect(finalReq1Decision.reason).toBe('presence-lockout');
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const next = guard.request({
+        ...input,
+        consent: { ...input.consent, requireUserPresence: true },
+      });
+      expect(pendingId).not.toBe('');
+      await guard.decide(pendingId, true, true);
+      await expect(next).resolves.toEqual({ approved: true, reason: 'user' });
+    }
+    expect(verifyPresence).toHaveBeenCalledTimes(2);
   });
 
   it('ensures active cooldown overrides cached session pre-approval when calling guard.request() directly', async () => {
@@ -1017,7 +993,6 @@ describe('ConsentGuard async decide & retry UX flow', () => {
       reversible: true,
       riskLevel: 'medium',
       requiresApproval: true,
-      requireUserPresence: true,
     };
 
     let pendingId: string | undefined;
@@ -1058,7 +1033,7 @@ describe('ConsentGuard async decide & retry UX flow', () => {
       toolName,
       origin,
       args: {},
-      consent: { ...reversibleMetadata, reversible: false },
+      consent: { ...reversibleMetadata, reversible: false, requireUserPresence: true },
     });
     expect(secondPendingId).toBeDefined();
 

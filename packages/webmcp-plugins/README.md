@@ -43,7 +43,7 @@ the Standard Schema adapter when passed a compatible `inputSchema`.
 | `@mcp-b/webmcp-plugins` | `invoke`, `createInvocationCallback`, `unwrapInvocation`, `InvocationFailure`, runner and plugin types |
 | `/standard-schema`      | `standardSchema(schema)` and schema conversion/validation helpers                                      |
 | `/execution-state`      | `executionState<T>()`, `ExecutionState<T>`, `ToolExecutionState<T>`, `INITIAL_EXECUTION_STATE`         |
-| `/consent`              | `consent({ broker })`, `ConsentBroker`, consent request/options types                                  |
+| `/consent`              | `consentBroker({ broker })`, `ConsentBroker`, `consent(guard, metadata)`, `ConsentGuard`               |
 | `/otel`                 | `otel(options)`, `OtelOptions`                                                                         |
 
 ## Named plugins
@@ -62,7 +62,7 @@ const plugin: WebMCPPlugin = {
 ```
 
 Pass plugin objects through `plugins: [...]`. The first is outermost. For
-`[tracing, execution, consent({ broker })]`, tracing and state include validation, approval
+`[tracing, execution, consentBroker({ broker })]`, tracing and state include validation, approval
 waiting, execution, and response formatting. Place observers before gates to record denied calls.
 
 `next()` takes no replacement arguments and can run once. Plugins must await or return it
@@ -123,10 +123,10 @@ or subscribes to an execution store implicitly.
 ## Consent
 
 ```ts
-import { ConsentBroker, consent } from '@mcp-b/webmcp-plugins/consent';
+import { ConsentBroker, consentBroker } from '@mcp-b/webmcp-plugins/consent';
 
 const broker = new ConsentBroker({ policy: { mode: 'click' } });
-const approval = consent({ broker });
+const approval = consentBroker({ broker });
 // Attach approval through plugins: [approval].
 
 const unsubscribe = broker.subscribe(() => {
@@ -135,7 +135,7 @@ const unsubscribe = broker.subscribe(() => {
 // From the user's decision handler: await broker.decide(request.id, { approved: true });
 ```
 
-`consent({ broker })` waits for prepared arguments and authorization before continuing.
+`consentBroker({ broker })` waits for prepared arguments and authorization before continuing.
 `broker.getSnapshot()` returns pending requests with `id`, `invocationId`, immutable `operation`,
 `caller`, and `expiresAt`. `decide(id, { approved, proof? })` returns `true` only for a live,
 approved request. Denial, expiry, failed verification, duplicate decisions, and replay return `false`.
@@ -153,6 +153,22 @@ a fresh challenge bound to the operation and user. For passkeys this includes th
 origin, RP ID, and required user verification. The protected executor must consume a grant for the
 same operation. An assertion ID is not verification; unsupported hardware cannot downgrade the
 policy to click approval. See the [security model](https://docs.mcp-b.ai/explanation/design/security-and-human-in-the-loop).
+
+### Interactive presence checks
+
+`consent(guard, metadata)` uses a `ConsentGuard` for an on-page approval queue. Subscribe
+with `guard.subscribe(pending => ...)` and resolve a request from a user event handler with
+`await guard.decide(id, approved, rememberForSession?)`. A failed presence check returns
+`{ success: false, retryable: true, attemptsRemaining }`; keep the card visible for retry.
+Three failed attempts deny the request and start a cooldown for that origin and tool.
+
+Set `metadata.requireUserPresence: true` to require a local WebAuthn ceremony on every
+approval, including tools with session preapproval. Failed or unavailable ceremonies deny
+approval. This local ceremony is not server authorization; use `ConsentBroker` verified
+mode when the protected operation requires a server-verified grant.
+
+React consumers can use `ConsentBrokerProvider`, `usePendingConsentRequests`, and
+`useGuardedWebMCP` from `@mcp-b/react-webmcp` with the same guard.
 
 ### Approval snapshots
 
@@ -256,7 +272,7 @@ identity is `unknown`.
 The old polyfill invocation entries are removed. Import the runner from this package's root and
 plugins from its subpaths. Replace `middleware` functions with named `plugins`,
 `createExecutionState()` with `executionState()`, `createOtelMiddleware()` with `otel()`, and
-`broker.aroundInvoke` with `consent({ broker })`. There are no compatibility aliases.
+`broker.aroundInvoke` with `consentBroker({ broker })`. There are no compatibility aliases.
 
 ## License
 

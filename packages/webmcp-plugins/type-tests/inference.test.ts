@@ -1,7 +1,6 @@
 import type { Tracer } from '@opentelemetry/api';
 import {
   ConsentBroker,
-  consent,
   consentBroker,
   type ConsentMetadata,
   type PendingConsentRequest,

@@ -63,7 +63,7 @@ call without an execution-state subscription. React is excluded. See the
 ## Plugins and optional state
 
 `useWebMCP` handles registration and local execution. Attach named plugins with
-`plugins: [execution, consent({ broker })]`. For UI state, create an `executionState()` store
+`plugins: [execution, consentBroker({ broker })]`. For UI state, create an `executionState()` store
 and subscribe with `useToolExecutionState()` only where it is displayed.
 The [shared React example](../usewebmcp/README.md#subscribe-only-where-state-is-displayed)
 works with this package's hook too.

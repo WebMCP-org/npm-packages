@@ -162,7 +162,7 @@ cancelling work.
 
 ## Add plugins
 
-Use `plugins: [tracing, execution, consent({ broker })]` to compose named plugins.
+Use `plugins: [tracing, execution, consentBroker({ broker })]` to compose named plugins.
 The first plugin is outermost. Tracing and state placed before consent observe validation,
 approval waiting, execution, and response formatting. Consent receives an immutable snapshot
 of validated arguments; plugin order cannot move validation after approval.
@@ -199,7 +199,7 @@ This is a breaking API change:
 - Import invocation helpers from `@mcp-b/webmcp-plugins`. Its `/standard-schema`,
   `/execution-state`, `/consent`, and `/otel` entries replace the removed polyfill entries.
 - Replace `createExecutionState()` with `executionState()`, `createOtelMiddleware()` with
-  `otel()`, and `broker.aroundInvoke` with `consent({ broker })`.
+  `otel()`, and `broker.aroundInvoke` with `consentBroker({ broker })`.
 
 `inputSchema: vendorSchema` remains supported. Core results are raw values; MCP output metadata
 and formatting belong to `@mcp-b/react-webmcp`. Core `WebMCPConfig` and `WebMCPReturn` use

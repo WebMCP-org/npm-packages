@@ -157,7 +157,7 @@ try {
 import type { WebMCP } from 'webmcp-types';
 import { useWebMCP } from '@mcp-b/react-webmcp';
 import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
-import { ConsentBroker, consent } from '@mcp-b/webmcp-plugins/consent';
+import { ConsentBroker, consentBroker } from '@mcp-b/webmcp-plugins/consent';
 import { otel } from '@mcp-b/webmcp-plugins/otel';
 import { trace } from '@opentelemetry/api';
 import type { ToolAnnotations } from '@mcp-b/webmcp-types';
@@ -188,7 +188,7 @@ export function useExtendedTypes() {
     name: 'instrumented', description: 'Built-in plugins preserve handler result types',
     plugins: [
       otel({ tracer: trace.getTracer('packed-types') }),
-      consent({ broker: new ConsentBroker({ policy: { mode: 'click' } }) }),
+      consentBroker({ broker: new ConsentBroker({ policy: { mode: 'click' } }) }),
     ],
     inputSchema: z.object({ count: z.string().transform(Number) }),
     execute: ({ count }) => count * 2,
