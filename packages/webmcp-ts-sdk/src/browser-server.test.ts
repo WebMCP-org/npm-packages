@@ -870,6 +870,47 @@ describe('BrowserMcpServer', () => {
     await server.close();
   });
 
+  it('backfills only tools from its frame subtree and preserves descendant execution', async () => {
+    const iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    const childWindow = iframe.contentWindow!;
+    // The browser runner hosts this test document in a frame. A sibling's
+    // parent is that same host, rather than the document served by this server.
+    const siblingWindow = { parent: window.parent } as Window;
+    const tools = [
+      { name: 'own', window },
+      { name: 'descendant', window: childWindow },
+      { name: 'ancestor', window: window.parent },
+      { name: 'sibling', window: siblingWindow },
+    ].map((tool) => ({ ...tool, description: tool.name, origin: location.origin }));
+    const executeTool = vi.fn(async () => JSON.stringify({ ok: true }));
+    const native = Object.assign(new EventTarget(), {
+      registerTool: () => {},
+      getTools: async () => tools,
+      executeTool,
+    });
+    server = new BrowserMcpServer(
+      { name: 'frame-scope-server', version: '1.0.0' },
+      { native: native as unknown as ModelContext }
+    );
+    try {
+      await server.syncNativeTools();
+      expect(server.listTools().map(({ name }) => name)).toEqual(['own', 'descendant']);
+      expect(await server.getTools()).toEqual(tools);
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverTransport);
+      client = new Client(
+        { name: 'frame-scope-client', version: '1.0.0' },
+        { versionNegotiation: { mode: 'auto' } }
+      );
+      await client.connect(clientTransport);
+      await client.callTool({ name: 'descendant', arguments: {} });
+      expect(executeTool).toHaveBeenCalledWith(tools[1], {}, expect.any(Object));
+    } finally {
+      iframe.remove();
+    }
+  });
+
   it('does not repopulate tools when close races with native getTools', async () => {
     type NativeTool = {
       name: string;
