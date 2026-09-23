@@ -44,13 +44,11 @@ export type {
   ConsentDecision,
   ConsentMetadata,
   DecideResult,
-  PendingConsentRequest,
+  GuardPendingConsentRequest as PendingConsentRequest,
   RiskLevel,
-} from './consent-types.js';
-export type { McpToolAnnotations } from './consent-annotations.js';
-export { toMcpAnnotations } from './consent-annotations.js';
-export type { ConsentDecisionEvent } from './consent-broker.js';
-export { ConsentGuard, MAX_PRESENCE_ATTEMPTS } from './consent-broker.js';
+  McpToolAnnotations,
+  ConsentDecisionEvent,
+} from '@mcp-b/webmcp-plugins/consent';
 export type { GuardedToolDef } from './useGuardedWebMCP.js';
 export { useGuardedWebMCP } from './useGuardedWebMCP.js';
 export {
@@ -59,10 +57,13 @@ export {
   usePendingConsentRequests,
 } from './ConsentBrokerProvider.js';
 export {
+  ConsentGuard,
+  MAX_PRESENCE_ATTEMPTS,
+  toMcpAnnotations,
   browserSupportsWebAuthn,
   platformAuthenticatorIsAvailable,
   verifyUserPresence,
-} from './consent-presence.js';
+} from '@mcp-b/webmcp-plugins/consent';
 
 declare module 'react' {
   interface FormHTMLAttributes<T> {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConsentGuard, MAX_PRESENCE_ATTEMPTS } from './consent-broker.js';
-import type { ConsentMetadata } from './consent-types.js';
+import { ConsentGuard, MAX_PRESENCE_ATTEMPTS } from '@mcp-b/webmcp-plugins/consent';
+import type { ConsentMetadata } from '@mcp-b/webmcp-plugins/consent';
 
 vi.mock('@mcp-b/webmcp-plugins/consent-presence', async (importOriginal) => {
   const mod = await importOriginal<typeof import('@mcp-b/webmcp-plugins/consent-presence')>();

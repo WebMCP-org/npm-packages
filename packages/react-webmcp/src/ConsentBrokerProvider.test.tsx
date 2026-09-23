@@ -1,13 +1,13 @@
 import { Component, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, renderHook } from 'vitest-browser-react';
-import { ConsentGuard } from './consent-broker.js';
+import { ConsentGuard } from '@mcp-b/webmcp-plugins/consent';
 import {
   ConsentBrokerProvider,
   useConsentBroker,
   usePendingConsentRequests,
 } from './ConsentBrokerProvider.js';
-import type { ConsentMetadata } from './consent-types.js';
+import type { ConsentMetadata } from '@mcp-b/webmcp-plugins/consent';
 
 afterEach(async () => {
   await cleanup();

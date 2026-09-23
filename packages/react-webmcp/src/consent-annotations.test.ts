@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { toMcpAnnotations } from './consent-annotations.js';
-import type { ConsentMetadata } from './consent-types.js';
+import { toMcpAnnotations } from '@mcp-b/webmcp-plugins/consent';
+import type { ConsentMetadata } from '@mcp-b/webmcp-plugins/consent';
 
 describe('toMcpAnnotations', () => {
   it('low-risk + reversible + idempotent: true → readOnly, idempotent, not destructive', () => {

@@ -1,8 +1,8 @@
 'use client';
 
 import { createContext, useContext, useMemo, useState, useEffect, type ReactNode } from 'react';
-import { ConsentGuard } from './consent-broker.js';
-import type { PendingConsentRequest } from './consent-types.js';
+import { ConsentGuard } from '@mcp-b/webmcp-plugins/consent';
+import type { PendingConsentRequest } from '@mcp-b/webmcp-plugins/consent';
 
 /**
  * Note: "Broker" in ConsentBrokerProvider and useConsentBroker refers to the

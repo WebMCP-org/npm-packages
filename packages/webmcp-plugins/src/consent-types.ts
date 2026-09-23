@@ -72,7 +72,7 @@ export interface ConsentDecision {
     | 'presence-failed';
 }
 
-/** Result returned by the asynchronous decide() call on ConsentGuard / ConsentBroker. */
+/** Result returned by the asynchronous ConsentGuard.decide() call. */
 export interface DecideResult {
   success: boolean;
   retryable?: boolean;
