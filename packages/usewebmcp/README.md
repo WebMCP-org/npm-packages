@@ -67,8 +67,8 @@ The default hook adds **zero owner re-renders per tool call**.
 
 One tool, one-field schema, five production trials. Renders count the registering component;
 metadata edits include the requested parent update. MCP Cat includes execution state by default.
-React is excluded from bundle sizes. [Measurements](https://github.com/WebMCP-org/npm-packages/blob/052f451e9353ea112093973b7e14a16f7715e7c7/benchmarks/react-hooks/PRODUCTION.md) ·
-[Bundle sizes](https://github.com/WebMCP-org/npm-packages/blob/052f451e9353ea112093973b7e14a16f7715e7c7/benchmarks/react-hooks/bundle-results.json).
+React is excluded from bundle sizes.
+[Benchmark results and run commands](https://github.com/WebMCP-org/npm-packages/tree/main/benchmarks/react-hooks).
 
 With our state plugin, subscribing a status child measured **0 owner + 2 child renders** per call;
 subscribing the owner measured 2 owner renders. Recording state without a subscriber measured 0.
@@ -87,7 +87,7 @@ subscribing the owner measured 2 owner renders. Recording state without a subscr
 All four accept JSON Schema metadata. MCP Cat expects handlers to return MCP results;
 Google formats raw results. Versions and sources: [MCP Cat](https://github.com/agentcathq/webmcp-react),
 [Google](https://github.com/GoogleChromeLabs/use-webmcp-tool), and the
-[comparison harness](https://github.com/WebMCP-org/npm-packages/blob/052f451e9353ea112093973b7e14a16f7715e7c7/benchmarks/react-hooks/README.md).
+[comparison harness](https://github.com/WebMCP-org/npm-packages/tree/main/benchmarks/react-hooks).
 
 ## Validate input with your schema library
 

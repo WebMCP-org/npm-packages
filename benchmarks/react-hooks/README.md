@@ -1,12 +1,34 @@
 # React hook comparison
 
 Measure native registrations, React commits, callback latency, and bundle size in a production
-browser. [Report](PRODUCTION.md) · [Raw samples](production-results.json) ·
-[Bundle sizes](bundle-results.json)
+browser. Generated reports and samples stay local.
 
-Results belong to the source commit and environment recorded in each artifact. Regenerate them
-after source changes. This production harness is the comparison source; package tests own
+The recorded results below belong to the measured source revision and environment. Regenerate
+them after source changes. This production harness is the comparison source; package tests own
 [lifecycle correctness](../../docs/TESTING.md#react-hook-harness).
+
+## Recorded results
+
+One tool, one-field stable schema, five production trials. Browser counts were
+measured on 2026-09-08 with React 19.2.8 and Chrome 155.0.8045.0 on an Apple
+M3 Max (macOS arm64), from hook source commit
+`dcd3748a4c0827824bd59e33c30d838d4de4a90f`. Bundle sizes were recorded
+on 2026-09-23 from a working tree at `9630051402b66f0b516d1afaa958aa33d1a0e7ad`.
+
+| Hook          |     Gzip | Mount registrations | Description-change renders | Owner renders per call |
+| ------------- | -------: | ------------------: | -------------------------: | ---------------------: |
+| usewebmcp     |  3.58 kB |                   1 |                          1 |                      0 |
+| MCP-B React   |  3.96 kB |                   1 |                          1 |                      0 |
+| MCP Cat 1.1.0 | 24.21 kB |                   2 |                          1 |                    1–2 |
+| Google 0.2.0  |  0.69 kB |                   1 |                          2 |                      0 |
+
+All four registered once per description change and never on unrelated parent
+updates. Without a state subscription, our hooks add no owner render during a
+call. With the execution-state plugin, subscribing a status child produced zero
+owner commits and two child commits per call; subscribing the owner produced two
+owner commits. Recording state without a subscriber produced zero commits.
+React is excluded from bundle sizes; built-in dependencies are included. These
+measurements are local comparisons, not timing guarantees.
 
 ## Reproduce
 
@@ -24,7 +46,8 @@ node benchmarks/react-hooks/bundle.mjs
 The runners consume these built production entries. Run timings from a clean checkout without
 concurrent builds or tests. The runner enables native
 WebMCP and rejects a missing/polyfilled registry. Artifacts record source commit, dirty-tree status,
-browser, platform, and toolchain versions.
+browser, platform, and toolchain versions. They write ignored `production-results.json`,
+`PRODUCTION.md`, and `bundle-results.json` in this directory.
 
 To check deterministic behavior without rewriting artifacts:
 
