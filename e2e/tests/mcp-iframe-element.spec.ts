@@ -113,7 +113,9 @@ test('bridges tools, resources, URI templates, and prompts', async ({ page }) =>
   expect(contract.config).toMatchObject({ uri: 'iframe://config' });
 });
 
-test('keeps MCP tool ownership local while WebMCP discovers the frame tree', async ({ page }) => {
+test('keeps ancestor tools out of child MCP servers while WebMCP discovers the frame tree', async ({
+  page,
+}) => {
   const tools = await page.evaluate(async () => {
     const parent = document.modelContext as BrowserMcpServer;
     const child = window.mcpIframeHost.getMcpIframe().iframe?.contentDocument
@@ -141,7 +143,7 @@ test('keeps MCP tool ownership local while WebMCP discovers the frame tree', asy
     expect.arrayContaining(['calculate', 'child-iframe_calculate', 'parent_only'])
   );
   expect(tools.childMcp).toEqual(['calculate']);
-  expect(tools.parentMcp).toEqual(['child-iframe_calculate', 'parent_only']);
+  expect(tools.parentMcp).toEqual(['calculate', 'child-iframe_calculate', 'parent_only']);
 });
 
 test('mirrors child list changes as one observable snapshot', async ({ page }) => {
