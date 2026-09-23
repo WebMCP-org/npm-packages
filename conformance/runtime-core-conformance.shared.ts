@@ -26,7 +26,8 @@ function requireModelContext(): ChromeModelContext {
   if (!modelContext) {
     throw new Error('Expected document.modelContext to be available');
   }
-  return modelContext;
+  // These suites exercise the retained JSON-string compatibility overload.
+  return modelContext as unknown as ChromeModelContext;
 }
 
 function requireExecuteTool(modelContext: ChromeModelContext) {

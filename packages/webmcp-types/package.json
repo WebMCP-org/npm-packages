@@ -56,7 +56,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/server": "catalog:",
-    "webmcp-types": "^0.1.6"
+    "webmcp-types": "^0.1.9"
   },
   "devDependencies": {
     "typescript": "catalog:",

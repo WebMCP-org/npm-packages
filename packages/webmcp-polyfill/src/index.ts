@@ -538,6 +538,12 @@ function installSubmitEventPolyfill(): void {
   }
 }
 
+/** Adds the existing MCP-B declarative form support to an upstream context. */
+export function installWebMCPDeclarativePolyfill(context: ModelContext): () => void {
+  installSubmitEventPolyfill();
+  return installDeclarativeForms(document, context);
+}
+
 export function initializeWebMCPPolyfill(options?: WebMCPPolyfillInitOptions): void {
   if (globalThis.isSecureContext === false) return;
   const nav = typeof navigator === 'undefined' ? null : navigator;

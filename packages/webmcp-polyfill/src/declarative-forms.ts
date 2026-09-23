@@ -846,12 +846,13 @@ export function installDeclarativeForms(document: Document, context: ModelContex
                 );
               }
               fillForm(form, input);
+              // Preserve the legacy no-response result while making it JSON-serializable upstream.
               return waitForSubmission(
                 registration,
                 definition.name,
                 definition.autosubmit,
                 submitter
-              );
+              ).then((result) => (result === undefined ? 'undefined' : result));
             },
           },
           { signal: controller.signal }

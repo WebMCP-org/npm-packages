@@ -371,7 +371,7 @@ describe('@mcp-b/webmcp-polyfill', () => {
       })
     ).rejects.toMatchObject({ name: 'InvalidStateError' });
     await expect(detachedContext.getTools()).rejects.toMatchObject({ name: 'InvalidStateError' });
-    const executeTool = (detachedContext as ModelContext & ChromeModelContextExtensions)
+    const executeTool = (detachedContext as unknown as ModelContext & ChromeModelContextExtensions)
       .executeTool;
     if (!executeTool) throw new Error('Expected executeTool');
     await expect(executeTool.call(detachedContext, detachedTool, '{}')).rejects.toMatchObject({

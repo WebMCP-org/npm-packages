@@ -14,12 +14,12 @@ export interface TransportConfiguration {
 export interface WebModelContextInitOptions {
   transport?: TransportConfiguration;
   autoInitialize?: boolean;
+  /** Input format of an already installed context. Defaults to the current object-input draft.
+   * Set to `json` for older Chrome implementations. */
+  nativeExecuteToolInput?: 'object' | 'json';
   /**
-   * Forwarded to @mcp-b/webmcp-polyfill when polyfill installation is needed.
+   * Installs the legacy testing shim when this entry point installs a polyfill.
    * Existing modelContextTesting implementations are never replaced.
-   *
-   * Deliberately inverts the polyfill's own default (false): this entry point is the
-   * batteries-included one, and the e2e suites rely on the shim being present.
    * @default true
    */
   installTestingShim?: boolean;

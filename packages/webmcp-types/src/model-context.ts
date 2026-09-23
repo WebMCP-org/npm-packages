@@ -83,7 +83,7 @@ type WidenedSchema<TSchema extends InputSchema> = string extends TSchema['type']
  * `addEventListener` and `ontoolchange` before using them.
  * @see https://webmachinelearning.github.io/webmcp/#modelcontext
  */
-export interface ModelContext extends Omit<WebMCP.ModelContext, 'getTools'> {
+export interface ModelContext extends Omit<WebMCP.ModelContext, 'getTools' | 'executeTool'> {
   getTools(options?: ModelContextGetToolOptions): Promise<RegisteredTool[]>;
 }
 
