@@ -100,7 +100,7 @@
     "typescript": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:",
-    "webmcp-polyfill": "github:webmachinelearning/webmcp-polyfill#a4cd4fcbde1c0214ded619aadc4412b9ab8d29d4"
+    "webmcp-polyfill": "github:webmachinelearning/webmcp-polyfill#439c6c341f1c632c63498ba206e2bd8471cb8efb"
   },
   "engines": {
     "node": ">=20"
