@@ -1,18 +1,55 @@
 import { IframeChildTransport, TabServerTransport } from '@mcp-b/transports';
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { initializeWebMCPPolyfill, installWebMCPDeclarativePolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from 'webmcp-polyfill';
 import { BrowserMcpServer, isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
-import type { ModelContext } from '@mcp-b/webmcp-types';
+import type { ModelContext, ModelContextTesting } from '@mcp-b/webmcp-types';
 import type { Transport } from '@modelcontextprotocol/server';
 import type { WebModelContextInitOptions } from './types.js';
 
 interface RuntimeState {
   server: BrowserMcpServer;
+  cleanupCompatibility: () => void;
   transport: Transport;
   previousDocumentModelContextDescriptor: PropertyDescriptor | undefined;
   previousNavigatorModelContextDescriptor: PropertyDescriptor | undefined;
 }
 
 let runtime: RuntimeState | null = null;
+// Upstream owns its document lifetime and has no uninstall API.
+let upstreamContext: ModelContext | undefined;
+
+function installTestingShim(server: BrowserMcpServer): () => void {
+  if (navigator.modelContextTesting) return () => {};
+  const shim: ModelContextTesting = Object.assign(new EventTarget(), {
+    ontoolchange: null as ModelContextTesting['ontoolchange'],
+    listTools: () =>
+      server.listTools().map(({ name, description, inputSchema }) => ({
+        name,
+        description,
+        inputSchema: JSON.stringify(inputSchema),
+      })),
+    async executeTool(name: string, input: string, options?: { signal?: AbortSignal }) {
+      const tool = (await server.getTools()).find((candidate) => candidate.name === name);
+      if (!tool) throw new DOMException(`Tool not found: ${name}`, 'UnknownError');
+      return server.executeTool(tool, input, options);
+    },
+  });
+  shim.addEventListener('toolchange', (event) => shim.ontoolchange?.call(shim, event));
+  const changed = () => shim.dispatchEvent(new Event('toolchange'));
+  server.addEventListener('toolchange', changed);
+  const previous = Object.getOwnPropertyDescriptor(navigator, 'modelContextTesting');
+  Object.defineProperty(navigator, 'modelContextTesting', {
+    configurable: true,
+    enumerable: true,
+    value: shim,
+  });
+  return () => {
+    server.removeEventListener('toolchange', changed);
+    if (navigator.modelContextTesting !== shim) return;
+    if (previous) Object.defineProperty(navigator, 'modelContextTesting', previous);
+    else Reflect.deleteProperty(navigator, 'modelContextTesting');
+  };
+}
 
 function isBrowserEnvironment(): boolean {
   return typeof window !== 'undefined' && typeof window.navigator !== 'undefined';
@@ -127,7 +164,12 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     return;
   }
 
-  // 1. Install polyfill (provides modelContext + modelContextTesting)
+  // Native and preinstalled contexts take precedence; otherwise install upstream.
+  if (!existingContext) {
+    installWebMCP();
+    upstreamContext = document.modelContext;
+  }
+  // Preserve the navigator-only compatibility path without replacing upstream.
   initializeWebMCPPolyfill({
     installTestingShim: options?.installTestingShim ?? true,
   });
@@ -149,7 +191,21 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
 
   // 4. Create server with native mirroring
   const hostname = window.location.hostname || 'localhost';
-  const server = new BrowserMcpServer({ name: `${hostname}-webmcp`, version: '1.0.0' }, { native });
+  const usesUpstream = native === upstreamContext;
+  const server = new BrowserMcpServer(
+    { name: `${hostname}-webmcp`, version: '1.0.0' },
+    {
+      native,
+      nativeExecuteToolInput:
+        options?.nativeExecuteToolInput ?? ('__isWebMCPPolyfill' in native ? 'json' : 'object'),
+    }
+  );
+  let cleanupForms = () => {};
+  let cleanupTesting = () => {};
+  const cleanupCompatibility = () => {
+    cleanupTesting();
+    cleanupForms();
+  };
 
   // 5. Replace both the canonical document surface and compatibility alias.
   const previousDocumentModelContextDescriptor = Object.getOwnPropertyDescriptor(
@@ -161,6 +217,10 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     'modelContext'
   );
   try {
+    if (usesUpstream) {
+      cleanupForms = installWebMCPDeclarativePolyfill(native);
+      if (options?.installTestingShim ?? true) cleanupTesting = installTestingShim(server);
+    }
     replaceModelContext(
       server,
       previousDocumentModelContextDescriptor,
@@ -168,11 +228,13 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     );
     runtime = {
       server,
+      cleanupCompatibility,
       transport,
       previousDocumentModelContextDescriptor,
       previousNavigatorModelContextDescriptor,
     };
   } catch (error) {
+    cleanupCompatibility();
     void server.close();
     void transport.close();
     throw error;
@@ -208,11 +270,13 @@ export function cleanupWebModelContext(): void {
   const {
     server,
     transport,
+    cleanupCompatibility,
     previousDocumentModelContextDescriptor,
     previousNavigatorModelContextDescriptor,
   } = runtime;
   runtime = null;
 
+  cleanupCompatibility();
   void server.close();
   void transport.close();
 

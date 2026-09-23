@@ -7,6 +7,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const upstreamTypesVersion = JSON.parse(
+  readFileSync(join(root, 'packages/usewebmcp/package.json'), 'utf8')
+).dependencies['webmcp-types'];
 const temporary = mkdtempSync(join(tmpdir(), 'webmcp-react-packages-'));
 const run = (command, args, cwd = root) => {
   try {
@@ -81,7 +84,7 @@ try {
               ? {
                   '@mcp-b/react-webmcp': tarballs['@mcp-b/react-webmcp'],
                   '@mcp-b/webmcp-types': tarballs['@mcp-b/webmcp-types'],
-                  'webmcp-types': '0.1.6',
+                  'webmcp-types': upstreamTypesVersion,
                 }
               : {}),
             react: version,

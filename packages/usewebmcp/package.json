@@ -59,7 +59,7 @@
   },
   "dependencies": {
     "@standard-schema/spec": "^1.1.0",
-    "webmcp-types": "^0.1.6"
+    "webmcp-types": "^0.1.9"
   },
   "devDependencies": {
     "@mcp-b/global": "workspace:*",

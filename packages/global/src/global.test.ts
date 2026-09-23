@@ -259,6 +259,33 @@ describe('global adapter', () => {
     await expect(modelContext.executeTool(tools[0]!, '{"value":7}')).resolves.toBe('{"value":7}');
   });
 
+  it('uses upstream object execution and preserves cancellation and annotations', async () => {
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+    let callbackSignal: AbortSignal | undefined;
+    const started = Promise.withResolvers<void>();
+    await modelContext.registerTool({
+      name: 'upstream_execution',
+      description: 'Runs through the official polyfill',
+      annotations: { consequentialHint: true, debugging: true },
+      execute(_input, options) {
+        callbackSignal = options?.signal;
+        started.resolve();
+        return new Promise(() => {});
+      },
+    });
+    const tool = (await modelContext.getTools()).find(({ name }) => name === 'upstream_execution')!;
+    expect(tool.annotations).toMatchObject({ consequentialHint: true, debugging: true });
+    const controller = new AbortController();
+    const result = modelContext.executeTool(tool, {}, { signal: controller.signal });
+    const rejection = expect(result).rejects.toBe('cancelled');
+    await started.promise;
+    expect(callbackSignal).toBeInstanceOf(AbortSignal);
+    controller.abort('cancelled');
+    await rejection;
+    await vi.waitFor(() => expect(callbackSignal?.aborted).toBe(true));
+  });
+
   it('fires producer toolchange events and ontoolchange on wrapper mutations', async () => {
     initializeWebModelContext();
 
@@ -394,7 +421,7 @@ describe('global adapter', () => {
 
     setDocumentModelContext(nativeContext);
 
-    initializeWebModelContext();
+    initializeWebModelContext({ nativeExecuteToolInput: 'json' });
     await vi.waitFor(() => {
       const names = getModelContext()
         .listTools()

@@ -950,9 +950,9 @@ describe('BrowserMcpServer', () => {
     const nativeContext = Object.assign(new EventTarget(), {
       registerTool: () => {},
       getTools: async () => [visibleNativeTool],
-      executeTool: async (tool: typeof firstNativeTool, input: string) => {
+      executeTool: async (tool: typeof firstNativeTool, input: { inputRequired?: boolean }) => {
         executedTools.push(tool);
-        if (JSON.parse(input).inputRequired === true) {
+        if (input.inputRequired === true) {
           return JSON.stringify(inputRequired({ requestState: 'opaque-native-state' }));
         }
         return JSON.stringify({
@@ -1033,7 +1033,7 @@ describe('BrowserMcpServer', () => {
       executeTool: vi.fn(
         (
           _tool: typeof nativeTool,
-          _input: string,
+          _input: object,
           options?: { signal?: AbortSignal }
         ): Promise<string> => {
           nativeSignal = options?.signal;

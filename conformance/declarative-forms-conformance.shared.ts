@@ -33,7 +33,8 @@ const FIXTURE_ATTRIBUTE = 'data-webmcp-declarative-conformance';
 function requireModelContext(): ChromeModelContext {
   const modelContext = document.modelContext;
   if (!modelContext) throw new Error('Expected document.modelContext to be installed');
-  return modelContext;
+  // These suites exercise the retained JSON-string compatibility overload.
+  return modelContext as unknown as ChromeModelContext;
 }
 
 /**

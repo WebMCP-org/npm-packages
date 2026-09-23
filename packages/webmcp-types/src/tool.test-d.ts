@@ -110,6 +110,8 @@ test('standard and extended annotations stay distinct', () => {
   expectTypeOf<WebMcpToolAnnotations>().toEqualTypeOf<{
     readOnlyHint?: boolean;
     untrustedContentHint?: boolean;
+    consequentialHint?: boolean;
+    debugging?: boolean;
   }>();
   expectTypeOf<ToolAnnotations>().toMatchTypeOf<{
     title?: string | undefined;

@@ -78,10 +78,16 @@ type McpRegistration = McpRegisteredPrompt | McpRegisteredResource | McpRegister
 
 export interface BrowserMcpServerOptions extends ServerOptions {
   native?: ModelContext;
+  /** The upstream draft uses objects; older Chrome implementations use JSON strings. */
+  nativeExecuteToolInput?: 'object' | 'json';
 }
 
 type NativeStandardToolsApi = ModelContext & {
-  executeTool: NonNullable<ChromeModelContextExtensions['executeTool']>;
+  executeTool(
+    tool: RegisteredTool,
+    input: object | string,
+    options?: ChromeModelContextExecuteToolOptions
+  ): Promise<string | null>;
 };
 type NativeRegisterToolFn = (
   tool: ModelContextTool<WebMcpToolInput>,
@@ -160,6 +166,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   readonly mcpServer: McpServer;
 
   private readonly native: ModelContext | undefined;
+  private readonly nativeExecuteToolInput: 'object' | 'json';
   private readonly ownerDocument: Document | null;
   private readonly tools = new Map<string, RegisteredWebMcpTool>();
   private peerOrigin: string | undefined;
@@ -181,7 +188,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
 
   constructor(serverInfo: Implementation, options: BrowserMcpServerOptions = {}) {
     super();
-    const { native, ...serverOptions } = options;
+    const { native, nativeExecuteToolInput, ...serverOptions } = options;
     this.mcpServer = new McpServer(serverInfo, {
       ...serverOptions,
       capabilities: mergeCapabilities(serverOptions.capabilities ?? {}, {
@@ -191,6 +198,8 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       }),
     });
     this.native = native;
+    this.nativeExecuteToolInput =
+      nativeExecuteToolInput ?? (native && '__isWebMCPPolyfill' in native ? 'json' : 'object');
     this.ownerDocument = globalThis.document ?? null;
     if (
       native &&
@@ -268,7 +277,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     try {
       await nativeRegister.call(
         this.native,
-        toNativeTool(tool, nativeInputSchema, (input) => execute(input)),
+        toNativeTool(tool, nativeInputSchema, (input, options) => execute(input, options?.signal)),
         { ...options, signal }
       );
     } catch (error) {
@@ -389,7 +398,12 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     const execute: RegisteredWebMcpTool['execute'] = async (args, signal) => {
       signal?.throwIfAborted();
       return withAbortSignal(
-        Promise.resolve().then(() => Reflect.apply(tool.execute, undefined, [args])),
+        Promise.resolve().then(() =>
+          Reflect.apply(tool.execute, undefined, [
+            args,
+            { signal: signal ?? new AbortController().signal },
+          ])
+        ),
         signal
       );
     };
@@ -545,7 +559,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       const execute = async (args: WebMcpToolInput, signal?: AbortSignal) => {
         const currentTool = this.nativeBackfilledTools.get(name)?.source;
         if (!currentTool) throw new Error(`Native tool not found: ${name}`);
-        const input = JSON.stringify(args);
+        const input = this.nativeExecuteToolInput === 'object' ? args : JSON.stringify(args);
         return parseNativeToolResult(
           signal
             ? await native.executeTool.call(this.native, currentTool, input, { signal })
@@ -688,14 +702,31 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
 
   async executeTool(
     tool: RegisteredTool,
-    inputArgsJson: string,
+    input: object | string = {},
     options?: ChromeModelContextExecuteToolOptions
   ): Promise<string | null> {
     validateWebMcpAccess(this.ownerDocument);
     if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
     const native = this.getNativeStandardToolsApi();
     if (native) {
-      return native.executeTool.call(this.native, tool, inputArgsJson, options);
+      const nativeInput =
+        this.nativeExecuteToolInput === 'object'
+          ? typeof input === 'string'
+            ? parseChromeToolInput(input)
+            : input
+          : typeof input === 'string'
+            ? input
+            : JSON.stringify(input);
+      const result = await native.executeTool.call(this.native, tool, nativeInput, options);
+      // The JSON-string overload retains the older Chrome result convention.
+      if (
+        typeof input === 'string' &&
+        this.nativeExecuteToolInput === 'object' &&
+        result !== null
+      ) {
+        return serializeChromeToolResult(JSON.parse(result));
+      }
+      return result;
     }
 
     if (tool === null || typeof tool !== 'object') {
@@ -715,7 +746,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     options?.signal?.throwIfAborted();
     const registered = this.tools.get(tool.name);
     if (!registered) throw createUnknownError(`Tool not found: ${tool.name}`);
-    const args = parseChromeToolInput(inputArgsJson);
+    const args = parseChromeToolInput(typeof input === 'string' ? input : JSON.stringify(input));
     try {
       const result = await withAbortSignal(
         registered.execute(args, options?.signal),
