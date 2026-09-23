@@ -7,4 +7,4 @@
 
 Use the official WebMCP polyfill as the default global runtime, bundled from a pinned upstream revision while its npm publication is pending. Track webmcp-types 0.1.9, support object-input execution and callback cancellation, and retain MCP-B declarative forms and legacy string-input compatibility. Existing native contexts take precedence; older Chrome contexts can select `nativeExecuteToolInput: 'json'`.
 
-Keep each MCP server's native-tool mirrors scoped to its own document so iframe bridges do not import their ancestor registrations recursively. The standard WebMCP discovery surface continues to expose the frame tree.
+Keep each MCP server's native-tool mirrors scoped to its document and descendants so iframe bridges do not import their ancestor registrations recursively. The standard WebMCP discovery surface continues to expose the frame tree.
