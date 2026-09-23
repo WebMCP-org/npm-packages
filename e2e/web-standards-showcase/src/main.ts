@@ -349,7 +349,7 @@ async function executeRegisteredTool(toolName: string, argsJson: string): Promis
     throw new Error(`Tool "${toolName}" was not found`);
   }
 
-  return (await executeTool.call(modelContext, tool, argsJson)) ?? '';
+  return (await executeTool.call(modelContext, tool, JSON.parse(argsJson))) ?? '';
 }
 
 /**
