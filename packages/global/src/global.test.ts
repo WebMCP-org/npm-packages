@@ -284,6 +284,56 @@ describe('global adapter', () => {
     await expect(modelContext.executeTool(tools[0]!, '{"value":7}')).resolves.toBe('{"value":7}');
   });
 
+  it('testing shim executes the listed descendant instead of a same-named outside tool', async () => {
+    initializeWebModelContext();
+    const server = getModelContext();
+    const testing = navigator.modelContextTesting;
+    if (!testing) throw new Error('Testing shim is unavailable');
+
+    const iframe = document.createElement('iframe');
+    document.body.append(iframe);
+    const outsideWindow = {
+      get parent() {
+        return this;
+      },
+    } as unknown as Window;
+    const descriptor = (name: string, source: Window) => ({
+      name,
+      description: name,
+      origin: location.origin,
+      window: source,
+    });
+    const descendant = descriptor('visible', iframe.contentWindow!);
+    const getTools = vi
+      .spyOn(server, 'getTools')
+      .mockResolvedValue([
+        descriptor('visible', outsideWindow),
+        descendant,
+        descriptor('hidden', outsideWindow),
+      ] as never);
+    const listTools = vi.spyOn(server, 'listTools').mockReturnValue([
+      {
+        name: 'visible',
+        description: 'visible',
+        inputSchema: { type: 'object', properties: {} },
+      },
+    ]);
+    const executeTool = vi.spyOn(server, 'executeTool').mockResolvedValue('descendant');
+
+    try {
+      await expect(testing.executeTool('visible', '{}')).resolves.toBe('descendant');
+      expect(executeTool).toHaveBeenCalledWith(descendant, '{}', undefined);
+      await expect(testing.executeTool('hidden', '{}')).rejects.toMatchObject({
+        name: 'UnknownError',
+      });
+    } finally {
+      getTools.mockRestore();
+      listTools.mockRestore();
+      executeTool.mockRestore();
+      iframe.remove();
+    }
+  });
+
   it('uses upstream object execution and preserves cancellation and annotations', async () => {
     initializeWebModelContext();
     const modelContext = getModelContext();
