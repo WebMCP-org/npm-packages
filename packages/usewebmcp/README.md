@@ -54,13 +54,8 @@ Use [`@mcp-b/global`](../global/README.md) for MCP server features. Browser type
 
 ## Performance comparison
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/WebMCP-org/npm-packages/92071e32a39585fe412de3e4ed651391c47ebcf7/apps/documentation-website/images/react-hooks/performance-dark.png">
-  <img src="https://raw.githubusercontent.com/WebMCP-org/npm-packages/92071e32a39585fe412de3e4ed651391c47ebcf7/apps/documentation-website/images/react-hooks/performance-light.png" alt="Production React re-renders with one tool, five trials. One description change: usewebmcp 1, MCP-B React 1, MCP Cat 1, Google 2. One sequential call: 2, 2, 1–2; Google exposes no execution state.">
-</picture>
-
 Both hooks add no renders for successful registration. All four register once per description change and never on unrelated updates in this benchmark.
-[Benchmark details](https://github.com/WebMCP-org/npm-packages/tree/92071e32a39585fe412de3e4ed651391c47ebcf7/benchmarks/react-hooks).
+[Benchmark details and run commands](https://github.com/WebMCP-org/npm-packages/tree/main/benchmarks/react-hooks).
 
 ## Feature comparison
 
