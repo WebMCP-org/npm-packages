@@ -103,6 +103,30 @@ jobs:
       - name: Install dependencies
         run: vp install --frozen-lockfile
 
+      - name: Diagnose upstream polyfill installation
+        run: |
+          node --input-type=module <<'NODE'
+          import { realpathSync, readdirSync, readFileSync, existsSync } from 'node:fs';
+          import { resolve } from 'node:path';
+          import { pathToFileURL } from 'node:url';
+          const root = realpathSync('packages/global/node_modules/webmcp-polyfill');
+          console.log('Upstream package:', root);
+          for (const directory of ['dist', 'src']) {
+            const path = resolve(root, directory);
+            console.log(directory, existsSync(path) ? readdirSync(path) : 'missing');
+          }
+          for (const file of ['package.json', 'tsconfig.json', 'src/frames.ts']) {
+            const path = resolve(root, file);
+            console.log(file, existsSync(path) ? readFileSync(path, 'utf8').slice(0, 4000) : 'missing');
+          }
+          try {
+            await import(pathToFileURL(resolve(root, 'dist/index.js')).href);
+            console.log('Upstream import succeeded');
+          } catch (error) {
+            console.error('Upstream import failed:', error.message);
+          }
+          NODE
+
       - name: Build packages
         run: pnpm build
 
