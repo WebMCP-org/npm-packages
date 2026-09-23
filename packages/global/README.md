@@ -33,7 +33,7 @@
 
 When no context is installed, `@mcp-b/global` installs the official
 [WebMCP polyfill](https://github.com/webmachinelearning/webmcp-polyfill)
-from revision `439c6c341f1c632c63498ba206e2bd8471cb8efb`. The revision is pinned
+from revision `a4cd4fcbde1c0214ded619aadc4412b9ab8d29d4`. The revision is pinned
 as a build dependency and bundled into both published entry points. Consumers
 do not install or build a Git dependency. The upstream project has not published
 its package yet; the currently published unscoped `webmcp-polyfill` is unrelated.
