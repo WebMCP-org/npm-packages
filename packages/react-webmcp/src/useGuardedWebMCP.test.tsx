@@ -367,6 +367,32 @@ describe('useGuardedWebMCP', () => {
     expect(execute).toHaveBeenLastCalledWith({ force: true });
   });
 
+  it('enforces consent for browser execution through the global runtime', async () => {
+    const execute = vi.fn().mockResolvedValue({ ok: true });
+    const broker = new ConsentGuard();
+    const pendingIds = trackPendingIds(broker);
+    await renderHook(
+      () =>
+        useGuardedWebMCP({
+          name: 'browserConsentTool',
+          description: 'Requires approval through the browser API',
+          consent: highRiskConsent,
+          execute,
+        }),
+      { wrapper: provider(broker) }
+    );
+
+    expect(document.modelContext).toBe(server);
+    const tool = (await server.getTools()).find((item) => item.name === 'browserConsentTool');
+    expect(tool).toBeDefined();
+    const invocation = server.executeTool(tool!, '{}');
+    await vi.waitFor(() => expect(pendingIds).toHaveLength(1));
+    expect(execute).not.toHaveBeenCalled();
+    await broker.decide(pendingIds[0]!, true);
+    await invocation;
+    expect(execute).toHaveBeenCalledOnce();
+  });
+
   it('applies updated consent policy without re-registering the tool', async () => {
     const execute = vi.fn().mockResolvedValue({ ok: true });
     const broker = new ConsentGuard();
