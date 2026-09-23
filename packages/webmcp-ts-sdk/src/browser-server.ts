@@ -601,7 +601,12 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   }
 
   private async backfillNativeStandardTools(native: NativeStandardToolsApi): Promise<void> {
-    const tools = await native.getTools();
+    // MCP serves this document. Cross-frame discovery belongs to the WebMCP
+    // surface; importing ancestor tools here would feed iframe bridges back
+    // into their own source and repeatedly prefix/re-register the same tools.
+    const tools = (await native.getTools()).filter(
+      (tool) => tool.window === this.ownerDocument?.defaultView
+    );
     if (this.closed) return;
     const nextTools = new Map<string, NativeBackfilledTool>();
     const nativeNames = new Set(tools.map(({ name }) => name));

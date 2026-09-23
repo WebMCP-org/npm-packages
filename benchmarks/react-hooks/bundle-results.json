@@ -1,9 +1,9 @@
 {
-  "recordedAt": "2026-09-08T01:10:06.372Z",
-  "sourceCommit": "dcd3748a4c0827824bd59e33c30d838d4de4a90f",
-  "sourceDirty": false,
+  "recordedAt": "2026-09-23T16:51:29.253Z",
+  "sourceCommit": "9630051402b66f0b516d1afaa958aa33d1a0e7ad",
+  "sourceDirty": true,
   "platform": "darwin/arm64",
-  "node": "v22.23.2",
+  "node": "v24.11.1",
   "bundler": {
     "vitePlus": "0.1.24",
     "vite": "8.0.16"
@@ -40,9 +40,9 @@
       "version": "5.1.0",
       "exportNames": ["useWebMCP"],
       "entry": "./dist/index.js",
-      "rawBytes": 19113,
-      "minifiedBytes": 10964,
-      "gzipBytes": 3959,
+      "rawBytes": 19126,
+      "minifiedBytes": 10972,
+      "gzipBytes": 3963,
       "externalImports": ["react", "react/jsx-runtime"]
     },
     {
@@ -101,11 +101,11 @@
       "library": "@mcp-b/webmcp-plugins",
       "subpath": "consent",
       "version": "5.1.0",
-      "exportNames": ["ConsentBroker", "consent"],
+      "exportNames": ["ConsentBroker", "consentBroker"],
       "entry": "./dist/consent.js",
-      "rawBytes": 6317,
-      "minifiedBytes": 3660,
-      "gzipBytes": 1520,
+      "rawBytes": 6727,
+      "minifiedBytes": 3666,
+      "gzipBytes": 1521,
       "externalImports": []
     },
     {

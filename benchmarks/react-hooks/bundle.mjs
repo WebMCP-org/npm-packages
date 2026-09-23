@@ -24,7 +24,7 @@ libraries.push(
     '': ['invoke'],
     'standard-schema': ['standardSchema'],
     'execution-state': ['executionState'],
-    consent: ['ConsentBroker', 'consent'],
+    consent: ['ConsentBroker', 'consentBroker'],
     otel: ['otel'],
   }).map(([subpath, exportNames]) => ({
     library: '@mcp-b/webmcp-plugins',

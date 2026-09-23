@@ -101,7 +101,7 @@ from production ESM with Vite+, targeting ES2022. Artifacts include raw, Oxc-min
 level 9 sizes.
 
 React and React DOM are external; other imported dependencies remain included. Each entry measures
-one export, except consent, which measures the usable `ConsentBroker` + `consent` pair. Sizes do
+one export, except consent, which measures the usable `ConsentBroker` + `consentBroker` pair. Sizes do
 not represent a complete application or the incremental cost of combining plugins. Application
 validators and browser setup are excluded. Assertions check exports, dependency resolution, and
 unexpected MCP SDK/polyfill initializer code in the core bundle.
