@@ -118,8 +118,8 @@ test('keeps ancestor tools out of child MCP servers while WebMCP discovers the f
 }) => {
   const tools = await page.evaluate(async () => {
     const parent = document.modelContext as BrowserMcpServer;
-    const child = window.mcpIframeHost.getMcpIframe().iframe?.contentDocument
-      ?.modelContext as BrowserMcpServer;
+    const childWindow = window.mcpIframeHost.getMcpIframe().iframe?.contentWindow;
+    const child = childWindow?.document.modelContext as BrowserMcpServer;
     const controller = new AbortController();
     await parent.registerTool(
       { name: 'parent_only', description: 'Parent tool', execute: async () => 'parent' },
@@ -127,9 +127,21 @@ test('keeps ancestor tools out of child MCP servers while WebMCP discovers the f
     );
     try {
       await Promise.all([parent.syncNativeTools(), child.syncNativeTools()]);
+      const testing = childWindow?.navigator.modelContextTesting;
+      if (!testing) throw new Error('Child testing shim is unavailable');
+      const ownTestingResult = await testing.executeTool('calculate', '{"a":1,"b":2}');
+      let hiddenToolError = '';
+      try {
+        await testing.executeTool('parent_only', '{}');
+      } catch (error) {
+        hiddenToolError = (error as Error).name;
+      }
       return {
         discovered: (await child.getTools()).map(({ name }) => name),
         childMcp: child.listTools().map(({ name }) => name),
+        childTesting: testing.listTools().map(({ name }) => name),
+        ownTestingResult,
+        hiddenToolError,
         parentMcp: parent
           .listTools()
           .map(({ name }) => name)
@@ -143,6 +155,9 @@ test('keeps ancestor tools out of child MCP servers while WebMCP discovers the f
     expect.arrayContaining(['calculate', 'child-iframe_calculate', 'parent_only'])
   );
   expect(tools.childMcp).toEqual(['calculate']);
+  expect(tools.childTesting).toEqual(['calculate']);
+  expect(tools.ownTestingResult).toContain('3');
+  expect(tools.hiddenToolError).toBe('UnknownError');
   expect(tools.parentMcp).toEqual(['calculate', 'child-iframe_calculate', 'parent_only']);
 });
 
