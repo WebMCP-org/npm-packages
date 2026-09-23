@@ -577,12 +577,11 @@ describe('ConsentGuard', () => {
 
     it('an active cooldown overrides cached session pre-approval', async () => {
       const broker = new ConsentGuard(30_000, async () => true);
-      const reversibleWithPresence: ConsentMetadata = {
+      const reversibleConsent: ConsentMetadata = {
         scope: ['deploy'],
         reversible: true,
         riskLevel: 'high',
         requiresApproval: true,
-        requireUserPresence: true,
       };
 
       let capturedId = '';
@@ -595,7 +594,7 @@ describe('ConsentGuard', () => {
         toolName: 'rollbackDeployment',
         origin: 'https://app.example.com',
         args: { force: true },
-        consent: reversibleWithPresence,
+        consent: reversibleConsent,
       });
       await broker.decide(capturedId, true, true);
       const d1 = await p1;
@@ -607,7 +606,7 @@ describe('ConsentGuard', () => {
         toolName: 'rollbackDeployment',
         origin: 'https://app.example.com',
         args: { force: true },
-        consent: reversibleWithPresence,
+        consent: reversibleConsent,
       });
       expect(d2.approved).toBe(true);
       expect(d2.reason).toBe('session-preapproval');
@@ -635,7 +634,7 @@ describe('ConsentGuard', () => {
         toolName: 'rollbackDeployment',
         origin: 'https://app.example.com',
         args: { force: true },
-        consent: reversibleWithPresence,
+        consent: reversibleConsent,
       });
       expect(d4.approved).toBe(false);
       expect(d4.reason).toBe('rate-limited');
