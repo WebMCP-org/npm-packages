@@ -1,7 +1,6 @@
-import type { ChromeModelContextExtensions } from '@mcp-b/webmcp-types';
 import { expect, type Page, test } from '@playwright/test';
 
-type ChromeModelContext = NonNullable<Document['modelContext']> & ChromeModelContextExtensions;
+type ChromeModelContext = NonNullable<Document['modelContext']>;
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -369,7 +368,7 @@ test.describe('Native API Semantics', () => {
         if (!tool) {
           return { missingApi: false, missingExecuteTool: false, missingTool: true };
         }
-        const response = await context.executeTool(tool, JSON.stringify({ value: 42 }));
+        const response = await context.executeTool(tool, { value: 42 });
         return {
           missingApi: false,
           missingExecuteTool: false,

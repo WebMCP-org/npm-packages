@@ -5,7 +5,7 @@
 
 export type { RegisteredTool as ToolInfo } from '@mcp-b/webmcp-types';
 
-import type { ChromeModelContext, ModelContextTool } from '@mcp-b/webmcp-types';
+import type { ModelContextTool } from '@mcp-b/webmcp-types';
 
 export interface ToolRegistration {
   unregister(): void;
@@ -16,11 +16,8 @@ export interface ToolRegistration {
  */
 export type Tool = ModelContextTool;
 
-/**
- * Strict native context plus Chromium's feature-detectable execution
- * extension.
- */
-export type ModelContext = ChromeModelContext;
+/** Current native WebMCP context, including object-input execution. */
+export type ModelContext = NonNullable<Document['modelContext']>;
 
 // ============================================================================
 // App-specific types (not in packages)

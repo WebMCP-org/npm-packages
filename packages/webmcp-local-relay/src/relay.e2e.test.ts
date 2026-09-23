@@ -884,7 +884,13 @@ describe('relay e2e (real browser assets)', () => {
           arguments: { reason: runtimeCase.mode },
         });
         expect(errorResult.isError).toBe(true);
-        expect(firstContentText(errorResult)).toContain(`always_fail:${runtimeCase.mode}`);
+        // The official runtime sanitizes callback failures at its execution
+        // boundary; the legacy testing shim retains the original message.
+        if (runtimeCase.mode === 'global') {
+          expect(firstContentText(errorResult)).toBe('Tool execution failed');
+        } else {
+          expect(firstContentText(errorResult)).toContain(`always_fail:${runtimeCase.mode}`);
+        }
       } catch (error) {
         throw formatE2EError(`${runtimeCase.mode} runtime-errors`, error, harness);
       } finally {
