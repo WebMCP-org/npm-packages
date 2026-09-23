@@ -1,7 +1,13 @@
-import type { ChromeModelContextExtensions } from '@mcp-b/webmcp-types';
+import type { RegisteredTool } from '@mcp-b/webmcp-types';
 import { expect, test } from '@playwright/test';
 
-type ChromeModelContext = NonNullable<Document['modelContext']> & ChromeModelContextExtensions;
+type ChromeModelContext = Omit<NonNullable<Document['modelContext']>, 'executeTool'> & {
+  executeTool(
+    tool: RegisteredTool,
+    input: object,
+    options?: { signal?: AbortSignal }
+  ): Promise<unknown>;
+};
 
 function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
   if (value === expectedText) {
@@ -242,9 +248,7 @@ test.describe('Chrome WebMCP native smoke', () => {
     expect(result.undefinedSchemaType).toBe('undefined');
   });
 
-  test('executeTool accepts a discovered tool descriptor and JSON object strings', async ({
-    page,
-  }) => {
+  test('executeTool accepts a discovered tool descriptor and object inputs', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const context = ((
         window as Window & {
@@ -284,8 +288,8 @@ test.describe('Chrome WebMCP native smoke', () => {
           return { missingApi: false, missingExecuteTool: false, missingTool: true };
         }
         const executeTool = context.executeTool.bind(context);
-        const withoutOptions = await executeTool(tool, JSON.stringify({ value: 7 }));
-        const withEmptyOptions = await executeTool(tool, JSON.stringify({ value: 8 }), {});
+        const withoutOptions = await executeTool(tool, { value: 7 });
+        const withEmptyOptions = await executeTool(tool, { value: 8 }, {});
         return {
           missingApi: false,
           missingExecuteTool: false,
@@ -308,7 +312,7 @@ test.describe('Chrome WebMCP native smoke', () => {
     expect(isDirectOrWrappedText(result.withEmptyOptions, 'beta:8')).toBe(true);
   });
 
-  test('executeTool accepts JSON array strings', async ({ page }) => {
+  test('executeTool accepts array inputs', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const context = ((
         window as Window & {
@@ -347,7 +351,7 @@ test.describe('Chrome WebMCP native smoke', () => {
           missingApi: false,
           missingExecuteTool: false,
           missingTool: false,
-          value: await context.executeTool(tool, JSON.stringify([1, 2, 3])),
+          value: await context.executeTool(tool, [1, 2, 3]),
         };
       } finally {
         controller.abort();
@@ -363,7 +367,7 @@ test.describe('Chrome WebMCP native smoke', () => {
     expect(isDirectOrWrappedText(result.value, 'beta-array:1,2,3')).toBe(true);
   });
 
-  test('executeTool rejects invalid JSON with UnknownError', async ({ page }) => {
+  test('executeTool rejects serialized JSON strings with TypeError', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const context = ((
         window as Window & {
@@ -384,7 +388,8 @@ test.describe('Chrome WebMCP native smoke', () => {
       }
 
       try {
-        await context.executeTool(firstTool, '{invalid json');
+        // @ts-expect-error Deliberately exercise the rejected legacy JSON-string input.
+        await context.executeTool(firstTool, '{}');
         return {
           missingApi: false,
           missingExecuteTool: false,
@@ -410,11 +415,11 @@ test.describe('Chrome WebMCP native smoke', () => {
     );
     expect(result.noTool).toBe(false);
     expect(result.didThrow).toBe(true);
-    expect(result.name).toBe('UnknownError');
-    expect(result.message).toMatch(/input arguments|parse/i);
+    expect(result.name).toBe('TypeError');
+    expect(result.message).toMatch(/input object|not an object/i);
   });
 
-  test('executeTool rejects primitive JSON payloads with UnknownError', async ({ page }) => {
+  test('executeTool rejects primitive inputs with TypeError', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const context = ((
         window as Window & {
@@ -435,7 +440,8 @@ test.describe('Chrome WebMCP native smoke', () => {
       }
 
       try {
-        await context.executeTool(firstTool, '"not-an-object"');
+        // @ts-expect-error Deliberately exercise the object-input boundary.
+        await context.executeTool(firstTool, 7);
         return {
           missingApi: false,
           missingExecuteTool: false,
@@ -461,8 +467,8 @@ test.describe('Chrome WebMCP native smoke', () => {
     );
     expect(result.noTool).toBe(false);
     expect(result.didThrow).toBe(true);
-    expect(result.name).toBe('UnknownError');
-    expect(result.message).toMatch(/input arguments|parse/i);
+    expect(result.name).toBe('TypeError');
+    expect(result.message).toMatch(/input object|not an object/i);
   });
 
   test('executeTool rejects a stale registered descriptor with UnknownError', async ({ page }) => {
@@ -502,7 +508,7 @@ test.describe('Chrome WebMCP native smoke', () => {
       controller.abort();
 
       try {
-        await context.executeTool(tool, '{}');
+        await context.executeTool(tool, {});
         return {
           missingApi: false,
           missingExecuteTool: false,
@@ -567,7 +573,7 @@ test.describe('Chrome WebMCP native smoke', () => {
         if (!tool) {
           return { missingApi: false, missingExecuteTool: false, missingTool: true };
         }
-        await context.executeTool(tool, '{}');
+        await context.executeTool(tool, {});
         return {
           missingApi: false,
           missingExecuteTool: false,
@@ -623,7 +629,7 @@ test.describe('Chrome WebMCP native smoke', () => {
       controller.abort();
 
       try {
-        await context.executeTool(firstTool, '{}', { signal: controller.signal });
+        await context.executeTool(firstTool, {}, { signal: controller.signal });
         return {
           missingApi: false,
           missingExecuteTool: false,
@@ -690,7 +696,7 @@ test.describe('Chrome WebMCP native smoke', () => {
         }
         const controller = new AbortController();
         const pending = context
-          .executeTool(tool, '{}', { signal: controller.signal })
+          .executeTool(tool, {}, { signal: controller.signal })
           .then((value) => ({ didThrow: false, value }))
           .catch((error: unknown) => ({
             didThrow: true,

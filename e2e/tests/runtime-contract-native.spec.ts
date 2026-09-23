@@ -1,4 +1,4 @@
-import type { ChromeModelContextExtensions, RegisteredTool } from '@mcp-b/webmcp-types';
+import type { RegisteredTool } from '@mcp-b/webmcp-types';
 import { expect, type Page, test } from '@playwright/test';
 import {
   DYNAMIC_TOOL_NAME,
@@ -11,7 +11,7 @@ import {
 } from './runtime-contract.helpers.js';
 
 type NativeModelContext = Pick<NonNullable<Document['modelContext']>, 'getTools'> & {
-  executeTool: NonNullable<ChromeModelContextExtensions['executeTool']>;
+  executeTool(tool: RegisteredTool, input: Record<string, unknown>): Promise<unknown>;
 };
 
 type NativeContextWindow = Window & {
@@ -46,7 +46,7 @@ async function executeNativeToolText(
         throw new Error(`Native tool is unavailable: ${toolName}`);
       }
 
-      const result = await modelContext.executeTool(tool, JSON.stringify(toolArgs));
+      const result = await modelContext.executeTool(tool, toolArgs);
       if (typeof result !== 'string') {
         const candidate = result as { content?: Array<{ text?: string }> } | null | undefined;
         const content = Array.isArray(candidate?.content) ? candidate.content : [];
@@ -84,7 +84,7 @@ async function executeNativeToolError(
           throw new Error(`Native tool is unavailable: ${toolName}`);
         }
 
-        await modelContext.executeTool(tool, JSON.stringify(toolArgs));
+        await modelContext.executeTool(tool, toolArgs);
         return '';
       } catch (error) {
         return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
@@ -158,7 +158,7 @@ test.describe('Runtime Contract - Browser API Caller', () => {
         return { missingRawModelContext: false, missingSumTool: true, toolsArePromise: false };
       }
 
-      const execution = await modelContext.executeTool(sumTool, JSON.stringify({ a: 4, b: 7 }));
+      const execution = await modelContext.executeTool(sumTool, { a: 4, b: 7 });
 
       return {
         missingRawModelContext: false,
@@ -256,7 +256,7 @@ test.describe('Runtime Contract - Browser API Caller', () => {
             if (!modelContext) {
               throw new Error('Native document.modelContext is unavailable');
             }
-            await modelContext.executeTool(tool, JSON.stringify(toolArgs));
+            await modelContext.executeTool(tool, toolArgs);
             return '';
           } catch (error) {
             return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
