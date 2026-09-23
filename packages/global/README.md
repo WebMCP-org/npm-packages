@@ -88,7 +88,7 @@ strings, set `nativeExecuteToolInput: 'json'` before automatic initialization:
 </html>
 ```
 
-- **Self-contained** - All dependencies bundled (285KB minified)
+- **Self-contained** - All dependencies bundled
 - **Auto-initializes** - `document.modelContext` ready immediately
 - **No build step** - Just drop it in your HTML
 

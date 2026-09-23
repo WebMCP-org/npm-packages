@@ -95,6 +95,31 @@ describe('global adapter', () => {
     expect(typeof getModelContext().listTools).toBe('function');
   });
 
+  it('restores a navigator-only context without installing the legacy polyfill', () => {
+    const nativeContext = createNativeModelContextStub();
+    const previousNavigatorDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
+    setDocumentModelContext(undefined);
+    Object.defineProperty(navigator, 'modelContext', {
+      configurable: true,
+      value: nativeContext,
+    });
+
+    try {
+      initializeWebModelContext();
+      expect(getModelContext()).toBeInstanceOf(BrowserMcpServer);
+      cleanupWebModelContext();
+      expect(document.modelContext).toBeUndefined();
+      expect(navigator.modelContext).toBe(nativeContext);
+    } finally {
+      cleanupWebModelContext();
+      if (previousNavigatorDescriptor) {
+        Object.defineProperty(navigator, 'modelContext', previousNavigatorDescriptor);
+      } else {
+        Reflect.deleteProperty(navigator, 'modelContext');
+      }
+    }
+  });
+
   it('leaves a non-configurable native modelContext untouched', () => {
     const nativeContext = createNativeModelContextStub();
     const previousNavigatorContext = navigator.modelContext;

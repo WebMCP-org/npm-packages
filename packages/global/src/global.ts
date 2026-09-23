@@ -1,5 +1,5 @@
 import { IframeChildTransport, TabServerTransport } from '@mcp-b/transports';
-import { initializeWebMCPPolyfill, installWebMCPDeclarativePolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCPDeclarativePolyfill } from '@mcp-b/webmcp-polyfill';
 import { installWebMCP } from 'webmcp-polyfill';
 import { BrowserMcpServer, isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import type { ModelContext, ModelContextTesting } from '@mcp-b/webmcp-types';
@@ -29,7 +29,19 @@ function installTestingShim(server: BrowserMcpServer): () => void {
         inputSchema: JSON.stringify(inputSchema),
       })),
     async executeTool(name: string, input: string, options?: { signal?: AbortSignal }) {
-      const tool = (await server.getTools()).find((candidate) => candidate.name === name);
+      const listed = server.listTools().some((tool) => tool.name === name);
+      const tool = listed
+        ? (await server.getTools()).find((candidate) => {
+            if (candidate.name !== name) return false;
+            let frame = candidate.window;
+            while (frame) {
+              if (frame === window) return true;
+              if (frame.parent === frame) break;
+              frame = frame.parent;
+            }
+            return false;
+          })
+        : undefined;
       if (!tool) throw new DOMException(`Tool not found: ${name}`, 'UnknownError');
       return server.executeTool(tool, input, options);
     },
@@ -169,11 +181,6 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     installWebMCP();
     upstreamContext = document.modelContext;
   }
-  // Preserve the navigator-only compatibility path without replacing upstream.
-  initializeWebMCPPolyfill({
-    installTestingShim: options?.installTestingShim ?? true,
-  });
-
   // 2. Save reference to the polyfill's (or native) context
   const native = readCurrentModelContext();
   if (!native) {
@@ -196,8 +203,9 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     { name: `${hostname}-webmcp`, version: '1.0.0' },
     {
       native,
-      nativeExecuteToolInput:
-        options?.nativeExecuteToolInput ?? ('__isWebMCPPolyfill' in native ? 'json' : 'object'),
+      ...(options?.nativeExecuteToolInput
+        ? { nativeExecuteToolInput: options.nativeExecuteToolInput }
+        : {}),
     }
   );
   let cleanupForms = () => {};
