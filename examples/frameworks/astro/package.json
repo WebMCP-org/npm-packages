@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",
-    "astro": "7.3.5"
+    "astro": "^7.3.5"
   }
 }
