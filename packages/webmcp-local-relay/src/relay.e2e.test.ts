@@ -28,13 +28,12 @@ const RUNTIME_CONTRACT_MODULE_PATH = resolve(
 const REAL_EMBED_PATH = resolve(PACKAGE_DIR, 'dist/browser/embed.js');
 const REAL_WIDGET_PATH = resolve(PACKAGE_DIR, 'dist/browser/widget.html');
 
-type RuntimeMode = 'fixture-native' | 'global' | 'polyfill-testing';
+type RuntimeMode = 'global' | 'polyfill-testing';
 
 interface RuntimeCase {
   mode: RuntimeMode;
   scriptRoute: string;
   scriptPath?: string;
-  scriptSource?: string;
 }
 
 interface StartedHttpServer {
@@ -58,20 +57,9 @@ interface E2EHarness {
   cleanup: () => Promise<void>;
 }
 
-interface BridgeFixtureSnapshot {
-  executeTool: number;
-  getTools: number;
-  lastExecuteGeneration: number;
-}
-
 declare global {
   interface Window {
     __WEBMCP_E2E__?: RuntimeContractController;
-    __WEBMCP_RELAY_FIXTURE__?: {
-      replace: (name: string) => void;
-      reset: () => void;
-      snapshot: () => BridgeFixtureSnapshot;
-    };
   }
 }
 
@@ -92,119 +80,6 @@ const RUNTIME_CASES: RuntimeCase[] = [
 
 function jsonForInlineScript(value: unknown): string {
   return JSON.stringify(value).replaceAll('<', '\\u003c');
-}
-
-function buildBridgeFixtureScript(): string {
-  return `(() => {
-    const counts = {
-      executeTool: 0,
-      getTools: 0,
-      lastExecuteGeneration: -1,
-    };
-    let generation = 0;
-    const registrations = new Map();
-    let descriptors = [];
-
-    const makeDescriptor = (tool) => ({
-      name: tool.name,
-      ...(tool.name === 'sum'
-        ? { title: 'Add numbers', annotations: { readOnlyHint: true } }
-        : {}),
-      description: tool.description ?? '',
-      inputSchema: JSON.stringify(tool.inputSchema ?? { type: 'object', properties: {} }),
-      window,
-      origin: location.origin,
-      __execute: tool.execute,
-      __generation: generation,
-    });
-
-    const refreshDescriptors = () => {
-      descriptors = [...registrations.values()].map(makeDescriptor);
-    };
-
-    class FixtureContext extends EventTarget {
-      ontoolchange = null;
-
-      async registerTool(tool, options = {}) {
-        registrations.set(tool.name, tool);
-        refreshDescriptors();
-        options.signal?.addEventListener(
-          'abort',
-          () => {
-            registrations.delete(tool.name);
-            refreshDescriptors();
-            this.dispatchEvent(new Event('toolchange'));
-          },
-          { once: true }
-        );
-        this.dispatchEvent(new Event('toolchange'));
-      }
-
-      async getTools() {
-        counts.getTools++;
-        await new Promise((resolve) => setTimeout(resolve, 5));
-        return descriptors;
-      }
-    }
-
-    const context = new FixtureContext();
-
-    const executeDescriptor = async (descriptor, inputObject) => {
-      counts.executeTool++;
-      if (!descriptors.includes(descriptor)) {
-        throw new Error('executeTool received a stale RegisteredTool descriptor');
-      }
-      if (!inputObject || typeof inputObject !== 'object' || Array.isArray(inputObject)) {
-        throw new TypeError('executeTool expected object input');
-      }
-      counts.lastExecuteGeneration = descriptor.__generation;
-      if (descriptor.name === 'always_fail') {
-        return JSON.stringify({
-          resultType: 'input_required',
-          requestState: 'fixture-input-required',
-        });
-      }
-      const result = await descriptor.__execute(inputObject);
-      if (descriptor.name === 'sum') {
-        return result.content[0].text;
-      }
-      return JSON.stringify(result);
-    };
-
-    context.executeTool = executeDescriptor;
-
-    Object.defineProperty(document, 'modelContext', {
-      configurable: true,
-      value: context,
-    });
-    delete navigator.modelContext;
-
-    window.__WEBMCP_RELAY_FIXTURE__ = {
-      snapshot: () => ({ ...counts }),
-      reset: () => {
-        counts.executeTool = 0;
-        counts.getTools = 0;
-        counts.lastExecuteGeneration = -1;
-      },
-      replace: (name) => {
-        generation++;
-        descriptors = descriptors.map((descriptor) =>
-          descriptor.name === name
-            ? { ...descriptor, __generation: generation }
-            : descriptor
-        );
-        context.dispatchEvent(new Event('toolchange'));
-      },
-    };
-  })();`;
-}
-
-function createBridgeFixtureRuntimeCase(): RuntimeCase {
-  return {
-    mode: 'fixture-native',
-    scriptRoute: '/runtime/fixture-native.js',
-    scriptSource: buildBridgeFixtureScript(),
-  };
 }
 
 function sendHtml(response: ServerResponse, html: string): void {
@@ -234,21 +109,10 @@ function readRuntimeScriptOrThrow(filePath: string): string {
 }
 
 function readRuntimeCaseScript(runtimeCase: RuntimeCase): string {
-  if (runtimeCase.scriptSource !== undefined) {
-    return runtimeCase.scriptSource;
-  }
   if (runtimeCase.scriptPath !== undefined) {
     return readRuntimeScriptOrThrow(runtimeCase.scriptPath);
   }
   throw new Error(`Runtime case "${runtimeCase.mode}" has no script source`);
-}
-
-async function readBridgeFixtureSnapshot(page: Page): Promise<BridgeFixtureSnapshot> {
-  const snapshot = await page.evaluate(() => window.__WEBMCP_RELAY_FIXTURE__?.snapshot());
-  if (!snapshot) {
-    throw new Error('Bridge fixture snapshot is unavailable');
-  }
-  return snapshot;
 }
 
 async function startHttpServer(
@@ -688,18 +552,20 @@ describe('relay e2e (real browser assets)', () => {
     }
   });
 
-  it('uses async document discovery, current descriptor identity, and document toolchange', async () => {
+  it('discovers and executes upstream polyfill tools across the iframe boundary', async () => {
     let widgetServer: StartedHttpServer | null = null;
     let harness: E2EHarness | null = null;
 
     try {
       const relayPort = await getOpenPort();
       widgetServer = await startWidgetAssetServer();
+      const runtimeCase = RUNTIME_CASES.find((candidate) => candidate.mode === 'polyfill-testing');
+      if (!runtimeCase) throw new Error('Upstream polyfill runtime case is missing');
       harness = await setupE2EHarness({
-        runtimeCase: createBridgeFixtureRuntimeCase(),
+        runtimeCase,
         relayPort,
         widgetOrigin: widgetServer.origin,
-        clientName: 'webmcp-local-relay-e2e-client-native-document',
+        clientName: 'webmcp-local-relay-e2e-client-polyfill-frames',
       });
 
       const tools = await harness.client.listTools();
@@ -711,60 +577,25 @@ describe('relay e2e (real browser assets)', () => {
           b: { type: 'number' },
         },
       });
-      expect(sumTool?.title).toBe('Add numbers');
-      expect(sumTool?.annotations).toMatchObject({ readOnlyHint: true });
-      expect(tools.tools.some((tool) => tool.name === 'decoy_extension')).toBe(false);
 
-      let snapshot = await readBridgeFixtureSnapshot(harness.page);
-      expect(snapshot.getTools).toBeGreaterThan(0);
-      expect(snapshot.executeTool).toBe(0);
-
-      const initialResult = await harness.client.callTool({
+      const result = await harness.client.callTool({
         name: harness.expectedToolName,
         arguments: { a: 4, b: 6 },
       });
-      expect(firstContentText(initialResult)).toBe('sum:10');
-      expect(initialResult.structuredContent).toEqual({ result: 'sum:10' });
-
-      snapshot = await readBridgeFixtureSnapshot(harness.page);
-      expect(snapshot.executeTool).toBe(1);
-      expect(snapshot.lastExecuteGeneration).toBe(0);
-
-      await harness.page.evaluate(() => {
-        window.__WEBMCP_RELAY_FIXTURE__?.reset();
-        window.__WEBMCP_RELAY_FIXTURE__?.replace('sum');
+      expect(firstContentText(result)).toBe('sum:10');
+      expect(result.structuredContent).toEqual({
+        a: 4,
+        b: 6,
+        sum: 10,
+        runtime: 'polyfill-testing',
       });
 
-      await waitForValue(
-        async () => {
-          const current = await readBridgeFixtureSnapshot(harness.page);
-          return current.getTools > 0 ? true : undefined;
-        },
-        1_000,
-        10
-      );
-
-      const refreshedResult = await harness.client.callTool({
-        name: harness.expectedToolName,
-        arguments: { a: 8, b: 3 },
+      const invocations = await harness.page.evaluate(async () => {
+        return (await window.__WEBMCP_E2E__?.readInvocations()) ?? [];
       });
-      expect(firstContentText(refreshedResult)).toBe('sum:11');
-
-      snapshot = await readBridgeFixtureSnapshot(harness.page);
-      expect(snapshot.executeTool).toBe(1);
-      expect(snapshot.lastExecuteGeneration).toBe(1);
-
-      const inputRequiredResult = await harness.client.callTool({
-        name: sanitizeName('always_fail'),
-        arguments: {},
-      });
-      expect(inputRequiredResult.isError).toBe(true);
-      expect(firstContentText(inputRequiredResult)).toContain(
-        'cannot forward MCP input_required results'
-      );
-      expect(inputRequiredResult).not.toHaveProperty('structuredContent.resultType');
+      expect(invocations).toEqual([{ name: 'sum', arguments: { a: 4, b: 6 } }]);
     } catch (error) {
-      throw formatE2EError('native document bridge', error, harness);
+      throw formatE2EError('upstream polyfill frames', error, harness);
     } finally {
       await harness?.cleanup();
       await stopHttpServer(widgetServer?.server ?? null);

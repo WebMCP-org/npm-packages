@@ -210,16 +210,16 @@ npx @mcp-b/webmcp-local-relay --widget-origin https://myapp.com
                    │ WebSocket (ws://127.0.0.1:9333)
 ┌──────────────────▼───────────────────┐
 │        Widget iframe                 │
-│   embed.js injects widget.html       │
+│   Upstream polyfill + relay socket    │
 └──────────────────┬───────────────────┘
-                   │ postMessage
+                   │ WebMCP frame bridge
 ┌──────────────────▼───────────────────┐
 │        Host page                     │
 │   WebMCP runtime + registered tools  │
 └──────────────────────────────────────┘
 ```
 
-**How it connects:** The embed script fetches the sibling `widget.html`, injects configuration, and loads it as a hidden blob iframe that inherits the host page origin. The iframe opens a WebSocket to the relay on `localhost`. Self-hosted copies must serve both `embed.js` and `widget.html`; cross-origin hosts must allow the widget fetch with CORS. The relay fails closed if that fetch fails.
+**How it connects:** The embed script fetches the sibling `widget.html`, injects configuration, and loads it as a hidden blob iframe that inherits the host page origin. The widget calls the [upstream WebMCP polyfill](https://github.com/webmachinelearning/webmcp-polyfill) installer. When native WebMCP is unavailable, the polyfill's frame bridge handles discovery, execution, and tool changes; otherwise the native API handles same-origin frame calls. `postMessage` is limited to reconnect and reload controls. The widget keeps a WebSocket to the relay on `localhost` for MCP traffic. Self-hosted copies must serve both `embed.js` and `widget.html`; cross-origin hosts must allow the widget fetch with CORS. The relay fails closed if that fetch fails.
 
 After a disconnect, the widget retries the last endpoint once after about `500ms`, then rescans the relay range after `10s`, `20s`, and `30s`. If no relay responds, it enters a dormant state and probes the configured or cached endpoint every two minutes; returning to the tab or sending `webmcp.connect` triggers immediate rediscovery.
 
@@ -230,7 +230,7 @@ After a disconnect, the widget retries the last endpoint once after about `500ms
 Supported page runtimes:
 
 1. `@mcp-b/global` (recommended for the complete MCP-B runtime)
-2. Current native Chrome with `document.modelContext.getTools()` and object-input `executeTool()`, which this relay requires to invoke tools
+2. Current native Chrome with cross-frame `getTools()` and object-input `executeTool()`
 3. `@mcp-b/webmcp-polyfill`
 
 Runtime dispatch behavior in the browser embed/widget layer:
@@ -240,9 +240,6 @@ Runtime dispatch behavior in the browser embed/widget layer:
   upstream API.
 - Refreshes the descriptor before every invocation so Chrome never receives a
   stale registration object.
-- When older Chrome requires JSON-string input, configure
-  `window.__webModelContextOptions.nativeExecuteToolInput = 'json'` before
-  loading `@mcp-b/global`; its bridge translates the relay's object input.
 
 ### WebMCP Standard Status
 
@@ -260,13 +257,13 @@ For Chromium/Chrome Canary native preview testing:
 
 ### Troubleshooting
 
-| Problem                  | Fix                                                                                                                                       |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected`   | Ensure the page loaded `embed.js` and the relay process is running                                                                        |
-| `No tools listed`        | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits the `toolchange` event |
-| `Tool not found`         | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                  |
-| Connection blocked       | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`            |
-| `Host response timeout:` | The host page exceeded its timeout (default 60s). Raise `data-request-timeout` and keep CLI `--invoke-timeout` slightly higher            |
+| Problem                    | Fix                                                                                                                                       |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `No sources connected`     | Ensure the page loaded `embed.js` and the relay process is running                                                                        |
+| `No tools listed`          | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits the `toolchange` event |
+| `Tool not found`           | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                  |
+| Connection blocked         | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`            |
+| `Tool execution timed out` | A page tool exceeded the timeout (default 60s). Raise `data-request-timeout` and keep CLI `--invoke-timeout` slightly higher              |
 
 ---
 
@@ -285,7 +282,7 @@ src/
 ├── schemas.ts                  Browser <-> relay protocol schemas
 ├── browser/embed.ts            Script-tag loader for website owners
 ├── browser/widget.ts           Widget IIFE entry point (calls startWidgetRuntime)
-├── browser/widgetRuntime.ts    Hidden iframe bridge runtime
+├── browser/widgetRuntime.ts    Iframe discovery, execution, and relay runtime
 ├── browser/shared.ts           Shared browser-side utilities
 └── index.ts                    Public API exports
 ```
