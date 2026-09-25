@@ -45,9 +45,9 @@ pnpm add @mcp-b/webmcp-polyfill
 ```
 
 ```ts
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 
-initializeWebMCPPolyfill();
+installWebMCP();
 ```
 
 Use [`@mcp-b/global`](../global/README.md) for MCP server features. Browser types come from the Community Group's [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types).

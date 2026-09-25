@@ -1,9 +1,9 @@
 import { IframeChildTransport, TabServerTransport } from '@mcp-b/transports';
-import { installWebMCPDeclarativePolyfill } from '@mcp-b/webmcp-polyfill';
-import { installWebMCP } from 'webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer, isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import type { ModelContext, ModelContextTesting } from '@mcp-b/webmcp-types';
 import type { Transport } from '@modelcontextprotocol/server';
+import { installWebMCPDeclarativeExtensions } from './declarative-forms.js';
 import type { WebModelContextInitOptions } from './types.js';
 
 interface RuntimeState {
@@ -15,8 +15,6 @@ interface RuntimeState {
 }
 
 let runtime: RuntimeState | null = null;
-// Upstream owns its document lifetime and has no uninstall API.
-let upstreamContext: ModelContext | undefined;
 
 function installTestingShim(server: BrowserMcpServer): () => void {
   if (navigator.modelContextTesting) return () => {};
@@ -179,7 +177,6 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
   // Native and preinstalled contexts take precedence; otherwise install upstream.
   if (!existingContext) {
     installWebMCP();
-    upstreamContext = document.modelContext;
   }
   // 2. Save reference to the polyfill's (or native) context
   const native = readCurrentModelContext();
@@ -198,7 +195,6 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
 
   // 4. Create server with native mirroring
   const hostname = window.location.hostname || 'localhost';
-  const usesUpstream = native === upstreamContext;
   const server = new BrowserMcpServer(
     { name: `${hostname}-webmcp`, version: '1.0.0' },
     {
@@ -225,10 +221,10 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     'modelContext'
   );
   try {
-    if (usesUpstream) {
-      cleanupForms = installWebMCPDeclarativePolyfill(native);
-      if (options?.installTestingShim ?? true) cleanupTesting = installTestingShim(server);
+    if (!('agentInvoked' in SubmitEvent.prototype) || !('respondWith' in SubmitEvent.prototype)) {
+      cleanupForms = installWebMCPDeclarativeExtensions(native);
     }
+    if (options?.installTestingShim ?? true) cleanupTesting = installTestingShim(server);
     replaceModelContext(
       server,
       previousDocumentModelContextDescriptor,
@@ -289,8 +285,7 @@ export function cleanupWebModelContext(): void {
   void transport.close();
 
   // Restore the descriptors that existed before we wrapped with BrowserMcpServer.
-  // We intentionally do NOT call cleanupWebMCPPolyfill() here — the polyfill
-  // manages its own lifecycle (auto-init, testing shim) independently.
+  // The upstream polyfill remains installed for the lifetime of the document.
   restoreProperty(document, 'modelContext', previousDocumentModelContextDescriptor);
   restoreProperty(navigator, 'modelContext', previousNavigatorModelContextDescriptor);
 }

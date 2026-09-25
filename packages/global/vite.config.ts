@@ -20,7 +20,6 @@ const esmConfig: Options = {
   platform: 'browser',
   deps: {
     neverBundle: ['@mcp-b/transports', '@mcp-b/webmcp-ts-sdk'],
-    alwaysBundle: ['webmcp-polyfill'],
   },
   tsconfig: './tsconfig.json',
   outDir: 'dist',

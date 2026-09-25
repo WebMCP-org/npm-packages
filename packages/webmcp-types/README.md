@@ -68,13 +68,13 @@ The callback input is `{ query: string; limit?: number }`. `registerTool()` retu
 
 ## Type surfaces
 
-| Type                         | Contract                                                         |
-| ---------------------------- | ---------------------------------------------------------------- |
-| `ModelContext`               | Upstream registration API with legacy discovery compatibility    |
-| `ChromeModelContext`         | Standard API plus feature-detectable Chromium `executeTool()`    |
-| `ModelContextExtensions`     | MCP-B registration and `listTools()` extensions                  |
-| `ModelContextWithExtensions` | Standard event/discovery shape with MCP-B registration overloads |
-| `ModelContextTesting`        | Deprecated optional testing compatibility surface                |
+| Type                         | Contract                                                                                            |
+| ---------------------------- | --------------------------------------------------------------------------------------------------- |
+| `ModelContext`               | Upstream registration and optional object-input `executeTool()` with legacy discovery compatibility |
+| `ChromeModelContext`         | Standard API plus feature-detectable Chromium `executeTool()`                                       |
+| `ModelContextExtensions`     | MCP-B registration and `listTools()` extensions                                                     |
+| `ModelContextWithExtensions` | Standard event/discovery shape with MCP-B registration overloads                                    |
+| `ModelContextTesting`        | Deprecated optional testing compatibility surface                                                   |
 
 Upstream callbacks receive input and an execution options bag with `signal`. The MCP-B compatibility tool types keep that bag optional for older runtimes. `ToolDescriptor` also supports `outputSchema`.
 

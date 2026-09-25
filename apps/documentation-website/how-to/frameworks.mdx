@@ -59,7 +59,7 @@ direct browser registrations. Use `usewebmcp` for tool registration, raw results
 ## Handle server rendering
 
 Mount tool hooks only in client-rendered components. Importing `@mcp-b/global` and calling
-`initializeWebMCPPolyfill()` are safe during server rendering, but code that reads `document`,
+`installWebMCP()` are safe during server rendering, but code that reads `document`,
 `window`, or page state must run on the client.
 
 Both published hook entry points preserve `'use client'`, and their server render does not register tools.

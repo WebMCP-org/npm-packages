@@ -655,7 +655,7 @@ describe('widget runtime', () => {
       url: APP_ORIGIN,
     });
     expect(connection.messages[1]).toEqual({
-      tools: [{ description: 'Adds numbers', name: 'sum' }],
+      tools: [{ name: 'pre-hello' }],
       type: 'tools/list',
     });
 
@@ -671,6 +671,42 @@ describe('widget runtime', () => {
     expect(connection.messages[2]).toEqual({
       tools: [],
       type: 'tools/changed',
+    });
+  });
+
+  it('uses the latest tool snapshot when tools change before hello is accepted', async () => {
+    const env = startRuntime({ sendHelloAccepted: false });
+    const listRequest = await waitForPostedMessage(env, 'webmcp.tools.list.request');
+    const connection = await waitForConnection(env);
+
+    const latestTools = [
+      { name: 'echo', description: 'Latest snapshot' },
+      { name: 'sum', description: 'Add numbers' },
+      { name: 'always_fail', description: 'Throw an error' },
+    ];
+    env.hostWindow.dispatchMessage(APP_ORIGIN, {
+      tools: latestTools,
+      type: 'webmcp.tools.changed',
+    });
+
+    expect(connection.messages).toHaveLength(0);
+    env.hostWindow.dispatchMessage(APP_ORIGIN, {
+      requestId: listRequest.payload.requestId,
+      tools: [{ name: 'echo', description: 'Stale initial snapshot' }],
+      type: 'webmcp.tools.list.response',
+    });
+
+    await vi.waitFor(() => {
+      expect(connection.messages).toHaveLength(1);
+    });
+    connection.client.send(JSON.stringify({ type: 'hello/accepted' }));
+
+    await vi.waitFor(() => {
+      expect(connection.messages).toHaveLength(2);
+    });
+    expect(connection.messages[1]).toEqual({
+      tools: latestTools,
+      type: 'tools/list',
     });
   });
 

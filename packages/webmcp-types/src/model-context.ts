@@ -41,7 +41,7 @@ export interface ChromeModelContextExecuteToolOptions {
   signal?: AbortSignal;
 }
 
-/** Experimental Chromium methods; feature-detect them before use. */
+/** Older Chromium methods; feature-detect the JSON-string overload before use. */
 export interface ChromeModelContextExtensions {
   executeTool?(
     tool: RegisteredTool,
@@ -85,6 +85,13 @@ type WidenedSchema<TSchema extends InputSchema> = string extends TSchema['type']
  */
 export interface ModelContext extends Omit<WebMCP.ModelContext, 'getTools' | 'executeTool'> {
   getTools(options?: ModelContextGetToolOptions): Promise<RegisteredTool[]>;
+
+  /** Current WebMCP object-input execution, absent in older native contexts. */
+  executeTool?(
+    tool: RegisteredTool,
+    inputObject?: object,
+    options?: WebMCP.ModelContextExecuteToolOptions
+  ): Promise<string | null>;
 }
 
 /** Non-standard methods exposed by MCP-B runtimes. */

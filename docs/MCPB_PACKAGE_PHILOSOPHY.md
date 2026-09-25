@@ -26,9 +26,8 @@ Use when you want:
 
 ### 2) `@mcp-b/webmcp-polyfill` (Canonical Core Runtime)
 
-- Strict runtime polyfill for core WebMCP behavior.
-- Includes the optional MCP-B `modelContextTesting` compatibility shim where applicable.
-- Built on top of `@mcp-b/webmcp-types`.
+- Bundles the upstream WebMCP polyfill source at the revision recorded in its package manifest.
+- Installs the standard `document.modelContext` runtime only.
 
 Use when you want:
 
@@ -37,7 +36,7 @@ Use when you want:
 ### 3) `@mcp-b/global` (MCP-B Runtime Entry Point)
 
 - Orchestrates the polyfill, `BrowserMcpServer`, and browser transport.
-- Installs the runtime behind the canonical `document.modelContext` surface.
+- Installs MCP-B aliases, declarative forms, testing helpers, and `outputSchema` extensions around the upstream runtime.
 - Exports initialization and transport configuration types. The browser adapter and its extension types belong to `@mcp-b/webmcp-ts-sdk`.
 
 Use when you want:

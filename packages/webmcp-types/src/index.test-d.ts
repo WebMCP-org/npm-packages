@@ -2,6 +2,7 @@ import { expectTypeOf, test } from 'vitest';
 import type {
   ChromeModelContext,
   ChromeModelContextExecuteToolOptions,
+  ChromeModelContextExtensions,
   WebMCP,
   ModelContext,
   ModelContextExtensions,
@@ -18,21 +19,25 @@ test('RegisteredTool.inputSchema spans both schema generations', () => {
   expectTypeOf<RegisteredTool['inputSchema']>().toEqualTypeOf<object | string | undefined>();
 });
 
-test('ModelContext exposes only the standard producer API', () => {
+test('ModelContext exposes the upstream producer API with optional runtime execution', () => {
   expectTypeOf<ModelContext['registerTool']>().returns.toEqualTypeOf<Promise<void>>();
   expectTypeOf<ModelContext['getTools']>()
     .parameter(0)
     .toEqualTypeOf<ModelContextGetToolOptions | undefined>();
   expectTypeOf<ModelContext['getTools']>().returns.toEqualTypeOf<Promise<RegisteredTool[]>>();
+  expectTypeOf<NonNullable<ModelContext['executeTool']>>()
+    .parameter(1)
+    .toEqualTypeOf<object | undefined>();
+  expectTypeOf<NonNullable<ModelContext['executeTool']>>().returns.toEqualTypeOf<
+    Promise<string | null>
+  >();
 
-  // @ts-expect-error Chromium execution is not part of the strict WebMCP surface.
-  expectTypeOf<ModelContext['executeTool']>().toBeNever();
   // @ts-expect-error Unregistration is owned by the registration AbortSignal.
   expectTypeOf<ModelContext['unregisterTool']>().toBeNever();
 });
 
-test('ChromeModelContext exposes feature-detectable execution', () => {
-  expectTypeOf<ChromeModelContext['executeTool']>().toEqualTypeOf<
+test('ChromeModelContext keeps the legacy JSON-string overload', () => {
+  expectTypeOf<ChromeModelContextExtensions['executeTool']>().toEqualTypeOf<
     | ((
         tool: RegisteredTool,
         inputArguments: string,
@@ -40,6 +45,12 @@ test('ChromeModelContext exposes feature-detectable execution', () => {
       ) => Promise<string | null>)
     | undefined
   >();
+
+  const supportsBothExecuteToolInputs = (context: ChromeModelContext, tool: RegisteredTool) => {
+    context.executeTool?.(tool, {});
+    context.executeTool?.(tool, '{}');
+  };
+  expectTypeOf(supportsBothExecuteToolInputs).toBeFunction();
 });
 
 test('MCP-B extensions list tools without restoring removed compatibility methods', () => {

@@ -623,9 +623,6 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: '@voidzero-dev/vite-plus-test@0.1.24(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(@vitest/coverage-v8@4.1.8(@voidzero-dev/vite-plus-test@0.1.24))(esbuild@0.28.1)(happy-dom@20.8.9)(jiti@2.7.0)(sass@1.97.3)(terser@5.50.0)(tsx@4.23.13)(typescript@5.9.3)(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.97.3)(terser@5.50.0)(tsx@4.23.13)(yaml@2.8.3))(yaml@2.8.3)'
-      webmcp-polyfill:
-        specifier: github:webmachinelearning/webmcp-polyfill#439c6c341f1c632c63498ba206e2bd8471cb8efb
-        version: https://codeload.github.com/webmachinelearning/webmcp-polyfill/tar.gz/439c6c341f1c632c63498ba206e2bd8471cb8efb
 
   packages/mcp-iframe:
     dependencies:
@@ -927,6 +924,9 @@ importers:
       '@standard-schema/spec':
         specifier: ^1.1.0
         version: 1.1.0
+      webmcp-types:
+        specifier: ^0.1.9
+        version: 0.1.9
     devDependencies:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
@@ -11533,10 +11533,6 @@ packages:
 
   webidl-conversions@3.0.1:
     resolution: {integrity: sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==}
-
-  webmcp-polyfill@https://codeload.github.com/webmachinelearning/webmcp-polyfill/tar.gz/439c6c341f1c632c63498ba206e2bd8471cb8efb:
-    resolution: {tarball: https://codeload.github.com/webmachinelearning/webmcp-polyfill/tar.gz/439c6c341f1c632c63498ba206e2bd8471cb8efb}
-    version: 0.1.0
 
   webmcp-types@0.1.9:
     resolution: {integrity: sha512-ibdkppgRDkQ/nvH541YS48kVt96OiuDr+d9JHnirAtI5k0coaFdo2QqCipbXyfwrteDC6xXwPoUGC9uS5ZGwfw==}
@@ -24928,10 +24924,6 @@ snapshots:
   web-namespaces@2.0.1: {}
 
   webidl-conversions@3.0.1: {}
-
-  webmcp-polyfill@https://codeload.github.com/webmachinelearning/webmcp-polyfill/tar.gz/439c6c341f1c632c63498ba206e2bd8471cb8efb:
-    dependencies:
-      webmcp-types: 0.1.9
 
   webmcp-types@0.1.9: {}
 

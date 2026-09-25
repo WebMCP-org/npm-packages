@@ -29,10 +29,8 @@ The [Web Model Context API](https://webmachinelearning.github.io/webmcp/) is a [
 ```
 document.modelContext
 ├── .registerTool(tool, { signal })  Register a tool for AI agents
-└── .getTools()                      Discover registered tools
-
-Chrome preview extension
-└── .executeTool(tool, inputJson)    Execute a discovered tool
+├── .getTools()                      Discover registered tools
+└── .executeTool(tool, inputObject)  Execute a discovered tool
 ```
 
 MCP-b **polyfills** that API for all browsers today, and **bridges** it to the full [Model Context Protocol](https://modelcontextprotocol.io/) — turning that tool source into a complete MCP server with prompts, resources, and browser transports.
@@ -45,7 +43,7 @@ MCP-b **polyfills** that API for all browsers today, and **bridges** it to the f
 
 If you're running Chrome with [`--enable-experimental-web-platform-features`](./e2e/web-standards-showcase/CHROMIUM_FLAGS.md), `document.modelContext` is already there. Just use it:
 
-Add `@mcp-b/webmcp-types` (`pnpm add -D @mcp-b/webmcp-types`) for input schema inference:
+Add upstream `webmcp-types` (`pnpm add -D webmcp-types`) for the standard browser types and input schema inference. Add `@mcp-b/webmcp-types` for MCP-B extensions and compatibility types:
 
 ```ts
 await document.modelContext.registerTool({
@@ -65,9 +63,9 @@ await document.modelContext.registerTool({
 Want it to work in **any browser** without the Chrome flag? Add the polyfill — same API, same code:
 
 ```ts
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill'; // pnpm add @mcp-b/webmcp-polyfill
+import { installWebMCP } from '@mcp-b/webmcp-polyfill'; // pnpm add @mcp-b/webmcp-polyfill
 
-initializeWebMCPPolyfill(); // no-op if native support exists
+installWebMCP(); // no-op if native support exists
 
 await document.modelContext.registerTool({
   name: 'get_page_title',
@@ -214,16 +212,17 @@ Any website running `@mcp-b/global` becomes callable from your desktop AI agent.
 
 ## Which Package?
 
-| I want to…                        | Package                                                                        |
-| --------------------------------- | ------------------------------------------------------------------------------ |
-| Add tools to my site (simplest)   | [`@mcp-b/global`](./packages/global)                                           |
-| Just the polyfill, no MCP bridge  | [`@mcp-b/webmcp-polyfill`](./packages/webmcp-polyfill)                         |
-| Register browser tools from React | [`usewebmcp`](./packages/usewebmcp)                                            |
-| React tools with MCP extensions   | [`@mcp-b/react-webmcp`](./packages/react-webmcp)                               |
-| Add WebMCP from an extension      | [`@mcp-b/webmcp-extension`](./packages/webmcp-extension)                       |
-| Forward tools to local AI agents  | [`@mcp-b/webmcp-local-relay`](./packages/webmcp-local-relay)                   |
-| Control Chrome from an AI agent   | [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) |
-| Just the TypeScript types         | [`@mcp-b/webmcp-types`](./packages/webmcp-types)                               |
+| I want to…                               | Package                                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------------ |
+| Add tools to my site (simplest)          | [`@mcp-b/global`](./packages/global)                                           |
+| Just the polyfill, no MCP bridge         | [`@mcp-b/webmcp-polyfill`](./packages/webmcp-polyfill)                         |
+| Register browser tools from React        | [`usewebmcp`](./packages/usewebmcp)                                            |
+| React tools with MCP extensions          | [`@mcp-b/react-webmcp`](./packages/react-webmcp)                               |
+| Add WebMCP from an extension             | [`@mcp-b/webmcp-extension`](./packages/webmcp-extension)                       |
+| Forward tools to local AI agents         | [`@mcp-b/webmcp-local-relay`](./packages/webmcp-local-relay)                   |
+| Control Chrome from an AI agent          | [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) |
+| Standard WebMCP TypeScript types         | [`webmcp-types`](https://www.npmjs.com/package/webmcp-types)                   |
+| MCP-B extensions and compatibility types | [`@mcp-b/webmcp-types`](./packages/webmcp-types)                               |
 
 Chrome DevTools integration now lives entirely upstream; its WebMCP changes have all landed there.
 
@@ -238,7 +237,10 @@ pnpm add @mcp-b/global
 # Strict WebMCP core polyfill only (no MCP extensions)
 pnpm add @mcp-b/webmcp-polyfill
 
-# TypeScript definitions (dev dependency)
+# Official WebMCP TypeScript definitions (dev dependency)
+pnpm add -D webmcp-types
+
+# MCP-B extension and compatibility types (dev dependency)
 pnpm add -D @mcp-b/webmcp-types
 
 # React hooks for full runtime
@@ -263,8 +265,8 @@ pnpm add @mcp-b/smart-dom-reader
 
 | Package                                              | Version                                                                                                             | Description                                                          |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| [@mcp-b/webmcp-polyfill](./packages/webmcp-polyfill) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill) | `document.modelContext` polyfill, with a deprecated navigator alias  |
-| [@mcp-b/webmcp-types](./packages/webmcp-types)       | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-types)](https://www.npmjs.com/package/@mcp-b/webmcp-types)       | TypeScript definitions for the WebMCP core API                       |
+| [@mcp-b/webmcp-polyfill](./packages/webmcp-polyfill) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill) | Vendored upstream `document.modelContext` polyfill                   |
+| [@mcp-b/webmcp-types](./packages/webmcp-types)       | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-types)](https://www.npmjs.com/package/@mcp-b/webmcp-types)       | MCP-B extensions and compatibility types based on upstream WebMCP    |
 | [@mcp-b/global](./packages/global)                   | [![npm](https://img.shields.io/npm/v/@mcp-b/global)](https://www.npmjs.com/package/@mcp-b/global)                   | Full runtime — polyfill + MCP bridge (prompts, resources, transport) |
 | [@mcp-b/webmcp-ts-sdk](./packages/webmcp-ts-sdk)     | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)     | Browser-adapted MCP TypeScript SDK with dynamic tool registration    |
 

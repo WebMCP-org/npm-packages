@@ -42,7 +42,10 @@ window.runProductionCase = async ({ library: name, toolCount, fields, schemaMode
   const library = libraries.find((item) => item.name === name);
   check(library, 'Unknown hook');
   const context = document.modelContext;
-  check(context && !('__isWebMCPPolyfill' in context), 'Native WebMCP is required');
+  check(
+    context && typeof context.registerTool === 'function' && typeof context.getTools === 'function',
+    'Native WebMCP is required; run Chrome with --enable-features=WebMCP'
+  );
   check((await context.getTools()).length === 0, 'Registry must start empty');
   const originalRegister = context.registerTool;
   const tools = new Map();

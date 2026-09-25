@@ -149,10 +149,13 @@ function buildBridgeFixtureScript(): string {
 
     const context = new FixtureContext();
 
-    const executeDescriptor = async (descriptor, inputJson) => {
+    const executeDescriptor = async (descriptor, inputObject) => {
       counts.executeTool++;
       if (!descriptors.includes(descriptor)) {
         throw new Error('executeTool received a stale RegisteredTool descriptor');
+      }
+      if (!inputObject || typeof inputObject !== 'object' || Array.isArray(inputObject)) {
+        throw new TypeError('executeTool expected object input');
       }
       counts.lastExecuteGeneration = descriptor.__generation;
       if (descriptor.name === 'always_fail') {
@@ -161,7 +164,7 @@ function buildBridgeFixtureScript(): string {
           requestState: 'fixture-input-required',
         });
       }
-      const result = await descriptor.__execute(JSON.parse(inputJson));
+      const result = await descriptor.__execute(inputObject);
       if (descriptor.name === 'sum') {
         return result.content[0].text;
       }
@@ -884,13 +887,8 @@ describe('relay e2e (real browser assets)', () => {
           arguments: { reason: runtimeCase.mode },
         });
         expect(errorResult.isError).toBe(true);
-        // The official runtime sanitizes callback failures at its execution
-        // boundary; the legacy testing shim retains the original message.
-        if (runtimeCase.mode === 'global') {
-          expect(firstContentText(errorResult)).toBe('Tool execution failed');
-        } else {
-          expect(firstContentText(errorResult)).toContain(`always_fail:${runtimeCase.mode}`);
-        }
+        // The upstream execution boundary sanitizes callback failures.
+        expect(firstContentText(errorResult)).toBe('Tool execution failed');
       } catch (error) {
         throw formatE2EError(`${runtimeCase.mode} runtime-errors`, error, harness);
       } finally {

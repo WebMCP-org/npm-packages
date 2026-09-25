@@ -5,6 +5,13 @@ the WebMCP `document.modelContext` surface plus MCP-B transport and extension
 features such as prompts, resources, browser-to-MCP bridges, or direct access to
 the composed official MCP server.
 
+The core runtime comes from [`@mcp-b/webmcp-polyfill`](../packages/webmcp-polyfill/README.md),
+which bundles the upstream
+[webmachinelearning/webmcp-polyfill](https://github.com/webmachinelearning/webmcp-polyfill)
+at revision `439c6c341f1c632c63498ba206e2bd8471cb8efb`. MCP-B declarative forms,
+the deprecated navigator alias, the testing shim, and MCP `outputSchema` support
+belong to `@mcp-b/global`.
+
 For the public docs site, see:
 
 - [@mcp-b/global reference](../apps/documentation-website/packages/global/reference.mdx)
@@ -75,10 +82,8 @@ Discovery stays on the document surface. Chromium's execution method is
 optional, so feature-detect it there as well:
 
 ```ts
-import type { ChromeModelContext } from '@mcp-b/webmcp-types';
-
-const modelContext = document.modelContext as ChromeModelContext;
-if (typeof modelContext.executeTool !== 'function') {
+const modelContext = document.modelContext;
+if (!modelContext || typeof modelContext.executeTool !== 'function') {
   throw new Error('Tool execution is unavailable');
 }
 
@@ -89,13 +94,14 @@ if (!tool) {
   throw new Error('counter_get is not registered');
 }
 
-const resultJson = await modelContext.executeTool(tool, '{}');
+const resultJson = await modelContext.executeTool(tool, {});
 const result = resultJson === null ? null : JSON.parse(resultJson);
 ```
 
-`executeTool()` is a Chromium-compatible extension, not a strict WebMCP member.
-`listTools()` is an MCP-B metadata helper. MCP clients that connect through the
-MCP SDK use the client's `listTools()` and `callTool(...)` protocol APIs.
+The upstream polyfill follows the object-input `executeTool()` API.
+`@mcp-b/global` also accepts serialized JSON through its MCP-B compatibility
+overload. `listTools()` is an MCP-B metadata helper. MCP clients that connect
+through the MCP SDK use the client's `listTools()` and `callTool(...)` APIs.
 
 ## Configure initialization
 
@@ -131,19 +137,26 @@ application code continues through `document.modelContext`.
 
 Initialization does four things:
 
-1. Installs `@mcp-b/webmcp-polyfill` if no native `document.modelContext` exists.
+1. Calls `installWebMCP()` from `@mcp-b/webmcp-polyfill` if no native
+   `document.modelContext` exists. The package bundles the pinned upstream
+   implementation; its deprecated `initializeWebMCPPolyfill()` alias remains
+   available to existing callers.
 2. Captures the current strict core context as `native`.
 3. Creates a `BrowserMcpServer` with `{ native }`.
 4. Replaces `document.modelContext` with that server so strict core calls mirror
    down while MCP-B extensions remain available.
 
-`navigator.modelContext` is kept as a deprecated alias for older preview
-runtimes. New code should use `document.modelContext`.
+`@mcp-b/global` owns the deprecated `navigator.modelContext` alias and the
+optional `navigator.modelContextTesting` shim. The standalone core polyfill
+does not install either surface. Global adds these extensions when it wraps a
+native context or an upstream polyfill that the app installed earlier.
+Declarative forms and MCP `outputSchema` also belong to `@mcp-b/global`.
 
 ## Output schemas
 
-`outputSchema` is MCP-B helper metadata, not part of the current WebMCP tool
-dictionary. See [Use schemas and structured output](../apps/documentation-website/how-to/use-schemas-and-structured-output.mdx)
+`outputSchema` is MCP-B helper metadata. `@mcp-b/global` exposes it through the
+MCP runtime; the upstream core polyfill does not implement it. See
+[Use schemas and structured output](../apps/documentation-website/how-to/use-schemas-and-structured-output.mdx)
 for the canonical guidance.
 
 ## Testing
@@ -164,5 +177,5 @@ console.log(tools.map((tool) => tool.name));
 ```
 
 Use `navigator.modelContextTesting` only for MCP-B compatibility tests and
-older tooling. Current native Chrome tests use `getTools()` and feature-detect
-the descriptor-based `executeTool()` extension.
+older tooling. Current native Chrome tests use `getTools()` and the
+object-input `executeTool()` method from upstream WebMCP types.

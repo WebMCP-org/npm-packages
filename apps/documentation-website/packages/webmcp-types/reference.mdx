@@ -91,14 +91,15 @@ want the surface installed rather than detected.
 
 ### `ModelContext`
 
-`document.modelContext` uses upstream `WebMCP.ModelContext`. The exported MCP-B `ModelContext` derives registration and events from upstream and widens discovery metadata for older Chrome versions. The live proposal may contain additional or changed members.
+`document.modelContext` uses upstream `WebMCP.ModelContext`. The exported MCP-B `ModelContext` derives registration and events from upstream, widens discovery metadata for older Chrome versions, and makes object-input `executeTool()` optional for runtimes that do not expose it yet. The live proposal may contain additional or changed members.
 
-| Member                         | Type                         |
-| ------------------------------ | ---------------------------- |
-| `registerTool(tool, options?)` | `Promise<void>`              |
-| `getTools(options?)`           | `Promise<RegisteredTool[]>`  |
-| `ontoolchange`                 | Event handler or `null`      |
-| EventTarget methods            | Inherited from `EventTarget` |
+| Member                         | Type                                                    |
+| ------------------------------ | ------------------------------------------------------- |
+| `registerTool(tool, options?)` | `Promise<void>`                                         |
+| `getTools(options?)`           | `Promise<RegisteredTool[]>`                             |
+| `executeTool(tool, input?)`    | Optional, `Promise<string \| null>`; input is an object |
+| `ontoolchange`                 | Event handler or `null`                                 |
+| EventTarget methods            | Inherited from `EventTarget`                            |
 
 | Option type                            | Field         | Type           | Meaning                                                      |
 | -------------------------------------- | ------------- | -------------- | ------------------------------------------------------------ |
@@ -113,7 +114,7 @@ Aborting the registration signal removes that registration.
 
 ### `ChromeModelContext`
 
-`ChromeModelContextExtensions` declares the serialized-JSON `executeTool()` signature supported by MCP-B and current Chrome builds. `ChromeModelContext` combines that compatibility shape with `ModelContext`. Feature-detect the method before calling it.
+`ChromeModelContextExtensions` declares the serialized-JSON `executeTool()` shape retained for older Chromium compatibility. The upstream `WebMCP.ModelContext` type uses object input. `ChromeModelContext` accepts either shape; prefer the upstream type for new code and feature-detect `executeTool()` before calling it.
 
 ```ts "execute-chrome-tool.ts"
 import type { ChromeModelContext } from '@mcp-b/webmcp-types';
@@ -221,7 +222,7 @@ That fallback applies to widened `InputSchema`, unknown compositions, and scalar
 | `executeTool(name, inputJson, options?)` | `Promise<string \| null>`       |
 | `ontoolchange`                           | Event handler or `null`         |
 
-New native integrations use `document.modelContext.getTools()` and feature-detect `executeTool()`. Follow the [Chrome imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api) for the browser's current serialized-JSON signature.
+New integrations use upstream `WebMCP.ModelContext` and pass an object to `executeTool()`. `ChromeModelContext` remains available when supporting older native builds that require a JSON string.
 
 `ModelContextTestingToolInfo` contains `name`, `description`, and an optional serialized `inputSchema`.
 

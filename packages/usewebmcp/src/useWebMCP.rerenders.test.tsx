@@ -1,4 +1,4 @@
-import { cleanupWebMCPPolyfill, initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { act, Profiler, type ProfilerOnRenderCallback, type PropsWithChildren } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, configure, render, renderHook } from 'vitest-browser-react/pure';
@@ -14,11 +14,10 @@ function withProfiler(onRender: ProfilerOnRenderCallback) {
   };
 }
 
-beforeEach(() => initializeWebMCPPolyfill());
+beforeEach(() => installWebMCP());
 afterEach(async () => {
   await cleanup();
   configure({ reactStrictMode: false });
-  cleanupWebMCPPolyfill();
   vi.restoreAllMocks();
 });
 

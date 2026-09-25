@@ -30,20 +30,22 @@
 
 ## Upstream runtime
 
-When no context is installed, `@mcp-b/global` installs the official
-[WebMCP polyfill](https://github.com/webmachinelearning/webmcp-polyfill)
-from revision `439c6c341f1c632c63498ba206e2bd8471cb8efb`. The revision is pinned
-as a build dependency and bundled into both published entry points. Consumers
-do not install or build a Git dependency. The upstream project has not published
-its package yet; the currently published unscoped `webmcp-polyfill` is unrelated.
+When no context is installed, `@mcp-b/global` calls `installWebMCP()` from
+`@mcp-b/webmcp-polyfill`. That package bundles the upstream
+[WebMCP polyfill](https://github.com/webmachinelearning/webmcp-polyfill) at
+revision `439c6c341f1c632c63498ba206e2bd8471cb8efb`. It also provides the
+standard browser types through `@mcp-b/webmcp-types`. Consumers do not install
+or build a Git dependency.
 
-MCP-B adds transports, prompts/resources, declarative forms, and the optional
-legacy testing shim. Existing native contexts take precedence. Cleanup removes
-the MCP-B adapter and its form registrations; the upstream context remains
-installed for the document lifetime. The legacy `@mcp-b/webmcp-polyfill` package
-remains available for compatibility. Upstream imperative `toolactivated` and
-`toolcancel` events are not implemented; MCP-B retains its existing declarative
-form behavior.
+`@mcp-b/global` layers MCP-B transports, prompts, resources, declarative forms,
+the deprecated `navigator.modelContext` alias, and the optional
+`navigator.modelContextTesting` shim on the upstream runtime. It also provides
+MCP `outputSchema` metadata and structured MCP responses. Existing native
+contexts take precedence and receive the same MCP-B extensions when wrapped,
+including when the upstream polyfill was installed before `@mcp-b/global`.
+`cleanupWebModelContext()` removes the MCP-B adapter and its form registrations;
+the upstream context remains installed for the document lifetime. The core
+polyfill does not provide these MCP-B extensions.
 
 `executeTool(tool, inputObject)` follows the current draft and returns JSON.
 The existing string-input overload remains supported and preserves the older
@@ -554,7 +556,8 @@ This package exports its initialization options:
 import type { TransportConfiguration, WebModelContextInitOptions } from '@mcp-b/global';
 ```
 
-Import browser contract types from `@mcp-b/webmcp-types`.
+Import core browser contracts from upstream `webmcp-types`. Use
+`@mcp-b/webmcp-types` for MCP-B extensions and compatibility types.
 
 ## Tool Routing Contract
 

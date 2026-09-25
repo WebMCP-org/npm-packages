@@ -176,11 +176,11 @@ After initialization, use `document.modelContext` for browser-facing WebMCP regi
 | `getTools(options?)`           | Resolve registered producer descriptors    |
 | `ontoolchange`                 | Observe changes to the available tool list |
 
-**Serialized execution compatibility:**
+**WebMCP execution:**
 
-| Method                                       | Description                                   |
-| -------------------------------------------- | --------------------------------------------- |
-| `executeTool(tool, inputArgsJson, options?)` | Execute a descriptor returned by `getTools()` |
+| Method                                     | Description                                   |
+| ------------------------------------------ | --------------------------------------------- |
+| `executeTool(tool, inputObject, options?)` | Execute a descriptor returned by `getTools()` |
 
 **Extension methods** (MCP-B only):
 
@@ -215,9 +215,7 @@ For the MCP-B-only server members, see [`@mcp-b/webmcp-ts-sdk` reference](/packa
 
 ## Tool routing
 
-`@mcp-b/global` mirrors registrations down to the underlying native or polyfill context so browser-facing tooling can still see them. Initial reconciliation uses the underlying context's asynchronous `getTools()` method and requires its descriptor-based, serialized-JSON `executeTool()` signature. Later `toolchange` events trigger another reconciliation. The MCP-B testing shim is not a native-tool discovery source.
-
-The [live WebMCP proposal](https://webmachinelearning.github.io/webmcp/) currently specifies an object-input `executeTool()` signature. This reference describes the package behavior.
+`@mcp-b/global` mirrors registrations down to the underlying native or polyfill context so browser-facing tooling can still see them. Initial reconciliation uses the underlying context's asynchronous `getTools()` and, when available, descriptor-based `executeTool()`. The upstream polyfill and current draft take object input. `BrowserMcpServer` also accepts serialized JSON for MCP-B compatibility; set `nativeExecuteToolInput: 'json'` when wrapping an older native implementation. Later `toolchange` events trigger another reconciliation. The MCP-B testing shim is not a native-tool discovery source.
 
 ---
 

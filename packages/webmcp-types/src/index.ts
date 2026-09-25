@@ -75,9 +75,9 @@ declare global {
     /**
      * True when a declarative WebMCP tool initiated this submission.
      *
-     * Optional because declarative forms are explainer-only: this attribute is
-     * in neither the WebMCP specification nor WPT's `webmcp.idl`, and no
-     * browser implements it. `@mcp-b/webmcp-polyfill` installs it.
+     * Optional because declarative forms are outside the WebMCP specification
+     * and WPT's `webmcp.idl`. Native Chromium may expose it; `@mcp-b/global`
+     * installs a fallback when the browser does not.
      */
     readonly agentInvoked?: boolean;
 

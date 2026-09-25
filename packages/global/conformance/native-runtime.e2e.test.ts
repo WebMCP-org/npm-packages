@@ -1,9 +1,4 @@
-import type {
-  ChromeModelContextExtensions,
-  ModelContext,
-  ModelContextTool,
-  RegisteredTool,
-} from '@mcp-b/webmcp-types';
+import type { ModelContext, ModelContextTool, RegisteredTool } from '@mcp-b/webmcp-types';
 import { runDeclarativeFormConformanceSuite } from '../../../conformance/declarative-forms-conformance.shared.js';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -12,7 +7,7 @@ type NativeRegisterTool = (
   options?: { signal?: AbortSignal }
 ) => Promise<void>;
 
-type ChromeExecuteTool = NonNullable<ChromeModelContextExtensions['executeTool']>;
+type NativeExecuteTool = NonNullable<ModelContext['executeTool']>;
 
 const registeredControllers: AbortController[] = [];
 
@@ -24,10 +19,9 @@ function requireNativeModelContext(): ModelContext {
   return modelContext;
 }
 
-function getChromeExecuteTool(modelContext: ModelContext): ChromeExecuteTool | undefined {
-  const chromeContext = modelContext as ModelContext & ChromeModelContextExtensions;
-  return typeof chromeContext.executeTool === 'function'
-    ? chromeContext.executeTool.bind(modelContext)
+function getNativeExecuteTool(modelContext: ModelContext): NativeExecuteTool | undefined {
+  return typeof modelContext.executeTool === 'function'
+    ? modelContext.executeTool.bind(modelContext)
     : undefined;
 }
 
@@ -152,7 +146,7 @@ describe('Native WebMCP conformance', () => {
 
   it('executes a registered tool when Chromium executeTool is available', async () => {
     const modelContext = requireNativeModelContext();
-    const executeTool = getChromeExecuteTool(modelContext);
+    const executeTool = getNativeExecuteTool(modelContext);
     if (!executeTool) {
       return;
     }
@@ -176,7 +170,7 @@ describe('Native WebMCP conformance', () => {
       throw new Error(`Expected getTools() to return ${toolName}`);
     }
 
-    const serialized = await executeTool(registeredTool, JSON.stringify({ value: 7 }));
+    const serialized = await executeTool(registeredTool, { value: 7 });
 
     expect(serialized).toEqual(expect.any(String));
     expect(serialized).toContain('value:7');
@@ -185,4 +179,6 @@ describe('Native WebMCP conformance', () => {
 
 runDeclarativeFormConformanceSuite({
   suiteName: 'Native declarative form conformance (Chrome)',
+  // Native Chromium keeps a pending declarative execution alive after its form is removed.
+  supportsFormRemovalCancellation: false,
 });

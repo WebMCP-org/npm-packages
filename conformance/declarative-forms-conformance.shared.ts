@@ -1,4 +1,4 @@
-import type { ChromeModelContext, InputSchema, RegisteredTool } from '@mcp-b/webmcp-types';
+import type { InputSchema, ModelContext, RegisteredTool } from '@mcp-b/webmcp-types';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 /**
@@ -21,26 +21,25 @@ interface DeclarativeFormConformanceOptions {
   suiteName: string;
   install?(): void | Promise<void>;
   cleanup?(): void | Promise<void>;
+  supportsFormRemovalCancellation?: boolean;
 }
 
 const FIXTURE_ATTRIBUTE = 'data-webmcp-declarative-conformance';
 
 /**
- * `@mcp-b/webmcp-types` declares `document.modelContext` optional because no
- * browser ships WebMCP unflagged. This suite runs after `install()`, so absence
- * is a harness failure rather than a supported state.
+ * WebMCP is optional in browser runtimes. This suite runs after `install()`, so
+ * absence is a harness failure rather than a supported state.
  */
-function requireModelContext(): ChromeModelContext {
+function requireModelContext(): ModelContext {
   const modelContext = document.modelContext;
   if (!modelContext) throw new Error('Expected document.modelContext to be installed');
-  // These suites exercise the retained JSON-string compatibility overload.
-  return modelContext as unknown as ChromeModelContext;
+  return modelContext as unknown as ModelContext;
 }
 
 /**
- * The declarative form surface is explainer-only, so `SubmitEvent.respondWith()`
- * is declared optional. The runtime under test installs it, so absence is a
- * harness failure rather than a supported state.
+ * Declarative forms are not part of the WebMCP draft or WPT IDL, so
+ * `SubmitEvent.respondWith()` is optional. Native Chromium and `@mcp-b/global`
+ * provide it; absence is a harness failure here.
  *
  * There is deliberately no matching helper for `agentInvoked`: synthetic
  * `Event('submit')` dispatches legitimately leave it `undefined`.
@@ -82,11 +81,17 @@ async function waitForCondition(
   throw new Error(message);
 }
 
-function executeTool(tool: RegisteredTool, input: Record<string, unknown>): Promise<string | null> {
+async function executeTool(tool: RegisteredTool, input: Record<string, unknown>): Promise<unknown> {
   const modelContext = requireModelContext();
   if (!modelContext.executeTool)
     throw new Error('Expected executeTool for declarative conformance');
-  return modelContext.executeTool(tool, JSON.stringify(input));
+  const serialized = await modelContext.executeTool(tool, input);
+  if (serialized === null) return null;
+  try {
+    return JSON.parse(serialized);
+  } catch {
+    return serialized;
+  }
 }
 
 export function runDeclarativeFormConformanceSuite(
@@ -320,7 +325,7 @@ export function runDeclarativeFormConformanceSuite(
       });
 
       expect(agentInvoked).toBe(true);
-      expect(result && JSON.parse(result)).toEqual({ accepted: true });
+      expect(result).toEqual({ accepted: true });
       expect(form.elements.namedItem('query')).toHaveProperty('value', 'declarative tools');
       expect(form.elements.namedItem('limit')).toHaveProperty('value', '25');
       expect(form.elements.namedItem('safe')).toHaveProperty('checked', true);
@@ -868,34 +873,39 @@ export function runDeclarativeFormConformanceSuite(
       expect(scope.value).toBe('global');
     });
 
-    it('rejects a pending response when its declarative form is removed', async () => {
-      const name = `declarative_removed_${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Pending form" toolautosubmit>
+    const itWithFormRemovalCancellation =
+      options.supportsFormRemovalCancellation === false ? it.skip : it;
+    itWithFormRemovalCancellation(
+      'rejects a pending response when its declarative form is removed',
+      async () => {
+        const name = `declarative_removed_${String(Date.now())}`;
+        toolNames.add(name);
+        document.body.insertAdjacentHTML(
+          'beforeend',
+          `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Pending form" toolautosubmit>
           <input name="value">
         </form>`
-      );
-      const form = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
-      if (!form) throw new Error('Expected pending declarative form fixture');
-      let submitted: (() => void) | undefined;
-      const submission = new Promise<void>((resolve) => {
-        submitted = resolve;
-      });
-      form.addEventListener('submit', (event) => {
-        event.preventDefault();
-        submitRespondWith(event, new Promise(() => {}));
-        submitted?.();
-      });
+        );
+        const form = document.querySelector<HTMLFormElement>(
+          `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
+        );
+        if (!form) throw new Error('Expected pending declarative form fixture');
+        let submitted: (() => void) | undefined;
+        const submission = new Promise<void>((resolve) => {
+          submitted = resolve;
+        });
+        form.addEventListener('submit', (event) => {
+          event.preventDefault();
+          submitRespondWith(event, new Promise(() => {}));
+          submitted?.();
+        });
 
-      const execution = executeTool(await waitForTool(name), { value: 'pending' });
-      await submission;
-      form.remove();
+        const execution = executeTool(await waitForTool(name), { value: 'pending' });
+        await submission;
+        form.remove();
 
-      await expect(execution).rejects.toMatchObject({ name: 'UnknownError' });
-    });
+        await expect(execution).rejects.toMatchObject({ name: 'UnknownError' });
+      }
+    );
   });
 }

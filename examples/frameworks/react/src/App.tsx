@@ -1,10 +1,10 @@
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { useEffect } from 'react';
 import { useWebMCP } from 'usewebmcp';
 
 export function App() {
   useEffect(() => {
-    initializeWebMCPPolyfill();
+    installWebMCP();
   }, []);
 
   useWebMCP({

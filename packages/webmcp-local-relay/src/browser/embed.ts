@@ -13,7 +13,7 @@
  */
 import { normalizeToolResponse } from '@mcp-b/webmcp-polyfill/schema';
 import type {
-  ChromeModelContextExtensions,
+  ChromeModelContextExecuteToolOptions,
   ModelContext,
   RegisteredTool,
 } from '@mcp-b/webmcp-types';
@@ -31,8 +31,12 @@ interface RelayToolDescriptor {
   annotations?: RegisteredTool['annotations'];
 }
 
-interface DescriptorToolContext extends ModelContext {
-  executeTool: NonNullable<ChromeModelContextExtensions['executeTool']>;
+interface ExecutableModelContext extends ModelContext {
+  executeTool(
+    tool: RegisteredTool,
+    inputObject: object,
+    options?: ChromeModelContextExecuteToolOptions
+  ): Promise<string | null>;
 }
 
 interface WidgetRequestMessage {
@@ -184,13 +188,13 @@ function normalizeSerializedToolResult(serialized: string | null): CallToolResul
 
 function hasDescriptorToolApi(
   modelContext: ModelContext | undefined
-): modelContext is DescriptorToolContext {
+): modelContext is ExecutableModelContext {
   return Boolean(
     modelContext && 'executeTool' in modelContext && typeof modelContext.executeTool === 'function'
   );
 }
 
-function getDocumentDescriptorContext(): DescriptorToolContext | undefined {
+function getDocumentDescriptorContext(): ExecutableModelContext | undefined {
   const modelContext: ModelContext | undefined = document.modelContext;
   return hasDescriptorToolApi(modelContext) ? modelContext : undefined;
 }
@@ -219,7 +223,7 @@ async function invokeRelayTool(name: string, args: JsonObject): Promise<CallTool
     throw new Error(`Tool not found: ${name}`);
   }
 
-  const serialized = await descriptorContext.executeTool(tool, JSON.stringify(args));
+  const serialized = await descriptorContext.executeTool(tool, args);
   return normalizeSerializedToolResult(serialized);
 }
 
