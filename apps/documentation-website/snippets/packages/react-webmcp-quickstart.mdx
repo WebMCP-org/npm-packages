@@ -1,0 +1,24 @@
+```tsx title="CalculatorTool.tsx"
+'use client';
+
+import '@mcp-b/global';
+import { useWebMCP } from '@mcp-b/react-webmcp';
+import { z } from 'zod';
+
+export function CalculatorTool() {
+  const tool = useWebMCP({
+    name: 'add_numbers',
+    description: 'Add two numbers',
+    inputSchema: z.object({ left: z.number(), right: z.number() }),
+    outputSchema: {
+      type: 'object',
+      properties: { total: { type: 'number' } },
+      required: ['total'],
+    },
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    execute: ({ left, right }) => ({ total: left + right }),
+  });
+
+  return <output>Last total: {tool.state.lastResult?.total ?? 'Not called yet'}</output>;
+}
+```

@@ -1,18 +1,65 @@
 import { IframeChildTransport, TabServerTransport } from '@mcp-b/transports';
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer, isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
-import type { ModelContext } from '@mcp-b/webmcp-types';
+import type { ModelContext, ModelContextTesting } from '@mcp-b/webmcp-types';
 import type { Transport } from '@modelcontextprotocol/server';
+import { installWebMCPDeclarativeExtensions } from './declarative-forms.js';
 import type { WebModelContextInitOptions } from './types.js';
 
 interface RuntimeState {
   server: BrowserMcpServer;
+  cleanupCompatibility: () => void;
   transport: Transport;
   previousDocumentModelContextDescriptor: PropertyDescriptor | undefined;
   previousNavigatorModelContextDescriptor: PropertyDescriptor | undefined;
 }
 
 let runtime: RuntimeState | null = null;
+
+function installTestingShim(server: BrowserMcpServer): () => void {
+  if (navigator.modelContextTesting) return () => {};
+  const shim: ModelContextTesting = Object.assign(new EventTarget(), {
+    ontoolchange: null as ModelContextTesting['ontoolchange'],
+    listTools: () =>
+      server.listTools().map(({ name, description, inputSchema }) => ({
+        name,
+        description,
+        inputSchema: JSON.stringify(inputSchema),
+      })),
+    async executeTool(name: string, input: string, options?: { signal?: AbortSignal }) {
+      const listed = server.listTools().some((tool) => tool.name === name);
+      const tool = listed
+        ? (await server.getTools()).find((candidate) => {
+            if (candidate.name !== name) return false;
+            let frame = candidate.window;
+            while (frame) {
+              if (frame === window) return true;
+              if (frame.parent === frame) break;
+              frame = frame.parent;
+            }
+            return false;
+          })
+        : undefined;
+      if (!tool) throw new DOMException(`Tool not found: ${name}`, 'UnknownError');
+      return server.executeTool(tool, input, options);
+    },
+  });
+  shim.addEventListener('toolchange', (event) => shim.ontoolchange?.call(shim, event));
+  const changed = () => shim.dispatchEvent(new Event('toolchange'));
+  server.addEventListener('toolchange', changed);
+  const previous = Object.getOwnPropertyDescriptor(navigator, 'modelContextTesting');
+  Object.defineProperty(navigator, 'modelContextTesting', {
+    configurable: true,
+    enumerable: true,
+    value: shim,
+  });
+  return () => {
+    server.removeEventListener('toolchange', changed);
+    if (navigator.modelContextTesting !== shim) return;
+    if (previous) Object.defineProperty(navigator, 'modelContextTesting', previous);
+    else Reflect.deleteProperty(navigator, 'modelContextTesting');
+  };
+}
 
 function isBrowserEnvironment(): boolean {
   return typeof window !== 'undefined' && typeof window.navigator !== 'undefined';
@@ -127,11 +174,10 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     return;
   }
 
-  // 1. Install polyfill (provides modelContext + modelContextTesting)
-  initializeWebMCPPolyfill({
-    installTestingShim: options?.installTestingShim ?? true,
-  });
-
+  // Native and preinstalled contexts take precedence; otherwise install upstream.
+  if (!existingContext) {
+    installWebMCP();
+  }
   // 2. Save reference to the polyfill's (or native) context
   const native = readCurrentModelContext();
   if (!native) {
@@ -149,7 +195,21 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
 
   // 4. Create server with native mirroring
   const hostname = window.location.hostname || 'localhost';
-  const server = new BrowserMcpServer({ name: `${hostname}-webmcp`, version: '1.0.0' }, { native });
+  const server = new BrowserMcpServer(
+    { name: `${hostname}-webmcp`, version: '1.0.0' },
+    {
+      native,
+      ...(options?.nativeExecuteToolInput
+        ? { nativeExecuteToolInput: options.nativeExecuteToolInput }
+        : {}),
+    }
+  );
+  let cleanupForms = () => {};
+  let cleanupTesting = () => {};
+  const cleanupCompatibility = () => {
+    cleanupTesting();
+    cleanupForms();
+  };
 
   // 5. Replace both the canonical document surface and compatibility alias.
   const previousDocumentModelContextDescriptor = Object.getOwnPropertyDescriptor(
@@ -161,6 +221,10 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     'modelContext'
   );
   try {
+    if (!('agentInvoked' in SubmitEvent.prototype) || !('respondWith' in SubmitEvent.prototype)) {
+      cleanupForms = installWebMCPDeclarativeExtensions(native);
+    }
+    if (options?.installTestingShim ?? true) cleanupTesting = installTestingShim(server);
     replaceModelContext(
       server,
       previousDocumentModelContextDescriptor,
@@ -168,11 +232,13 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     );
     runtime = {
       server,
+      cleanupCompatibility,
       transport,
       previousDocumentModelContextDescriptor,
       previousNavigatorModelContextDescriptor,
     };
   } catch (error) {
+    cleanupCompatibility();
     void server.close();
     void transport.close();
     throw error;
@@ -208,17 +274,18 @@ export function cleanupWebModelContext(): void {
   const {
     server,
     transport,
+    cleanupCompatibility,
     previousDocumentModelContextDescriptor,
     previousNavigatorModelContextDescriptor,
   } = runtime;
   runtime = null;
 
+  cleanupCompatibility();
   void server.close();
   void transport.close();
 
   // Restore the descriptors that existed before we wrapped with BrowserMcpServer.
-  // We intentionally do NOT call cleanupWebMCPPolyfill() here — the polyfill
-  // manages its own lifecycle (auto-init, testing shim) independently.
+  // The upstream polyfill remains installed for the lifetime of the document.
   restoreProperty(document, 'modelContext', previousDocumentModelContextDescriptor);
   restoreProperty(navigator, 'modelContext', previousNavigatorModelContextDescriptor);
 }

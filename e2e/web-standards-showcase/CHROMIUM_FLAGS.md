@@ -143,15 +143,6 @@ console.table(
 3. Close every process using the selected test profile, then relaunch Chrome.
 4. Confirm the page does not import `@mcp-b/global` or another polyfill.
 
-### The showcase reports a polyfill
-
-The showcase treats `__isWebMCPPolyfill === true` as a polyfill marker. Remove
-polyfill imports and retry with a clean profile.
-
-```javascript
-console.log(document.modelContext?.__isWebMCPPolyfill);
-```
-
 ### `executeTool` is missing
 
 `executeTool()` is an optional Chromium preview extension, not strict WebMCP

@@ -1,0 +1,12 @@
+{
+  "name": "webmcp-hook-benchmark",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "use-webmcp-tool": "0.2.0",
+    "webmcp-react": "1.1.0",
+    "zod": "4.4.3"
+  }
+}

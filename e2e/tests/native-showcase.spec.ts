@@ -1,7 +1,6 @@
-import type { ChromeModelContextExtensions } from '@mcp-b/webmcp-types';
 import { expect, type Page, test } from '@playwright/test';
 
-type ChromeModelContext = NonNullable<Document['modelContext']> & ChromeModelContextExtensions;
+type ChromeModelContext = NonNullable<Document['modelContext']>;
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -9,7 +8,11 @@ test.beforeEach(async ({ page }) => {
       __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
       __WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__?: Navigator['modelContext'];
     };
-    target.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = document.modelContext;
+    const nativeContext = document.modelContext;
+    if (!nativeContext) {
+      throw new Error('Native document.modelContext must exist before the showcase starts');
+    }
+    target.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = nativeContext;
     target.__WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__ = navigator.modelContext;
   });
 });
@@ -58,6 +61,13 @@ async function waitForToolSet(page: Page, toolNames: string[]): Promise<void> {
 async function openShowcase(page: Page): Promise<void> {
   await page.goto('/');
   await waitForNativeReady(page);
+  const keptBrowserContext = await page.evaluate(() => {
+    const raw = (
+      window as Window & { __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'] }
+    ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+    return Boolean(raw && raw === document.modelContext);
+  });
+  expect(keptBrowserContext).toBe(true);
 }
 
 async function waitForTextContains(page: Page, selector: string, text: string): Promise<void> {
@@ -114,24 +124,26 @@ test.describe('Native API Detection', () => {
     });
   });
 
-  test('verifies native implementation (not polyfill)', async ({ page }) => {
+  test('keeps the browser-provided context without loading a polyfill', async ({ page }) => {
     await openShowcase(page);
 
     const implementation = await page.evaluate(() => {
-      const context = (
-        window as Window & {
-          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'] & {
-            __isWebMCPPolyfill?: boolean;
-          };
-        }
+      const rawContext = (
+        window as Window & { __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'] }
       ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
       return {
-        constructorName: context?.constructor.name,
-        isPolyfill: context?.__isWebMCPPolyfill === true,
+        hasRawContext: Boolean(rawContext),
+        remainsActive: rawContext === document.modelContext,
+        hasRegistration: typeof rawContext?.registerTool === 'function',
+        hasDiscovery: typeof rawContext?.getTools === 'function',
       };
     });
-    expect(implementation.constructorName).toBeTruthy();
-    expect(implementation.isPolyfill).toBe(false);
+    expect(implementation).toEqual({
+      hasRawContext: true,
+      remainsActive: true,
+      hasRegistration: true,
+      hasDiscovery: true,
+    });
   });
 });
 
@@ -369,7 +381,7 @@ test.describe('Native API Semantics', () => {
         if (!tool) {
           return { missingApi: false, missingExecuteTool: false, missingTool: true };
         }
-        const response = await context.executeTool(tool, JSON.stringify({ value: 42 }));
+        const response = await context.executeTool(tool, { value: 42 });
         return {
           missingApi: false,
           missingExecuteTool: false,

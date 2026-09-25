@@ -39,9 +39,7 @@ function toDomString(value: unknown): string {
 export function coerceWebMcpToolDescriptor<TArgs extends WebMcpToolInput>(
   tool: ToolDescriptor<TArgs>
 ): ToolDescriptor<TArgs>;
-export function coerceWebMcpToolDescriptor(
-  tool: Record<string, unknown>
-): ToolDescriptor<WebMcpToolInput>;
+export function coerceWebMcpToolDescriptor(tool: object): ToolDescriptor<WebMcpToolInput>;
 export function coerceWebMcpToolDescriptor(tool: object): ToolDescriptor<WebMcpToolInput> {
   const name: unknown = Reflect.get(tool, 'name');
   const description: unknown = Reflect.get(tool, 'description');
@@ -90,6 +88,12 @@ export function coerceWebMcpToolDescriptor(tool: object): ToolDescriptor<WebMcpT
               ? {}
               : { openWorldHint: Boolean(annotationMembers.openWorldHint) }),
             untrustedContentHint: Boolean(annotationMembers.untrustedContentHint),
+            ...(annotationMembers.consequentialHint === undefined
+              ? {}
+              : { consequentialHint: Boolean(annotationMembers.consequentialHint) }),
+            ...(annotationMembers.debugging === undefined
+              ? {}
+              : { debugging: Boolean(annotationMembers.debugging) }),
           },
         }),
   } as ToolDescriptor<WebMcpToolInput>;
@@ -205,6 +209,10 @@ export function toWebMcpAnnotations(annotations: WebMcpToolAnnotations): WebMcpT
   return {
     readOnlyHint: annotations.readOnlyHint ?? false,
     untrustedContentHint: annotations.untrustedContentHint ?? false,
+    ...(annotations.consequentialHint === undefined
+      ? {}
+      : { consequentialHint: annotations.consequentialHint }),
+    ...(annotations.debugging === undefined ? {} : { debugging: annotations.debugging }),
   };
 }
 

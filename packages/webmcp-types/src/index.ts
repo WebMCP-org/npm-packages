@@ -1,5 +1,13 @@
 import type { ModelContext, ModelContextTesting } from './model-context.js';
 
+/**
+ * Loads upstream browser globals, including optional `document.modelContext`.
+ * Availability is per-runtime: Chromium exposes it under WebMCP flags,
+ * ChatGPT's built-in browser ships it for Codex site tools, and elsewhere
+ * the property is absent. Feature-detect it or install the polyfill.
+ */
+export type { WebMCP } from 'webmcp-types';
+
 export type {
   CallToolResult,
   ContentBlock,
@@ -34,6 +42,7 @@ export type {
   ToolAnnotations,
   ToolDescriptor,
   ToolDescriptorFromSchema,
+  ToolExecuteCallbackOptions,
   ToolListItem,
   ToolResultFromOutputSchema,
   WebMcpToolAnnotations,
@@ -54,18 +63,6 @@ declare global {
       })
     | undefined;
 
-  interface Document {
-    /**
-     * Canonical WebMCP API for this document.
-     *
-     * Optional because no browser ships WebMCP unflagged: Chromium exposes it
-     * only under `--enable-features=WebMCP`, and elsewhere the property is
-     * genuinely absent (`'modelContext' in document === false`). Feature-detect
-     * it, or install `@mcp-b/webmcp-polyfill`.
-     */
-    readonly modelContext?: ModelContext;
-  }
-
   interface Navigator {
     /** @deprecated Use `document.modelContext`. */
     readonly modelContext?: ModelContext;
@@ -78,9 +75,9 @@ declare global {
     /**
      * True when a declarative WebMCP tool initiated this submission.
      *
-     * Optional because declarative forms are explainer-only: this attribute is
-     * in neither the WebMCP specification nor WPT's `webmcp.idl`, and no
-     * browser implements it. `@mcp-b/webmcp-polyfill` installs it.
+     * Optional because declarative forms are outside the WebMCP specification
+     * and WPT's `webmcp.idl`. Native Chromium may expose it; `@mcp-b/global`
+     * installs a fallback when the browser does not.
      */
     readonly agentInvoked?: boolean;
 

@@ -163,7 +163,7 @@
     if (!n) throw Error(`No executable WebMCP runtime found on this page`);
     let r = (await n.getTools()).find((t) => t.name === e);
     if (!r) throw Error(`Tool not found: ${e}`);
-    return S(await n.executeTool(r, JSON.stringify(t)));
+    return S(await n.executeTool(r, t));
   }
   let D = !1,
     O = 0,

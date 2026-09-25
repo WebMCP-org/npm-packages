@@ -14,7 +14,7 @@ keywords:
 icon: 'brackets-curly'
 ---
 
-`@mcp-b/webmcp-types` emits TypeScript declarations only. It defines the browser contracts implemented by MCP-B packages separately from MCP-B extensions and serialized-JSON execution compatibility.
+`@mcp-b/webmcp-types` emits TypeScript declarations only. It loads upstream `webmcp-types` and adds MCP-B extensions, schema helpers, and serialized-JSON execution compatibility. Both packages can be loaded together.
 
 The [WebMCP draft](https://webmachinelearning.github.io/webmcp/) is authoritative for the browser API.
 For ambient declarations that track that proposal directly, use the Community Group's
@@ -62,7 +62,7 @@ declarative API support.
 
 | Property                        | Type                                           | Status                                   |
 | ------------------------------- | ---------------------------------------------- | ---------------------------------------- |
-| `document.modelContext`         | `ModelContext?`                                | Canonical                                |
+| `document.modelContext`         | `WebMCP.ModelContext?`                         | Canonical                                |
 | `navigator.modelContext`        | `ModelContext \| undefined`                    | Deprecated compatibility alias           |
 | `navigator.modelContextTesting` | `ModelContextTesting \| undefined`             | Deprecated testing compatibility surface |
 | `SubmitEvent.agentInvoked`      | `boolean?`                                     | Declarative forms                        |
@@ -91,14 +91,15 @@ want the surface installed rather than detected.
 
 ### `ModelContext`
 
-`ModelContext` is the package-supported registration and discovery type for `document.modelContext`. The live proposal may contain additional or changed members.
+`document.modelContext` uses upstream `WebMCP.ModelContext`. The exported MCP-B `ModelContext` derives registration and events from upstream, widens discovery metadata for older Chrome versions, and makes object-input `executeTool()` optional for runtimes that do not expose it yet. The live proposal may contain additional or changed members.
 
-| Member                         | Type                         |
-| ------------------------------ | ---------------------------- |
-| `registerTool(tool, options?)` | `Promise<void>`              |
-| `getTools(options?)`           | `Promise<RegisteredTool[]>`  |
-| `ontoolchange`                 | Event handler or `null`      |
-| EventTarget methods            | Inherited from `EventTarget` |
+| Member                         | Type                                                    |
+| ------------------------------ | ------------------------------------------------------- |
+| `registerTool(tool, options?)` | `Promise<void>`                                         |
+| `getTools(options?)`           | `Promise<RegisteredTool[]>`                             |
+| `executeTool(tool, input?)`    | Optional, `Promise<string \| null>`; input is an object |
+| `ontoolchange`                 | Event handler or `null`                                 |
+| EventTarget methods            | Inherited from `EventTarget`                            |
 
 | Option type                            | Field         | Type           | Meaning                                                      |
 | -------------------------------------- | ------------- | -------------- | ------------------------------------------------------------ |
@@ -113,7 +114,7 @@ Aborting the registration signal removes that registration.
 
 ### `ChromeModelContext`
 
-`ChromeModelContextExtensions` declares the serialized-JSON `executeTool()` signature supported by MCP-B and current Chrome builds. `ChromeModelContext` combines that compatibility shape with `ModelContext`. Feature-detect the method before calling it.
+`ChromeModelContextExtensions` declares the serialized-JSON `executeTool()` shape retained for older Chromium compatibility. The upstream `WebMCP.ModelContext` type uses object input. `ChromeModelContext` accepts either shape; prefer the upstream type for new code and feature-detect `executeTool()` before calling it.
 
 ```ts "execute-chrome-tool.ts"
 import type { ChromeModelContext } from '@mcp-b/webmcp-types';
@@ -138,28 +139,35 @@ The MCP-B extension surface provides schema-aware `registerTool()` overloads and
 
 The generic tool dictionary used by the package's browser registration contracts.
 
-| Property      | Type                                      | Required |
-| ------------- | ----------------------------------------- | -------- |
-| `name`        | `TName`                                   | Yes      |
-| `description` | `string`                                  | Yes      |
-| `title`       | `string`                                  | No       |
-| `inputSchema` | `InputSchema`                             | No       |
-| `annotations` | `WebMcpToolAnnotations`                   | No       |
-| `execute`     | `(input: TArgs) => MaybePromise<TResult>` | Yes      |
+| Property      | Type                                                                            | Required |
+| ------------- | ------------------------------------------------------------------------------- | -------- |
+| `name`        | `TName`                                                                         | Yes      |
+| `description` | `string`                                                                        | Yes      |
+| `title`       | `string`                                                                        | No       |
+| `inputSchema` | `InputSchema`                                                                   | No       |
+| `annotations` | `WebMcpToolAnnotations`                                                         | No       |
+| `execute`     | `(input: TArgs, options?: ToolExecuteCallbackOptions) => MaybePromise<TResult>` | Yes      |
+
+The proposal always passes `ToolExecuteCallbackOptions` (a required cancellation
+`signal`) as the callback's second argument. The package types it optional
+because [Codex site tools](/reference/webmcp/codex-site-tools) invoke the
+callback with the input alone and `@mcp-b/webmcp-polyfill` cancels by racing
+the returned promise. Read it as `options?.signal` instead of destructuring
+`{ signal }`.
 
 ### `ToolDescriptor<TArgs, TResult, TName>`
 
 The MCP-B descriptor adds `outputSchema` and MCP annotations.
 
-| Property       | Type                                     | Required |
-| -------------- | ---------------------------------------- | -------- |
-| `name`         | `TName`                                  | Yes      |
-| `description`  | `string`                                 | Yes      |
-| `title`        | `string`                                 | No       |
-| `inputSchema`  | `InputSchema`                            | No       |
-| `outputSchema` | `JsonSchemaForInference`                 | No       |
-| `annotations`  | `ToolAnnotations`                        | No       |
-| `execute`      | `(args: TArgs) => MaybePromise<TResult>` | Yes      |
+| Property       | Type                                                                           | Required |
+| -------------- | ------------------------------------------------------------------------------ | -------- |
+| `name`         | `TName`                                                                        | Yes      |
+| `description`  | `string`                                                                       | Yes      |
+| `title`        | `string`                                                                       | No       |
+| `inputSchema`  | `InputSchema`                                                                  | No       |
+| `outputSchema` | `JsonSchemaForInference`                                                       | No       |
+| `annotations`  | `ToolAnnotations`                                                              | No       |
+| `execute`      | `(args: TArgs, options?: ToolExecuteCallbackOptions) => MaybePromise<TResult>` | Yes      |
 
 `ToolDescriptorFromSchema<TInput, TOutput, TName>` infers callback input and output from literal schemas. `ToolListItem<TName>` describes the metadata returned by `listTools()`.
 
@@ -214,7 +222,7 @@ That fallback applies to widened `InputSchema`, unknown compositions, and scalar
 | `executeTool(name, inputJson, options?)` | `Promise<string \| null>`       |
 | `ontoolchange`                           | Event handler or `null`         |
 
-New native integrations use `document.modelContext.getTools()` and feature-detect `executeTool()`. Follow the [Chrome imperative API](https://developer.chrome.com/docs/ai/webmcp/imperative-api) for the browser's current serialized-JSON signature.
+New integrations use upstream `WebMCP.ModelContext` and pass an object to `executeTool()`. `ChromeModelContext` remains available when supporting older native builds that require a JSON string.
 
 `ModelContextTestingToolInfo` contains `name`, `description`, and an optional serialized `inputSchema`.
 

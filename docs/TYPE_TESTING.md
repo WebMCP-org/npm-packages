@@ -216,7 +216,7 @@ If you need anything broader than that, the design is probably wrong.
 
 ### 1. Use the canonical package for the boundary you are testing
 
-- strict core WebMCP types come from `@mcp-b/webmcp-types`
+- strict core WebMCP types come from upstream `webmcp-types`
 - strict core runtime behavior comes from `@mcp-b/webmcp-polyfill`
 - MCP-B extensions come from `@mcp-b/global`
 
@@ -228,7 +228,7 @@ If the test is about runtime behavior, use the runtime we publish.
 
 - use `@mcp-b/webmcp-polyfill` when testing strict core runtime behavior
 - use `@mcp-b/global` when testing MCP-B runtime and extension behavior
-- let those packages install `document.modelContext`, the deprecated `navigator.modelContext` alias, and `navigator.modelContextTesting`
+- the polyfill installs `document.modelContext`; `@mcp-b/global` owns the deprecated `navigator.modelContext` alias and `navigator.modelContextTesting`
 
 Do not manually assign globals in runtime tests when the package under test already owns that setup.
 

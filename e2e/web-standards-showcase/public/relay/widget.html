@@ -227,18 +227,20 @@
         }
         function b(e) {
           let t = new Map(),
-            r = null,
-            s = null,
-            l = !1,
+            r = [],
+            s = 0,
+            l = null,
             d = null,
-            m = null,
-            b = `idle`,
-            x = 0,
-            S = null,
-            C = (e) => {
+            m = !1,
+            b = null,
+            x = null,
+            S = `idle`,
+            C = 0,
+            w = null,
+            T = (e) => {
               for (let [n, r] of t) (clearTimeout(r.timeoutId), t.delete(n), r.reject(Error(e)));
             };
-          function w(n, r) {
+          function E(n, r) {
             let a = i();
             return new Promise((i, o) => {
               let s = setTimeout(() => {
@@ -257,64 +259,64 @@
                 ));
             });
           }
-          let T = (t, i) => {
-              let c = [],
+          let D = (t, i) => {
+              let c = s,
                 u = () => {
-                  d && (clearTimeout(d), (d = null));
+                  b && (clearTimeout(b), (b = null));
                 },
                 h = () => {
-                  o(t, JSON.stringify({ type: `tools/list`, tools: c }));
+                  o(t, JSON.stringify({ type: `tools/list`, tools: r }));
                 };
-              (m && (clearTimeout(m), (m = null)),
-                (r = i),
-                (s = t),
-                (x = 0),
-                (l = !1),
-                (b = `idle`),
-                t.addEventListener(`message`, (s) => {
-                  let c;
+              (x && (clearTimeout(x), (x = null)),
+                (l = i),
+                (d = t),
+                (C = 0),
+                (m = !1),
+                (S = `idle`),
+                t.addEventListener(`message`, (r) => {
+                  let s;
                   try {
-                    c = JSON.parse(String(s.data));
+                    s = JSON.parse(String(r.data));
                   } catch (e) {
                     console.warn(`[webmcp-relay-widget] Failed to parse relay message:`, e);
                     return;
                   }
-                  let d = f(c);
+                  let c = f(s);
+                  if (c) {
+                    l = { hello: c, host: i.host, port: i.port };
+                    return;
+                  }
+                  if (n(s) && s.type === `hello/accepted`) {
+                    (u(), (m = !0), g(e, i), h());
+                    return;
+                  }
+                  let d = p(s);
                   if (d) {
-                    r = { hello: d, host: i.host, port: i.port };
-                    return;
-                  }
-                  if (n(c) && c.type === `hello/accepted`) {
-                    (u(), (l = !0), g(e, i), h());
-                    return;
-                  }
-                  let m = p(c);
-                  if (m) {
                     (u(),
-                      (l = !1),
+                      (m = !1),
                       _(e),
                       window.parent.postMessage(
                         {
                           type: `webmcp.relay.rejected`,
                           host: i.host,
                           port: i.port,
-                          message: m.message,
-                          reason: m.reason,
+                          message: d.message,
+                          reason: d.reason,
                         },
                         e.hostOrigin
                       ),
                       console.error(
                         `[webmcp-relay-widget] Relay rejected browser hello:`,
-                        m.reason,
-                        m.message
+                        d.reason,
+                        d.message
                       ));
                     try {
-                      t.close(1008, m.message);
+                      t.close(1008, d.message);
                     } catch {}
                     return;
                   }
-                  if (!n(c) || typeof c.type != `string`) return;
-                  let v = c;
+                  if (!n(s) || typeof s.type != `string`) return;
+                  let v = s;
                   if (v.type === `ping`) {
                     o(t, JSON.stringify({ type: `pong` }));
                     return;
@@ -330,7 +332,7 @@
                     );
                     return;
                   }
-                  w(`webmcp.tools.invoke`, { toolName: v.toolName, args: n(v.args) ? v.args : {} })
+                  E(`webmcp.tools.invoke`, { toolName: v.toolName, args: n(v.args) ? v.args : {} })
                     .then((e) => {
                       o(t, JSON.stringify({ type: `result`, callId: v.callId, result: e.result }));
                     })
@@ -353,7 +355,7 @@
                 t.addEventListener(
                   `close`,
                   () => {
-                    s === t && ((l = !1), (s = null), u(), C(`WebSocket connection lost`), O());
+                    d === t && ((m = !1), (d = null), u(), T(`WebSocket connection lost`), A());
                   },
                   { once: !0 }
                 ),
@@ -365,9 +367,9 @@
                     console.warn(`[webmcp-relay-widget] Error closing socket after error:`, e);
                   }
                 }),
-                w(`webmcp.tools.list`, {})
+                E(`webmcp.tools.list`, {})
                   .then((n) => {
-                    ((c = Array.isArray(n.tools) ? n.tools : []),
+                    (s === c && (r = Array.isArray(n.tools) ? n.tools : []),
                       o(
                         t,
                         JSON.stringify({
@@ -378,9 +380,9 @@
                           url: e.hostUrl,
                         })
                       ),
-                      (d = setTimeout(() => {
-                        ((d = null),
-                          !(s !== t || t.readyState !== WebSocket.OPEN || l) &&
+                      (b = setTimeout(() => {
+                        ((b = null),
+                          !(d !== t || t.readyState !== WebSocket.OPEN || m) &&
                             (console.warn(
                               `[webmcp-relay-widget] Relay did not acknowledge browser hello`
                             ),
@@ -394,67 +396,67 @@
                     } catch {}
                   }));
             },
-            E = async (t) => {
+            O = async (t) => {
               let n = await y({ host: t.host, port: t.port });
               if (!n) return !1;
               let r = n.endpoint;
               return (e.relayId && r.hello.relayId !== e.relayId) ||
                 (e.relayWorkspace && r.hello.workspace !== e.relayWorkspace)
                 ? (n.socket.close(), !1)
-                : (T(n.socket, r), !0);
+                : (D(n.socket, r), !0);
             },
-            D = async () => {
-              b = `discovering`;
+            k = async () => {
+              S = `discovering`;
               try {
-                for (let t of v(e)) if (await E(t)) return !0;
+                for (let t of v(e)) if (await O(t)) return !0;
                 return !1;
               } finally {
-                b === `discovering` && (b = `idle`);
+                S === `discovering` && (S = `idle`);
               }
             },
-            O = () => {
-              if (!r || m) return;
-              let e = { host: r.host, port: r.port },
+            A = () => {
+              if (!l || x) return;
+              let e = { host: l.host, port: l.port },
                 t = Math.round(500 * (0.85 + Math.random() * 0.3));
-              m = setTimeout(() => {
-                ((m = null),
-                  E(e).then((e) => {
-                    e || k();
+              x = setTimeout(() => {
+                ((x = null),
+                  O(e).then((e) => {
+                    e || j();
                   }));
               }, t);
             },
-            k = () => {
-              if (m) return;
-              let e = c[x];
+            j = () => {
+              if (x) return;
+              let e = c[C];
               if (e === void 0) {
-                M();
+                P();
                 return;
               }
-              m = setTimeout(() => {
-                ((m = null),
-                  D().then((e) => {
-                    e || ((x += 1), k());
+              x = setTimeout(() => {
+                ((x = null),
+                  k().then((e) => {
+                    e || ((C += 1), j());
                   }));
               }, e);
             },
-            A = () => {
-              document.visibilityState === `visible` && b === `dormant` && P();
-            },
-            j = () => {
-              (document.removeEventListener(`visibilitychange`, A),
-                S !== null && (clearInterval(S), (S = null)));
-            },
             M = () => {
-              b !== `dormant` &&
-                ((b = `dormant`),
-                m && (clearTimeout(m), (m = null)),
-                document.addEventListener(`visibilitychange`, A),
-                (S = setInterval(() => {
-                  N();
+              document.visibilityState === `visible` && S === `dormant` && I();
+            },
+            N = () => {
+              (document.removeEventListener(`visibilitychange`, M),
+                w !== null && (clearInterval(w), (w = null)));
+            },
+            P = () => {
+              S !== `dormant` &&
+                ((S = `dormant`),
+                x && (clearTimeout(x), (x = null)),
+                document.addEventListener(`visibilitychange`, M),
+                (w = setInterval(() => {
+                  F();
                 }, 12e4)));
             },
-            N = async () => {
-              if (b !== `dormant`) return;
+            F = async () => {
+              if (S !== `dormant`) return;
               let t = new Set(),
                 n = [],
                 r = (e, r) => {
@@ -464,58 +466,52 @@
               e.relayPortHint !== void 0 && r(e.relayHostHint, e.relayPortHint);
               let i = h(e);
               if ((i && r(i.host, i.port), n.length !== 0)) {
-                ((b = `discovering`), j());
+                ((S = `discovering`), N());
                 for (let e of n)
-                  if (await E(e)) {
-                    x = 0;
+                  if (await O(e)) {
+                    C = 0;
                     return;
                   }
-                M();
+                P();
               }
             },
-            P = () => {
-              (j(),
-                (x = 0),
-                D().then((e) => {
-                  e || M();
+            I = () => {
+              (N(),
+                (C = 0),
+                k().then((e) => {
+                  e || P();
                 }));
             };
-          (window.addEventListener(`message`, (r) => {
-            if (r.source !== window.parent || r.origin !== e.hostOrigin) return;
-            let i = r.data;
-            if (n(i) && i.type === `webmcp.tools.changed`) {
-              s &&
-                l &&
-                o(
-                  s,
-                  JSON.stringify({
-                    type: `tools/changed`,
-                    tools: Array.isArray(i.tools) ? i.tools : [],
-                  })
-                );
+          (window.addEventListener(`message`, (i) => {
+            if (i.source !== window.parent || i.origin !== e.hostOrigin) return;
+            let a = i.data;
+            if (n(a) && a.type === `webmcp.tools.changed`) {
+              ((r = Array.isArray(a.tools) ? a.tools : []),
+                s++,
+                d && m && o(d, JSON.stringify({ type: `tools/changed`, tools: r })));
               return;
             }
-            if (n(i) && i.type === `webmcp.connect`) {
-              b === `dormant` ? P() : !s && b !== `discovering` && D();
+            if (n(a) && a.type === `webmcp.connect`) {
+              S === `dormant` ? I() : !d && S !== `discovering` && k();
               return;
             }
-            let a = u(i);
-            if (!a) return;
-            let c = t.get(a.requestId);
-            if (c) {
-              if (a.type === c.responseType) {
-                (clearTimeout(c.timeoutId), t.delete(a.requestId), c.resolve(a));
+            let c = u(a);
+            if (!c) return;
+            let l = t.get(c.requestId);
+            if (l) {
+              if (c.type === l.responseType) {
+                (clearTimeout(l.timeoutId), t.delete(c.requestId), l.resolve(c));
                 return;
               }
-              a.type === c.errorType &&
-                (clearTimeout(c.timeoutId),
-                t.delete(a.requestId),
-                c.reject(Error(String(a.error || `Unknown host error`))));
+              c.type === l.errorType &&
+                (clearTimeout(l.timeoutId),
+                t.delete(c.requestId),
+                l.reject(Error(String(c.error || `Unknown host error`))));
             }
           }),
             e.autoConnect &&
-              D().then((e) => {
-                e || k();
+              k().then((e) => {
+                e || j();
               }));
         }
         d();

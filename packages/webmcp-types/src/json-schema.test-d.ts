@@ -156,13 +156,13 @@ test('standard registration contextually infers literal object and array inputs'
   });
 });
 
-test('widened registration inputs require object-or-array narrowing', () => {
+test('upstream registration uses a record fallback while MCP-B retains its compatibility input', () => {
   registerStandardTool({
     name: 'runtime',
     description: 'Runtime schema',
     inputSchema: runtimeSchema,
     execute(args) {
-      expectTypeOf(args).toEqualTypeOf<WebMcpToolInput>();
+      expectTypeOf(args).toEqualTypeOf<Record<string, unknown>>();
       return args;
     },
   });

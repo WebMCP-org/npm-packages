@@ -36,12 +36,12 @@ Both apps are pnpm workspace members.
 
 ### `apps/landing-page` — `@mcp-b/landing-page`
 
-Landing page at [mcp-b.ai](https://mcp-b.ai) (also `www.mcp-b.ai`). Astro 6
+Landing page at [mcp-b.ai](https://mcp-b.ai) (also `www.mcp-b.ai`). Astro 7
 (`output: 'server'`) deployed to Cloudflare Workers via `@astrojs/cloudflare`
-v13. Dev runs on real workerd (Vite Environment API).
+v14. Dev runs on real workerd (Vite Environment API).
 
 - `pnpm dev` (`wrangler types` → `astro dev`), `pnpm build` (`wrangler types` → `astro check` → `astro build`), `pnpm preview`.
-- Cloudflare runtime: env via `import { env } from 'cloudflare:workers'`; `Astro.request.cf`; execution context at `Astro.locals.cfContext`. Do NOT use `Astro.locals.runtime` (removed in v13).
+- Cloudflare runtime: env via `import { env } from 'cloudflare:workers'`; `Astro.request.cf`; execution context at `Astro.locals.cfContext`. Do NOT use `Astro.locals.runtime` (removed in Astro v6).
 - Secrets: `npx wrangler secret put <KEY>`; local secrets in `.dev.vars`.
 - Config: `astro.config.mjs`, `wrangler.jsonc`. Excluded from root `pnpm build`/`check-all` via `--filter '!@mcp-b/landing-page'`.
 
@@ -89,11 +89,14 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 ### WebMCP Proposal APIs
 
 - `document.modelContext` is the canonical current-draft WebMCP surface.
-- `navigator.modelContext` is a deprecated compatibility alias.
-- `navigator.modelContextTesting` is a compatibility surface for testing only.
-- The current Community Group draft includes `executeTool()`. Its draft signature
-  accepts an input object, while current Chrome and MCP-B compatibility paths use
-  serialized JSON. Check the live draft and package source before documenting it.
+- `navigator.modelContext` and `navigator.modelContextTesting` are MCP-B
+  compatibility surfaces owned by `@mcp-b/global`, not by the upstream core
+  polyfill.
+- The current Community Group draft and current Chrome (verified in the m152
+  native lane) accept an input object in `executeTool()`. Older Chrome accepts
+  serialized JSON; select `nativeExecuteToolInput: 'json'` for those contexts.
+  MCP-B retains a string-input overload for compatibility. Check the live draft
+  and package source before documenting it.
 - New examples and public documentation use `document.modelContext`.
 
 ### Package Layering
@@ -111,10 +114,10 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 │  native/polyfill context.                            │
 ├─────────────────────────────────────────────────────┤
 │  @mcp-b/webmcp-polyfill                             │
-│  Provides document.modelContext when the browser     │
-│  doesn't have native support. Keeps the deprecated   │
-│  navigator alias and testing shim for compatibility. │
-│  no prompts, no resources.                           │
+│  Bundles upstream webmachinelearning/webmcp-polyfill │
+│  at the pinned Git revision. Exposes installWebMCP()  │
+│  and a deprecated initializer alias.                 │
+│  Standard WebMCP core only; no MCP-B extensions.      │
 ├─────────────────────────────────────────────────────┤
 │  Native browser API (if available)                   │
 │  document.modelContext provided by the browser.      │
@@ -123,23 +126,26 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 ### Initialization Flow (`@mcp-b/global`)
 
-1. **Polyfill:** `initializeWebMCPPolyfill()` is called. If a native model context already exists, the polyfill returns early. Otherwise it installs `document.modelContext`, the deprecated navigator alias, and the optional testing shim.
+1. **Polyfill:** Preserve existing native/preinstalled contexts. Otherwise call `installWebMCP()` from `@mcp-b/webmcp-polyfill`. That package bundles the upstream source at the commit recorded in `packages/webmcp-polyfill/package.json`; `initializeWebMCPPolyfill()` remains as a deprecated alias. MCP-B declarative forms, navigator aliases, the testing shim, and `outputSchema` belong to `@mcp-b/global`.
 2. **Capture native:** A reference to the current document-first context is saved as `native`.
 3. **BrowserMcpServer:** Created with `{ native }`, so browser-facing tool registrations mirror down to the underlying context and native tools are reconciled through `getTools()`.
-4. **Replace:** Both compatibility surfaces expose the `BrowserMcpServer` instance, which adds `registerPrompt`, `registerResource`, `listTools`, and other MCP-B extensions. Browser-shaped execution uses `getTools()` plus feature-detected `executeTool(tool, inputJson)`.
+4. **Replace:** Both compatibility surfaces expose the `BrowserMcpServer` instance, which adds `registerPrompt`, `registerResource`, `listTools`, and other MCP-B extensions. Browser-shaped execution uses `getTools()` plus feature-detected `executeTool(tool, inputObject)`.
 5. **Cleanup:** `cleanupWebModelContext()` restores the original native/polyfill context.
 
 ### What Lives Where
 
-| Method               |  Current draft   |      Polyfill       |   BrowserMcpServer    |
-| -------------------- | :--------------: | :-----------------: | :-------------------: |
-| `registerTool()`     |        Y         |          Y          | Y (mirrors to native) |
-| `getTools()`         |        Y         |          Y          | Y (delegates native)  |
-| `ontoolchange`       |        Y         |          Y          |           Y           |
-| `executeTool(tool)`  | Y (object input) | compat (JSON input) |    Y (JSON input)     |
-| `registerPrompt()`   |        -         |          -          |           Y           |
-| `registerResource()` |        -         |          -          |           Y           |
-| `listTools()`        |        -         |          -          |           Y           |
+| Method / capability        | Current draft | `@mcp-b/webmcp-polyfill` |   `@mcp-b/global` / BrowserMcpServer    |
+| -------------------------- | :-----------: | :----------------------: | :-------------------------------------: |
+| `registerTool()`           |       Y       |            Y             |           Y (mirrors to core)           |
+| `getTools()`               |       Y       |            Y             |          Y (delegates to core)          |
+| `ontoolchange`             |       Y       |            Y             |                    Y                    |
+| `executeTool(tool, input)` |  Y (object)   |        Y (object)        | Y (object and JSON compatibility input) |
+| MCP-B declarative forms    |       -       |            -             |                    Y                    |
+| Navigator alias/testing    |       -       |            -             |                    Y                    |
+| `outputSchema`             |       -       |            -             |                    Y                    |
+| `registerPrompt()`         |       -       |            -             |                    Y                    |
+| `registerResource()`       |       -       |            -             |                    Y                    |
+| `listTools()`              |       -       |            -             |                    Y                    |
 
 ### Extension Integration (`@mcp-b/webmcp-extension`)
 
@@ -150,9 +156,11 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 ### Key Type Interfaces (`@mcp-b/webmcp-types`)
 
-- `ModelContext`: the package-supported registration and discovery surface
-  (`registerTool`, `getTools`, `ontoolchange`)
-- `ChromeModelContext`: the serialized-JSON `executeTool()` compatibility shape
+- `WebMCP`: the standard browser API namespace re-exported from upstream
+  `webmcp-types`.
+- `ModelContext`: the MCP-B registration and discovery compatibility surface.
+- `ChromeModelContext`: the serialized-JSON `executeTool()` shape for older
+  Chromium contexts.
 - `ModelContextExtensions`: schema-aware MCP-B `registerTool` overloads plus `listTools`
 - `ModelContextWithExtensions` = `Omit<ModelContext, 'registerTool'> & ModelContextExtensions`
 
@@ -186,13 +194,18 @@ The pinned WPT revision and CI job live in
 the shared local/CI runner live in
 [`scripts/run-webmcp-wpt.mjs`](./scripts/run-webmcp-wpt.mjs). The WPT lane builds
 the standalone polyfill, disables native WebMCP, injects the bundle, and runs
-the declarative suite plus an explicit page-local imperative allowlist.
-Frame-tree, origin-policy, and navigation WPT are excluded because they require
-native coverage. When changing covered behavior, run the shared conformance
-suite and replay the WPT lane with
+an explicit page-local imperative allowlist against the strict upstream core.
+MCP-B declarative-form conformance runs through `@mcp-b/global`. Frame-tree,
+origin-policy, and navigation WPT are excluded because they require native
+coverage. When changing covered behavior, run the shared conformance suite and
+replay the WPT lane with
 `CHROME_BIN=/path/to/chrome-canary pnpm test:wpt`. Update the WPT pin
 deliberately and review the upstream diff first. See
 [`docs/TESTING.md`](./docs/TESTING.md) for the test matrix.
+
+The pinned WPT revision's excluded imperative cases still expect JSON-string
+`executeTool()` input or older annotation shapes than the vendored upstream
+revision. Refresh the WPT pin before adding those cases back.
 
 `pnpm test:wpt:idl` is a second lane checking API _shape_ rather than behavior.
 It needs `interfaces` in the `.reference/wpt` sparse checkout and runs

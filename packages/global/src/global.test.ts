@@ -1,5 +1,5 @@
 import { TabClientTransport, TabServerTransport } from '@mcp-b/transports';
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import type { ModelContext } from '@mcp-b/webmcp-types';
 import { Client } from '@modelcontextprotocol/client';
@@ -93,6 +93,99 @@ describe('global adapter', () => {
     expect(initializeWebModelContext()).toBeUndefined();
     expect(document.modelContext).not.toBe(nativeContext);
     expect(typeof getModelContext().listTools).toBe('function');
+  });
+
+  it('adds MCP-B extensions around an upstream context installed beforehand', () => {
+    installWebMCP();
+    const upstreamContext = document.modelContext;
+    const previousTesting = navigator.modelContextTesting;
+    const previousRespondWith = Object.getOwnPropertyDescriptor(
+      SubmitEvent.prototype,
+      'respondWith'
+    );
+
+    initializeWebModelContext();
+
+    const server = getModelContext();
+    expect(server).toBeInstanceOf(BrowserMcpServer);
+    expect(document.modelContext).toBe(server);
+    expect(navigator.modelContext).toBe(server);
+    expect(navigator.modelContextTesting).toBeDefined();
+    expect(typeof SubmitEvent.prototype.respondWith).toBe('function');
+
+    cleanupWebModelContext();
+    expect(document.modelContext).toBe(upstreamContext);
+    expect(navigator.modelContextTesting).toBe(previousTesting);
+    expect(Object.getOwnPropertyDescriptor(SubmitEvent.prototype, 'respondWith')).toEqual(
+      previousRespondWith
+    );
+  });
+
+  it('leaves native declarative form support in place', async () => {
+    const nativeContext = createNativeModelContextStub();
+    if (!nativeContext) throw new Error('Native modelContext stub is unavailable');
+    const registerTool = vi.spyOn(nativeContext, 'registerTool');
+    const previousAgentInvoked = Object.getOwnPropertyDescriptor(
+      SubmitEvent.prototype,
+      'agentInvoked'
+    );
+    const previousRespondWith = Object.getOwnPropertyDescriptor(
+      SubmitEvent.prototype,
+      'respondWith'
+    );
+    Object.defineProperties(SubmitEvent.prototype, {
+      agentInvoked: { configurable: true, get: () => false },
+      respondWith: { configurable: true, writable: true, value: () => {} },
+    });
+    setDocumentModelContext(nativeContext);
+    const form = document.createElement('form');
+    form.setAttribute('toolname', 'native_declarative_tool');
+    form.setAttribute('tooldescription', 'Provided by the browser');
+    document.body.append(form);
+
+    try {
+      initializeWebModelContext();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(registerTool).not.toHaveBeenCalled();
+    } finally {
+      form.remove();
+      cleanupWebModelContext();
+      if (previousAgentInvoked) {
+        Object.defineProperty(SubmitEvent.prototype, 'agentInvoked', previousAgentInvoked);
+      } else {
+        Reflect.deleteProperty(SubmitEvent.prototype, 'agentInvoked');
+      }
+      if (previousRespondWith) {
+        Object.defineProperty(SubmitEvent.prototype, 'respondWith', previousRespondWith);
+      } else {
+        Reflect.deleteProperty(SubmitEvent.prototype, 'respondWith');
+      }
+    }
+  });
+
+  it('restores a navigator-only context without installing the legacy polyfill', () => {
+    const nativeContext = createNativeModelContextStub();
+    const previousNavigatorDescriptor = Object.getOwnPropertyDescriptor(navigator, 'modelContext');
+    setDocumentModelContext(undefined);
+    Object.defineProperty(navigator, 'modelContext', {
+      configurable: true,
+      value: nativeContext,
+    });
+
+    try {
+      initializeWebModelContext();
+      expect(getModelContext()).toBeInstanceOf(BrowserMcpServer);
+      cleanupWebModelContext();
+      expect(document.modelContext).toBeUndefined();
+      expect(navigator.modelContext).toBe(nativeContext);
+    } finally {
+      cleanupWebModelContext();
+      if (previousNavigatorDescriptor) {
+        Object.defineProperty(navigator, 'modelContext', previousNavigatorDescriptor);
+      } else {
+        Reflect.deleteProperty(navigator, 'modelContext');
+      }
+    }
   });
 
   it('leaves a non-configurable native modelContext untouched', () => {
@@ -259,6 +352,83 @@ describe('global adapter', () => {
     await expect(modelContext.executeTool(tools[0]!, '{"value":7}')).resolves.toBe('{"value":7}');
   });
 
+  it('testing shim executes the listed descendant instead of a same-named outside tool', async () => {
+    initializeWebModelContext();
+    const server = getModelContext();
+    const testing = navigator.modelContextTesting;
+    if (!testing) throw new Error('Testing shim is unavailable');
+
+    const iframe = document.createElement('iframe');
+    document.body.append(iframe);
+    const outsideWindow = {
+      get parent() {
+        return this;
+      },
+    } as unknown as Window;
+    const descriptor = (name: string, source: Window) => ({
+      name,
+      description: name,
+      origin: location.origin,
+      window: source,
+    });
+    const descendant = descriptor('visible', iframe.contentWindow!);
+    const getTools = vi
+      .spyOn(server, 'getTools')
+      .mockResolvedValue([
+        descriptor('visible', outsideWindow),
+        descendant,
+        descriptor('hidden', outsideWindow),
+      ] as never);
+    const listTools = vi.spyOn(server, 'listTools').mockReturnValue([
+      {
+        name: 'visible',
+        description: 'visible',
+        inputSchema: { type: 'object', properties: {} },
+      },
+    ]);
+    const executeTool = vi.spyOn(server, 'executeTool').mockResolvedValue('descendant');
+
+    try {
+      await expect(testing.executeTool('visible', '{}')).resolves.toBe('descendant');
+      expect(executeTool).toHaveBeenCalledWith(descendant, '{}', undefined);
+      await expect(testing.executeTool('hidden', '{}')).rejects.toMatchObject({
+        name: 'UnknownError',
+      });
+    } finally {
+      getTools.mockRestore();
+      listTools.mockRestore();
+      executeTool.mockRestore();
+      iframe.remove();
+    }
+  });
+
+  it('uses upstream object execution and preserves cancellation and annotations', async () => {
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+    let callbackSignal: AbortSignal | undefined;
+    const started = Promise.withResolvers<void>();
+    await modelContext.registerTool({
+      name: 'upstream_execution',
+      description: 'Runs through the official polyfill',
+      annotations: { consequentialHint: true, debugging: true },
+      execute(_input, options) {
+        callbackSignal = options?.signal;
+        started.resolve();
+        return new Promise(() => {});
+      },
+    });
+    const tool = (await modelContext.getTools()).find(({ name }) => name === 'upstream_execution')!;
+    expect(tool.annotations).toMatchObject({ consequentialHint: true, debugging: true });
+    const controller = new AbortController();
+    const result = modelContext.executeTool(tool, {}, { signal: controller.signal });
+    const rejection = expect(result).rejects.toBe('cancelled');
+    await started.promise;
+    expect(callbackSignal).toBeInstanceOf(AbortSignal);
+    controller.abort('cancelled');
+    await rejection;
+    await vi.waitFor(() => expect(callbackSignal?.aborted).toBe(true));
+  });
+
   it('fires producer toolchange events and ontoolchange on wrapper mutations', async () => {
     initializeWebModelContext();
 
@@ -319,7 +489,7 @@ describe('global adapter', () => {
   });
 
   it('backfills tools registered before initializeWebModelContext', async () => {
-    initializeWebMCPPolyfill();
+    installWebMCP();
 
     const nativeContext = document.modelContext as unknown as {
       registerTool: (
@@ -394,7 +564,7 @@ describe('global adapter', () => {
 
     setDocumentModelContext(nativeContext);
 
-    initializeWebModelContext();
+    initializeWebModelContext({ nativeExecuteToolInput: 'json' });
     await vi.waitFor(() => {
       const names = getModelContext()
         .listTools()

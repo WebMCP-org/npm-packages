@@ -1,6 +1,5 @@
 import { cleanupWebModelContext, initializeWebModelContext } from '@mcp-b/global';
 import { TabClientTransport } from '@mcp-b/transports';
-import { cleanupWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import { Client } from '@modelcontextprotocol/client';
 import { Profiler, StrictMode, Suspense } from 'react';
@@ -17,7 +16,6 @@ let client: Client;
 
 beforeEach(async () => {
   cleanupWebModelContext();
-  cleanupWebMCPPolyfill();
   const channelId = `registration-hooks-${crypto.randomUUID()}`;
   initializeWebModelContext({
     installTestingShim: false,
@@ -41,7 +39,6 @@ afterEach(async () => {
   await client.close();
   cleanupWebModelContext();
   await server.close();
-  cleanupWebMCPPolyfill();
   vi.restoreAllMocks();
 });
 
@@ -98,7 +95,6 @@ describe.each([
       await client.close();
       cleanupWebModelContext();
       await server.close();
-      cleanupWebMCPPolyfill();
       expect(getBrowserMcpServer()).toBeUndefined();
       const warn = vi.spyOn(console, 'warn');
       const hook = await renderHook<RegistrationProps, WebMCPPromptReturn>(useRegistration, {
@@ -268,7 +264,7 @@ it('toggles resource templates through the same enabled option', async () => {
   expect((await client.listResourceTemplates()).resourceTemplates).toEqual([]);
 });
 
-it('forwards context enabled options without registration-induced commits or resetting local controls', async () => {
+it('forwards context enabled options with bounded commits and stable local controls', async () => {
   const register = vi.spyOn(server, 'registerTool');
   const warn = vi.spyOn(console, 'warn');
   const onRender = vi.fn();
@@ -294,8 +290,10 @@ it('forwards context enabled options without registration-induced commits or res
   for (const enabled of [true, false, true]) {
     onRender.mockClear();
     await hook.rerender({ enabled, value: 'latest' });
+    expect(hook.result.current.registrationError).toBeNull();
     expect((await client.listTools()).tools).toHaveLength(enabled ? 1 : 0);
-    expect(onRender).toHaveBeenCalledOnce();
+    expect(onRender).toHaveBeenCalled();
+    expect(onRender).toHaveBeenCalledTimes(1); // The requested parent update only.
     expect(hook.result.current.state).toBe(state);
     expect(hook.result.current.execute).toBe(execute);
     expect(hook.result.current.reset).toBe(reset);

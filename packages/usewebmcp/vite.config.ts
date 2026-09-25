@@ -2,8 +2,18 @@ import { playwright } from 'vite-plus/test/browser-playwright';
 import { defineConfig } from 'vite-plus';
 
 const isCI = process.env.CI === 'true';
+const native = process.env.WEBMCP_NATIVE === '1';
 
 export default defineConfig({
+  // Prebundle every React test entry to avoid reloads that invalidate render counts.
+  optimizeDeps: {
+    include: [
+      'react-dom',
+      'react/jsx-dev-runtime',
+      'vitest-browser-react',
+      'vitest-browser-react/pure',
+    ],
+  },
   pack: {
     entry: ['src/index.ts'],
     platform: 'browser',
@@ -13,7 +23,7 @@ export default defineConfig({
     clean: true,
     treeshake: true,
     deps: {
-      neverBundle: [/^react(?:\/.*)?$/, /^react-dom(?:\/.*)?$/, /^@mcp-b\/webmcp-types$/],
+      neverBundle: [/^react(?:\/.*)?$/, /^react-dom(?:\/.*)?$/],
     },
     tsconfig: './tsconfig.json',
   },
@@ -22,13 +32,16 @@ export default defineConfig({
     browser: {
       enabled: true,
       provider: playwright({
-        launchOptions: process.env.CHROME_BIN ? { executablePath: process.env.CHROME_BIN } : {},
+        launchOptions: {
+          ...(process.env.CHROME_BIN ? { executablePath: process.env.CHROME_BIN } : {}),
+          args: [native ? '--enable-features=WebMCP' : '--disable-features=WebMCP'],
+        },
       }),
       instances: [{ browser: 'chromium' }],
       headless: true,
     },
     // Test file patterns
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    include: native ? ['src/useWebMCP.native.ts'] : ['src/**/*.{test,spec}.{ts,tsx}'],
     // Exclude build output
     exclude: ['dist', 'node_modules'],
     // Enable globals for cleaner test syntax

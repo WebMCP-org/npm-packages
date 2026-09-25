@@ -156,6 +156,9 @@ jobs:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
         run: pnpm test:hooks:coverage
 
+      - name: Check packed React hooks and server rendering
+        run: pnpm test:hooks:package
+
       - name: Run remaining unit tests with coverage
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}

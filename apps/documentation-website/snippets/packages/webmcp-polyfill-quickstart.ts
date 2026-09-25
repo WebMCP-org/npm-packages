@@ -1,6 +1,6 @@
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 
-initializeWebMCPPolyfill();
+installWebMCP();
 
 await document.modelContext.registerTool({
   name: 'get_page_title',

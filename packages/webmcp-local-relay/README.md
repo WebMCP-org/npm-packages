@@ -230,15 +230,19 @@ After a disconnect, the widget retries the last endpoint once after about `500ms
 Supported page runtimes:
 
 1. `@mcp-b/global` (recommended for the complete MCP-B runtime)
-2. Current native Chrome with `document.modelContext.getTools()` and its descriptor-based `executeTool()` extension, which this relay requires to invoke tools
+2. Current native Chrome with `document.modelContext.getTools()` and object-input `executeTool()`, which this relay requires to invoke tools
 3. `@mcp-b/webmcp-polyfill`
 
 Runtime dispatch behavior in the browser embed/widget layer:
 
 - Uses asynchronous `document.modelContext.getTools()` and the exact returned
-  descriptor with feature-detected `executeTool()`.
+  descriptor with `executeTool()` and object input, as defined by the current
+  upstream API.
 - Refreshes the descriptor before every invocation so Chrome never receives a
   stale registration object.
+- When older Chrome requires JSON-string input, configure
+  `window.__webModelContextOptions.nativeExecuteToolInput = 'json'` before
+  loading `@mcp-b/global`; its bridge translates the relay's object input.
 
 ### WebMCP Standard Status
 

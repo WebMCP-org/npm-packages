@@ -4,3 +4,7 @@ codecov:
     wait_for_ci: false
 ignore:
   - 'e2e/web-standards-showcase/**'
+  # Vendored from webmachinelearning/webmcp-polyfill at a pinned commit.
+  # Keep its implementation lines under upstream's test suite; this repo covers
+  # the MCP-B adapter, WPT conformance, and integrations.
+  - 'packages/webmcp-polyfill/src/upstream/**'

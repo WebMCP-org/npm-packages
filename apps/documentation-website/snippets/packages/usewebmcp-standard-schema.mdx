@@ -1,0 +1,20 @@
+```ts title="useTotalTool.ts"
+'use client';
+
+import { useWebMCP } from 'usewebmcp';
+import { z } from 'zod';
+
+const totalInput = z.object({
+  count: z.string().regex(/^\d+$/, 'Use digits for count').transform(Number),
+  limit: z.number().default(10),
+});
+
+export function useTotalTool() {
+  return useWebMCP({
+    name: 'calculate_total',
+    description: 'Add a numeric count to a limit, which defaults to 10',
+    inputSchema: totalInput,
+    execute: ({ count, limit }) => ({ total: count + limit }),
+  });
+}
+```

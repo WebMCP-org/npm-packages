@@ -79,7 +79,7 @@ Goal: keep one place to track standards decisions, implementation details, and e
 
 - Shared suite: `conformance/runtime-core-conformance.shared.ts`
 - Global runtime entry: `packages/global/conformance/global-runtime.e2e.test.ts`
-- Polyfill runtime entry: `packages/webmcp-polyfill/conformance/polyfill-runtime.e2e.test.ts`
+- Polyfill runtime smoke test: `packages/webmcp-polyfill/src/index.test.ts`
 - Native Chromium runtime entry: `conformance/native-runtime.e2e.test.ts`
 - Shared declarative suite: `conformance/declarative-forms-conformance.shared.ts`
 - Pinned upstream declarative and page-local imperative WPT:
@@ -88,11 +88,11 @@ Goal: keep one place to track standards decisions, implementation details, and e
 
 Current MCP-B alignment note:
 
-- The July 28, 2026 WebMCP draft defines the strict `document.modelContext` surface as `registerTool(tool, options?)`, `getTools(options?)`, `ontoolchange`, and inherited `EventTarget` methods.
+- The current WebMCP draft and vendored upstream polyfill use `document.modelContext`, registration signals, `getTools()`, `toolchange`, and object-input `executeTool()`.
 - `getTools({ fromOrigins })` returns `RegisteredTool` values. Their `inputSchema` fields contain serialized JSON Schema.
-- The polyfill registers an `abort` listener on `options.signal` and removes the tool when the signal aborts; pre-aborted signals reject with `AbortError`.
+- The vendored polyfill registers an `abort` listener on `options.signal` and removes the tool when the signal aborts; pre-aborted signals reject with `AbortError`.
 - `BrowserMcpServer.registerTool(tool, options?)` accepts the same shape, resolves `undefined`, and forwards `options.signal` to the underlying native context when the caller provides one.
-- Chromium's `executeTool(registeredTool, inputArguments, options?)` remains an experimental implementation extension. It is feature-detected and excluded from strict core types.
+- Older Chromium builds use serialized-JSON `executeTool` input; MCP-B exposes `nativeExecuteToolInput: 'json'` for those builds. The upstream polyfill and current draft use object input.
 - Current Chromium HEAD no longer exposes `navigator.modelContext` or `navigator.modelContextTesting`. MCP-B retains both only as deprecated optional compatibility surfaces.
 - Keep browser-surface tests explicit so experimental Chromium behavior is not mistaken for a WebMCP guarantee.
 
@@ -121,6 +121,6 @@ Run commands:
 - Native conformance does not rely on removed preview methods such as `provideContext()` or `clearContext()`.
 - If Chromium exposes `document.modelContext.executeTool(...)`, the suite invokes it with the exact `RegisteredTool` returned by `getTools()`. It does not invoke the extension when absent.
 - Current Chromium source notes that tool input schema enforcement during execution is incomplete.
-- `@mcp-b/webmcp-polyfill` likewise treats input schemas as advertised metadata during direct and testing-shim execution; it parses the JSON input but does not validate it against the schema.
+- The vendored upstream polyfill treats input schemas as metadata during direct execution; it accepts object input and does not validate it against the schema.
 - `@mcp-b/webmcp-polyfill` and `BrowserMcpServer` accept `registerTool(tool, { signal })`; aborting the signal owns removal.
 - Conformance implication: do not assert execution-time schema validation in native or polyfill conformance; MCP transport validation belongs to the official MCP server.

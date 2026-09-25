@@ -11,9 +11,9 @@
 	<body>
 		<p>WebMCP tool "get_status" registered.</p>
 		<script>
-			import { initializeWebMCPPolyfill } from "@mcp-b/webmcp-polyfill";
+			import { installWebMCP } from "@mcp-b/webmcp-polyfill";
 
-			initializeWebMCPPolyfill();
+			installWebMCP();
 
 			await document.modelContext.registerTool({
 				name: "get_status",

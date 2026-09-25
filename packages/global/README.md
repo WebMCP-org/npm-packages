@@ -5,7 +5,6 @@
 [![npm version](https://img.shields.io/npm/v/@mcp-b/global?style=flat-square)](https://www.npmjs.com/package/@mcp-b/global)
 [![npm downloads](https://img.shields.io/npm/dm/@mcp-b/global?style=flat-square)](https://www.npmjs.com/package/@mcp-b/global)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
-[![Bundle Size](https://img.shields.io/badge/IIFE-285KB-blue?style=flat-square)](https://bundlephobia.com/package/@mcp-b/global)
 [![W3C](https://img.shields.io/badge/W3C-Web_Model_Context-005A9C?style=flat-square)](https://webmachinelearning.github.io/webmcp/)
 
 **[Reference](https://docs.mcp-b.ai/packages/global/reference)** | **[First Tool Tutorial](https://docs.mcp-b.ai/tutorials/first-tool)** | **[Add Tools to an App](https://docs.mcp-b.ai/how-to/add-tools-to-an-existing-app)**
@@ -14,20 +13,50 @@
 
 ## Why Use @mcp-b/global?
 
-| Feature                      | Benefit                                                                                                                                                              |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **W3C Standard**             | Implements the emerging WebMCP API specification                                                                                                                     |
-| **Drop-in IIFE**             | Add AI capabilities with a single `<script>` tag - no build step                                                                                                     |
-| **Native Chromium Support**  | Auto-detects and uses native browser implementation when available                                                                                                   |
-| **Dual Transport**           | Works with both same-window clients AND parent pages (iframe support)                                                                                                |
-| **Spec-Aware Compatibility** | Tracks the current WebMCP draft (`document.modelContext`, `registerTool(tool, { signal })`, and `getTools()`) plus Chromium's optional `executeTool(...)` extension. |
-| **Works with Any AI**        | Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client                                                                                                         |
+| Feature                      | Benefit                                                                                                                                            |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **W3C Standard**             | Implements the emerging WebMCP API specification                                                                                                   |
+| **Drop-in IIFE**             | Add AI capabilities with a single `<script>` tag - no build step                                                                                   |
+| **Native Chromium Support**  | Auto-detects and uses native browser implementation when available                                                                                 |
+| **Dual Transport**           | Works with both same-window clients AND parent pages (iframe support)                                                                              |
+| **Spec-Aware Compatibility** | Tracks the current WebMCP draft (`document.modelContext`, `registerTool(tool, { signal })`, and `getTools()`) and object-input `executeTool(...)`. |
+| **Works with Any AI**        | Claude, ChatGPT, Gemini, Cursor, Copilot, and any MCP client                                                                                       |
 
 ## Package Selection
 
-- Use `@mcp-b/webmcp-types` when you only need strict WebMCP type definitions.
+- Use upstream `webmcp-types` for the standard browser API; `@mcp-b/webmcp-types` adds MCP-B extensions and older-browser compatibility.
 - Use `@mcp-b/webmcp-polyfill` when you only need strict WebMCP runtime polyfill behavior.
 - Use `@mcp-b/global` when you want MCPB integration features (bridge transport, prompts/resources, testing helpers, extension APIs).
+
+## Upstream runtime
+
+When no context is installed, `@mcp-b/global` calls `installWebMCP()` from
+`@mcp-b/webmcp-polyfill`. That package bundles the upstream
+[WebMCP polyfill](https://github.com/webmachinelearning/webmcp-polyfill) at
+revision `439c6c341f1c632c63498ba206e2bd8471cb8efb`. It also provides the
+standard browser types through `@mcp-b/webmcp-types`. Consumers do not install
+or build a Git dependency.
+
+`@mcp-b/global` layers MCP-B transports, prompts, resources, declarative forms,
+the deprecated `navigator.modelContext` alias, and the optional
+`navigator.modelContextTesting` shim on the upstream runtime. It also provides
+MCP `outputSchema` metadata and structured MCP responses. Existing native
+contexts take precedence and receive the same MCP-B extensions when wrapped,
+including when the upstream polyfill was installed before `@mcp-b/global`.
+`cleanupWebModelContext()` removes the MCP-B adapter and its form registrations;
+the upstream context remains installed for the document lifetime. The core
+polyfill does not provide these MCP-B extensions.
+
+`executeTool(tool, inputObject)` follows the current draft and returns JSON.
+The existing string-input overload remains supported and preserves the older
+Chrome result convention. For an older native Chrome context that accepts JSON
+strings, set `nativeExecuteToolInput: 'json'` before automatic initialization:
+
+```html
+<script>
+  window.__webModelContextOptions = { nativeExecuteToolInput: 'json' };
+</script>
+```
 
 ## Quick Start
 
@@ -60,7 +89,7 @@
 </html>
 ```
 
-- **Self-contained** - All dependencies bundled (285KB minified)
+- **Self-contained** - All dependencies bundled
 - **Auto-initializes** - `document.modelContext` ready immediately
 - **No build step** - Just drop it in your HTML
 
@@ -75,7 +104,7 @@
 </script>
 ```
 
-The ESM version is smaller (~16KB) but doesn't bundle dependencies.
+The ESM entry keeps MCP-B dependencies external and bundles the official polyfill.
 
 ### Via NPM
 
@@ -189,10 +218,10 @@ const tools = await document.modelContext.getTools();
 // [{ name: 'search-products', inputSchema: '{"type":"object",...}', ... }, ...]
 ```
 
-#### `executeTool(tool, inputArgsJson)`
+#### `executeTool(tool, inputObject)`
 
-Chromium exposes an optional descriptor-based execution method. Feature-detect it
-on the canonical document surface.
+Execute a discovered descriptor with an input object. The result is serialized JSON.
+Feature-detect the context before calling it.
 
 ```bash
 npm install --save-dev @mcp-b/webmcp-types
@@ -200,10 +229,9 @@ npm install --save-dev @mcp-b/webmcp-types
 
 ```typescript
 import '@mcp-b/global';
-import type { ChromeModelContext } from '@mcp-b/webmcp-types';
 
-const modelContext = document.modelContext as ChromeModelContext;
-if (typeof modelContext.executeTool !== 'function') {
+const modelContext = document.modelContext;
+if (!modelContext || typeof modelContext.executeTool !== 'function') {
   throw new Error('Tool execution is unavailable');
 }
 
@@ -211,10 +239,7 @@ const tools = await modelContext.getTools();
 const searchTool = tools.find((tool) => tool.name === 'search-products');
 if (!searchTool) throw new Error('search-products is not available');
 
-const resultJson = await modelContext.executeTool(
-  searchTool,
-  JSON.stringify({ query: 'laptop', limit: 5 })
-);
+const resultJson = await modelContext.executeTool(searchTool, { query: 'laptop', limit: 5 });
 const result = resultJson === null ? null : JSON.parse(resultJson);
 // { content: [{ type: 'text', text: '...' }] }
 ```
@@ -222,7 +247,7 @@ const result = resultJson === null ? null : JSON.parse(resultJson);
 #### `listTools()`
 
 This MCP-B helper exposes MCP metadata. In-page WebMCP consumers should use
-`getTools()` and feature-detect `executeTool(tool, inputArgsJson)`.
+`getTools()` and feature-detect `executeTool(tool, inputObject)`.
 
 Prompt, resource, and lower-level MCP helpers are MCP-B extensions. Narrow
 `document.modelContext` with `isBrowserMcpServer()` from
@@ -531,7 +556,8 @@ This package exports its initialization options:
 import type { TransportConfiguration, WebModelContextInitOptions } from '@mcp-b/global';
 ```
 
-Import browser contract types from `@mcp-b/webmcp-types`.
+Import core browser contracts from upstream `webmcp-types`. Use
+`@mcp-b/webmcp-types` for MCP-B extensions and compatibility types.
 
 ## Tool Routing Contract
 
