@@ -1,5 +1,5 @@
 import { TabClientTransport, TabServerTransport } from '@mcp-b/transports';
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import type { ModelContext } from '@mcp-b/webmcp-types';
 import { Client } from '@modelcontextprotocol/client';
@@ -93,6 +93,74 @@ describe('global adapter', () => {
     expect(initializeWebModelContext()).toBeUndefined();
     expect(document.modelContext).not.toBe(nativeContext);
     expect(typeof getModelContext().listTools).toBe('function');
+  });
+
+  it('adds MCP-B extensions around an upstream context installed beforehand', () => {
+    installWebMCP();
+    const upstreamContext = document.modelContext;
+    const previousTesting = navigator.modelContextTesting;
+    const previousRespondWith = Object.getOwnPropertyDescriptor(
+      SubmitEvent.prototype,
+      'respondWith'
+    );
+
+    initializeWebModelContext();
+
+    const server = getModelContext();
+    expect(server).toBeInstanceOf(BrowserMcpServer);
+    expect(document.modelContext).toBe(server);
+    expect(navigator.modelContext).toBe(server);
+    expect(navigator.modelContextTesting).toBeDefined();
+    expect(typeof SubmitEvent.prototype.respondWith).toBe('function');
+
+    cleanupWebModelContext();
+    expect(document.modelContext).toBe(upstreamContext);
+    expect(navigator.modelContextTesting).toBe(previousTesting);
+    expect(Object.getOwnPropertyDescriptor(SubmitEvent.prototype, 'respondWith')).toEqual(
+      previousRespondWith
+    );
+  });
+
+  it('leaves native declarative form support in place', async () => {
+    const nativeContext = createNativeModelContextStub();
+    if (!nativeContext) throw new Error('Native modelContext stub is unavailable');
+    const registerTool = vi.spyOn(nativeContext, 'registerTool');
+    const previousAgentInvoked = Object.getOwnPropertyDescriptor(
+      SubmitEvent.prototype,
+      'agentInvoked'
+    );
+    const previousRespondWith = Object.getOwnPropertyDescriptor(
+      SubmitEvent.prototype,
+      'respondWith'
+    );
+    Object.defineProperties(SubmitEvent.prototype, {
+      agentInvoked: { configurable: true, get: () => false },
+      respondWith: { configurable: true, writable: true, value: () => {} },
+    });
+    setDocumentModelContext(nativeContext);
+    const form = document.createElement('form');
+    form.setAttribute('toolname', 'native_declarative_tool');
+    form.setAttribute('tooldescription', 'Provided by the browser');
+    document.body.append(form);
+
+    try {
+      initializeWebModelContext();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(registerTool).not.toHaveBeenCalled();
+    } finally {
+      form.remove();
+      cleanupWebModelContext();
+      if (previousAgentInvoked) {
+        Object.defineProperty(SubmitEvent.prototype, 'agentInvoked', previousAgentInvoked);
+      } else {
+        Reflect.deleteProperty(SubmitEvent.prototype, 'agentInvoked');
+      }
+      if (previousRespondWith) {
+        Object.defineProperty(SubmitEvent.prototype, 'respondWith', previousRespondWith);
+      } else {
+        Reflect.deleteProperty(SubmitEvent.prototype, 'respondWith');
+      }
+    }
   });
 
   it('restores a navigator-only context without installing the legacy polyfill', () => {
@@ -421,7 +489,7 @@ describe('global adapter', () => {
   });
 
   it('backfills tools registered before initializeWebModelContext', async () => {
-    initializeWebMCPPolyfill();
+    installWebMCP();
 
     const nativeContext = document.modelContext as unknown as {
       registerTool: (

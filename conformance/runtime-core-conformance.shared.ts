@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import type { ChromeModelContext, ModelContextTool } from '@mcp-b/webmcp-types';
+import type { ModelContext, ModelContextTool } from '@mcp-b/webmcp-types';
 
 interface RuntimeCoreConformanceOptions {
   suiteName: string;
@@ -21,16 +21,15 @@ function uniqueToolName(prefix: string): string {
   return `${prefix}_${String(Date.now())}_${String(Math.random()).slice(2)}`;
 }
 
-function requireModelContext(): ChromeModelContext {
+function requireModelContext(): ModelContext {
   const modelContext = document.modelContext;
   if (!modelContext) {
     throw new Error('Expected document.modelContext to be available');
   }
-  // These suites exercise the retained JSON-string compatibility overload.
-  return modelContext as unknown as ChromeModelContext;
+  return modelContext as unknown as ModelContext;
 }
 
-function requireExecuteTool(modelContext: ChromeModelContext) {
+function requireExecuteTool(modelContext: ModelContext) {
   if (!modelContext.executeTool) {
     throw new Error('Expected document.modelContext.executeTool to be available');
   }
@@ -111,7 +110,7 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
         throw new Error(`Expected navigator.modelContext.getTools() to return ${toolName}`);
       }
 
-      const serialized = await requireExecuteTool(navigatorAlias)(navigatorTool, '{}');
+      const serialized = await requireExecuteTool(navigatorAlias)(navigatorTool, {});
       expect(serialized).toEqual(expect.any(String));
       expect(serialized).toContain('alias-ok');
     });
@@ -153,7 +152,7 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
 
       const tool = (await modelContext.getTools()).find((candidate) => candidate.name === toolName);
       if (!tool) throw new Error(`Expected getTools() to return ${toolName}`);
-      const serialized = await requireExecuteTool(modelContext)(tool, '{}');
+      const serialized = await requireExecuteTool(modelContext)(tool, {});
       expect(serialized).toEqual(expect.any(String));
       expect(serialized).toContain('ok');
 
@@ -191,7 +190,7 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
       const tool = tools.find((candidate) => candidate.name === toolName);
       if (!tool) throw new Error(`Expected getTools() to return ${toolName}`);
 
-      const serialized = await requireExecuteTool(modelContext)(tool, JSON.stringify({ value: 9 }));
+      const serialized = await requireExecuteTool(modelContext)(tool, { value: 9 });
       expect(serialized).toEqual(expect.any(String));
       expect(serialized).toContain('producer:9');
     });

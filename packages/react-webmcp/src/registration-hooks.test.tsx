@@ -2,7 +2,6 @@ import { useToolExecutionState } from 'usewebmcp';
 import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
 import { cleanupWebModelContext, initializeWebModelContext } from '@mcp-b/global';
 import { TabClientTransport } from '@mcp-b/transports';
-import { cleanupWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import { Client } from '@modelcontextprotocol/client';
 import { Profiler, StrictMode, Suspense } from 'react';
@@ -19,7 +18,6 @@ let client: Client;
 
 beforeEach(async () => {
   cleanupWebModelContext();
-  cleanupWebMCPPolyfill();
   const channelId = `registration-hooks-${crypto.randomUUID()}`;
   initializeWebModelContext({
     installTestingShim: false,
@@ -43,7 +41,6 @@ afterEach(async () => {
   await client.close();
   cleanupWebModelContext();
   await server.close();
-  cleanupWebMCPPolyfill();
   vi.restoreAllMocks();
 });
 
@@ -100,7 +97,6 @@ describe.each([
       await client.close();
       cleanupWebModelContext();
       await server.close();
-      cleanupWebMCPPolyfill();
       expect(getBrowserMcpServer()).toBeUndefined();
       const warn = vi.spyOn(console, 'warn');
       const hook = await renderHook<RegistrationProps, WebMCPPromptReturn>(useRegistration, {

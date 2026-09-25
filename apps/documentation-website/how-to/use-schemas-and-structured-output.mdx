@@ -68,12 +68,13 @@ Install [`@mcp-b/webmcp-plugins`](https://github.com/WebMCP-org/npm-packages/tre
 and your schema library. Provide native WebMCP or initialize the polyfill separately.
 
 ```bash title="Install the adapter and Zod"
-pnpm add @mcp-b/webmcp-plugins zod@^4.2
+pnpm add @mcp-b/webmcp-plugins @mcp-b/webmcp-polyfill zod@^4.2
 ```
 
 ```ts title="total-tool.ts"
 import { createInvocationCallback } from '@mcp-b/webmcp-plugins';
 import { standardSchema } from '@mcp-b/webmcp-plugins/standard-schema';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { z } from 'zod';
 
 const input = standardSchema(
@@ -84,6 +85,7 @@ const input = standardSchema(
 );
 
 export async function registerTotalTool() {
+  installWebMCP();
   const context = document.modelContext;
   if (!context) throw new Error('Initialize WebMCP before registering tools');
   const registration = new AbortController();

@@ -1,6 +1,5 @@
 import { cleanupWebModelContext, initializeWebModelContext } from '@mcp-b/global';
 import { TabClientTransport } from '@mcp-b/transports';
-import { cleanupWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import { Client } from '@modelcontextprotocol/client';
 import { Component, type ReactNode } from 'react';
@@ -17,7 +16,6 @@ let client: Client;
 
 beforeEach(async () => {
   cleanupWebModelContext();
-  cleanupWebMCPPolyfill();
   const channelId = `guarded-webmcp-${crypto.randomUUID()}`;
   initializeWebModelContext({
     installTestingShim: false,
@@ -41,7 +39,6 @@ afterEach(async () => {
   await client.close();
   cleanupWebModelContext();
   await server.close();
-  cleanupWebMCPPolyfill();
   vi.restoreAllMocks();
 });
 

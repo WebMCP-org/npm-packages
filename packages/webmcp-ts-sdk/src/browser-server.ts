@@ -23,7 +23,6 @@ import {
 } from '@mcp-b/webmcp-plugins';
 import type {
   ChromeModelContextExecuteToolOptions,
-  ChromeModelContextExtensions,
   InputSchema,
   ModelContext,
   ModelContextGetToolOptions,
@@ -253,8 +252,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       }),
     });
     this.native = native;
-    this.nativeExecuteToolInput =
-      nativeExecuteToolInput ?? (native && '__isWebMCPPolyfill' in native ? 'json' : 'object');
+    this.nativeExecuteToolInput = nativeExecuteToolInput ?? 'object';
     this.ownerDocument = globalThis.document ?? null;
     if (
       native &&
@@ -302,8 +300,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   }
 
   private getNativeStandardToolsApi(): NativeStandardToolsApi | undefined {
-    const candidate: (ModelContext & Partial<ChromeModelContextExtensions>) | undefined =
-      this.native;
+    const candidate: ModelContext | undefined = this.native;
     return candidate && typeof candidate.executeTool === 'function'
       ? (candidate as NativeStandardToolsApi)
       : undefined;

@@ -9,12 +9,12 @@ owners. This keeps tools usable with native WebMCP as the Community Group propos
 | ------------------------ | -------------------------------------------------------------------------- |
 | `webmcp-types`           | Upstream browser contracts and `document.modelContext` declarations        |
 | `@mcp-b/webmcp-types`    | Derived MCP-B extensions, descriptor helpers, and compatibility types      |
-| `@mcp-b/webmcp-polyfill` | Browser fallback, declarative behavior, and compatibility helpers          |
+| `@mcp-b/webmcp-polyfill` | Vendored upstream standard runtime for `document.modelContext`             |
 | `@mcp-b/webmcp-plugins`  | Shared invocation runner, Standard Schema adapter, consent, state, tracing |
 | `usewebmcp`              | React registration lifetime and explicit execution-state subscription      |
 | `@mcp-b/react-webmcp`    | MCP result formatting/output metadata, prompt/resource hooks, and clients  |
 | `@mcp-b/webmcp-ts-sdk`   | BrowserMcpServer and the official MCP server bridge                        |
-| `@mcp-b/global`          | Runtime initialization and transport orchestration                         |
+| `@mcp-b/global`          | MCP-B forms, aliases, testing, output schemas, and runtime orchestration   |
 
 The polyfill does not depend on plugins. Core hooks depend on the plugin runner and upstream
 types, without installing a fallback or MCP bridge. The SDK uses both browser compatibility
@@ -59,8 +59,7 @@ choice instead of a registration side effect.
 
 ## Hard cutover
 
-The former polyfill plugin entries, `middleware` option, `useWebMCPTool`, and implicit hook
-`state`/`reset` are removed without aliases. Use named `plugins`, `executionState()`,
-`consentBroker({ broker })`, and `otel(options)`. The
-[plugin reference](../packages/webmcp-plugins/README.md) and
+The former `middleware` option, `useWebMCPTool`, and implicit hook `state`/`reset` are removed
+without aliases. Use named `plugins`, `executionState()`, `consentBroker({ broker })`, and
+`otel(options)`. The [plugin reference](../packages/webmcp-plugins/README.md) and
 [React migration](../packages/usewebmcp/README.md#migration) describe the supported API.

@@ -47,9 +47,9 @@ The hook does not initialize a browser runtime. Browser types come from the Comm
 For browsers without native support:
 
 ```ts
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 
-initializeWebMCPPolyfill();
+installWebMCP();
 ```
 
 Install `@mcp-b/webmcp-polyfill` separately when using this fallback.

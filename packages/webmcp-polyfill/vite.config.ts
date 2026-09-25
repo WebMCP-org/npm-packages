@@ -58,7 +58,7 @@ export default defineConfig({
       }),
       instances: [{ browser: 'chromium' }],
     },
-    include: ['src/**/*.test.ts', 'conformance/**/*.test.ts'],
+    include: ['src/**/*.test.ts'],
     exclude: ['dist', 'node_modules'],
     globals: true,
     maxConcurrency: isCI ? 1 : 2,

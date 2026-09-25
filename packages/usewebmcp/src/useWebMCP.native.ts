@@ -11,10 +11,11 @@ function hasExecution(context: WebMCP.ModelContext | undefined): context is WebM
 }
 
 beforeAll(() => {
-  expect(document.modelContext, 'Run with Chrome Canary and WEBMCP_NATIVE=1').toBeDefined();
-  expect(
-    document.modelContext && Reflect.get(document.modelContext, '__isWebMCPPolyfill')
-  ).not.toBe(true);
+  const context = document.modelContext;
+  expect(context, 'Run with Chrome Canary and WEBMCP_NATIVE=1').toBeDefined();
+  expect(typeof context?.registerTool).toBe('function');
+  expect(typeof context?.getTools).toBe('function');
+  expect(typeof context?.executeTool).toBe('function');
 });
 
 it('registers, validates, executes, and cleans up through native WebMCP in StrictMode', async () => {

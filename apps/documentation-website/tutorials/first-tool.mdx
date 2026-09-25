@@ -145,7 +145,7 @@ if (typeof executeTool !== 'function') {
   throw new Error('This runtime does not expose a compatible executeTool method');
 }
 
-const result = await executeTool.call(modelContext, tool, '{}');
+const result = await executeTool.call(modelContext, tool, {});
 console.log(result === null ? null : JSON.parse(result));
 ```
 
@@ -157,7 +157,7 @@ The output should be an object containing your tool's response:
 }
 ```
 
-You have registered a WebMCP tool, discovered it through `getTools()`, and executed it through the polyfill's serialized-JSON compatibility method.
+You have registered a WebMCP tool, discovered it through `getTools()`, and executed it through the upstream object-input API.
 
 </Step>
 
@@ -222,7 +222,7 @@ Here is the full `index.html` for reference:
 
 - `@mcp-b/webmcp-polyfill` installs its WebMCP-compatible tool surface when loaded via a script tag
 - `registerTool()` returns a promise that resolves after registering a tool with a name, description, input schema, and execute function
-- `document.modelContext.getTools()` discovers registered tools; this polyfill executes them through its feature-detected, serialized-JSON `executeTool()` signature
+- `document.modelContext.getTools()` discovers registered tools; the upstream polyfill accepts an object as `executeTool()` input
 - A WebMCP callback can return any serializable value; this example returns an MCP-shaped `content` array
 
 ## Next steps

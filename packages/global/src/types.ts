@@ -18,8 +18,7 @@ export interface WebModelContextInitOptions {
    * Set to `json` for older Chrome implementations. */
   nativeExecuteToolInput?: 'object' | 'json';
   /**
-   * Installs the legacy testing shim when this entry point installs a polyfill.
-   * Existing modelContextTesting implementations are never replaced.
+   * Installs the legacy testing shim on the wrapped context when one is absent.
    * @default true
    */
   installTestingShim?: boolean;

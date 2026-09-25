@@ -1,5 +1,5 @@
 import { Component, type OnInit } from '@angular/core';
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 
 @Component({
   selector: 'app-root',
@@ -7,7 +7,7 @@ import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 })
 export class App implements OnInit {
   async ngOnInit() {
-    initializeWebMCPPolyfill();
+    installWebMCP();
 
     await document.modelContext.registerTool({
       name: 'get_status',

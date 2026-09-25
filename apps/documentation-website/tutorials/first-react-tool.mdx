@@ -49,12 +49,12 @@ pnpm add @mcp-b/webmcp-polyfill @mcp-b/webmcp-plugins usewebmcp
 Open `src/main.tsx` and add the polyfill initialization before `createRoot`:
 
 ```tsx title="src/main.tsx"
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 
-initializeWebMCPPolyfill();
+installWebMCP();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -63,7 +63,7 @@ createRoot(document.getElementById('root')!).render(
 );
 ```
 
-Calling `initializeWebMCPPolyfill()` once at the top level makes `document.modelContext` available before any component mounts.
+Calling `installWebMCP()` once at the top level makes `document.modelContext` available before any component mounts.
 
 </Step>
 
@@ -155,7 +155,7 @@ const tools = await modelContext.getTools();
 console.log(tools);
 ```
 
-You should see an array containing your `say_hello` tool. Now feature-detect the polyfill's serialized-JSON execution method and call it:
+You should see an array containing your `say_hello` tool. Now feature-detect the upstream object-input execution method and call it:
 
 ```javascript title="Call the tool through the polyfill"
 const tool = tools.find((candidate) => candidate.name === 'say_hello');
@@ -166,7 +166,7 @@ if (typeof executeTool !== 'function') {
   throw new Error('This runtime does not expose a compatible executeTool method');
 }
 
-const result = await executeTool.call(modelContext, tool, JSON.stringify({ name: 'Console' }));
+const result = await executeTool.call(modelContext, tool, { name: 'Console' });
 console.log(result === null ? null : JSON.parse(result));
 ```
 
@@ -186,11 +186,11 @@ Notice that the execution count in the UI also incremented, because the same und
 
 ## What you learned
 
-- `initializeWebMCPPolyfill()` should be called once at app startup, before components mount
+- `installWebMCP()` should be called once at app startup, before components mount
 - `useWebMCP` registers a tool on mount and unregisters on unmount
 - Metadata changes update registration automatically; equivalent inline schemas do not cause re-registration
-- The hook returns `execute` for local calls; the `executionState()` plugin records calls and `useToolExecutionState()` subscribes the UI
-- Tools registered via the hook are discoverable with `document.modelContext.getTools()` and callable when the runtime exposes its serialized-JSON `executeTool()` signature
+- `useWebMCP` returns local `execute`; the `executionState()` plugin records calls and `useToolExecutionState()` subscribes the UI
+- Tools registered via the hook are discoverable with `document.modelContext.getTools()` and callable when the runtime exposes object-input `executeTool()`
 
 ## Next steps
 

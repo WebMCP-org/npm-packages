@@ -41,8 +41,9 @@ export interface ModelContextTool<
    * The options bag is typed optional because only part of the ecosystem
    * passes it: the draft requires `(inputObject, options)`
    * (webmcp `#callbackdef-toolexecutecallback`), but Codex site tools invoke
-   * the callback with the input alone. The polyfill and BrowserMcpServer
-   * pass a fresh cancellation signal for each call. See
+   * the callback with the input alone, and `@mcp-b/webmcp-polyfill` cancels
+   * by racing the returned promise instead of passing a signal (observed
+   * August 27, 2026 -- see
    * https://docs.mcp-b.ai/reference/webmcp/codex-site-tools). Read it as
    * `options?.signal`; destructuring `{ signal }` throws where the bag is
    * absent.

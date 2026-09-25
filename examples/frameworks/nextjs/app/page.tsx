@@ -1,11 +1,11 @@
 'use client';
 
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { useEffect } from 'react';
 
 export default function Home() {
   useEffect(() => {
-    initializeWebMCPPolyfill();
+    installWebMCP();
 
     void document.modelContext.registerTool({
       name: 'get_status',

@@ -47,24 +47,16 @@ import '@mcp-b/global';
 For the tool-only polyfill, initialize it explicitly:
 
 ```ts title="main.ts"
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 
-initializeWebMCPPolyfill();
+installWebMCP();
 ```
 
 If you load the IIFE build, place its script tag before scripts that register tools. See [Choose a
 runtime](/how-to/choose-runtime) if the application imports more than one MCP-B runtime.
 
-For a standalone polyfill installation, confirm that the polyfill won initialization by inspecting
-its private marker:
-
-```js title="Browser console"
-document.modelContext?.__isWebMCPPolyfill === true;
-```
-
-Use this marker only for diagnostics and tests. Application behavior must not depend on it.
-
-`@mcp-b/global` replaces the polyfill context with `BrowserMcpServer`. To check that runtime, add
+The standalone polyfill has no public runtime marker. `@mcp-b/global` replaces the core context
+with `BrowserMcpServer`. To check that runtime, add
 `@mcp-b/webmcp-ts-sdk` as a direct dependency and use its guard:
 
 ```ts title="runtime-check.ts"

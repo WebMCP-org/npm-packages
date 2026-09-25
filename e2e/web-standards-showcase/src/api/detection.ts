@@ -1,9 +1,9 @@
 import type { DetectionResult } from '../types';
 
 /**
- * Detects if the native Web Model Context API is available
- * This function explicitly checks for the NATIVE implementation,
- * rejecting any polyfill implementations
+ * Checks the WebMCP API surface used by this native-only showcase.
+ * WebMCP does not expose a standard way to identify a polyfill at runtime;
+ * the showcase relies on its native-Chrome launch setup and does not load one.
  */
 export function detectNativeAPI(): DetectionResult {
   const result: DetectionResult = {
@@ -13,9 +13,7 @@ export function detectNativeAPI(): DetectionResult {
     message: '',
   };
 
-  const context = document.modelContext as
-    | (Document['modelContext'] & { __isWebMCPPolyfill?: boolean })
-    | undefined;
+  const context = document.modelContext;
 
   if (!context) {
     result.message =
@@ -24,13 +22,6 @@ export function detectNativeAPI(): DetectionResult {
   }
 
   result.available = true;
-
-  result.isPolyfill = context.__isWebMCPPolyfill === true;
-  if (result.isPolyfill) {
-    result.message =
-      'WebMCP polyfill detected. This app requires Chromium document.modelContext with no polyfill loaded.';
-    return result;
-  }
 
   if (
     typeof context.registerTool !== 'function' ||
@@ -42,7 +33,7 @@ export function detectNativeAPI(): DetectionResult {
   }
 
   result.isNative = true;
-  result.message = 'Native Chromium Web Model Context API detected!';
+  result.message = 'Native Chromium Web Model Context API detected in the native-only showcase.';
   return result;
 }
 

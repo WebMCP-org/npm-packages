@@ -138,8 +138,7 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
     const controller = new AbortController();
     let timer: ReturnType<typeof setInterval> | undefined;
     const register = () => {
-      const context =
-        document.modelContext ?? ('modelContext' in navigator ? navigator.modelContext : undefined);
+      const context = document.modelContext;
       const isSupported = canRegister(context);
       const {
         config: current,

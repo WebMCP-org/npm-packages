@@ -97,44 +97,46 @@ async function executeNativeToolError(
 test.describe('Runtime Contract - Browser API Caller', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
+      const nativeContext = document.modelContext;
+      if (!nativeContext) {
+        throw new Error('Native WebMCP must be enabled before the MCP-B runtime starts');
+      }
       (window as NativeContextWindow).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ =
-        document.modelContext as unknown as NativeModelContext;
+        nativeContext as unknown as NativeModelContext;
     });
     await waitForRuntimePage(page, '/runtime-contract.html');
+    const capturedNativeContext = await page.evaluate(() =>
+      Boolean((window as NativeContextWindow).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__)
+    );
+    expect(capturedNativeContext).toBe(true);
   });
 
-  test('runs against native document.modelContext instead of the MCP-B polyfill', async ({
+  test('wraps the pre-existing native document.modelContext with MCP-B extensions', async ({
     page,
   }) => {
     const runtime = await page.evaluate(() => {
       const rawModelContext = (window as NativeContextWindow)
-        .__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ as
-        | (NativeModelContext & {
-            __isWebMCPPolyfill?: boolean;
-            __isBrowserMcpServer?: boolean;
-          })
+        .__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ as NativeModelContext | undefined;
+      const activeModelContext = document.modelContext as
+        | (NonNullable<Document['modelContext']> & { listTools?: unknown })
         | undefined;
-      const activeModelContext = document.modelContext as unknown as {
-        __isWebMCPPolyfill?: boolean;
-        __isBrowserMcpServer?: boolean;
-      };
 
       return {
         hasRawDocumentModelContext: typeof rawModelContext !== 'undefined',
         rawModelContextHasGetTools: typeof rawModelContext?.getTools === 'function',
         rawModelContextHasExecuteTool: typeof rawModelContext?.executeTool === 'function',
-        rawModelContextHasPolyfillMarker: rawModelContext?.__isWebMCPPolyfill === true,
-        rawModelContextHasBrowserServerMarker: rawModelContext?.__isBrowserMcpServer === true,
-        activeModelContextHasPolyfillMarker: activeModelContext.__isWebMCPPolyfill === true,
+        activeContextWrapsNative: Boolean(
+          rawModelContext && activeModelContext !== rawModelContext
+        ),
+        activeContextHasMcpBExtensions: typeof activeModelContext?.listTools === 'function',
       };
     });
 
     expect(runtime.hasRawDocumentModelContext).toBe(true);
     expect(runtime.rawModelContextHasGetTools).toBe(true);
     expect(runtime.rawModelContextHasExecuteTool).toBe(true);
-    expect(runtime.rawModelContextHasPolyfillMarker).toBe(false);
-    expect(runtime.rawModelContextHasBrowserServerMarker).toBe(false);
-    expect(runtime.activeModelContextHasPolyfillMarker).toBe(false);
+    expect(runtime.activeContextWrapsNative).toBe(true);
+    expect(runtime.activeContextHasMcpBExtensions).toBe(true);
   });
 
   test('discovers the canonical base tool set through browser APIs', async ({ page }) => {

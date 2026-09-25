@@ -1,4 +1,4 @@
-import { cleanupWebMCPPolyfill, initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { executionState } from '@mcp-b/webmcp-plugins/execution-state';
 import {
   Profiler,
@@ -13,11 +13,10 @@ import { cleanup, configure, renderHook } from 'vitest-browser-react/pure';
 import { useWebMCP } from './useWebMCP.js';
 import { useToolExecutionState } from './useToolExecutionState.js';
 
-beforeEach(() => initializeWebMCPPolyfill());
+beforeEach(() => installWebMCP());
 afterEach(async () => {
   await cleanup();
   configure({ reactStrictMode: false });
-  cleanupWebMCPPolyfill();
   vi.restoreAllMocks();
 });
 

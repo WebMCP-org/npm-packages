@@ -37,7 +37,9 @@ pnpm --filter mcp-e2e-tests test:native-contract:default
 pnpm --filter mcp-e2e-tests test:native-showcase
 
 # Shared WebMCP conformance lanes
+# Strict core WebMCP runtime
 pnpm --filter @mcp-b/webmcp-polyfill test:conformance
+# MCP-B runtime and declarative-form extensions
 pnpm --filter @mcp-b/global test:conformance:global
 
 # Pinned upstream WebMCP WPT (requires .reference/wpt and Chrome Canary)
@@ -228,10 +230,14 @@ The upstream suite lives in
 [`webmcp`](https://github.com/web-platform-tests/wpt/tree/master/webmcp). The
 workflow pins its WPT revision and injects
 `packages/webmcp-polyfill/dist/index.iife.js` with native WebMCP disabled. It
-runs every declarative test plus an explicit allowlist of imperative tests for
-the page-local surface. Frame-tree, origin-policy, and navigation WPT are
-excluded because they require native browser behavior. The shared repository
-suite adds MCP-B-specific polyfill, global, and native integration coverage.
+runs an explicit allowlist of imperative tests for the strict core surface.
+Frame-tree, origin-policy, and navigation WPT are excluded because they require
+native browser behavior. MCP-B declarative-form tests run in the
+`@mcp-b/global` conformance lane, alongside the MCP-B runtime extensions. The
+standalone polyfill conformance tests cover the upstream core package.
+The pinned WPT revision's omitted imperative cases still expect JSON-string
+`executeTool()` input or older annotations; refresh the pin before restoring
+them.
 
 ### IDL shape conformance
 

@@ -33,11 +33,22 @@ test.describe('Chrome WebMCP native smoke', () => {
         __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
         __WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__?: Navigator['modelContext'];
       };
-      target.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = document.modelContext;
+      const nativeContext = document.modelContext;
+      if (!nativeContext) {
+        throw new Error('Native WebMCP must be enabled before the MCP-B runtime starts');
+      }
+      target.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = nativeContext;
       target.__WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__ = navigator.modelContext;
     });
     await page.goto('/');
     await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
+    const capturedNativeContext = await page.evaluate(() =>
+      Boolean(
+        (window as Window & { __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: unknown })
+          .__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__
+      )
+    );
+    expect(capturedNativeContext).toBe(true);
   });
 
   test('exposes the native document.modelContext surface', async ({ page }) => {
@@ -47,8 +58,12 @@ test.describe('Chrome WebMCP native smoke', () => {
         __WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__?: unknown;
       };
       const context = raw.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      const activeContext = document.modelContext as
+        | (NonNullable<Document['modelContext']> & { listTools?: unknown })
+        | undefined;
 
       return {
+        capturedBeforeRuntime: Boolean(context),
         hasDocumentModelContext: Boolean(context),
         hasRegisterTool: typeof context?.registerTool === 'function',
         hasGetTools: typeof context?.getTools === 'function',
@@ -56,19 +71,18 @@ test.describe('Chrome WebMCP native smoke', () => {
         executeToolType: typeof context?.executeTool,
         hasDeprecatedNavigatorAlias:
           typeof raw.__WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__ !== 'undefined',
-        isPolyfill:
-          (context as (ChromeModelContext & { __isWebMCPPolyfill?: boolean }) | undefined)
-            ?.__isWebMCPPolyfill === true,
+        hasMcpBExtensions: typeof activeContext?.listTools === 'function',
       };
     });
 
     expect(surface.hasDocumentModelContext).toBe(true);
+    expect(surface.capturedBeforeRuntime).toBe(true);
     expect(surface.hasRegisterTool).toBe(true);
     expect(surface.hasGetTools).toBe(true);
     expect(surface.hasAddEventListener).toBe(true);
     expect(['function', 'undefined']).toContain(surface.executeToolType);
     expect(surface.hasDeprecatedNavigatorAlias).toBe(false);
-    expect(surface.isPolyfill).toBe(false);
+    expect(surface.hasMcpBExtensions).toBe(true);
   });
 
   test('getTools returns valid RegisteredTool entries for every tool', async ({ page }) => {

@@ -42,8 +42,7 @@
     "directory": "packages/global"
   },
   "files": [
-    "dist",
-    "LICENSE.webmcp-polyfill"
+    "dist"
   ],
   "type": "module",
   "sideEffects": true,
@@ -99,8 +98,7 @@
     "playwright": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:",
-    "vitest": "catalog:",
-    "webmcp-polyfill": "github:webmachinelearning/webmcp-polyfill#439c6c341f1c632c63498ba206e2bd8471cb8efb"
+    "vitest": "catalog:"
   },
   "engines": {
     "node": ">=20"
