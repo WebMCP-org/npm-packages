@@ -1,27 +1,26 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type DependencyList } from 'react';
 import {
   normalizeInputSchema,
   normalizeToolResponse,
   type ToolInputSchema,
 } from '@mcp-b/webmcp-ts-sdk/schema';
 import type { InputSchema, JsonSchemaForInference } from '@mcp-b/webmcp-ts-sdk';
-import type { DependencyList } from 'react';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { useWebMCPWithAdapter, type WebMCPAdapter } from 'usewebmcp/internal';
 import type { WebMCPConfig as CoreWebMCPConfig } from 'usewebmcp';
 import type { InferOutput, InferValidatedToolInput, WebMCPConfig, WebMCPReturn } from './types.js';
 
 function isStandardSchema(schema: object): schema is StandardSchemaV1 {
+  const standard = '~standard' in schema ? schema['~standard'] : undefined;
   return (
-    '~standard' in schema &&
-    typeof schema['~standard'] === 'object' &&
-    schema['~standard'] !== null &&
-    'version' in schema['~standard'] &&
-    schema['~standard'].version === 1 &&
-    'validate' in schema['~standard'] &&
-    typeof schema['~standard'].validate === 'function'
+    typeof standard === 'object' &&
+    standard !== null &&
+    'version' in standard &&
+    standard.version === 1 &&
+    'validate' in standard &&
+    typeof standard.validate === 'function'
   );
 }
 
@@ -32,14 +31,10 @@ async function validateInput<T extends ToolInputSchema>(
   if (!schema || !isStandardSchema(schema)) return input as InferValidatedToolInput<T>;
 
   const result = await schema['~standard'].validate(input);
-  if (!result.issues && 'value' in result) return result.value as InferValidatedToolInput<T>;
+  if ('value' in result) return result.value as InferValidatedToolInput<T>;
   throw new TypeError(
     `Invalid tool input: ${(result.issues ?? []).map((issue) => issue.message).join('; ')}`
   );
-}
-
-function toError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
 }
 
 /** The core React lifecycle with MCP result formatting and output metadata. */
@@ -57,7 +52,10 @@ export function useWebMCP<
         error: undefined,
       };
     } catch (error) {
-      return { schema: undefined, error: toError(error) };
+      return {
+        schema: undefined,
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
     }
   }, [config.inputSchema]);
   const coreConfig: CoreWebMCPConfig<InputSchema, InferOutput<TOutput>> = {

@@ -73,7 +73,7 @@ function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, 
   let preparationError = schema.error ?? adapter?.preparationError;
   let descriptorKey: string;
   try {
-    descriptorKey = JSON.stringify([metadata, exposedTo]);
+    descriptorKey = JSON.stringify([metadata, schema.key, exposedTo]);
   } catch (error) {
     preparationError = toError(error);
     descriptorKey = preparationError.message;
@@ -91,7 +91,7 @@ function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, 
       options: WebMCP.ToolExecuteCallbackOptions = { signal: new AbortController().signal },
       forAgent = false
     ): Promise<ExecutionOutcome<TResult>> => {
-      const executionConfig = committed.current.config;
+      const { config: executionConfig, adapter: executionAdapter } = committed.current;
       const { signal } = options;
       pendingExecutions.current += 1;
       setState((previous) =>
@@ -112,15 +112,15 @@ function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, 
             signal.throwIfAborted();
             if (result instanceof Error) throw result;
             const output =
-              forAgent && committed.current.adapter?.formatOutput
-                ? await committed.current.adapter.formatOutput(result)
+              forAgent && executionAdapter?.formatOutput
+                ? await executionAdapter.formatOutput(result)
                 : result;
             signal.throwIfAborted();
             return { result, output };
           } catch (cause) {
             signal.throwIfAborted();
             const error = toError(cause);
-            const formatError = committed.current.adapter?.formatError;
+            const formatError = executionAdapter?.formatError;
             if (!forAgent || !formatError) return { error };
             const output = await formatError(error);
             signal.throwIfAborted();
@@ -230,7 +230,7 @@ function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, 
     };
     // Descriptor contents avoid churn from inline schemas; deps can explicitly refresh registration.
     // oxlint-disable-next-line react-doctor/exhaustive-deps -- Metadata is compared by value and callbacks are read after commit.
-  }, [descriptorKey, schema.key, preparationError?.message, enabled, ...(deps ?? [])]);
+  }, [descriptorKey, preparationError?.message, enabled, ...(deps ?? [])]);
 
   return { state, ...registration, execute, reset };
 }

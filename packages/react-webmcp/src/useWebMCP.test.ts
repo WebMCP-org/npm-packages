@@ -328,6 +328,61 @@ describe('useWebMCP in a browser runtime', () => {
     await unmount();
   });
 
+  it.each(['output', 'error'] as const)(
+    'uses the call-start %s formatter across a configuration update',
+    async (stage) => {
+      const firstResult = Promise.withResolvers<string>();
+      const started = Promise.withResolvers<void>();
+      const failure = new Error('Handler failed');
+      const register = vi.spyOn(document.modelContext, 'registerTool');
+      try {
+        const hook = await renderHook(
+          ({ revision }) =>
+            useWebMCP({
+              name: `mcp_snapshot_${stage}`,
+              description: 'Keeps each execution and formatter paired',
+              execute: () => {
+                if (revision === 'A') {
+                  started.resolve();
+                  return firstResult.promise;
+                }
+                if (stage === 'error') throw failure;
+                return 'next';
+              },
+              formatOutput: (value) => `${revision}:${value}`,
+              formatError: (error) => `${revision}:${error.message}`,
+            }),
+          { initialProps: { revision: 'A' } }
+        );
+        const tool = register.mock.calls.find(
+          ([tool]) => tool.name === `mcp_snapshot_${stage}`
+        )?.[0];
+        if (!tool) throw new Error('Tool was not registered');
+        const signal = new AbortController().signal;
+        let first!: Promise<unknown>;
+        await hook.act(async () => {
+          first = Promise.resolve(tool.execute({}, { signal }));
+          await started.promise;
+        });
+
+        await hook.rerender({ revision: 'B' });
+        expect(
+          register.mock.calls.filter(([registered]) => registered.name === `mcp_snapshot_${stage}`)
+        ).toHaveLength(1);
+        await hook.act(async () => {
+          if (stage === 'output') firstResult.resolve('first');
+          else firstResult.reject(failure);
+          await expect(first).resolves.toBe(stage === 'output' ? 'A:first' : 'A:Handler failed');
+          await expect(tool.execute({}, { signal })).resolves.toBe(
+            stage === 'output' ? 'B:next' : 'B:Handler failed'
+          );
+        });
+      } finally {
+        register.mockRestore();
+      }
+    }
+  );
+
   it('converts a real Zod Standard JSON Schema through the registration path', async () => {
     const inputSchema = z.object({
       query: z.string(),
