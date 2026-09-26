@@ -44,7 +44,7 @@ export type {
   ConsentDecision,
   ConsentMetadata,
   DecideResult,
-  GuardPendingConsentRequest as PendingConsentRequest,
+  PendingConsentRequest,
   RiskLevel,
   McpToolAnnotations,
   ConsentDecisionEvent,

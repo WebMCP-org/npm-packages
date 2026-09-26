@@ -1,9 +1,4 @@
-import {
-  InvocationFailure,
-  type InvocationContext,
-  type AroundInvoke,
-  type InvocationResult,
-} from './invocation.js';
+import { InvocationFailure, type AroundInvoke } from './invocation.js';
 
 /** Observable state for successful, failed, and overlapping invocations. */
 export interface ToolExecutionState<T = unknown> {
@@ -61,13 +56,10 @@ export function executionState<T = unknown>(
   };
   return {
     name: 'execution-state',
-    async aroundInvoke<TResult extends T>(
-      _call: InvocationContext,
-      next: () => Promise<InvocationResult<TResult>>
-    ) {
+    async aroundInvoke(_call, next) {
       pending++;
       publish({ ...snapshot, isExecuting: true, error: null });
-      let result: InvocationResult<TResult>;
+      let result: Awaited<ReturnType<typeof next>>;
       try {
         result = await next();
       } catch (failure) {

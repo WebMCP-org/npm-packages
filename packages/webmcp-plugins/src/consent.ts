@@ -4,19 +4,11 @@ import {
   InvocationFailure,
   immutableJson,
   type Caller,
-  type InvocationContext,
-  type InvocationResult,
   type PreparedOperation,
   type ToolIdentity,
   type WebMCPPlugin,
 } from './invocation.js';
 
-// ---------------------------------------------------------------------------
-// Barrel re-exports — this file is the public `@mcp-b/webmcp-plugins/consent`
-// entry point. Everything below this block is this module's own
-// implementation (ConsentBroker + the consent()/consentBroker() plugin
-// factories); everything above is passthrough from sibling modules.
-// ---------------------------------------------------------------------------
 export * from './consent-types.js';
 export * from './consent-annotations.js';
 export { ConsentGuard, type ConsentDecisionEvent, MAX_PRESENCE_ATTEMPTS } from './consent-guard.js';
@@ -230,10 +222,7 @@ export class ConsentBroker {
 export function consentBroker({ broker }: { broker: ConsentBroker }): WebMCPPlugin {
   return {
     name: 'consent',
-    aroundInvoke: async <T>(
-      call: InvocationContext,
-      next: () => Promise<InvocationResult<T>>
-    ): Promise<InvocationResult<T>> => {
+    aroundInvoke: async (call, next) => {
       const operation = await call.prepare();
       await broker.authorize({
         invocationId: call.id,
@@ -257,10 +246,7 @@ export function consentBroker({ broker }: { broker: ConsentBroker }): WebMCPPlug
 export function consent(guard: ConsentGuard, meta: ConsentMetadata): WebMCPPlugin {
   return {
     name: 'consent',
-    aroundInvoke: async <T>(
-      call: InvocationContext,
-      next: () => Promise<InvocationResult<T>>
-    ): Promise<InvocationResult<unknown>> => {
+    aroundInvoke: async (call, next) => {
       const origin =
         call.tool.registeringOrigin ?? (globalThis as any).location?.origin ?? 'unknown';
       const toolName = call.tool.name;

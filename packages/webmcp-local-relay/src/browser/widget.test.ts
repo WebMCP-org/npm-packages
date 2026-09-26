@@ -33,6 +33,7 @@ interface RelayOptions {
   sendHelloAccepted?: boolean;
   sendHelloRejected?: { message: string; reason: string } | false;
   tools?: TestTool[];
+  withoutToolChangeEvents?: boolean;
 }
 
 interface TestTool {
@@ -217,6 +218,9 @@ function installEnvironment(options?: RelayOptions): WidgetTestEnv {
   const serverPort = options?.serverPort ?? relayPort;
   const hostWindow = createHostWindow();
   const modelContext = new EventTarget() as TestModelContext;
+  if (options?.withoutToolChangeEvents) {
+    Object.defineProperty(modelContext, 'addEventListener', { value: undefined });
+  }
   let tools = options?.tools ?? [];
   modelContext.getTools = async () =>
     tools.map(
@@ -600,6 +604,19 @@ describe('widget runtime', () => {
         tools: [{ name: 'after', description: 'Updated tool' }],
         type: 'tools/changed',
       });
+    });
+  });
+
+  it('still lists tools when the frame context has no toolchange event API', async () => {
+    const env = startRuntime({
+      withoutToolChangeEvents: true,
+      tools: [{ name: 'initial', description: 'Initial tool' }],
+    });
+    const connection = await completeHandshake(env);
+
+    expect(connection.messages[1]).toEqual({
+      tools: [{ name: 'initial', description: 'Initial tool' }],
+      type: 'tools/list',
     });
   });
 

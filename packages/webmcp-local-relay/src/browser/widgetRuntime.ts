@@ -108,18 +108,12 @@ export function parseConfig(search = window.location.search): WidgetConfig | nul
   const tabId = getParam('tabId') || createRequestId();
   const relayHostHint = getParam('relayHost') || '127.0.0.1';
   const relayPortHintRaw = getParam('relayPort');
-  const relayPortHint =
-    relayPortHintRaw && relayPortHintRaw.length > 0
-      ? Number(relayPortHintRaw)
-      : RELAY_PORT_RANGE_START;
+  const relayPortHint = Number(relayPortHintRaw || RELAY_PORT_RANGE_START);
   const autoConnect = getParam('autoConnect') !== 'false';
   const relayId = getParam('relayId') || undefined;
   const relayWorkspace = getParam('relayWorkspace') || undefined;
   const requestTimeoutRaw = getParam('requestTimeout');
-  const requestTimeoutMs =
-    requestTimeoutRaw && requestTimeoutRaw.length > 0
-      ? Number(requestTimeoutRaw)
-      : DEFAULT_REQUEST_TIMEOUT_MS;
+  const requestTimeoutMs = Number(requestTimeoutRaw || DEFAULT_REQUEST_TIMEOUT_MS);
 
   if (!isLoopbackHost(relayHostHint)) {
     console.error(
@@ -286,7 +280,10 @@ function clearCachedEndpoint(config: WidgetConfig): void {
   }
 }
 
-function buildDiscoveryCandidates(config: WidgetConfig): Array<{ host: string; port: number }> {
+function buildDiscoveryCandidates(
+  config: WidgetConfig,
+  includePortRange = true
+): Array<{ host: string; port: number }> {
   const cached = readCachedEndpoint(config);
   const seen = new Set<string>();
   const candidates: Array<{ host: string; port: number }> = [];
@@ -311,9 +308,11 @@ function buildDiscoveryCandidates(config: WidgetConfig): Array<{ host: string; p
     pushCandidate(cached.host, cached.port);
   }
 
-  for (const host of ['127.0.0.1', '[::1]']) {
-    for (let port = RELAY_PORT_RANGE_START; port <= RELAY_PORT_RANGE_END; port += 1) {
-      pushCandidate(host, port);
+  if (includePortRange) {
+    for (const host of ['127.0.0.1', '[::1]']) {
+      for (let port = RELAY_PORT_RANGE_START; port <= RELAY_PORT_RANGE_END; port += 1) {
+        pushCandidate(host, port);
+      }
     }
   }
 
@@ -443,20 +442,6 @@ async function listRelayTools(): Promise<RelayToolEntry[]> {
   });
 }
 
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value) ?? 'undefined';
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map(stableStringify).join(',')}]`;
-  }
-  const object = value as Record<string, unknown>;
-  return `{${Object.keys(object)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${stableStringify(object[key])}`)
-    .join(',')}}`;
-}
-
 function normalizeSerializedToolResult(serialized: string | null) {
   if (serialized === null) {
     return {
@@ -513,7 +498,10 @@ function runWidget(cfg: WidgetConfig): void {
       if (revision !== toolChangeRevision) continue;
 
       const tools = entries.map(({ descriptor }) => descriptor);
-      const snapshot = tools.map(stableStringify).sort().join('\n');
+      const snapshot = tools
+        .map((tool) => JSON.stringify(tool))
+        .sort()
+        .join('\n');
       currentToolEntries = entries;
       currentTools = tools;
       if (snapshot === lastToolsSnapshot) return;
@@ -539,17 +527,16 @@ function runWidget(cfg: WidgetConfig): void {
   };
 
   const modelContext = getExecutableModelContext();
-  modelContext?.addEventListener('toolchange', onToolsChanged);
+  if (typeof modelContext?.addEventListener === 'function') {
+    modelContext.addEventListener('toolchange', onToolsChanged);
+  }
   void refreshTools().catch((error: unknown) => {
     console.warn('[webmcp-relay-widget] Failed to read WebMCP tools:', error);
   });
 
   const activateSocket = (socket: WebSocket, endpoint: RelayEndpoint): void => {
     const clearHelloAckTimer = (): void => {
-      if (!helloAckTimer) {
-        return;
-      }
-      clearTimeout(helloAckTimer);
+      if (helloAckTimer !== null) clearTimeout(helloAckTimer);
       helloAckTimer = null;
     };
 
@@ -894,24 +881,7 @@ function runWidget(cfg: WidgetConfig): void {
       return;
     }
 
-    const seen = new Set<string>();
-    const candidates: Array<{ host: string; port: number }> = [];
-
-    const pushCandidate = (host: string, port: number): void => {
-      const key = `${host}:${String(port)}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      candidates.push({ host, port });
-    };
-
-    if (cfg.relayPortHint !== undefined) {
-      pushCandidate(cfg.relayHostHint, cfg.relayPortHint);
-    }
-
-    const cached = readCachedEndpoint(cfg);
-    if (cached) {
-      pushCandidate(cached.host, cached.port);
-    }
+    const candidates = buildDiscoveryCandidates(cfg, false);
 
     if (candidates.length === 0) {
       return;

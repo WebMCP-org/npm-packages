@@ -31,11 +31,8 @@ const TAB_ID_STORAGE_KEY = '__webmcp_relay_tab_id';
 let widgetWindow: Window | null = null;
 let config: RelayConfig;
 
-function getCurrentScriptElement(): HTMLScriptElement | null {
-  return document.currentScript instanceof HTMLScriptElement ? document.currentScript : null;
-}
-
-const scriptEl = getCurrentScriptElement();
+const scriptEl =
+  document.currentScript instanceof HTMLScriptElement ? document.currentScript : null;
 const DEBUG = scriptEl ? scriptEl.hasAttribute('data-debug') : false;
 
 function debugWarn(...args: unknown[]): void {

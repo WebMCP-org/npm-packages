@@ -2,7 +2,6 @@ import type {
   ConsentDecision,
   ConsentMetadata,
   DecideResult,
-  GuardPendingConsentRequest,
   PendingConsentRequest,
 } from './consent-types.js';
 import { verifyUserPresence } from './consent-presence.js';
@@ -10,7 +9,7 @@ import { verifyUserPresence } from './consent-presence.js';
 export type { DecideResult, PendingConsentRequest };
 
 /** Callback signature for broker subscribers. */
-type Listener = (pending: GuardPendingConsentRequest[]) => void;
+type Listener = (pending: PendingConsentRequest[]) => void;
 
 /** Event emitted when a consent request is resolved. */
 export interface ConsentDecisionEvent extends ConsentDecision {
@@ -77,7 +76,7 @@ const MAX_COOLDOWN_MS = 5 * 60_000;
  * face longer cooldowns on each subsequent lockout.
  */
 export class ConsentGuard {
-  private pending = new Map<string, GuardPendingConsentRequest>();
+  private pending = new Map<string, PendingConsentRequest>();
   private requestControls = new Map<
     string,
     {
@@ -153,13 +152,21 @@ export class ConsentGuard {
     this.listeners.forEach((fn) => fn(list));
   }
 
-  private notifyDecision(request: GuardPendingConsentRequest, decision: ConsentDecision) {
+  private notifyDecision(request: PendingConsentRequest, decision: ConsentDecision) {
     const event: ConsentDecisionEvent = {
       ...decision,
       ...request,
       resolvedAt: Date.now(),
     };
     this.decisionListeners.forEach((fn) => fn(event));
+  }
+
+  private removePendingRequest(id: string) {
+    this.pending.delete(id);
+    const controls = this.requestControls.get(id);
+    controls?.clearTimeout();
+    this.requestControls.delete(id);
+    return controls;
   }
 
   /**
@@ -263,9 +270,8 @@ export class ConsentGuard {
         timeoutId = setTimeout(() => {
           if (this.pending.has(id)) {
             const timedOutEntry = this.pending.get(id)!;
-            this.pending.delete(id);
             this.inFlightDecisions.delete(id);
-            this.requestControls.delete(id);
+            this.removePendingRequest(id);
             this.notify();
             const decision: ConsentDecision = { approved: false, reason: 'timeout' };
             this.notifyDecision(timedOutEntry, decision);
@@ -281,7 +287,7 @@ export class ConsentGuard {
         }
       };
 
-      const entry: GuardPendingConsentRequest = {
+      const entry: PendingConsentRequest = {
         id,
         ...input,
         createdAt: Date.now(),
@@ -340,7 +346,7 @@ export class ConsentGuard {
   /**
    * Resolve a pending consent request asynchronously.
    *
-   * @param id - The {@link GuardPendingConsentRequest.id} to resolve.
+   * @param id - The {@link PendingConsentRequest.id} to resolve.
    * @param approved - Whether the user approved the call.
    * @param rememberForSession - If `true` **and** the tool's
    *   `consent.reversible` is also `true`, cache this approval so future calls
@@ -365,10 +371,7 @@ export class ConsentGuard {
     // and resolves the broker.request() promise as denied.
     if (!approved) {
       this.inFlightDecisions.delete(id);
-      this.pending.delete(id);
-      const controls = this.requestControls.get(id);
-      controls?.clearTimeout();
-      this.requestControls.delete(id);
+      const controls = this.removePendingRequest(id);
       this.notify();
 
       const decisionReason = reason ?? 'user';
@@ -430,10 +433,7 @@ export class ConsentGuard {
             } else {
               // Attempt 3: lockout escalation
               this.notifyDecision(entry, { approved: false, reason: 'presence-lockout' });
-              this.pending.delete(id);
-              const controls = this.requestControls.get(id);
-              controls?.clearTimeout();
-              this.requestControls.delete(id);
+              const controls = this.removePendingRequest(id);
               this.notify();
 
               const decision: ConsentDecision = { approved: false, reason: 'presence-lockout' };
@@ -448,10 +448,7 @@ export class ConsentGuard {
           }
         }
 
-        this.pending.delete(id);
-        const controls = this.requestControls.get(id);
-        controls?.clearTimeout();
-        this.requestControls.delete(id);
+        const controls = this.removePendingRequest(id);
         this.notify();
 
         const sessionKey = `${entry.origin}::${entry.toolName}`;

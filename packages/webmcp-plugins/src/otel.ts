@@ -11,12 +11,7 @@ import {
   type Context,
   isSpanContextValid,
 } from '@opentelemetry/api';
-import {
-  InvocationFailure,
-  type InvocationContext,
-  type InvocationResult,
-  type WebMCPPlugin,
-} from './invocation.js';
+import { InvocationFailure, type InvocationContext, type WebMCPPlugin } from './invocation.js';
 
 export interface OtelOptions {
   tracer: Tracer;
@@ -46,10 +41,7 @@ export function otel(options: OtelOptions): WebMCPPlugin {
   }
   return {
     name: 'otel',
-    aroundInvoke: async <T>(
-      call: InvocationContext,
-      next: () => Promise<InvocationResult<T>>
-    ): Promise<InvocationResult<T>> => {
+    aroundInvoke: async (call, next) => {
       const mcp = call.protocol === 'mcp';
       const ambient =
         observe(() => options.parentContext?.(call) ?? context.active()) ?? ROOT_CONTEXT;
@@ -95,17 +87,8 @@ export function otel(options: OtelOptions): WebMCPPlugin {
           parent
         )
       );
-      let downstream: Promise<InvocationResult<T>> | undefined;
-      const proceed = (): Promise<InvocationResult<T>> => {
-        if (!downstream) {
-          try {
-            downstream = next();
-          } catch (error) {
-            downstream = Promise.reject(error);
-          }
-        }
-        return downstream;
-      };
+      let downstream: ReturnType<typeof next> | undefined;
+      const proceed = () => (downstream ??= (async () => next())());
       if (span) observe(() => context.with(trace.setSpan(parent, span), proceed));
       try {
         const result = await proceed();
