@@ -1,4 +1,4 @@
-import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
+import { normalizeInputSchema } from '@mcp-b/webmcp-ts-sdk/schema';
 import { useCallback } from 'react';
 import type { WebMCPPromptConfig, WebMCPPromptReturn } from './types.js';
 import { getBrowserMcpServer } from './model-context.js';

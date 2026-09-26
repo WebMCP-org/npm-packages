@@ -82,7 +82,7 @@ await server.syncNativeTools();
 
 ## Schema boundary
 
-`BrowserMcpServer` converts JSON Schema or Standard JSON Schema input metadata through the optional [`@mcp-b/webmcp-polyfill/schema`](../webmcp-polyfill/README.md#schema-helpers) adapter. When the supplied schema also has `~standard.validate()`, the adapter preserves that method for the official MCP server. For plain JSON Schema, the server uses the MCP SDK's `fromJsonSchema` adapter.
+`BrowserMcpServer` converts JSON Schema or Standard JSON Schema input metadata with the SDK schema adapter. When the supplied schema also has `~standard.validate()`, the adapter preserves that method for the official MCP server. For plain JSON Schema, the server uses the MCP SDK's `fromJsonSchema` adapter.
 
 This validation runs on **MCP client calls**. Direct `executeTool()` calls and native WebMCP mirrors invoke the browser callback without passing through MCP validation. Validate in that callback when exposing tools through both paths, and pass plain JSON metadata so the MCP SDK does not also apply the vendor transforms. The [`usewebmcp`](../usewebmcp/README.md) hook already does this for local and agent calls using the validator supplied in your schema.
 
@@ -97,6 +97,7 @@ MCP requires an object-root tool input schema. An array-root WebMCP tool remains
 - `isBrowserMcpServer`
 - `PromptDescriptor`
 - `ResourceDescriptor`
+- `@mcp-b/webmcp-ts-sdk/schema` schema conversion and response helpers
 
 Import MCP clients, servers, schemas, transports, and validators from the official `@modelcontextprotocol/*` packages.
 

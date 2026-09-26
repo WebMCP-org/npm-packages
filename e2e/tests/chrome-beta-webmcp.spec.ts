@@ -1,5 +1,7 @@
-import type { RegisteredTool } from '@mcp-b/webmcp-types';
+import type { WebMCP } from 'webmcp-types';
 import { expect, test } from '@playwright/test';
+
+type RegisteredTool = WebMCP.RegisteredTool;
 
 type ChromeModelContext = Omit<NonNullable<Document['modelContext']>, 'executeTool'> & {
   executeTool(
@@ -63,7 +65,6 @@ test.describe('Chrome WebMCP native smoke', () => {
         | undefined;
 
       return {
-        capturedBeforeRuntime: Boolean(context),
         hasDocumentModelContext: Boolean(context),
         hasRegisterTool: typeof context?.registerTool === 'function',
         hasGetTools: typeof context?.getTools === 'function',
@@ -76,7 +77,6 @@ test.describe('Chrome WebMCP native smoke', () => {
     });
 
     expect(surface.hasDocumentModelContext).toBe(true);
-    expect(surface.capturedBeforeRuntime).toBe(true);
     expect(surface.hasRegisterTool).toBe(true);
     expect(surface.hasGetTools).toBe(true);
     expect(surface.hasAddEventListener).toBe(true);

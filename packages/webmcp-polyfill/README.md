@@ -81,13 +81,10 @@ See the [WebMCP draft](https://webmachinelearning.github.io/webmcp/) and the
 [upstream polyfill](https://github.com/webmachinelearning/webmcp-polyfill) for
 the standard API and implementation details.
 
-## MCP-B schema helpers
-
-The `@mcp-b/webmcp-polyfill/schema` entry remains available for MCP-B schema
-normalization and response helpers. It is separate from the upstream runtime.
-Use [`@mcp-b/global`](../global/README.md) when you need MCP `outputSchema`
-metadata and structured MCP responses. See the
-[schemas and structured output guide](https://docs.mcp-b.ai/how-to/use-schemas-and-structured-output).
+MCP-B schema conversion and response helpers live in
+`@mcp-b/webmcp-ts-sdk/schema`.
+Use [`@mcp-b/global`](../global/README.md) for MCP `outputSchema` metadata and
+structured MCP responses.
 
 ## Runtime boundary
 

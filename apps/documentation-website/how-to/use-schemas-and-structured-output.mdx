@@ -58,22 +58,21 @@ For direct browser registration, activate the Community Group's declarations:
 pnpm add -D webmcp-types
 ```
 
-Import `type { WebMCP }` from `webmcp-types` when naming browser contracts. Use
-[`@mcp-b/webmcp-types`](/packages/webmcp-types/reference) for MCP-B descriptor helpers and
-compatibility types. Both packages can be loaded together.
+The Community Group package supplies the browser contracts. MCP-B adapter extensions and schema
+conversion are documented in the [`@mcp-b/webmcp-ts-sdk` reference](/packages/webmcp-ts-sdk/reference).
 
 ## Convert a Standard JSON Schema implementation outside React
 
 For direct native or polyfilled `registerTool()` calls, convert the metadata and validate in the
-callback. The optional adapter lives at [`@mcp-b/webmcp-polyfill/schema`](/packages/webmcp-polyfill/reference#schema-entry):
+callback. The MCP-B adapter lives at [`@mcp-b/webmcp-ts-sdk/schema`](/packages/webmcp-ts-sdk/reference#schema-boundary):
 
 ```bash title="Install the adapter and Zod"
-pnpm add @mcp-b/webmcp-polyfill zod@^4.2
+pnpm add @mcp-b/webmcp-polyfill @mcp-b/webmcp-ts-sdk zod@^4.2
 ```
 
 ```ts title="total-tool.ts"
 import { installWebMCP } from '@mcp-b/webmcp-polyfill';
-import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
+import { normalizeInputSchema } from '@mcp-b/webmcp-ts-sdk/schema';
 import { z } from 'zod';
 
 const totalInput = z.object({
@@ -120,12 +119,12 @@ can execute it, or use the React hook when registering from React.
 
 ## Add MCP-B output metadata
 
-Add `outputSchema` when an MCP client needs typed structured data. Declare the descriptor
-separately so `ToolDescriptorFromSchema` checks the returned value:
+Add `outputSchema` when an MCP client needs typed structured data. The SDK descriptor type checks
+the input and output when you declare the descriptor separately:
 
 ```ts title="search-summary-tool.ts"
 import '@mcp-b/global';
-import type { JsonSchemaForInference, ToolDescriptorFromSchema } from '@mcp-b/webmcp-types';
+import type { JsonSchemaForInference, ToolDescriptorFromSchema } from '@mcp-b/webmcp-ts-sdk';
 
 const inputSchema = {
   type: 'object',
@@ -162,8 +161,8 @@ await context.registerTool(tool);
 
 `outputSchema` is MCP-B metadata for output inference and structured MCP responses. If your handler
 constructs an MCP `CallToolResult` directly, include schema-compatible `structuredContent` as well
-as human-readable `content`. The [package reference](/packages/webmcp-types/reference) lists the
-output inference types.
+as human-readable `content`. The [`@mcp-b/webmcp-ts-sdk` reference](/packages/webmcp-ts-sdk/reference)
+documents the adapter extensions and schema boundary.
 
 `outputSchema` is enforced on calls through the official MCP server. The React hook uses it for
 inference and checks JSON serializability, but does not enforce the output schema on local or direct

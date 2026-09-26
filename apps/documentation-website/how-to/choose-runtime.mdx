@@ -5,7 +5,7 @@ keywords:
   [
     '@mcp-b/global',
     '@mcp-b/webmcp-polyfill',
-    '@mcp-b/webmcp-types',
+    'webmcp-types',
     'usewebmcp',
     '@mcp-b/react-webmcp',
     'runtime',
@@ -27,8 +27,8 @@ compatibility, type inference, or extension behavior your application needs.
 2. **Do you only need ambient types for the live proposal?** Use the Community Group's
    [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) package.
 
-3. **Do you need MCP-B compatibility types or schema inference?** Use
-   [`@mcp-b/webmcp-types`](/packages/webmcp-types/overview).
+3. **Do you need MCP-B adapter extensions or schema conversion?** Use
+   [`@mcp-b/webmcp-ts-sdk`](/packages/webmcp-ts-sdk/overview).
 
 4. **Do you need browser tool registration and discovery where native support is unavailable?** Use
    [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview).
@@ -49,8 +49,8 @@ compatibility, type inference, or extension behavior your application needs.
 | Choice                   | Adds a browser runtime | Choose it for                                                |
 | ------------------------ | ---------------------- | ------------------------------------------------------------ |
 | Native browser support   | No                     | Browser behavior documented by the implementation            |
-| `webmcp-types`           | No                     | Ambient declarations that track the live proposal            |
-| `@mcp-b/webmcp-types`    | No                     | MCP-B contracts and schema inference                         |
+| `webmcp-types`           | No                     | Core browser declarations that track the live proposal       |
+| `@mcp-b/webmcp-ts-sdk`   | No                     | MCP-B adapter extensions and schema conversion               |
 | `@mcp-b/webmcp-polyfill` | Yes                    | Tool registration and discovery compatibility                |
 | `@mcp-b/global`          | Yes                    | MCP-B extensions, server access, and browser transports      |
 | `usewebmcp`              | No                     | React tool hooks over an initialized `document.modelContext` |
@@ -72,8 +72,8 @@ accepts object input and keeps a serialized-JSON compatibility overload; set
 - For React, compare [`usewebmcp`](/packages/usewebmcp/overview) with
   [`@mcp-b/react-webmcp`](/packages/react-webmcp/overview), then use the [React
   tutorial](/tutorials/first-react-tool).
-- For schema inference and MCP-B type contracts, use the
-  [`@mcp-b/webmcp-types` reference](/packages/webmcp-types/reference).
+- For MCP-B adapter extensions and schema conversion, use the
+  [`@mcp-b/webmcp-ts-sdk` reference](/packages/webmcp-ts-sdk/reference).
 
 ## How the layers relate
 

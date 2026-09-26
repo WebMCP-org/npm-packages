@@ -13,7 +13,7 @@ export type {
 } from 'usewebmcp';
 export { useWebMCP } from './useWebMCP.js';
 
-export type { ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';
+export type { ToolInputSchema } from '@mcp-b/webmcp-ts-sdk/schema';
 export type { McpClientProviderProps } from './client/McpClientProvider.js';
 export { McpClientProvider, useMcpClient } from './client/McpClientProvider.js';
 export type {

@@ -1,11 +1,6 @@
-/**
- * Showcase types — thin re-exports from @mcp-b/webmcp-types with aliases
- * that preserve the import names used throughout the app.
- */
+import type { WebMCP } from 'webmcp-types';
 
-export type { RegisteredTool as ToolInfo } from '@mcp-b/webmcp-types';
-
-import type { ModelContextTool } from '@mcp-b/webmcp-types';
+export type ToolInfo = WebMCP.RegisteredTool;
 
 export interface ToolRegistration {
   unregister(): void;
@@ -14,7 +9,7 @@ export interface ToolRegistration {
 /**
  * Strict WebMCP tool descriptor used by the native showcase.
  */
-export type Tool = ModelContextTool;
+export type Tool = WebMCP.ModelContextTool;
 
 /** Current native WebMCP context, including object-input execution. */
 export type ModelContext = NonNullable<Document['modelContext']>;
@@ -24,8 +19,6 @@ export type ModelContext = NonNullable<Document['modelContext']>;
 // ============================================================================
 
 export interface DetectionResult {
-  available: boolean;
   isNative: boolean;
-  isPolyfill: boolean;
   message: string;
 }

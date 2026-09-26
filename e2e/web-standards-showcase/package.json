@@ -13,7 +13,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mcp-b/webmcp-types": "workspace:*",
     "@radix-ui/react-checkbox": "^1.3.11",
     "@radix-ui/react-collapsible": "^1.1.20",
     "@radix-ui/react-label": "^2.1.15",
@@ -28,10 +27,12 @@
     "lucide-react": "^0.577.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "webmcp-types": "^0.1.9"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.54.1",
+    "@modelcontextprotocol/server": "catalog:",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "catalog:",
     "@types/react": "^19.2.18",

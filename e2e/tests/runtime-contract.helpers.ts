@@ -1,4 +1,4 @@
-import type { CallToolResult, TextContent } from '@mcp-b/webmcp-types';
+import type { CallToolResult, TextContent } from '@modelcontextprotocol/server';
 import { expect, type Frame, type Page } from '@playwright/test';
 import {
   DYNAMIC_TOOL_NAME,

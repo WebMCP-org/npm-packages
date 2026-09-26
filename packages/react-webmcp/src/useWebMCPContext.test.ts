@@ -1,5 +1,5 @@
 import { initializeWebModelContext } from '@mcp-b/global';
-import type { CallToolResult, ChromeModelContext, ModelContext } from '@mcp-b/webmcp-types';
+import type { CallToolResult, ChromeModelContext, ModelContext } from '@mcp-b/webmcp-ts-sdk';
 import { Suspense, createElement } from 'react';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderHook } from 'vitest-browser-react';

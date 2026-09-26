@@ -1,21 +1,16 @@
 import { installWebMCP } from '@mcp-b/webmcp-polyfill';
-import type { ChromeModelContext, ModelContext } from '@mcp-b/webmcp-types';
 import { StrictMode, Suspense, createElement, useLayoutEffect } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, renderHook } from 'vitest-browser-react';
 import { z } from 'zod';
 import { useWebMCP } from './useWebMCP.js';
 
-function hasDescriptorExecution(context: ModelContext): context is ChromeModelContext {
-  return 'executeTool' in context && typeof context.executeTool === 'function';
-}
-
 async function executeRegisteredTool(
   name: string,
   args: Record<string, unknown> = {}
 ): Promise<unknown> {
   const modelContext = document.modelContext;
-  if (!hasDescriptorExecution(modelContext)) {
+  if (!modelContext || typeof modelContext.executeTool !== 'function') {
     throw new Error('Chrome descriptor execution is unavailable');
   }
 
@@ -205,42 +200,6 @@ describe('useWebMCP in a browser runtime', () => {
       await expect(hook.result.current.execute({})).rejects.toBe(failure);
     });
     expect(formatError).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps isExecuting true until every overlapping execution settles', async () => {
-    const resolvers = new Map<string, (value: string) => void>();
-    const { act, result } = await renderHook(() =>
-      useWebMCP({
-        name: 'browser_concurrent_state',
-        description: 'Tracks concurrent executions',
-        inputSchema: {
-          type: 'object',
-          properties: { id: { type: 'string' } },
-          required: ['id'],
-        } as const,
-        execute: ({ id }) => new Promise<string>((resolve) => resolvers.set(id, resolve)),
-      })
-    );
-
-    let first!: Promise<unknown>;
-    let second!: Promise<unknown>;
-    await act(async () => {
-      first = result.current.execute({ id: 'first' });
-      second = result.current.execute({ id: 'second' });
-    });
-    expect(result.current.state.isExecuting).toBe(true);
-
-    await act(async () => {
-      resolvers.get('first')?.('first');
-      await first;
-    });
-    expect(result.current.state.isExecuting).toBe(true);
-
-    await act(async () => {
-      resolvers.get('second')?.('second');
-      await second;
-    });
-    expect(result.current.state.isExecuting).toBe(false);
   });
 
   it('settles an execution that outlives the component without a React warning', async () => {

@@ -199,7 +199,7 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
           },
           { signal: controller.signal, ...(current.exposedTo && { exposedTo: current.exposedTo }) }
         );
-        void Promise.resolve(registered).catch(failed);
+        void registered.catch(failed);
       } catch (cause) {
         failed(cause);
       }

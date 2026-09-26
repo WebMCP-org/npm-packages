@@ -1,11 +1,6 @@
-import type {
-  CallToolResult,
-  InputSchema,
-  JsonValue,
-  ToolDescriptor,
-  WebMcpToolInput,
-  WebMcpToolAnnotations,
-} from '@mcp-b/webmcp-types';
+import type { CallToolResult, JSONValue as JsonValue } from '@modelcontextprotocol/server';
+import type { InputSchema, WebMcpToolInput } from './common.js';
+import type { ToolDescriptor, WebMcpToolAnnotations } from './tool.js';
 import type { StandardJSONSchemaV1, StandardSchemaV1 } from '@standard-schema/spec';
 
 type StandardInputValidatorSchema = StandardSchemaV1<WebMcpToolInput, WebMcpToolInput>;

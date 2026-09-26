@@ -65,7 +65,6 @@
   },
   "devDependencies": {
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
-    "@mcp-b/webmcp-types": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"

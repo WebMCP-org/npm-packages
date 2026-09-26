@@ -1,4 +1,4 @@
-import type { RegisteredTool } from '@mcp-b/webmcp-types';
+import type { WebMCP } from 'webmcp-types';
 import { expect, type Page, test } from '@playwright/test';
 import {
   DYNAMIC_TOOL_NAME,
@@ -9,6 +9,8 @@ import {
   unregisterDynamicTool,
   waitForRuntimePage,
 } from './runtime-contract.helpers.js';
+
+type RegisteredTool = WebMCP.RegisteredTool;
 
 type NativeModelContext = Pick<NonNullable<Document['modelContext']>, 'getTools'> & {
   executeTool(tool: RegisteredTool, input: Record<string, unknown>): Promise<unknown>;

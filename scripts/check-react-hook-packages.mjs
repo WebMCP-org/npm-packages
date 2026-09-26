@@ -28,13 +28,7 @@ const run = (command, args, cwd = root) => {
 
 try {
   const tarballs = {};
-  for (const directory of [
-    'webmcp-types',
-    'webmcp-polyfill',
-    'webmcp-ts-sdk',
-    'usewebmcp',
-    'react-webmcp',
-  ]) {
+  for (const directory of ['webmcp-polyfill', 'webmcp-ts-sdk', 'usewebmcp', 'react-webmcp']) {
     const cwd = join(root, 'packages', directory);
     const manifest = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'));
     const { filename } = JSON.parse(
@@ -83,7 +77,7 @@ try {
             ...(extended
               ? {
                   '@mcp-b/react-webmcp': tarballs['@mcp-b/react-webmcp'],
-                  '@mcp-b/webmcp-types': tarballs['@mcp-b/webmcp-types'],
+                  '@mcp-b/webmcp-ts-sdk': tarballs['@mcp-b/webmcp-ts-sdk'],
                   'webmcp-types': upstreamTypesVersion,
                 }
               : {}),
@@ -143,7 +137,7 @@ try {
         `
 import type { WebMCP } from 'webmcp-types';
 import { useWebMCP } from '@mcp-b/react-webmcp';
-import type { ToolAnnotations } from '@mcp-b/webmcp-types';
+import type { ToolAnnotations } from '@mcp-b/webmcp-ts-sdk';
 const context: WebMCP.ModelContext | undefined = document.modelContext;
 const annotations: ToolAnnotations = { readOnlyHint: true, idempotentHint: true };
 export function useExtendedTypes() {

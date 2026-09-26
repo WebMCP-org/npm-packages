@@ -43,7 +43,6 @@ coverage
 # React hook benchmark output
 benchmarks/react-hooks/production-results.json
 benchmarks/react-hooks/bundle-results.json
-benchmarks/react-hooks/PRODUCTION.md
 
 # Misc
 .cache

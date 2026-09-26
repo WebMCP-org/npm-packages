@@ -1,5 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import type { ModelContext, ModelContextTool } from '@mcp-b/webmcp-types';
+import type { ModelContext, WebMCP } from '@mcp-b/webmcp-ts-sdk';
+
+type ModelContextTool = WebMCP.ModelContextTool;
 
 interface RuntimeCoreConformanceOptions {
   suiteName: string;

@@ -1,5 +1,5 @@
-import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
-import type { ModelContext } from '@mcp-b/webmcp-types';
+import { normalizeInputSchema } from './schema.js';
+import type { ModelContext } from './model-context.js';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { inputRequired } from '@modelcontextprotocol/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';

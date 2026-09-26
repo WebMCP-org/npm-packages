@@ -7,8 +7,6 @@ import type {
   ModelContext,
   ModelContextExtensions,
   ModelContextGetToolOptions,
-  ModelContextTesting,
-  ModelContextTestingToolInfo,
   ModelContextWithExtensions,
   RegisteredTool,
   ToolListItem,
@@ -59,41 +57,9 @@ test('MCP-B extensions list tools without restoring removed compatibility method
   expectTypeOf<ModelContextExtensions['unregisterTool']>().toBeNever();
 });
 
-test('the Chromium testing shim retains its observable contract', () => {
-  expectTypeOf<ModelContextTesting['listTools']>().returns.toEqualTypeOf<
-    ModelContextTestingToolInfo[]
-  >();
-  expectTypeOf<ModelContextTesting['executeTool']>().parameter(0).toEqualTypeOf<string>();
-  expectTypeOf<ModelContextTesting['executeTool']>().parameter(1).toEqualTypeOf<string>();
-  expectTypeOf<ModelContextTesting['executeTool']>()
-    .parameter(2)
-    .toEqualTypeOf<ChromeModelContextExecuteToolOptions | undefined>();
-  expectTypeOf<ModelContextTesting['executeTool']>().returns.toEqualTypeOf<
-    Promise<string | null>
-  >();
-  // @ts-expect-error Fake cross-document results are not part of the compatibility surface.
-  expectTypeOf<ModelContextTesting['getCrossDocumentScriptToolResult']>().toBeNever();
-});
-
 test('global declarations use the document-first API', () => {
   expectTypeOf<Document['modelContext']>().toEqualTypeOf<WebMCP.ModelContext | undefined>();
   expectTypeOf<Navigator['modelContext']>().toEqualTypeOf<ModelContext | undefined>();
-  expectTypeOf<Navigator['modelContextTesting']>().toEqualTypeOf<ModelContextTesting | undefined>();
-});
-
-test('the ModelContext interface object brands values but is not constructible', () => {
-  // The interface object only exists where the realm implements WebMCP, so the
-  // global is declared possibly-undefined and `instanceof` needs a guard.
-  expectTypeOf<NonNullable<typeof ModelContext>>().toMatchTypeOf<Function>();
-  const hasModelContextBrand = (value: unknown) =>
-    typeof ModelContext !== 'undefined' && value instanceof ModelContext;
-  expectTypeOf(hasModelContextBrand).returns.toBeBoolean();
-
-  const constructModelContext = () => {
-    // @ts-expect-error WebMCP does not define a ModelContext constructor.
-    return new ModelContext();
-  };
-  expectTypeOf(constructModelContext).toBeFunction();
 });
 
 test('global modelContext properties are readonly', () => {

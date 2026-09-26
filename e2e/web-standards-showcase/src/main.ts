@@ -149,18 +149,10 @@ function updateDetectionBanner(detection: ReturnType<typeof detectNativeAPI>): v
 
   if (!banner || !status) return;
 
-  if (detection.isNative) {
-    banner.className = 'sticky top-0 z-50 bg-green-600 text-white shadow-lg';
-    status.innerHTML = `
-      <span class="flex items-center gap-4 py-3 text-sm">${detection.message}</span>
-    `;
-  } else if (detection.available && detection.isPolyfill) {
-    banner.className = 'sticky top-0 z-50 bg-yellow-600 text-white shadow-lg';
-    status.innerHTML = `<span class="flex items-center gap-4 py-3 text-sm">${detection.message}</span>`;
-  } else {
-    banner.className = 'sticky top-0 z-50 bg-red-600 text-white shadow-lg';
-    status.innerHTML = `<span class="flex items-center gap-4 py-3 text-sm">${detection.message}</span>`;
-  }
+  banner.className = detection.isNative
+    ? 'sticky top-0 z-50 bg-green-600 text-white shadow-lg'
+    : 'sticky top-0 z-50 bg-red-600 text-white shadow-lg';
+  status.innerHTML = `<span class="flex items-center gap-4 py-3 text-sm">${detection.message}</span>`;
 }
 
 /**

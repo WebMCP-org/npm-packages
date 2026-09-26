@@ -4,12 +4,8 @@
 // Import the global package to initialize document.modelContext
 import '@mcp-b/global';
 import type { BrowserMcpServer, PromptDescriptor, ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
-import type {
-  InputSchema,
-  ModelContextTesting,
-  RegistrationHandle,
-  ToolDescriptor,
-} from '@mcp-b/webmcp-types';
+import type { ModelContextTesting } from '@mcp-b/global';
+import type { RegistrationHandle, ToolDescriptor } from '@mcp-b/webmcp-ts-sdk';
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -29,7 +25,7 @@ function getTestingAPI(): ModelContextTesting | undefined {
   return navigator.modelContextTesting;
 }
 
-type RegisteredToolDescriptor = ToolDescriptor & { inputSchema: InputSchema };
+type RegisteredToolDescriptor = ToolDescriptor & { inputSchema: object };
 
 async function replaceOwnedTools(tools: RegisteredToolDescriptor[]): Promise<void> {
   for (const controller of baseToolControllers.splice(0)) {

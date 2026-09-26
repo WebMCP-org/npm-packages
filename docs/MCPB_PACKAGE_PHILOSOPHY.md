@@ -13,16 +13,18 @@ To keep integration predictable, this repo separates:
 
 ## Package Layers
 
-### 1) `webmcp-types` and `@mcp-b/webmcp-types`
+### 1) Upstream `webmcp-types` and MCP-B adapter extensions
 
-- The Community Group's upstream `webmcp-types` owns browser contracts and the global `document.modelContext` declaration.
-- `@mcp-b/webmcp-types` derives MCP-B extension and legacy compatibility types from upstream.
-- MCP-B extensions do not broaden the core global surface. Both type packages can be loaded together.
+- The Community Group's upstream `webmcp-types` owns the WebMCP browser contracts and
+  `document.modelContext` declaration.
+- `@mcp-b/webmcp-ts-sdk` owns MCP-B adapter and extension contracts, along with schema
+  conversion helpers.
+- MCP-B extensions do not broaden the upstream core declaration. There is no separate MCP-B WebMCP types package.
 
 Use when you want:
 
-- upstream browser contracts and input inference: `webmcp-types`
-- MCP-B input/output descriptor helpers and compatibility types: `@mcp-b/webmcp-types`
+- standard browser contracts and input inference: upstream `webmcp-types`
+- MCP-B adapter extensions or schema conversion: `@mcp-b/webmcp-ts-sdk`
 
 ### 2) `@mcp-b/webmcp-polyfill` (Canonical Core Runtime)
 
@@ -68,7 +70,8 @@ Use when you want:
 
 Core layering:
 
-1. `webmcp-types` -> core browser type contracts; `@mcp-b/webmcp-types` -> derived MCP-B extensions and compatibility
+1. `webmcp-types` -> core browser type contracts; `@mcp-b/webmcp-ts-sdk` -> MCP-B adapter
+   and extension contracts
 2. `@mcp-b/webmcp-polyfill` -> canonical core runtime behavior
 3. `@mcp-b/global` -> MCP-B extensions/runtime built on core
 4. `@mcp-b/react-webmcp` -> React hooks for MCP-B runtime
@@ -76,7 +79,7 @@ Core layering:
 
 ## Contribution Rules for This Boundary
 
-1. Do not broaden `@mcp-b/webmcp-types` global `document.modelContext` to MCP-B-only extensions.
+1. Keep MCP-B-only extensions out of the upstream `document.modelContext` declaration.
 2. Put the browser adapter and its extension types in `@mcp-b/webmcp-ts-sdk`; keep runtime orchestration in `@mcp-b/global`.
 3. Keep `@mcp-b/react-webmcp` aligned with the packages that own each contract. Do not use `@mcp-b/global` as a type barrel.
 4. Keep `usewebmcp` aligned with upstream `webmcp-types`. It delegates Standard Schema validation to the supplied schema; MCP formatting and output metadata belong in `@mcp-b/react-webmcp`.
@@ -84,7 +87,8 @@ Core layering:
 
 ## Quick Selection Guide
 
-1. Need core browser contracts only: `webmcp-types`; add `@mcp-b/webmcp-types` for MCP-B extensions or compatibility
+1. Need core browser contracts only: upstream `webmcp-types`; use `@mcp-b/webmcp-ts-sdk`
+   for MCP-B adapter extensions or schema conversion
 2. Need strict core runtime only: `@mcp-b/webmcp-polyfill`
 3. Need full MCP-B runtime and extension APIs: `@mcp-b/global`
 4. Need React hooks for MCP-B: `@mcp-b/react-webmcp`

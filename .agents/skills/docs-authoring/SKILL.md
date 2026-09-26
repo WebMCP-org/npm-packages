@@ -300,7 +300,7 @@ This is critical. WebMCP is an active **Web Machine Learning Community Group pro
 | React hooks                        | `packages/react-webmcp/`, `packages/usewebmcp/`                                 |
 | Transports, iframe, relay          | `packages/transports/`, `packages/mcp-iframe/`, `packages/webmcp-local-relay/`  |
 | Tooling (smart-dom-reader, etc.)   | `packages/smart-dom-reader/`, etc.                                              |
-| Type contracts                     | `packages/webmcp-types/src/*.test-d.ts`                                         |
+| Type contracts                     | `packages/*/src/*.test-d.ts`, `packages/usewebmcp/type-tests/`                  |
 | Chromium flags & testing           | `e2e/web-standards-showcase/CHROMIUM_FLAGS.md`, `e2e/tests/CHROMIUM_TESTING.md` |
 
 ---

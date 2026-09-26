@@ -24,7 +24,7 @@
 
 ## Package Selection
 
-- Use upstream `webmcp-types` for the standard browser API; `@mcp-b/webmcp-types` adds MCP-B extensions and older-browser compatibility.
+- Use upstream `webmcp-types` for standard browser contracts and `@mcp-b/webmcp-ts-sdk` for MCP-B extensions and compatibility types.
 - Use `@mcp-b/webmcp-polyfill` when you only need strict WebMCP runtime polyfill behavior.
 - Use `@mcp-b/global` when you want MCPB integration features (bridge transport, prompts/resources, testing helpers, extension APIs).
 
@@ -33,9 +33,9 @@
 When no context is installed, `@mcp-b/global` calls `installWebMCP()` from
 `@mcp-b/webmcp-polyfill`. That package bundles the upstream
 [WebMCP polyfill](https://github.com/webmachinelearning/webmcp-polyfill) at
-revision `439c6c341f1c632c63498ba206e2bd8471cb8efb`. It also provides the
-standard browser types through `@mcp-b/webmcp-types`. Consumers do not install
-or build a Git dependency.
+revision `439c6c341f1c632c63498ba206e2bd8471cb8efb`. It depends on the
+upstream `webmcp-types` declarations. Consumers do not install or build a Git
+dependency.
 
 `@mcp-b/global` layers MCP-B transports, prompts, resources, declarative forms,
 the deprecated `navigator.modelContext` alias, and the optional
@@ -222,10 +222,6 @@ const tools = await document.modelContext.getTools();
 
 Execute a discovered descriptor with an input object. The result is serialized JSON.
 Feature-detect the context before calling it.
-
-```bash
-npm install --save-dev @mcp-b/webmcp-types
-```
 
 ```typescript
 import '@mcp-b/global';
@@ -557,7 +553,7 @@ import type { TransportConfiguration, WebModelContextInitOptions } from '@mcp-b/
 ```
 
 Import core browser contracts from upstream `webmcp-types`. Use
-`@mcp-b/webmcp-types` for MCP-B extensions and compatibility types.
+`@mcp-b/webmcp-ts-sdk` for MCP-B extensions and compatibility types.
 
 ## Tool Routing Contract
 

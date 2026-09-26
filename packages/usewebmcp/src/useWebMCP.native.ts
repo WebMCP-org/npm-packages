@@ -1,20 +1,21 @@
-import type { WebMCP } from 'webmcp-types';
 import { createElement, StrictMode } from 'react';
 import { beforeAll, expect, it } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { z } from 'zod';
 import { useWebMCP } from './index.js';
 
-function hasExecution(context: WebMCP.ModelContext | undefined): context is WebMCP.ModelContext {
-  return !!context && typeof context.executeTool === 'function';
+function requireNativeModelContext() {
+  const context = document.modelContext;
+  if (!context || typeof context.executeTool !== 'function') {
+    throw new Error('Run with Chrome Canary and WEBMCP_NATIVE=1');
+  }
+  return context;
 }
 
 beforeAll(() => {
-  const context = document.modelContext;
-  expect(context, 'Run with Chrome Canary and WEBMCP_NATIVE=1').toBeDefined();
-  expect(typeof context?.registerTool).toBe('function');
-  expect(typeof context?.getTools).toBe('function');
-  expect(typeof context?.executeTool).toBe('function');
+  const context = requireNativeModelContext();
+  expect(typeof context.registerTool).toBe('function');
+  expect(typeof context.getTools).toBe('function');
 });
 
 it('registers, validates, executes, and cleans up through native WebMCP in StrictMode', async () => {
@@ -32,8 +33,7 @@ it('registers, validates, executes, and cleans up through native WebMCP in Stric
       }),
     { wrapper: ({ children }) => createElement(StrictMode, null, children) }
   );
-  const context = document.modelContext;
-  if (!hasExecution(context)) throw new Error('Native executeTool is unavailable');
+  const context = requireNativeModelContext();
   await hook.act(async () => {
     await expect
       .poll(async () => (await context.getTools()).some((tool) => tool.name === 'native_validated'))
@@ -77,8 +77,7 @@ it('forwards native cancellation to the handler and clears pending state', async
       },
     })
   );
-  const context = document.modelContext;
-  if (!hasExecution(context)) throw new Error('Native executeTool is unavailable');
+  const context = requireNativeModelContext();
   await hook.act(async () => {
     await expect
       .poll(async () => (await context.getTools()).some((tool) => tool.name === 'native_cancelled'))

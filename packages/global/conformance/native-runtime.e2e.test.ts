@@ -1,6 +1,12 @@
-import type { ModelContext, ModelContextTool, RegisteredTool } from '@mcp-b/webmcp-types';
+import type { WebMCP } from '@mcp-b/webmcp-ts-sdk';
 import { runDeclarativeFormConformanceSuite } from '../../../conformance/declarative-forms-conformance.shared.js';
 import { afterEach, describe, expect, it } from 'vitest';
+
+type ModelContext = Omit<WebMCP.ModelContext, 'executeTool'> & {
+  executeTool?: WebMCP.ModelContext['executeTool'];
+};
+type ModelContextTool = WebMCP.ModelContextTool;
+type RegisteredTool = WebMCP.RegisteredTool;
 
 type NativeRegisterTool = (
   tool: ModelContextTool,

@@ -67,7 +67,7 @@ Examples of banned patterns:
 
 ```ts
 const registerTool = mc.registerTool as unknown as (tool: unknown) => Promise<void>;
-const ctx = document.modelContext as ModelContextWithExtensions;
+const ctx = document.modelContext as { listTools: () => unknown[] };
 const testing = navigator.modelContextTesting as unknown as {
   executeTool: (name: string, inputArgsJson: string) => Promise<string | null>;
 };
@@ -180,10 +180,11 @@ If code needs MCP-B extension methods, use a real type guard or the owning packa
 Preferred pattern:
 
 ```ts
-function hasModelContextExtensions(
-  modelContext: Navigator['modelContext']
-): modelContext is Navigator['modelContext'] & ModelContextExtensions {
-  return 'listTools' in modelContext;
+import { isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
+
+const context = document.modelContext;
+if (context && isBrowserMcpServer(context)) {
+  context.listTools();
 }
 ```
 
@@ -218,7 +219,8 @@ If you need anything broader than that, the design is probably wrong.
 
 - strict core WebMCP types come from upstream `webmcp-types`
 - strict core runtime behavior comes from `@mcp-b/webmcp-polyfill`
-- MCP-B extensions come from `@mcp-b/global`
+- MCP-B adapter extensions come from `@mcp-b/webmcp-ts-sdk`; globals installed by the full
+  runtime come from `@mcp-b/global`
 
 Do not import a weaker or more convenient type from the wrong layer.
 
@@ -339,7 +341,8 @@ Do not copy the weaker local pattern.
 
 Fix it so the nearest example matches the canonical package story:
 
-- `@mcp-b/webmcp-types` provides the type contract
+- Import each MCP-B contract from its owning package, with adapter extensions in
+  `@mcp-b/webmcp-ts-sdk`
 - `@mcp-b/webmcp-polyfill` installs strict core runtime globals
 - `@mcp-b/global` installs MCP-B runtime/extension globals
 - native Chromium tests use the real `document.modelContext.getTools()` surface and feature-detect Chrome's descriptor-based `executeTool()` extension; compatibility-shim coverage is kept in a separate lane

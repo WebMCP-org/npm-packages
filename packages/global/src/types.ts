@@ -1,6 +1,16 @@
-/// <reference types="@mcp-b/webmcp-types" preserve="true" />
-
+import type { WebMCP } from '@mcp-b/webmcp-polyfill';
 import type { IframeChildTransportOptions, TabServerTransportOptions } from '@mcp-b/transports';
+
+/** @deprecated Compatibility surface for Chromium's removed testing API. */
+export interface ModelContextTesting extends EventTarget {
+  listTools(): Array<{ name: string; description: string; inputSchema?: string }>;
+  executeTool(
+    toolName: string,
+    inputArgsJson: string,
+    options?: WebMCP.ModelContextExecuteToolOptions
+  ): Promise<string | null>;
+  ontoolchange: ((this: ModelContextTesting, event: Event) => unknown) | null;
+}
 
 export interface TransportConfiguration {
   /**
@@ -27,5 +37,15 @@ export interface WebModelContextInitOptions {
 declare global {
   interface Window {
     __webModelContextOptions?: WebModelContextInitOptions;
+  }
+
+  interface Navigator {
+    /** @deprecated Compatibility surface for older Chromium previews. */
+    modelContextTesting?: ModelContextTesting;
+  }
+
+  interface SubmitEvent {
+    readonly agentInvoked?: boolean;
+    respondWith?(agentResponse: Promise<unknown>): void;
   }
 }

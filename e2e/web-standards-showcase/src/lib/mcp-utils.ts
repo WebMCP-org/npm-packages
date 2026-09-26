@@ -2,7 +2,7 @@
  * Utilities for working with MCP (Model Context Protocol) responses
  */
 
-import type { CallToolResult } from '@mcp-b/webmcp-types';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 
 /**
  * Formatted result with extracted display text and error status

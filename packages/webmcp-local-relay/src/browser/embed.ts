@@ -11,12 +11,8 @@
  * chain multiple API calls:
  * `<script src=".../embed.js" data-request-timeout="120000"></script>`
  */
-import { normalizeToolResponse } from '@mcp-b/webmcp-polyfill/schema';
-import type {
-  ChromeModelContextExecuteToolOptions,
-  ModelContext,
-  RegisteredTool,
-} from '@mcp-b/webmcp-types';
+import { normalizeToolResponse } from '@mcp-b/webmcp-ts-sdk/schema';
+import type { ModelContext, RegisteredTool } from '@mcp-b/webmcp-ts-sdk';
 import type { CallToolResult } from '@modelcontextprotocol/server';
 import { createRequestId, isJsonObject } from './shared.js';
 
@@ -31,13 +27,7 @@ interface RelayToolDescriptor {
   annotations?: RegisteredTool['annotations'];
 }
 
-interface ExecutableModelContext extends ModelContext {
-  executeTool(
-    tool: RegisteredTool,
-    inputObject: object,
-    options?: ChromeModelContextExecuteToolOptions
-  ): Promise<string | null>;
-}
+type ExecutableModelContext = ModelContext & Required<Pick<ModelContext, 'executeTool'>>;
 
 interface WidgetRequestMessage {
   requestId: string;
@@ -189,9 +179,7 @@ function normalizeSerializedToolResult(serialized: string | null): CallToolResul
 function hasDescriptorToolApi(
   modelContext: ModelContext | undefined
 ): modelContext is ExecutableModelContext {
-  return Boolean(
-    modelContext && 'executeTool' in modelContext && typeof modelContext.executeTool === 'function'
-  );
+  return Boolean(modelContext && typeof modelContext.executeTool === 'function');
 }
 
 function getDocumentDescriptorContext(): ExecutableModelContext | undefined {

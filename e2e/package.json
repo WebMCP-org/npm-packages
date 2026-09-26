@@ -44,12 +44,14 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
+    "@mcp-b/global": "workspace:*",
     "@mcp-b/mcp-iframe": "workspace:*",
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
-    "@mcp-b/webmcp-types": "workspace:*",
     "@modelcontextprotocol/client": "catalog:",
+    "@modelcontextprotocol/server": "catalog:",
     "@playwright/test": "^1.62.1",
     "@types/node": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "webmcp-types": "^0.1.9"
   }
 }

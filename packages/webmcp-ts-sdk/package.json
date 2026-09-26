@@ -51,6 +51,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "import": "./dist/schema.js"
     }
   },
   "publishConfig": {
@@ -71,9 +75,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mcp-b/webmcp-polyfill": "workspace:*",
-    "@mcp-b/webmcp-types": "workspace:*",
-    "@modelcontextprotocol/server": "catalog:"
+    "@modelcontextprotocol/server": "catalog:",
+    "@standard-schema/spec": "^1.1.0",
+    "webmcp-types": "^0.1.9"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "catalog:",

@@ -1,4 +1,5 @@
-import type { CallToolResult, InputSchema, JsonObject, TextContent } from '@mcp-b/webmcp-types';
+import type { CallToolResult, TextContent } from '@modelcontextprotocol/server';
+import type { InputSchema, JsonObject } from '@mcp-b/webmcp-ts-sdk';
 
 const BASE_TOOL_NAMES = ['echo', 'sum', 'always_fail'] as const;
 export const DYNAMIC_TOOL_NAME = 'dynamic_tool';
@@ -38,14 +39,6 @@ export interface RuntimeContractState {
   invocations: RuntimeInvocationRecord[];
 }
 
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function normalizeArguments(value: unknown): Record<string, unknown> {
-  return isObjectRecord(value) ? structuredClone(value) : {};
-}
-
 function textResult(text: string, structuredContent?: JsonObject): CallToolResult {
   return {
     content: [{ type: 'text', text }],
@@ -60,7 +53,7 @@ function recordInvocation(
 ): void {
   state.invocations.push({
     name,
-    arguments: normalizeArguments(args),
+    arguments: structuredClone(args),
   });
 }
 
@@ -102,9 +95,8 @@ export function createRuntimeContractTools(
           required: ['message'],
         },
         async execute(args) {
-          const normalized = normalizeArguments(args);
-          const message = typeof normalized.message === 'string' ? normalized.message : '';
-          recordInvocation(state, 'echo', normalized);
+          const message = typeof args.message === 'string' ? args.message : '';
+          recordInvocation(state, 'echo', args);
           return textResult(`echo:${message}`, {
             message,
             runtime: runtimeLabel,
@@ -123,9 +115,8 @@ export function createRuntimeContractTools(
           required: ['a', 'b'],
         },
         async execute(args) {
-          const normalized = normalizeArguments(args);
-          const a = Number(normalized.a ?? 0);
-          const b = Number(normalized.b ?? 0);
+          const a = Number(args.a ?? 0);
+          const b = Number(args.b ?? 0);
           const sum = a + b;
           recordInvocation(state, 'sum', { a, b });
           return textResult(`sum:${sum}`, {
@@ -146,12 +137,11 @@ export function createRuntimeContractTools(
           },
         },
         async execute(args) {
-          const normalized = normalizeArguments(args);
           const reason =
-            typeof normalized.reason === 'string' && normalized.reason.length > 0
-              ? normalized.reason
+            typeof args.reason === 'string' && args.reason.length > 0
+              ? args.reason
               : 'runtime failure';
-          recordInvocation(state, 'always_fail', normalized);
+          recordInvocation(state, 'always_fail', args);
           throw new Error(`always_fail:${reason}`);
         },
       },
@@ -168,9 +158,8 @@ export function createRuntimeContractTools(
           required: ['value'],
         },
         async execute(args) {
-          const normalized = normalizeArguments(args);
-          const value = typeof normalized.value === 'string' ? normalized.value : '';
-          recordInvocation(state, dynamicToolName, normalized);
+          const value = typeof args.value === 'string' ? args.value : '';
+          recordInvocation(state, dynamicToolName, args);
           return textResult(`dynamic:${value}`, {
             value,
             runtime: runtimeLabel,

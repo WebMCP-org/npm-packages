@@ -1,4 +1,4 @@
-import type { InputSchema, ModelContext, RegisteredTool } from '@mcp-b/webmcp-types';
+import type { InputSchema, ModelContext, RegisteredTool } from '@mcp-b/webmcp-ts-sdk';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 /**
@@ -873,9 +873,7 @@ export function runDeclarativeFormConformanceSuite(
       expect(scope.value).toBe('global');
     });
 
-    const itWithFormRemovalCancellation =
-      options.supportsFormRemovalCancellation === false ? it.skip : it;
-    itWithFormRemovalCancellation(
+    it.skipIf(options.supportsFormRemovalCancellation === false)(
       'rejects a pending response when its declarative form is removed',
       async () => {
         const name = `declarative_removed_${String(Date.now())}`;

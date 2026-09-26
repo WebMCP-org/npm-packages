@@ -39,18 +39,17 @@ CHROME_BIN=/path/to/chrome-canary node benchmarks/react-hooks/production.mjs
 node benchmarks/react-hooks/bundle.mjs
 ```
 
-The runners write `production-results.json`, `PRODUCTION.md`, and
-`bundle-results.json` in this directory. These generated files are ignored by
-Git. Run timings without concurrent builds or tests. The browser runner rejects
-a missing or polyfilled WebMCP registry and checks registration, current
-handlers, completed calls, and cleanup.
+The runners write `production-results.json` and `bundle-results.json` in this
+directory. These generated files are ignored by Git. Run timings without
+concurrent builds or tests. The browser runner starts Chrome with native WebMCP
+enabled and no polyfill loaded, then checks registration, current handlers,
+completed calls, and cleanup.
 
 The browser runner measures 1, 10, and 100 tools with 1 or 100 schema fields,
 using stable and inline schema objects. Each scenario has one warmup and five
 measured trials. It measures mount, ten unrelated parent updates, a description
 change, and ten sequential calls. Every handler yields one MessageChannel task.
-The generated report gives medians and observed ranges; raw samples preserve
-individual operations and environment details.
+The production JSON preserves individual operations and environment details.
 
 The isolated benchmark lockfile pins React 19.2.8, MCP Cat 1.1.0, Google 0.2.0,
 and Zod 4.4.3. Our hooks are built from this checkout. Competitor dependencies

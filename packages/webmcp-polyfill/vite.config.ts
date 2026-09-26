@@ -8,7 +8,6 @@ const isCI = process.env.CI === 'true';
 const esmConfig: Options = {
   entry: {
     index: 'src/index.ts',
-    schema: 'src/schema.ts',
   },
   format: ['esm'],
   dts: true,
@@ -23,7 +22,7 @@ const esmConfig: Options = {
 };
 
 // IIFE build for script tag usage - bundles everything for standalone use
-// Uses index.ts which auto-initializes on load
+// Uses iife.ts, which auto-initializes on load.
 const iifeConfig: Options = {
   entry: {
     index: 'src/iife.ts',

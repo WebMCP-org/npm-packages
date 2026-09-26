@@ -10,7 +10,7 @@ if (new URLSearchParams(location.search).has('allow-tools-policy')) {
 await import('@mcp-b/global');
 
 import type { BrowserMcpServer, ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
-import type { RegistrationHandle } from '@mcp-b/webmcp-types';
+import type { RegistrationHandle } from '@mcp-b/webmcp-ts-sdk';
 
 const modelContext = document.modelContext as BrowserMcpServer;
 const wait = (milliseconds: number) =>

@@ -214,16 +214,19 @@ importers:
 
   e2e:
     devDependencies:
+      '@mcp-b/global':
+        specifier: workspace:*
+        version: link:../packages/global
       '@mcp-b/mcp-iframe':
         specifier: workspace:*
         version: link:../packages/mcp-iframe
       '@mcp-b/webmcp-ts-sdk':
         specifier: workspace:*
         version: link:../packages/webmcp-ts-sdk
-      '@mcp-b/webmcp-types':
-        specifier: workspace:*
-        version: link:../packages/webmcp-types
       '@modelcontextprotocol/client':
+        specifier: 'catalog:'
+        version: 2.0.0
+      '@modelcontextprotocol/server':
         specifier: 'catalog:'
         version: 2.0.0
       '@playwright/test':
@@ -235,6 +238,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+      webmcp-types:
+        specifier: ^0.1.9
+        version: 0.1.9
 
   e2e/react-webmcp-test-app:
     dependencies:
@@ -293,9 +299,6 @@ importers:
       '@mcp-b/webmcp-ts-sdk':
         specifier: workspace:*
         version: link:../../packages/webmcp-ts-sdk
-      '@mcp-b/webmcp-types':
-        specifier: workspace:*
-        version: link:../../packages/webmcp-types
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
         version: 2.0.0
@@ -324,9 +327,6 @@ importers:
 
   e2e/web-standards-showcase:
     dependencies:
-      '@mcp-b/webmcp-types':
-        specifier: workspace:*
-        version: link:../../packages/webmcp-types
       '@radix-ui/react-checkbox':
         specifier: ^1.3.11
         version: 1.3.11(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -372,10 +372,16 @@ importers:
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
+      webmcp-types:
+        specifier: ^0.1.9
+        version: 0.1.9
     devDependencies:
       '@cloudflare/vite-plugin':
         specifier: ^1.54.1
         version: 1.54.2(@voidzero-dev/vite-plus-core@0.1.24(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.97.3)(terser@5.50.0)(tsx@4.23.13)(typescript@5.9.3)(yaml@2.8.3))(wrangler@4.127.1)
+      '@modelcontextprotocol/server':
+        specifier: 'catalog:'
+        version: 2.0.0
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(@voidzero-dev/vite-plus-core@0.1.24(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.97.3)(terser@5.50.0)(tsx@4.23.13)(typescript@5.9.3)(yaml@2.8.3))
@@ -595,9 +601,6 @@ importers:
       '@mcp-b/webmcp-ts-sdk':
         specifier: workspace:*
         version: link:../webmcp-ts-sdk
-      '@mcp-b/webmcp-types':
-        specifier: workspace:*
-        version: link:../webmcp-types
       '@modelcontextprotocol/server':
         specifier: 'catalog:'
         version: 2.0.0
@@ -636,9 +639,6 @@ importers:
       '@mcp-b/webmcp-ts-sdk':
         specifier: workspace:*
         version: link:../webmcp-ts-sdk
-      '@mcp-b/webmcp-types':
-        specifier: workspace:*
-        version: link:../webmcp-types
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.1
@@ -651,15 +651,9 @@ importers:
 
   packages/react-webmcp:
     dependencies:
-      '@mcp-b/webmcp-polyfill':
-        specifier: workspace:*
-        version: link:../webmcp-polyfill
       '@mcp-b/webmcp-ts-sdk':
         specifier: workspace:*
         version: link:../webmcp-ts-sdk
-      '@mcp-b/webmcp-types':
-        specifier: workspace:*
-        version: link:../webmcp-types
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
         version: 2.0.0
@@ -805,9 +799,6 @@ importers:
       '@mcp-b/webmcp-polyfill':
         specifier: workspace:*
         version: link:../webmcp-polyfill
-      '@mcp-b/webmcp-types':
-        specifier: workspace:*
-        version: link:../webmcp-types
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.1
@@ -869,6 +860,9 @@ importers:
 
   packages/webmcp-local-relay:
     dependencies:
+      '@mcp-b/webmcp-ts-sdk':
+        specifier: workspace:*
+        version: link:../webmcp-ts-sdk
       '@modelcontextprotocol/core':
         specifier: 'catalog:'
         version: 2.0.0
@@ -888,9 +882,6 @@ importers:
       '@mcp-b/webmcp-polyfill':
         specifier: workspace:*
         version: link:../webmcp-polyfill
-      '@mcp-b/webmcp-types':
-        specifier: workspace:*
-        version: link:../webmcp-types
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
         version: 2.0.0
@@ -918,12 +909,6 @@ importers:
 
   packages/webmcp-polyfill:
     dependencies:
-      '@mcp-b/webmcp-types':
-        specifier: workspace:*
-        version: link:../webmcp-types
-      '@standard-schema/spec':
-        specifier: ^1.1.0
-        version: 1.1.0
       webmcp-types:
         specifier: ^0.1.9
         version: 0.1.9
@@ -946,15 +931,15 @@ importers:
 
   packages/webmcp-ts-sdk:
     dependencies:
-      '@mcp-b/webmcp-polyfill':
-        specifier: workspace:*
-        version: link:../webmcp-polyfill
-      '@mcp-b/webmcp-types':
-        specifier: workspace:*
-        version: link:../webmcp-types
       '@modelcontextprotocol/server':
         specifier: 'catalog:'
         version: 2.0.0
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
+      webmcp-types:
+        specifier: ^0.1.9
+        version: 0.1.9
     devDependencies:
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
@@ -965,25 +950,6 @@ importers:
       playwright:
         specifier: 'catalog:'
         version: 1.62.1
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vite-plus:
-        specifier: 'catalog:'
-        version: 0.1.24(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.8(@voidzero-dev/vite-plus-test@0.1.24))(esbuild@0.28.1)(happy-dom@20.8.9)(jiti@2.7.0)(sass@1.97.3)(svelte@5.55.7(@typescript-eslint/types@8.68.0))(terser@5.50.0)(tsx@4.23.13)(typescript@5.9.3)(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.97.3)(terser@5.50.0)(tsx@4.23.13)(yaml@2.8.3))(yaml@2.8.3)
-      vitest:
-        specifier: 'catalog:'
-        version: '@voidzero-dev/vite-plus-test@0.1.24(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.8(@voidzero-dev/vite-plus-test@0.1.24))(esbuild@0.28.1)(happy-dom@20.8.9)(jiti@2.7.0)(sass@1.97.3)(terser@5.50.0)(tsx@4.23.13)(typescript@5.9.3)(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.97.3)(terser@5.50.0)(tsx@4.23.13)(yaml@2.8.3))(yaml@2.8.3)'
-
-  packages/webmcp-types:
-    dependencies:
-      '@modelcontextprotocol/server':
-        specifier: 'catalog:'
-        version: 2.0.0
-      webmcp-types:
-        specifier: ^0.1.9
-        version: 0.1.9
-    devDependencies:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3

@@ -44,7 +44,7 @@
     "test:unit": "pnpm test:unit:scripts && pnpm test:unit:packages && pnpm test:hooks",
     "test:unit:coverage": "pnpm test:unit:scripts && pnpm test:unit:packages:coverage && pnpm test:hooks:coverage",
     "test:unit:packages": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/landing-page' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' --filter '!usewebmcp' --filter '!@mcp-b/react-webmcp' run test",
-    "test:unit:packages:coverage": "pnpm --filter @mcp-b/documentation-website --filter @mcp-b/webmcp-types test && pnpm -r --filter './packages/**' --filter '!usewebmcp' --filter '!@mcp-b/react-webmcp' run test:coverage",
+    "test:unit:packages:coverage": "pnpm --filter @mcp-b/documentation-website test && pnpm -r --filter './packages/**' --filter '!usewebmcp' --filter '!@mcp-b/react-webmcp' run test:coverage",
     "test:unit:scripts": "node --test scripts/*.test.mjs",
     "test:wpt": "pnpm --filter @mcp-b/webmcp-polyfill build && node ./scripts/run-webmcp-wpt.mjs",
     "test:wpt:idl": "pnpm --filter @mcp-b/webmcp-polyfill build && node ./scripts/run-webmcp-wpt.mjs --idl",

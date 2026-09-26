@@ -14,23 +14,18 @@ import {
   validateWebMcpAccess,
   validateWebMcpToolDescriptor,
   withAbortSignal,
-} from '@mcp-b/webmcp-polyfill/schema';
-import type { NormalizedInputSchema } from '@mcp-b/webmcp-polyfill/schema';
+} from './schema.js';
+import type { NormalizedInputSchema } from './schema.js';
 import type {
   ChromeModelContextExecuteToolOptions,
-  InputSchema,
   ModelContext,
   ModelContextGetToolOptions,
   ModelContextRegisterToolOptions,
-  ModelContextTool,
   ModelContextWithExtensions,
-  RegistrationHandle,
   RegisteredTool,
-  ToolAnnotations,
-  ToolDescriptor,
-  ToolListItem,
-  WebMcpToolInput,
-} from '@mcp-b/webmcp-types';
+} from './model-context.js';
+import type { InputSchema, RegistrationHandle, WebMcpToolInput } from './common.js';
+import type { ModelContextTool, ToolAnnotations, ToolDescriptor, ToolListItem } from './tool.js';
 import {
   fromJsonSchema,
   isInputRequiredResult,
@@ -493,8 +488,8 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     // MCP serves this frame's subtree. Importing ancestor or sibling tools
     // would feed iframe bridges back into their source and repeatedly prefix
     // the same tools. Descendants remain available to top-frame clients.
+    const ownerWindow = this.ownerDocument?.defaultView;
     const tools = (await native.getTools()).filter((tool) => {
-      const ownerWindow = this.ownerDocument?.defaultView;
       let frame = tool.window;
       while (frame) {
         if (frame === ownerWindow) return true;

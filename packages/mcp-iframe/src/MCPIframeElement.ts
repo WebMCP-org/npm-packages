@@ -44,7 +44,7 @@ import type {
   ModelContext,
   ModelContextTool,
   RegistrationHandle,
-} from '@mcp-b/webmcp-types';
+} from '@mcp-b/webmcp-ts-sdk';
 import {
   Client,
   UriTemplate,

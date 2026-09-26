@@ -50,24 +50,6 @@ export interface ChromeModelContextExtensions {
   ): Promise<string | null>;
 }
 
-/** @deprecated Metadata returned by `navigator.modelContextTesting`. */
-export interface ModelContextTestingToolInfo {
-  name: string;
-  description: string;
-  inputSchema?: string;
-}
-
-/** @deprecated Compatibility surface for Chromium's removed testing API. */
-export interface ModelContextTesting extends EventTarget {
-  listTools(): ModelContextTestingToolInfo[];
-  executeTool(
-    toolName: string,
-    inputArgsJson: string,
-    options?: ChromeModelContextExecuteToolOptions
-  ): Promise<string | null>;
-  ontoolchange: ((this: ModelContextTesting, event: Event) => unknown) | null;
-}
-
 /** Options accepted by `ModelContext.registerTool()`. */
 export type ModelContextRegisterToolOptions = WebMCP.ModelContextRegisterToolOptions;
 
@@ -132,3 +114,10 @@ export interface ModelContextExtensions {
 export type ChromeModelContext = ModelContext & ChromeModelContextExtensions;
 export type ModelContextWithExtensions = Omit<ModelContext, 'registerTool'> &
   ModelContextExtensions;
+
+declare global {
+  interface Navigator {
+    /** @deprecated Use `document.modelContext`. */
+    readonly modelContext?: ModelContext;
+  }
+}

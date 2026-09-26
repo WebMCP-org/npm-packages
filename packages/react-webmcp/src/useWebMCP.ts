@@ -1,7 +1,7 @@
 'use client';
 
-import { normalizeToolResponse, type ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';
-import type { InputSchema, JsonSchemaForInference } from '@mcp-b/webmcp-types';
+import { normalizeToolResponse, type ToolInputSchema } from '@mcp-b/webmcp-ts-sdk/schema';
+import type { InputSchema, JsonSchemaForInference } from '@mcp-b/webmcp-ts-sdk';
 import type { DependencyList } from 'react';
 import { useWebMCP as useCoreWebMCP } from 'usewebmcp';
 import type { WebMCPConfig, WebMCPReturn } from './types.js';

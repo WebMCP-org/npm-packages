@@ -32,9 +32,10 @@ flowchart TB
   Proposal -->|"target browser contract"| Portable
 ```
 
-The live draft owns the exact `ModelContext` members and signatures. MCP-B may
-retain compatibility types or adapters while browser implementations converge.
-Do not infer proposal status from where a method appears in an MCP-B type.
+The live draft owns the exact `ModelContext` members and signatures. Upstream [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types)
+provides the browser declarations. MCP-B adapter and extension contracts live
+with [`@mcp-b/webmcp-ts-sdk`](/packages/webmcp-ts-sdk/reference). The SDK may
+include compatibility adapters, but they do not redefine the proposal.
 
 ## Why the extension boundary exists
 
@@ -78,11 +79,11 @@ flowchart TD
   Validator -->|"Validated and transformed input"| Handler["Your tool implementation"]
 ```
 
-The standalone polyfill keeps its browser contract focused on JSON Schema metadata. Adding an
-optional helper under [`@mcp-b/webmcp-polyfill/schema`](/packages/webmcp-polyfill/reference#schema-entry)
-does not change `document.modelContext.registerTool()` or make it call a validator. This is an
-adapter extension, not a browser API feature. Declarative forms separately use the browser's form
-constraint validation.
+The standalone polyfill keeps its browser contract focused on JSON Schema metadata.
+[`@mcp-b/webmcp-ts-sdk/schema`](/packages/webmcp-ts-sdk/reference#schema-boundary) converts schemas
+for direct WebMCP registrations and the MCP adapter; it does not change
+`document.modelContext.registerTool()` or make it call a validator. Declarative forms separately use
+the browser's form constraint validation.
 
 The MCP route has another validation owner: the official server composed by
 [`BrowserMcpServer`](/packages/webmcp-ts-sdk/reference#schema-boundary). It can use a validator
@@ -93,6 +94,5 @@ validator expecting a string.
 
 The [schema guide](/how-to/use-schemas-and-structured-output) shows how to keep one owner for vendor
 validation when registering directly, and how to add MCP output schemas independently. Upstream
-[`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) owns the core browser declarations;
-[`@mcp-b/webmcp-types`](/packages/webmcp-types/reference) derives compatibility and MCP extension types.
-Neither type package performs runtime validation.
+[`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) owns the core browser declarations.
+The SDK schema adapter handles MCP-B conversion; neither package performs runtime validation by itself.

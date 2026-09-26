@@ -1,12 +1,13 @@
-import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';
-import type { PromptDescriptor, ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
+import type { ToolInputSchema } from '@mcp-b/webmcp-ts-sdk/schema';
 import type {
   InferJsonSchema,
   InputSchema,
   JsonSchemaForInference,
   MaybePromise,
   ToolAnnotations,
-} from '@mcp-b/webmcp-types';
+  PromptDescriptor,
+  ResourceDescriptor,
+} from '@mcp-b/webmcp-ts-sdk';
 import type {
   ToolExecuteFunction as CoreToolExecuteFunction,
   WebMCPConfig as CoreWebMCPConfig,
@@ -45,7 +46,7 @@ export type {
   PromptDescriptor,
   ResourceDescriptor,
 } from '@mcp-b/webmcp-ts-sdk';
-export type { CallToolResult, ToolAnnotations, ToolDescriptor } from '@mcp-b/webmcp-types';
+export type { CallToolResult, ToolAnnotations, ToolDescriptor } from '@mcp-b/webmcp-ts-sdk';
 
 /** A single message returned by {@link WebMCPPromptConfig.get}. */
 export type PromptMessage = Awaited<ReturnType<PromptDescriptor['get']>>['messages'][number];

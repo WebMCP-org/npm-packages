@@ -22,7 +22,7 @@ then run the broader suite before merging.
 | Change                             | Command                                                       |
 | ---------------------------------- | ------------------------------------------------------------- |
 | Package logic and React hooks      | `pnpm test:unit`                                              |
-| Polyfill browser behavior          | `pnpm --filter @mcp-b/webmcp-polyfill test:conformance`       |
+| Polyfill install smoke             | `pnpm --filter @mcp-b/webmcp-polyfill test:smoke`             |
 | Composed `@mcp-b/global` behavior  | `pnpm --filter @mcp-b/global test:conformance:global`         |
 | Tab and iframe transports          | `pnpm --filter mcp-e2e-tests test:runtime-contract:transport` |
 | `<mcp-iframe>` element             | `pnpm --filter mcp-e2e-tests test:mcp-iframe`                 |
@@ -40,7 +40,7 @@ Run the polyfill and composed global contracts together when you change registra
 discovery, lifecycle, or execution behavior:
 
 ```bash title="Run MCP-B browser conformance"
-pnpm --filter @mcp-b/webmcp-polyfill test:conformance
+pnpm --filter @mcp-b/webmcp-polyfill test:smoke
 pnpm --filter @mcp-b/global test:conformance:global
 ```
 

@@ -1,4 +1,5 @@
 import type { RuntimeContractController } from '../runtime-contract/core.js';
+import type {} from '@mcp-b/global';
 import type { MCPIframeElement } from '@mcp-b/mcp-iframe/element';
 import type {
   CallToolResult,

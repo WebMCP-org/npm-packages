@@ -100,12 +100,12 @@ Run commands:
 
 - Pinned upstream WebMCP WPT against the standalone polyfill:
   - `CHROME_BIN="/path/to/chrome-canary" pnpm test:wpt`
-- WebMCP polyfill runtime (non-native Chromium):
-  - `pnpm --filter @mcp-b/webmcp-polyfill run test:conformance`
+- WebMCP polyfill smoke test (non-native Chromium):
+  - `pnpm --filter @mcp-b/webmcp-polyfill run test:smoke`
 - Global runtime (non-native Chromium):
   - `pnpm --filter @mcp-b/global run test:conformance:global`
-- WebMCP polyfill runtime through the global matrix alias:
-  - `pnpm --filter @mcp-b/global run test:conformance:polyfill`
+- WebMCP polyfill smoke test through the global matrix alias:
+  - `pnpm --filter @mcp-b/global run test:smoke:polyfill`
 - Native runtime (Chrome 152+ Dev/Canary + flags):
   - `CHROME_BIN=\"/path/to/chrome-dev-or-canary\" CHROME_FLAGS=\"--enable-features=WebMCP\" pnpm --filter @mcp-b/global run test:conformance:native`
 - Matrix:

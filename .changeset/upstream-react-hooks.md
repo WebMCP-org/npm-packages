@@ -1,13 +1,11 @@
 ---
 'usewebmcp': major
 '@mcp-b/react-webmcp': major
-'@mcp-b/webmcp-types': major
 '@mcp-b/webmcp-polyfill': patch
 ---
 
 Use the Community Group's `webmcp-types` as the core React hook contract and the owner of
-`Document.modelContext`. MCP-B types now derive standard contracts from upstream and retain
-extension and legacy discovery types without conflicting global declarations.
+`Document.modelContext`. MCP-B extension types are now exported by `@mcp-b/webmcp-ts-sdk`.
 
 `usewebmcp` no longer installs MCP-B or the MCP SDK. Its results infer from `execute` and successful
 agent calls return raw values. To retain `outputSchema`, MCP annotations, and automatic MCP response

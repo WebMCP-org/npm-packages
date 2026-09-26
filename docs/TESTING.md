@@ -37,8 +37,8 @@ pnpm --filter mcp-e2e-tests test:native-contract:default
 pnpm --filter mcp-e2e-tests test:native-showcase
 
 # Shared WebMCP conformance lanes
-# Strict core WebMCP runtime
-pnpm --filter @mcp-b/webmcp-polyfill test:conformance
+# Strict core WebMCP install, registration, execution, and abort smoke test
+pnpm --filter @mcp-b/webmcp-polyfill test:smoke
 # MCP-B runtime and declarative-form extensions
 pnpm --filter @mcp-b/global test:conformance:global
 
@@ -210,7 +210,9 @@ runs an explicit allowlist of imperative tests for the strict core surface.
 Frame-tree, origin-policy, and navigation WPT are excluded because they require
 native browser behavior. MCP-B declarative-form tests run in the
 `@mcp-b/global` conformance lane, alongside the MCP-B runtime extensions. The
-standalone polyfill conformance tests cover the upstream core package.
+standalone polyfill test is an install, registration, execution, and abort
+smoke test. The selected upstream WPT allowlist provides behavioral
+conformance coverage.
 The pinned WPT revision's omitted imperative cases still expect JSON-string
 `executeTool()` input or older annotations; refresh the pin before restoring
 them.

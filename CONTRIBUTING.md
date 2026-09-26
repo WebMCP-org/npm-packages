@@ -159,7 +159,6 @@ Package scopes (all in `packages/` directory):
 - `webmcp-local-relay` - @mcp-b/webmcp-local-relay
 - `webmcp-polyfill` - @mcp-b/webmcp-polyfill
 - `webmcp-ts-sdk` - @mcp-b/webmcp-ts-sdk
-- `webmcp-types` - @mcp-b/webmcp-types
 
 Repository-wide scopes:
 
@@ -224,9 +223,8 @@ npm-packages/
 │   ├── transports/              # Core transport implementations
 │   ├── webmcp-extension/         # MV3 extension template and content-script client
 │   ├── webmcp-polyfill/         # Strict core WebMCP runtime polyfill
-│   ├── webmcp-types/            # Strict core WebMCP type definitions
 │   ├── usewebmcp/               # React hooks for strict core WebMCP API
-│   └── webmcp-ts-sdk/           # TypeScript SDK adapter
+│   └── webmcp-ts-sdk/           # MCP SDK adapter and MCP-B extensions
 ├── e2e/                         # E2E tests and test apps
 ├── docs/                        # Technical documentation
 └── .changeset/                  # Changeset files

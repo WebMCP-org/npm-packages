@@ -1,10 +1,10 @@
 import { IframeChildTransport, TabServerTransport } from '@mcp-b/transports';
 import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer, isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
-import type { ModelContext, ModelContextTesting } from '@mcp-b/webmcp-types';
+import type { ModelContext } from '@mcp-b/webmcp-ts-sdk';
 import type { Transport } from '@modelcontextprotocol/server';
 import { installWebMCPDeclarativeExtensions } from './declarative-forms.js';
-import type { WebModelContextInitOptions } from './types.js';
+import type { ModelContextTesting, WebModelContextInitOptions } from './types.js';
 
 interface RuntimeState {
   server: BrowserMcpServer;
@@ -74,38 +74,13 @@ function canReplaceModelContext(target: Document | Navigator): boolean {
   return descriptor ? descriptor.configurable === true : Object.isExtensible(target);
 }
 
-function replaceDocumentModelContext(value: unknown): void {
-  Object.defineProperty(document, 'modelContext', {
+function replaceModelContextProperty(target: Document | Navigator, value: unknown): void {
+  Object.defineProperty(target, 'modelContext', {
     configurable: true,
     enumerable: true,
     writable: false,
     value,
   });
-
-  if (document.modelContext !== value) {
-    console.error(
-      '[WebModelContext] Failed to replace document.modelContext.',
-      'Descriptor:',
-      Object.getOwnPropertyDescriptor(document, 'modelContext')
-    );
-  }
-}
-
-function replaceNavigatorModelContext(value: unknown): void {
-  Object.defineProperty(navigator, 'modelContext', {
-    configurable: true,
-    enumerable: true,
-    writable: false,
-    value,
-  });
-
-  if (navigator.modelContext !== value) {
-    console.error(
-      '[WebModelContext] Failed to replace navigator.modelContext.',
-      'Descriptor:',
-      Object.getOwnPropertyDescriptor(navigator, 'modelContext')
-    );
-  }
 }
 
 function restoreProperty(
@@ -130,8 +105,8 @@ function replaceModelContext(
   previousNavigatorDescriptor: PropertyDescriptor | undefined
 ): void {
   try {
-    replaceDocumentModelContext(value);
-    replaceNavigatorModelContext(value);
+    replaceModelContextProperty(document, value);
+    replaceModelContextProperty(navigator, value);
   } catch (error) {
     restoreProperty(document, 'modelContext', previousDocumentDescriptor);
     restoreProperty(navigator, 'modelContext', previousNavigatorDescriptor);

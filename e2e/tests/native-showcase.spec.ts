@@ -61,13 +61,6 @@ async function waitForToolSet(page: Page, toolNames: string[]): Promise<void> {
 async function openShowcase(page: Page): Promise<void> {
   await page.goto('/');
   await waitForNativeReady(page);
-  const keptBrowserContext = await page.evaluate(() => {
-    const raw = (
-      window as Window & { __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'] }
-    ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
-    return Boolean(raw && raw === document.modelContext);
-  });
-  expect(keptBrowserContext).toBe(true);
 }
 
 async function waitForTextContains(page: Page, selector: string, text: string): Promise<void> {

@@ -1,4 +1,4 @@
-import type { InputSchema, ModelContext, WebMcpToolInput } from '@mcp-b/webmcp-types';
+import type { InputSchema, ModelContext, WebMcpToolInput } from '@mcp-b/webmcp-ts-sdk';
 
 type DeclarativeControl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 type Submitter = HTMLButtonElement | HTMLInputElement;
@@ -71,13 +71,9 @@ export function respondWithAgentSubmitEvent(
 /** Installs the MCP-B declarative form and SubmitEvent extensions. */
 export function installWebMCPDeclarativeExtensions(context: ModelContext): () => void {
   const prototype = SubmitEvent.prototype;
-  const installedProperties: Array<{
-    key: 'agentInvoked' | 'respondWith';
-    previous: PropertyDescriptor | undefined;
-  }> = [];
+  const installedProperties: Array<'agentInvoked' | 'respondWith'> = [];
 
   if (!('agentInvoked' in prototype)) {
-    const previous = Object.getOwnPropertyDescriptor(prototype, 'agentInvoked');
     Object.defineProperty(prototype, 'agentInvoked', {
       configurable: true,
       enumerable: true,
@@ -85,11 +81,10 @@ export function installWebMCPDeclarativeExtensions(context: ModelContext): () =>
         return isAgentInvokedSubmitEvent(this);
       },
     });
-    installedProperties.push({ key: 'agentInvoked', previous });
+    installedProperties.push('agentInvoked');
   }
 
   if (!('respondWith' in prototype)) {
-    const previous = Object.getOwnPropertyDescriptor(prototype, 'respondWith');
     Object.defineProperty(prototype, 'respondWith', {
       configurable: true,
       enumerable: true,
@@ -98,16 +93,13 @@ export function installWebMCPDeclarativeExtensions(context: ModelContext): () =>
         respondWithAgentSubmitEvent(this, agentResponse);
       },
     });
-    installedProperties.push({ key: 'respondWith', previous });
+    installedProperties.push('respondWith');
   }
 
   const cleanupForms = installDeclarativeForms(document, context);
   return () => {
     cleanupForms();
-    for (const { key, previous } of installedProperties.reverse()) {
-      if (previous) Object.defineProperty(prototype, key, previous);
-      else Reflect.deleteProperty(prototype, key);
-    }
+    for (const key of installedProperties) Reflect.deleteProperty(prototype, key);
   };
 }
 

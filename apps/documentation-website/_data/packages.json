@@ -1,17 +1,5 @@
 [
   {
-    "id": "webmcp-types",
-    "packageName": "@mcp-b/webmcp-types",
-    "sidebarLabel": "webmcp-types",
-    "category": "Core runtime",
-    "summary": "Zero-runtime TypeScript types for MCP-B's WebMCP surface, schema inference, and document and navigator augmentation.",
-    "installCommand": "npm install --save-dev @mcp-b/webmcp-types",
-    "overviewPath": "/packages/webmcp-types/overview",
-    "referencePath": "/packages/webmcp-types/reference",
-    "quickstartSnippet": "packages/webmcp-types-quickstart.ts",
-    "sourcePackagePath": "packages/webmcp-types"
-  },
-  {
     "id": "webmcp-polyfill",
     "packageName": "@mcp-b/webmcp-polyfill",
     "sidebarLabel": "webmcp-polyfill",

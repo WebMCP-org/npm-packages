@@ -1,4 +1,4 @@
-import type { ModelContextRegisterToolOptions } from '@mcp-b/webmcp-types';
+import type { WebMCP } from 'webmcp-types';
 import {
   createRuntimeContractController,
   createRuntimeContractState,
@@ -12,7 +12,7 @@ import {
 export interface RuntimeContractModelContext {
   registerTool(
     tool: RuntimeContractTool,
-    options?: ModelContextRegisterToolOptions
+    options?: WebMCP.ModelContextRegisterToolOptions
   ): void | Promise<void>;
 }
 

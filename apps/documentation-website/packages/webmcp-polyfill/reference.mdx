@@ -22,11 +22,10 @@ shims, and MCP `outputSchema` support.
 
 ## Package entries
 
-| Import                          | Purpose                                             |
-| ------------------------------- | --------------------------------------------------- |
-| `@mcp-b/webmcp-polyfill`        | ESM installer for the bundled upstream runtime      |
-| `@mcp-b/webmcp-polyfill/iife`   | Script bundle that installs the runtime when loaded |
-| `@mcp-b/webmcp-polyfill/schema` | MCP-B schema and response helpers                   |
+| Import                        | Purpose                                             |
+| ----------------------------- | --------------------------------------------------- |
+| `@mcp-b/webmcp-polyfill`      | ESM installer for the bundled upstream runtime      |
+| `@mcp-b/webmcp-polyfill/iife` | Script bundle that installs the runtime when loaded |
 
 The standalone bundle installs `document.modelContext` automatically:
 
@@ -75,49 +74,10 @@ The core package does not provide:
 These MCP-B extensions belong to [`@mcp-b/global`](/packages/global/reference).
 The upstream context remains installed for the lifetime of its document.
 
-## Schema entry
-
-`@mcp-b/webmcp-polyfill/schema` remains available for MCP-B schema and response
-helpers. It is separate from the upstream core runtime.
-
-`normalizeInputSchema()` converts JSON Schema and
-[Standard JSON Schema v1](https://standardschema.dev/json-schema)
-implementations. Conversion calls `~standard.jsonSchema.input()`, trying
-`draft-2020-12` and then `draft-07`. When a
-[Standard Schema v1](https://standardschema.dev/) validator is also present, the
-helper preserves `~standard.validate()` as a non-enumerable property for the MCP
-SDK. It does not invoke the validator or wrap the tool callback.
-
-| Registration/execution path                                | Schema conversion                                    | Argument validation                                              |
-| ---------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------- |
-| `usewebmcp` or the MCP-B tool hook                         | Automatic for Standard JSON Schema                   | Supplied Standard Schema validator on local and agent calls      |
-| Core polyfill imperative API                               | Caller supplies JSON Schema                          | Caller validates in the handler                                  |
-| `normalizeInputSchema()` helper                            | Converts metadata and preserves a supplied validator | None; this helper does not execute tools                         |
-| `BrowserMcpServer` through an MCP client                   | Automatic conversion                                 | MCP server uses a preserved validator or its JSON Schema adapter |
-| Direct `BrowserMcpServer.executeTool()` or a native mirror | Already converted metadata                           | Bypasses MCP validation; caller validates in the handler         |
-
-The [schema guide](/how-to/use-schemas-and-structured-output) covers the
-registration paths. When your callback owns validation,
-`{ ...normalizeInputSchema(schema).inputSchema }` copies only JSON metadata.
-This prevents the MCP SDK from applying vendor transforms a second time if the
-tool later uses the MCP-B runtime.
-
-The schema entry exports these helper groups:
-
-| Group               | Exports                                                                                                                                      |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Schema types        | `ToolInputSchema`, `NormalizedInputSchema`                                                                                                   |
-| Schema conversion   | `normalizeInputSchema`, `serializeInputSchema`                                                                                               |
-| Descriptor handling | `coerceWebMcpToolDescriptor`, `validateWebMcpToolDescriptor`, `normalizeToolResponse`, `toWebMcpAnnotations`                                 |
-| Chrome wire format  | `parseChromeToolInput`, `serializeChromeToolResult`                                                                                          |
-| Access and aborts   | `validatePotentiallyTrustworthyOrigins`, `validateExecutableOrigin`, `validateWebMcpAccess`, `validateOriginAgentCluster`, `withAbortSignal` |
-| Error construction  | `createUnknownError`, `createToolInvocationFailedError`, `createInvalidStateError`                                                           |
-| Object detection    | `isPlainObject`                                                                                                                              |
-
-The `document.modelContext.registerTool()` boundary does not convert schema
-metadata or validate invocation arguments. It follows WebMCP. Use
-`@mcp-b/global` when you need MCP-side validation, structured responses, or
-`outputSchema` metadata.
+MCP-B schema conversion and response helpers are exported by the
+[`@mcp-b/webmcp-ts-sdk/schema` adapter](/packages/webmcp-ts-sdk/reference#schema-boundary).
+The polyfill's `document.modelContext.registerTool()` follows WebMCP and does
+not validate invocation arguments.
 
 <Card title="WebMCP draft" icon="book" href="https://webmachinelearning.github.io/webmcp/">
   Read the current Community Group report.

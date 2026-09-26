@@ -4,7 +4,6 @@
   "commit": false,
   "fixed": [
     [
-      "@mcp-b/webmcp-types",
       "@mcp-b/smart-dom-reader",
       "@mcp-b/smart-dom-reader-server",
       "@mcp-b/webmcp-polyfill",

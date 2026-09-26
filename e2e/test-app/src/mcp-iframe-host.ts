@@ -1,7 +1,7 @@
 import '@mcp-b/global';
 
 import { TabClientTransport } from '@mcp-b/transports';
-import { normalizeToolResponse } from '@mcp-b/webmcp-polyfill/schema';
+import { normalizeToolResponse } from '@mcp-b/webmcp-ts-sdk/schema';
 import type { MCPIframeElement } from '@mcp-b/mcp-iframe/element';
 import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import { Client, UriTemplate, type Variables } from '@modelcontextprotocol/client';

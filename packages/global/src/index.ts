@@ -2,7 +2,11 @@ import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 
 export { cleanupWebModelContext, initializeWebModelContext };
 
-export type { TransportConfiguration, WebModelContextInitOptions } from './types.js';
+export type {
+  ModelContextTesting,
+  TransportConfiguration,
+  WebModelContextInitOptions,
+} from './types.js';
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   const options = window.__webModelContextOptions;

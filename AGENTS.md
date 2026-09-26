@@ -41,7 +41,7 @@ Landing page at [mcp-b.ai](https://mcp-b.ai) (also `www.mcp-b.ai`). Astro 6
 v13. Dev runs on real workerd (Vite Environment API).
 
 - `pnpm dev` (`wrangler types` → `astro dev`), `pnpm build` (`wrangler types` → `astro check` → `astro build`), `pnpm preview`.
-- Cloudflare runtime: env via `import { env } from 'cloudflare:workers'`; `Astro.request.cf`; execution context at `Astro.locals.cfContext`. Do NOT use `Astro.locals.runtime` (removed in v13).
+- Cloudflare runtime: env via `import { env } from 'cloudflare:workers'`; `Astro.request.cf`; execution context at `Astro.locals.cfContext`. Do NOT use `Astro.locals.runtime` (removed from `@astrojs/cloudflare` in v13, used with Astro 6).
 - Secrets: `npx wrangler secret put <KEY>`; local secrets in `.dev.vars`.
 - Config: `astro.config.mjs`, `wrangler.jsonc`. Excluded from root `pnpm build`/`check-all` via `--filter '!@mcp-b/landing-page'`.
 
@@ -80,7 +80,7 @@ the Diataxis framework.
 
 ### Commit Scopes
 
-Package scopes: `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-extension`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`, `webmcp-types`
+Package scopes: `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-extension`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`
 
 Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
@@ -154,15 +154,12 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 - Keep privileged extension APIs and secrets out of the MAIN-world bundle.
 - The template is top-frame only. Do not add `all_frames` while `@mcp-b/global` selects the iframe-child transport in child frames.
 
-### Key Type Interfaces (`@mcp-b/webmcp-types`)
+### Type ownership
 
-- `WebMCP`: the standard browser API namespace re-exported from upstream
-  `webmcp-types`.
-- `ModelContext`: the MCP-B registration and discovery compatibility surface.
-- `ChromeModelContext`: the serialized-JSON `executeTool()` shape for older
-  Chromium contexts.
-- `ModelContextExtensions`: schema-aware MCP-B `registerTool` overloads plus `listTools`
-- `ModelContextWithExtensions` = `Omit<ModelContext, 'registerTool'> & ModelContextExtensions`
+- Upstream `webmcp-types` owns the WebMCP browser contracts and `document.modelContext`
+  declaration.
+- `@mcp-b/webmcp-ts-sdk` owns MCP-B adapter and extension contracts plus schema helpers.
+- `@mcp-b/global` declares the MCP-B globals that its runtime installs.
 
 ## Reference Repos (`.reference/`)
 
@@ -172,7 +169,7 @@ references; `wpt/` is also the pinned upstream conformance suite used by CI.
 
 | Directory          | Upstream                                                                                      | Purpose                                     |
 | ------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `standard-schema/` | [standard-schema/standard-schema](https://github.com/standard-schema/standard-schema)         | `@mcp-b/webmcp-types` reference             |
+| `standard-schema/` | [standard-schema/standard-schema](https://github.com/standard-schema/standard-schema)         | `@mcp-b/webmcp-ts-sdk/schema` reference     |
 | `typescript-sdk/`  | [anthropics/anthropic-sdk-typescript](https://github.com/anthropics/anthropic-sdk-typescript) | General SDK reference                       |
 | `webmcp/`          | [webmachinelearning/webmcp](https://github.com/webmachinelearning/webmcp)                     | WebMCP draft and explainer source           |
 | `wpt/`             | [web-platform-tests/wpt](https://github.com/web-platform-tests/wpt)                           | Executable WebMCP conformance, pinned in CI |

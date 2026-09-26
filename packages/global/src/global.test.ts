@@ -1,7 +1,7 @@
 import { TabClientTransport, TabServerTransport } from '@mcp-b/transports';
 import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
-import type { ModelContext } from '@mcp-b/webmcp-types';
+import type { ModelContext } from '@mcp-b/webmcp-ts-sdk';
 import { Client } from '@modelcontextprotocol/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';

@@ -1,5 +1,7 @@
 import { installWebMCP } from './index.js';
 
+export * from './index.js';
+
 try {
   installWebMCP();
 } catch (error) {

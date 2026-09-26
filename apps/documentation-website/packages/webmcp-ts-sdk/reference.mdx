@@ -193,9 +193,8 @@ Stops native reconciliation, aborts native mirrors, removes registrations, and c
 
 ## Schema boundary
 
-`BrowserMcpServer` normalizes JSON Schema and Standard JSON Schema inputs through the
-[polyfill's optional schema adapter](/packages/webmcp-polyfill/reference#schema-entry). If the schema
-also supplies `~standard.validate()`, the adapter preserves it for the composed `McpServer`.
+`BrowserMcpServer` normalizes JSON Schema and Standard JSON Schema inputs with `normalizeInputSchema()`.
+If the schema also supplies `~standard.validate()`, the adapter preserves it for the composed `McpServer`.
 Otherwise the MCP server uses its `fromJsonSchema` adapter.
 
 This validation runs on MCP client calls. Direct `executeTool()` calls and native mirrors execute the
@@ -212,14 +211,15 @@ MCP requires object-root tool input schemas. An array-root WebMCP tool remains a
 
 ## Exports
 
-The package exports only its adapter surface:
+The root exports `BrowserMcpServer`, `isBrowserMcpServer`, `ModelContext`, `RegisteredTool`,
+`ModelContextExtensions`, `ModelContextWithExtensions`, `ChromeModelContext`, `InputSchema`,
+`ToolDescriptor`, `ToolDescriptorFromSchema`, `ToolAnnotations`, `JsonSchemaForInference`,
+`InferJsonSchema`, `InferArgsFromInputSchema`, and `ToolResultFromOutputSchema`. `WebMCP` is the
+upstream namespace re-exported from `webmcp-types`; use it directly for standard browser contracts.
 
-- `BrowserMcpServer`
-- `BrowserMcpServerOptions`
-- `isBrowserMcpServer`
-- `PromptDescriptor`
-- `ResourceDescriptor`
-
-Import MCP clients, protocol schemas, transports, validators, and upstream server types from their official `@modelcontextprotocol/*` packages.
+Import MCP response types such as `CallToolResult`, MCP clients, protocol schemas, transports, and
+validators from their official `@modelcontextprotocol/*` packages. The
+`@mcp-b/webmcp-ts-sdk/schema` subpath exports `normalizeInputSchema()` and `normalizeToolResponse()`
+along with descriptor and serialization helpers.
 
 The [`@mcp-b/transports` reference](/packages/transports/reference) documents browser transports. [WebMCP and MCP-B extensions](/explanation/strict-core-vs-mcp-b-extensions) defines the boundary between the proposal and this adapter.

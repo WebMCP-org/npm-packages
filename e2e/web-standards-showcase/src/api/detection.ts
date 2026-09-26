@@ -6,35 +6,28 @@ import type { DetectionResult } from '../types';
  * the showcase relies on its native-Chrome launch setup and does not load one.
  */
 export function detectNativeAPI(): DetectionResult {
-  const result: DetectionResult = {
-    available: false,
-    isNative: false,
-    isPolyfill: false,
-    message: '',
-  };
-
   const context = document.modelContext;
 
   if (!context) {
-    result.message =
-      'document.modelContext not found. Please launch Chromium with --enable-experimental-web-platform-features';
-    return result;
+    return {
+      isNative: false,
+      message:
+        'document.modelContext not found. Please launch Chromium with --enable-experimental-web-platform-features',
+    };
   }
-
-  result.available = true;
 
   if (
     typeof context.registerTool !== 'function' ||
     typeof context.getTools !== 'function' ||
     typeof context.addEventListener !== 'function'
   ) {
-    result.message = 'document.modelContext is missing required WebMCP methods';
-    return result;
+    return { isNative: false, message: 'document.modelContext is missing required WebMCP methods' };
   }
 
-  result.isNative = true;
-  result.message = 'Native Chromium Web Model Context API detected in the native-only showcase.';
-  return result;
+  return {
+    isNative: true,
+    message: 'Native Chromium Web Model Context API detected in the native-only showcase.',
+  };
 }
 
 /**

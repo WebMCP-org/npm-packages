@@ -1,7 +1,9 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import type { ModelContextRegisterToolOptions } from '@mcp-b/webmcp-types';
+import type { WebMCP } from 'webmcp-types';
 import type { ModelContext, Tool, ToolRegistration } from '../types';
+
+type ModelContextRegisterToolOptions = WebMCP.ModelContextRegisterToolOptions;
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
