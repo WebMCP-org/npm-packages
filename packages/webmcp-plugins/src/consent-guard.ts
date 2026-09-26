@@ -402,12 +402,7 @@ export class ConsentGuard {
     const execute = async (): Promise<DecideResult> => {
       try {
         if (entry.consent.requireUserPresence) {
-          let verified = false;
-          try {
-            verified = (await presencePromise!) === true;
-          } catch {
-            verified = false;
-          }
+          const verified = (await Promise.resolve(presencePromise).catch(() => false)) === true;
 
           // Check if request was cancelled/denied while ceremony was in-flight
           if (!this.pending.has(id)) {
@@ -451,11 +446,6 @@ export class ConsentGuard {
               };
             }
           }
-        }
-
-        // Check if request was cancelled/denied while ceremony was in-flight
-        if (!this.pending.has(id)) {
-          return { success: false, retryable: false, reason: 'denied' };
         }
 
         this.pending.delete(id);

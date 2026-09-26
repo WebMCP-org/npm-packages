@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
 import type { ToolInputSchema } from '@mcp-b/webmcp-polyfill/schema';
 import { consent, toMcpAnnotations, type ConsentMetadata } from '@mcp-b/webmcp-plugins/consent';
 import { useWebMCP } from 'usewebmcp';
@@ -50,9 +49,6 @@ export interface GuardedToolDef<Args, Result> {
 export function useGuardedWebMCP<Args, Result>(def: GuardedToolDef<Args, Result>) {
   const broker = useConsentBroker();
 
-  // The hook reads the latest committed plugins without re-registering the tool.
-  const plugins = useMemo(() => [consent(broker, def.consent)], [broker, def.consent]);
-
   // `useWebMCP`'s `execute` type is derived from its own schema-inference
   // generics, which don't know about `GuardedToolDef`'s independent `Args`/
   // `Result` type parameters — the two can't be unified structurally. Rather
@@ -66,9 +62,9 @@ export function useGuardedWebMCP<Args, Result>(def: GuardedToolDef<Args, Result>
     name: def.name,
     description: def.description,
     ...(def.inputSchema && { inputSchema: def.inputSchema }),
-    ...(def.consent && { annotations: toMcpAnnotations(def.consent) }),
+    annotations: toMcpAnnotations(def.consent),
     ...(def.enabled !== undefined && { enabled: def.enabled }),
-    plugins,
+    plugins: [consent(broker, def.consent)],
     execute: ((args: Args) => def.execute(args)) as unknown as UseWebMCPConfig['execute'],
   });
 }
