@@ -73,9 +73,10 @@ runtime behavior.
 import { useWebMCP } from '@mcp-b/react-webmcp';
 ```
 
-This hook wraps [`usewebmcp`](/packages/usewebmcp/reference) with MCP annotations, output-schema
-inference, and automatic text/`structuredContent` response formatting. Its lifecycle, Standard Schema
-validation, cancellation, `enabled`, `exposedTo`, and registration errors come from the core hook.
+This hook wraps [`usewebmcp`](/packages/usewebmcp/reference) with Standard Schema conversion and
+validation, MCP annotations, output-schema inference, and automatic text/`structuredContent`
+response formatting. Registration lifecycle, cancellation, `enabled`, `exposedTo`, and execution
+state use the core hook.
 The published entry point preserves `'use client'` and supports React 18/19 server rendering.
 
 | Field                     | Type                                     | Required | Description                      |
@@ -95,10 +96,10 @@ Tool hooks no longer return `isRegistered`; use the runtime’s `getTools()` for
 Agent failures default to `{ content: [{ type: "text", text: error.message }], isError: true }`.
 `formatError` overrides this response. Both formatters may be async and are awaited. Local failures
 and cancellation always reject. `state.error` retains execution failures separately
-from `registrationError`. See [response behavior](/packages/usewebmcp/reference#tool-responses).
+from `registrationError`. Core-hook behavior is in the [usewebmcp reference](/packages/usewebmcp/reference).
 
 Native Chrome WebMCP does not currently define or enforce `outputSchema`. The
-React hooks use it for output typing and structured MCP responses.
+`@mcp-b/react-webmcp` hook uses it for output typing and structured MCP responses.
 
 `enabled` controls registration, not local execution. See
 [registration configuration](/packages/usewebmcp/reference#config-fields) for state and

@@ -1,8 +1,6 @@
-import { z } from 'zod';
 import {
   useWebMCP,
   type InferToolInput,
-  type InferValidatedToolInput,
   type WebMCP,
   type WebMCPConfig,
   type WebMCPReturn,
@@ -15,13 +13,9 @@ type Input = {
   properties: { query: { type: 'string' }; limit: { type: 'integer' } };
   required: ['query'];
 };
-const schema = z.object({ count: z.string().transform(Number), limit: z.number().default(10) });
-
 export type InferenceAssertions = [
   Assert<Equal<WebMCPConfig['enabled'], boolean | undefined>>,
   Assert<Equal<InferToolInput<Input>, { query: string; limit?: number }>>,
-  Assert<Equal<InferToolInput<typeof schema>, z.input<typeof schema>>>,
-  Assert<Equal<InferValidatedToolInput<typeof schema>, z.output<typeof schema>>>,
   Assert<Equal<WebMCPReturn['state']['lastResult'], unknown>>,
   Assert<Equal<Extract<keyof WebMCPReturn, 'isRegistered'>, never>>,
   Assert<Equal<WebMCPConfig['annotations'], WebMCP.ToolAnnotations | undefined>>,
@@ -47,18 +41,6 @@ export function useInferenceExamples() {
   // @ts-expect-error - query must be a string
   void tool.execute({ query: 1 });
 
-  const transformed = useWebMCP({
-    name: 'parse',
-    description: 'Parse a count',
-    inputSchema: schema,
-    execute: ({ count, limit }) => {
-      const total: number = count + limit;
-      return total;
-    },
-  });
-  const parsed: Promise<number> = transformed.execute({ count: '2' });
-  // @ts-expect-error - callers supply the input type, not the transformed type
-  void transformed.execute({ count: 2 });
   useWebMCP({
     name: 'extended',
     description: 'Extended',
@@ -73,5 +55,5 @@ export function useInferenceExamples() {
     annotations: { destructiveHint: true },
     execute: () => 1,
   });
-  return { result, lastResult, parsed };
+  return { result, lastResult };
 }

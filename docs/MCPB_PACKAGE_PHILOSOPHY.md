@@ -82,7 +82,7 @@ Core layering:
 1. Keep MCP-B-only extensions out of the upstream `document.modelContext` declaration.
 2. Put the browser adapter and its extension types in `@mcp-b/webmcp-ts-sdk`; keep runtime orchestration in `@mcp-b/global`.
 3. Keep `@mcp-b/react-webmcp` aligned with the packages that own each contract. Do not use `@mcp-b/global` as a type barrel.
-4. Keep `usewebmcp` aligned with upstream `webmcp-types`. It delegates Standard Schema validation to the supplied schema; MCP formatting and output metadata belong in `@mcp-b/react-webmcp`.
+4. Keep `usewebmcp` aligned with upstream `webmcp-types`: accept WebMCP JSON Schema metadata and pass inputs through without validation. Standard Schema conversion and validation, MCP formatting, and output metadata belong in `@mcp-b/react-webmcp`.
 5. If a shared type crosses packages, move it to the correct canonical layer rather than duplicating.
 
 ## Quick Selection Guide

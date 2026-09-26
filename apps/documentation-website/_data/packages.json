@@ -74,7 +74,7 @@
     "packageName": "usewebmcp",
     "sidebarLabel": "usewebmcp",
     "category": "React",
-    "summary": "React tool registration with upstream WebMCP types, raw results, and optional Standard Schema validation.",
+    "summary": "Core React tool registration with upstream WebMCP types, JSON Schema inference, and raw results.",
     "installCommand": "pnpm add usewebmcp",
     "overviewPath": "/packages/usewebmcp/overview",
     "referencePath": "/packages/usewebmcp/reference",

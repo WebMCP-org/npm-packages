@@ -2,7 +2,6 @@ import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { StrictMode, Suspense, createElement, useLayoutEffect } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, renderHook } from 'vitest-browser-react';
-import { z } from 'zod';
 import { useWebMCP } from './useWebMCP.js';
 
 async function executeRegisteredTool(
@@ -160,48 +159,6 @@ describe('useWebMCP in a browser runtime', () => {
     });
   });
 
-  it('awaits an agent error formatter without changing local rejection or success state', async () => {
-    const register = vi.spyOn(document.modelContext, 'registerTool');
-    const failure = new Error('Tool failed');
-    const formatted = Promise.withResolvers<string>();
-    const formatError = vi.fn(() => formatted.promise);
-    const hook = await renderHook(() =>
-      useWebMCP({
-        name: 'formatted_error',
-        description: 'Formats agent errors',
-        execute: () => {
-          throw failure;
-        },
-        formatError,
-      })
-    );
-    const tool = register.mock.calls[0]?.[0];
-    if (!tool) throw new Error('Tool was not registered');
-    expect(tool).not.toHaveProperty('formatError');
-    let response!: Promise<unknown>;
-    await hook.act(() => {
-      response = Promise.resolve(tool.execute({}, { signal: new AbortController().signal }));
-      // Observe rejection immediately so a failed implementation produces no unhandled error.
-      void response.catch(() => {});
-    });
-    expect(formatError).toHaveBeenCalledWith(failure);
-    expect(hook.result.current.state.isExecuting).toBe(true);
-    await hook.act(async () => {
-      formatted.resolve('Please retry');
-      await expect(response).resolves.toBe('Please retry');
-    });
-    expect(hook.result.current.state).toEqual({
-      isExecuting: false,
-      lastResult: null,
-      error: failure,
-      executionCount: 0,
-    });
-    await hook.act(async () => {
-      await expect(hook.result.current.execute({})).rejects.toBe(failure);
-    });
-    expect(formatError).toHaveBeenCalledTimes(1);
-  });
-
   it('settles an execution that outlives the component without a React warning', async () => {
     let settle: ((value: string) => void) | undefined;
     const { act, result, unmount } = await renderHook(() =>
@@ -338,83 +295,6 @@ describe('useWebMCP in a browser runtime', () => {
     await expectValueDescription('Revision 1');
     await rerender({ revision: 2 });
     await expectValueDescription('Revision 2');
-  });
-
-  it('converts a real Zod Standard JSON Schema through the registration path', async () => {
-    const inputSchema = z.object({
-      query: z.string(),
-      limit: z.number().int().min(1).max(50).optional(),
-    });
-
-    await renderHook(() =>
-      useWebMCP({
-        name: 'browser_standard_schema',
-        description: 'Uses Standard JSON Schema',
-        inputSchema,
-        execute: async ({ query }) => query,
-      })
-    );
-
-    const tool = await findTool('browser_standard_schema');
-    expect(tool?.inputSchema).toEqual({
-      $schema: 'https://json-schema.org/draft/2020-12/schema',
-      type: 'object',
-      properties: {
-        query: { type: 'string' },
-        limit: { type: 'integer', minimum: 1, maximum: 50 },
-      },
-      required: ['query'],
-    });
-  });
-
-  it('validates and transforms Standard Schema input on local and registered calls', async () => {
-    const inputSchema = z.object({
-      count: z.string().regex(/^\d+$/, 'Count must contain digits').transform(Number),
-      limit: z.number().default(10),
-    });
-    const execute = vi.fn(({ count, limit }: z.output<typeof inputSchema>) => count + limit);
-    const hook = await renderHook(() =>
-      useWebMCP({
-        name: 'validated_input',
-        description: 'Validates before execution',
-        inputSchema,
-        execute,
-      })
-    );
-    await hook.act(async () => {
-      await expect(hook.result.current.execute({ count: '2' })).resolves.toBe(12);
-      await expect(executeRegisteredTool('validated_input', { count: '3' })).resolves.toBe(13);
-      await expect(hook.result.current.execute({ count: 'bad' })).rejects.toThrow(
-        'Count must contain digits'
-      );
-      await expect(executeRegisteredTool('validated_input', { count: 3 })).rejects.toMatchObject({
-        name: 'UnknownError',
-      });
-    });
-    expect(execute).toHaveBeenCalledTimes(2);
-    expect(execute.mock.calls[0]?.[0]).toEqual({ count: 2, limit: 10 });
-    expect(hook.result.current.state.error?.message).toContain('Invalid tool input');
-    expect(hook.result.current.state.executionCount).toBe(2);
-  });
-
-  it('awaits async validation and refuses invalid local input before side effects', async () => {
-    const inputSchema = z.object({
-      name: z.string().refine(async (name) => name !== 'blocked', 'Name is blocked'),
-    });
-    const execute = vi.fn(({ name }: z.output<typeof inputSchema>) => name.toUpperCase());
-    const hook = await renderHook(() =>
-      useWebMCP({ name: 'async_validation', description: 'Checks names', inputSchema, execute })
-    );
-    await hook.act(async () => {
-      await expect(hook.result.current.execute({ name: 'blocked' })).rejects.toThrow(
-        'Name is blocked'
-      );
-    });
-    expect(execute).not.toHaveBeenCalled();
-    expect(hook.result.current.state).toMatchObject({ isExecuting: false, executionCount: 0 });
-    await hook.act(async () => {
-      await expect(hook.result.current.execute({ name: 'Ada' })).resolves.toBe('ADA');
-    });
   });
 
   it('tracks cancellation separately for overlapping executions and ignores late completion', async () => {
@@ -723,25 +603,6 @@ describe('useWebMCP in a browser runtime', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('exposes schema conversion errors and recovers when supplied a valid schema', async () => {
-    const invalid = z.object({ value: z.custom<symbol>() });
-    const valid = z.object({ value: z.string() });
-    const hook = await renderHook(
-      ({ broken }) =>
-        useWebMCP({
-          name: 'schema_error',
-          description: 'Reports bad schemas',
-          inputSchema: broken ? invalid : valid,
-          execute: () => 'ok',
-        }),
-      { initialProps: { broken: true } }
-    );
-    expect(hook.result.current.registrationError?.message).toContain('Failed to convert');
-    expect(await findTool('schema_error')).toBeUndefined();
-    await hook.rerender({ broken: false });
-    await expect.poll(() => findTool('schema_error')).toBeDefined();
-    expect(hook.result.current.registrationError).toBeNull();
-  });
   it('reports a schema that serializes to undefined and recovers after correction', async () => {
     const invalid = { type: 'object', toJSON: () => undefined };
     const hook = await renderHook(
@@ -792,61 +653,4 @@ describe('useWebMCP in a browser runtime', () => {
       expect(await findTool('circular_schema')).toMatchObject({ inputSchema: { type: 'object' } });
     }
   );
-
-  it('handles validation aborting before its promise settles', async () => {
-    const validation = Promise.withResolvers<boolean>();
-    const controller = new AbortController();
-    const execute = vi.fn(() => 'unexpected');
-    const inputSchema = z.object({
-      value: z.string().refine(() => {
-        controller.abort();
-        return validation.promise;
-      }),
-    });
-    const hook = await renderHook(() =>
-      useWebMCP({
-        name: 'cancel_validation',
-        description: 'Cancel validation',
-        inputSchema,
-        execute,
-      })
-    );
-    await hook.act(async () => {
-      await expect(
-        hook.result.current.execute({ value: 'ok' }, { signal: controller.signal })
-      ).rejects.toThrow();
-      validation.resolve(true);
-    });
-    expect(execute).not.toHaveBeenCalled();
-    expect(hook.result.current.state.isExecuting).toBe(false);
-  });
-
-  it('formats agent results without changing local values and records formatter failures', async () => {
-    const hook = await renderHook(
-      ({ fail }) =>
-        useWebMCP({
-          name: 'formatted_result',
-          description: 'Formats output',
-          execute: () => ({ count: 3 }),
-          formatOutput: async ({ count }) => {
-            if (fail) throw new Error('Formatting failed');
-            return `Count: ${count}`;
-          },
-        }),
-      { initialProps: { fail: false } }
-    );
-    await hook.act(async () => {
-      await expect(executeRegisteredTool('formatted_result')).resolves.toBe('Count: 3');
-      await expect(hook.result.current.execute({})).resolves.toEqual({ count: 3 });
-    });
-    expect(hook.result.current.state.lastResult).toEqual({ count: 3 });
-    await hook.rerender({ fail: true });
-    await hook.act(async () => {
-      await expect(executeRegisteredTool('formatted_result')).rejects.toMatchObject({
-        name: 'UnknownError',
-      });
-    });
-    expect(hook.result.current.state.error?.message).toBe('Formatting failed');
-    expect(hook.result.current.state.executionCount).toBe(2);
-  });
 });

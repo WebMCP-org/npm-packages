@@ -15,7 +15,7 @@ export default defineConfig({
     ],
   },
   pack: {
-    entry: ['src/index.ts'],
+    entry: ['src/index.ts', 'src/internal.ts'],
     platform: 'browser',
     dts: true,
     minify: process.env.NODE_ENV === 'prod',

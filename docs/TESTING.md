@@ -132,10 +132,11 @@ globals and declarations with `skipLibCheck: false`, with strict null checking e
 The React 18 consumer installs core hooks only; React 19 also checks MCP-B/upstream type coexistence.
 
 Browser tests cover StrictMode, suspended renders, metadata updates, duplicate and delayed
-registrations, late runtime injection, Standard Schema validation/transforms, and cancellation.
-Platform failure tests mock the browser registration boundary; successful calls use the real runtime.
+registrations, late runtime injection, and cancellation. `@mcp-b/react-webmcp` tests additionally
+cover Standard Schema validation and transforms. Platform failure tests mock the browser
+registration boundary; successful calls use the real runtime.
 
-For native registration, validation, cleanup, and execution-signal propagation:
+For native registration, cleanup, and execution-signal propagation in the core hook:
 
 ```bash
 CHROME_BIN=/path/to/chrome-canary pnpm --filter usewebmcp test:native
@@ -150,7 +151,7 @@ and [Standard Schema](https://standardschema.dev/).
 
 `pnpm --filter mcp-e2e-tests test:integration:frameworks`
 
-This lane covers framework-level integrations such as React hooks and validation matrices.
+This lane covers framework-level integrations such as React hooks and the MCP-B validation matrix.
 
 ### React hook render regressions
 

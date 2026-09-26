@@ -76,6 +76,7 @@
   "dependencies": {
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@modelcontextprotocol/client": "catalog:",
+    "@standard-schema/spec": "^1.1.0",
     "usewebmcp": "workspace:*"
   },
   "devDependencies": {

@@ -3,14 +3,26 @@
 import type { DependencyList } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { WebMCP } from 'webmcp-types';
-import { toInputSchema, validateInput } from './schema.js';
-import type { ToolExecutionState, ToolInputSchema, WebMCPConfig, WebMCPReturn } from './types.js';
+import type {
+  InferToolInput,
+  ToolExecutionState,
+  ToolInputSchema,
+  WebMCPConfig,
+  WebMCPReturn,
+} from './types.js';
 
 const INITIAL_STATE = { isExecuting: false, lastResult: null, error: null, executionCount: 0 };
 const INITIAL_REGISTRATION = { isSupported: false, registrationError: null };
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 type ExecutionOutcome<T> = { result: T; output: unknown } | { error: Error; output?: unknown };
+
+export interface WebMCPAdapter<TResult> {
+  descriptor?: object;
+  preparationError?: Error;
+  formatOutput?: (result: TResult) => WebMCP.MaybePromise<unknown>;
+  formatError?: (error: Error) => WebMCP.MaybePromise<unknown>;
+}
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
@@ -25,10 +37,10 @@ function canRegister(context: unknown): context is Pick<WebMCP.ModelContext, 're
   );
 }
 
-/** Registers a React-owned tool using the upstream WebMCP contract. */
-export function useWebMCP<const TInputSchema extends ToolInputSchema = object, TResult = unknown>(
+function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, TResult = unknown>(
   config: WebMCPConfig<TInputSchema, TResult>,
-  deps?: DependencyList
+  deps?: DependencyList,
+  adapter?: WebMCPAdapter<TResult>
 ): WebMCPReturn<TInputSchema, TResult> {
   const [state, setState] = useState<ToolExecutionState<TResult>>(INITIAL_STATE);
   const [registration, setRegistration] =
@@ -36,8 +48,7 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
   const pendingExecutions = useRef(0);
   const schema = useMemo(() => {
     try {
-      const value =
-        config.inputSchema === undefined ? undefined : toInputSchema(config.inputSchema);
+      const value = config.inputSchema;
       const key = JSON.stringify(value);
       if (value !== undefined && key === undefined) {
         throw new TypeError('inputSchema must serialize to JSON');
@@ -47,20 +58,19 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
       return { error: toError(error) };
     }
   }, [config.inputSchema]);
-  const {
-    execute: _execute,
-    formatOutput: _formatOutput,
-    formatError: _formatError,
-    inputSchema: _inputSchema,
-    enabled = true,
-    exposedTo,
-    ...metadata
-  } = config;
+  const { name, title, description, annotations, enabled = true, exposedTo } = config;
+  const metadata = {
+    name,
+    ...(title !== undefined && { title }),
+    description,
+    ...(annotations !== undefined && { annotations }),
+    ...adapter?.descriptor,
+  };
   const descriptor = {
     ...metadata,
     ...(schema.value !== undefined && { inputSchema: schema.value }),
   };
-  let preparationError = schema.error;
+  let preparationError = schema.error ?? adapter?.preparationError;
   let descriptorKey: string;
   try {
     descriptorKey = JSON.stringify([metadata, exposedTo]);
@@ -68,11 +78,11 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
     preparationError = toError(error);
     descriptorKey = preparationError.message;
   }
-  const committed = useRef({ config, descriptor, preparationError });
+  const committed = useRef({ config, descriptor, preparationError, adapter });
 
   // Publish only committed renders, before external calls from later layout effects.
   useIsomorphicLayoutEffect(() => {
-    committed.current = { config, descriptor, preparationError };
+    committed.current = { config, descriptor, preparationError, adapter };
   });
 
   const run = useCallback(
@@ -95,22 +105,24 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
         signal.throwIfAborted();
         const operation = async (): Promise<ExecutionOutcome<TResult>> => {
           try {
-            const validated = await validateInput(executionConfig.inputSchema, input);
-            signal.throwIfAborted();
-            const result = await executionConfig.execute(validated, options);
+            const result = await executionConfig.execute(
+              input as InferToolInput<TInputSchema>,
+              options
+            );
             signal.throwIfAborted();
             if (result instanceof Error) throw result;
             const output =
-              forAgent && executionConfig.formatOutput
-                ? await executionConfig.formatOutput(result)
+              forAgent && committed.current.adapter?.formatOutput
+                ? await committed.current.adapter.formatOutput(result)
                 : result;
             signal.throwIfAborted();
             return { result, output };
           } catch (cause) {
             signal.throwIfAborted();
             const error = toError(cause);
-            if (!forAgent || !executionConfig.formatError) return { error };
-            const output = await executionConfig.formatError(error);
+            const formatError = committed.current.adapter?.formatError;
+            if (!forAgent || !formatError) return { error };
+            const output = await formatError(error);
             signal.throwIfAborted();
             return { error, output };
           }
@@ -221,4 +233,23 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
   }, [descriptorKey, schema.key, preparationError?.message, enabled, ...(deps ?? [])]);
 
   return { state, ...registration, execute, reset };
+}
+
+/** Registers a React-owned tool using the upstream WebMCP contract. */
+export function useWebMCP<const TInputSchema extends ToolInputSchema = object, TResult = unknown>(
+  config: WebMCPConfig<TInputSchema, TResult>,
+  deps?: DependencyList
+): WebMCPReturn<TInputSchema, TResult> {
+  return useWebMCPInternal(config, deps);
+}
+
+export function useWebMCPWithAdapter<
+  const TInputSchema extends ToolInputSchema = object,
+  TResult = unknown,
+>(
+  config: WebMCPConfig<TInputSchema, TResult>,
+  deps: DependencyList | undefined,
+  adapter: WebMCPAdapter<TResult>
+): WebMCPReturn<TInputSchema, TResult> {
+  return useWebMCPInternal(config, deps, adapter);
 }

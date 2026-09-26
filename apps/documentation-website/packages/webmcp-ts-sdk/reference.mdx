@@ -201,7 +201,7 @@ This validation runs on MCP client calls. Direct `executeTool()` calls and nativ
 browser callback without passing through MCP validation. Validate in the callback when both paths
 can call a tool, and pass plain JSON metadata so the MCP server does not also apply the vendor
 transforms. The [schema guide](/how-to/use-schemas-and-structured-output) demonstrates this pattern;
-[`usewebmcp`](/packages/usewebmcp/reference) already applies it for React registrations.
+[`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) applies it for React registrations.
 
 `outputSchema` is enforced by the official MCP server on MCP calls. Direct browser calls do not
 perform that check. `PromptDescriptor.argsSchema` accepts `InputSchema`. Direct upstream server

@@ -59,82 +59,58 @@ Both hooks add no renders for successful registration. All four register once pe
 
 ## Feature comparison
 
-| Feature                         | `usewebmcp`     | `@mcp-b/react-webmcp` | MCP Cat | Google    |
-| ------------------------------- | --------------- | --------------------- | ------- | --------- |
-| Hook bundle (gzip)              | 1.7 kB          | 2.1 kB                | 24.2 kB | 0.7 kB    |
-| Schema validation               | Standard Schema | Standard Schema       | Zod     | Manual    |
-| Registration errors             | Yes             | Yes                   | Yes     | Sync only |
-| Running, result & error state   | Yes             | Yes                   | Yes     | No        |
-| Call tools from React           | Yes             | Yes                   | Yes     | No        |
-| Automatic MCP result formatting | No              | Yes                   | No      | Yes       |
-| Prompt & resource hooks         | No              | Yes                   | No      | No        |
+| Feature                         | `usewebmcp` | `@mcp-b/react-webmcp` | MCP Cat | Google    |
+| ------------------------------- | ----------- | --------------------- | ------- | --------- |
+| Hook bundle (gzip)              | 1.7 kB      | 2.1 kB                | 24.2 kB | 0.7 kB    |
+| Runtime input validation        | Handler     | Standard Schema       | Zod     | Manual    |
+| Registration errors             | Yes         | Yes                   | Yes     | Sync only |
+| Running, result & error state   | Yes         | Yes                   | Yes     | No        |
+| Call tools from React           | Yes         | Yes                   | Yes     | No        |
+| Automatic MCP result formatting | No          | Yes                   | No      | Yes       |
+| Prompt & resource hooks         | No          | Yes                   | No      | No        |
 
 Bundle sizes exclude React and include built-in dependencies. App validators and runtimes are extra.
 
 All four accept JSON Schema. Compared: our PR #329, [MCP Cat 1.1.0](https://www.npmjs.com/package/webmcp-react/v/1.1.0), and [Google 0.2.0](https://www.npmjs.com/package/use-webmcp-tool/v/0.2.0).
 
-## Validate input with your schema library
+## Input schemas
 
-Pass a schema with Standard JSON Schema conversion and Standard Schema validation. This example uses Zod 4.2+:
+`usewebmcp` accepts the JSON Schema object from the WebMCP API and infers TypeScript input types
+from it. The schema is metadata; the hook does not validate arguments. Validate in your handler
+when needed. Local calls to `execute()` are typed but do not run a validator.
 
-```ts
-'use client';
-
-import { useWebMCP } from 'usewebmcp';
-import { z } from 'zod';
-
-const totalInput = z.object({
-  count: z.string().regex(/^\d+$/, 'Use digits for count').transform(Number),
-  limit: z.number().default(10),
-});
-
-export function useTotalTool() {
-  return useWebMCP({
-    name: 'calculate_total',
-    description: 'Add a numeric count to a limit, which defaults to 10',
-    inputSchema: totalInput,
-    execute: ({ count, limit }) => ({ total: count + limit }),
-  });
-}
-```
-
-Arguments `{ count: "2" }` become `{ count: 2, limit: 10 }`, producing `{ total: 12 }`.
-TypeScript infers the caller input, validated input, and result.
-
-The hook calls your schema's converter and validator, including async validation, defaults,
-and transforms. It ships no validation engine. Plain JSON Schema provides metadata and
-inference only; validate in your handler when using it. Reuse immutable schema objects to cache
-conversion and serialization; replace the object when the schema changes.
-[Schema details](https://docs.mcp-b.ai/packages/usewebmcp/reference#schemas-and-inference).
+For Standard Schema validation, output schemas, MCP annotations, or MCP result formatting, use
+[`@mcp-b/react-webmcp`](../react-webmcp/README.md).
 
 ## State and lifecycle
 
 - `state` exposes `isExecuting`, `lastResult`, `error`, and `executionCount`.
-- `execute(input, options?)` calls the validated handler locally. `reset()` clears state without cancelling work.
+- `execute(input, options?)` calls the handler locally. `reset()` clears state without cancelling work.
 - `isSupported` reports API availability; `registrationError` reports setup failures separately from `state.error`.
 - `enabled: false` unregisters the tool while keeping local execution available.
-- Local and agent failures reject by default. `formatOutput` and `formatError` customize agent responses and await async formatters.
+- Local and agent failures reject; the browser handles registered tool results.
 - Handlers receive `(input, { signal })` for cancellation, which always rejects.
 - Both packages preserve `'use client'` and support React 18/19, SSR, and StrictMode.
 
 See the [reference](https://docs.mcp-b.ai/packages/usewebmcp/reference) for metadata updates,
-cancellation, late runtime discovery, and response formatting.
+cancellation, late runtime discovery, and raw result handling.
 
 ## Migrating from the previous hook
 
-The core hook now returns raw results and uses upstream WebMCP types. To keep `outputSchema`,
-MCP annotations, `InferOutput`, and automatic MCP responses, change your import:
+The core hook returns raw results and uses upstream WebMCP types. To keep Standard Schema
+validation, `outputSchema`, MCP annotations, `InferOutput`, and automatic MCP responses, change
+your import:
 
 ```ts
 import { useWebMCP } from '@mcp-b/react-webmcp';
 ```
 
 Both tool hooks remove `isRegistered`; use the runtime’s `getTools()` for confirmed discovery.
-Prompt and resource hooks retain their registration status. Core failures now reject unless
-`formatError` is supplied; the MCP adapter keeps MCP error responses by default.
+Prompt and resource hooks retain their registration status. Core failures reject; the MCP adapter
+returns MCP error responses by default.
 
-Core `WebMCPConfig` and `WebMCPReturn` now take `TResult` as their second generic.
-`InferToolInput` describes caller input; `InferValidatedToolInput` describes validated input.
+Core `WebMCPConfig` and `WebMCPReturn` take `TResult` as their second generic.
+`InferToolInput` describes the JSON Schema input accepted by WebMCP.
 [Type reference](https://docs.mcp-b.ai/packages/usewebmcp/reference#exported-types).
 
 ## Development

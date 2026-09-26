@@ -62,21 +62,20 @@ JSON Schema metadata. [Standard Schema](https://standardschema.dev/) lets an int
 library's validator. The library remains responsible for its refinements, defaults, transforms, and
 async checks.
 
-The shared [`usewebmcp` hook](/packages/usewebmcp/reference) owns the React callback, so it can run the
-supplied validator before either a local call or an agent call. This keeps validation consistent
-whether `document.modelContext` comes from the browser, the polyfill, or the MCP-B runtime. It adds
-no dependency on a validation engine. [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) uses
-the same callback and adds MCP result formatting and output metadata.
+The core [`usewebmcp` hook](/packages/usewebmcp/reference) accepts upstream JSON Schema metadata and
+does not validate runtime input. [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) converts
+Standard JSON Schema metadata and calls the supplied validator before either local or agent calls.
+It adds MCP result formatting and output metadata as well.
 
 ```mermaid
 flowchart TD
-  Schema["Your schema library"] --> Metadata["Standard JSON Schema conversion"]
-  Metadata --> Browser["JSON metadata registered with WebMCP"]
-  Schema --> Validator["Supplied Standard Schema validator"]
-  Agent["Agent call"] --> Hook["React hook callback"]
-  Local["Local execute call"] --> Hook
-  Hook --> Validator
-  Validator -->|"Validated and transformed input"| Handler["Your tool implementation"]
+  Schema["Your schema library"] --> Adapter["MCP-B React adapter"]
+  Adapter -->|"JSON Schema metadata"| Browser["WebMCP registration"]
+  Agent["Agent call"] --> Adapter
+  Local["Local execute call"] --> Adapter
+  Adapter -->|"Standard Schema validation"| Handler["Your tool implementation"]
+  Core["Core usewebmcp with JSON Schema"] --> Browser
+  Core -->|"Input passed through"| Handler
 ```
 
 The standalone polyfill keeps its browser contract focused on JSON Schema metadata.

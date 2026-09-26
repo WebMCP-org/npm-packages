@@ -23,8 +23,9 @@ For `{ left: 3, right: 4 }`, React state holds `{ total: 7 }`; the agent receive
 
 ## Package boundary
 
-Both hooks share lifecycle, Standard Schema validation, and React 18/19 support, including
-`'use client'`. This package adds MCP responses, prompts, resources, and client hooks.
+Both hooks support React 18/19 and preserve `'use client'`. This package adds Standard Schema
+conversion and validation, MCP responses, prompts, resources, and client hooks on top of the core
+registration lifecycle.
 Agent failures become MCP error responses; local failures and cancellation reject.
 
 [Performance comparison](/packages/usewebmcp/overview#performance-comparison) ·

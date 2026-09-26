@@ -1,3 +1,4 @@
+import type { StandardJSONSchemaV1, StandardSchemaV1 } from '@standard-schema/spec';
 import type { ToolInputSchema } from '@mcp-b/webmcp-ts-sdk/schema';
 import type {
   InferJsonSchema,
@@ -9,9 +10,10 @@ import type {
   ResourceDescriptor,
 } from '@mcp-b/webmcp-ts-sdk';
 import type {
-  ToolExecuteFunction as CoreToolExecuteFunction,
+  InferToolInput as CoreInferToolInput,
   WebMCPConfig as CoreWebMCPConfig,
   WebMCPReturn as CoreWebMCPReturn,
+  WebMCP,
 } from 'usewebmcp';
 
 /** Infers MCP-B structured output from its JSON Schema. */
@@ -23,23 +25,46 @@ export type InferOutput<T extends JsonSchemaForInference | undefined = undefined
     ? InferJsonSchema<T>
     : unknown;
 
+export type InferToolInput<T extends ToolInputSchema> = T extends StandardJSONSchemaV1
+  ? StandardJSONSchemaV1.InferInput<T>
+  : CoreInferToolInput<T>;
+
+export type InferValidatedToolInput<T extends ToolInputSchema> = T extends StandardSchemaV1
+  ? StandardSchemaV1.InferOutput<T>
+  : InferToolInput<T>;
+
 /** Core hook configuration with opt-in MCP metadata. */
 export interface WebMCPConfig<
   TInput extends ToolInputSchema = InputSchema,
   TOutput extends JsonSchemaForInference | undefined = undefined,
-> extends Omit<CoreWebMCPConfig<TInput, InferOutput<TOutput>>, 'annotations'> {
+> extends Omit<
+  CoreWebMCPConfig<InputSchema, InferOutput<TOutput>>,
+  'annotations' | 'execute' | 'inputSchema'
+> {
+  inputSchema?: TInput;
+  execute: ToolExecuteFunction<TInput, TOutput>;
   outputSchema?: TOutput;
   annotations?: ToolAnnotations;
+  formatOutput?: (result: InferOutput<TOutput>) => MaybePromise<unknown>;
+  formatError?: (error: Error) => MaybePromise<unknown>;
 }
 
 export type ToolExecuteFunction<
   TInput extends ToolInputSchema = InputSchema,
   TOutput extends JsonSchemaForInference | undefined = undefined,
-> = CoreToolExecuteFunction<TInput, InferOutput<TOutput>>;
+> = (
+  input: InferValidatedToolInput<TInput>,
+  options: WebMCP.ToolExecuteCallbackOptions
+) => MaybePromise<InferOutput<TOutput>>;
 export type WebMCPReturn<
   TOutput extends JsonSchemaForInference | undefined = undefined,
   TInput extends ToolInputSchema = InputSchema,
-> = CoreWebMCPReturn<TInput, InferOutput<TOutput>>;
+> = Omit<CoreWebMCPReturn<InputSchema, InferOutput<TOutput>>, 'execute'> & {
+  execute: (
+    input: InferToolInput<TInput>,
+    options?: WebMCP.ToolExecuteCallbackOptions
+  ) => Promise<InferOutput<TOutput>>;
+};
 
 export type {
   BrowserMcpServer as ModelContextProtocol,

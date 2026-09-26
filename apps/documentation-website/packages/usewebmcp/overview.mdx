@@ -1,7 +1,7 @@
 ---
 title: 'usewebmcp overview'
-description: 'Register React state and actions as WebMCP tools, with upstream types and optional Standard Schema validation.'
-keywords: ['usewebmcp', 'overview', 'react', 'standard schema', 'useWebMCP']
+description: 'Register React state and actions as WebMCP tools with upstream types and JSON Schema input inference.'
+keywords: ['usewebmcp', 'overview', 'react', 'JSON Schema', 'useWebMCP']
 icon: 'react'
 ---
 
@@ -23,15 +23,15 @@ has the comparison, method, and commands to run it.
 
 ## Feature comparison
 
-| Feature                         | `usewebmcp`     | `@mcp-b/react-webmcp` | MCP Cat | Google    |
-| ------------------------------- | --------------- | --------------------- | ------- | --------- |
-| Hook bundle (gzip)              | 1.7 kB          | 2.1 kB                | 24.2 kB | 0.7 kB    |
-| Schema validation               | Standard Schema | Standard Schema       | Zod     | Manual    |
-| Registration errors             | Yes             | Yes                   | Yes     | Sync only |
-| Running, result & error state   | Yes             | Yes                   | Yes     | No        |
-| Call tools from React           | Yes             | Yes                   | Yes     | No        |
-| Automatic MCP result formatting | No              | Yes                   | No      | Yes       |
-| Prompt & resource hooks         | No              | Yes                   | No      | No        |
+| Feature                         | `usewebmcp` | `@mcp-b/react-webmcp` | MCP Cat | Google    |
+| ------------------------------- | ----------- | --------------------- | ------- | --------- |
+| Hook bundle (gzip)              | 1.7 kB      | 2.1 kB                | 24.2 kB | 0.7 kB    |
+| Schema validation               | Handler     | Standard Schema       | Zod     | Manual    |
+| Registration errors             | Yes         | Yes                   | Yes     | Sync only |
+| Running, result & error state   | Yes         | Yes                   | Yes     | No        |
+| Call tools from React           | Yes         | Yes                   | Yes     | No        |
+| Automatic MCP result formatting | No          | Yes                   | No      | Yes       |
+| Prompt & resource hooks         | No          | Yes                   | No      | No        |
 
 Bundle sizes exclude React and include built-in dependencies. App validators and runtimes are extra.
 
@@ -40,10 +40,10 @@ All four accept JSON Schema. Compared: our PR #329, [MCP Cat 1.1.0](https://www.
 ## Package boundary
 
 The hook uses Community Group [types](https://github.com/webmachinelearning/webmcp-types)
-and calls your schema's validator. Supply native WebMCP, the
+and accepts upstream JSON Schema metadata without runtime validation. Supply native WebMCP, the
 [polyfill](/packages/webmcp-polyfill/overview), or [MCP-B runtime](/packages/global/overview).
-React 18/19 and `'use client'` are supported. Failures reject by default;
-[`formatError`](/packages/usewebmcp/reference#tool-responses) customizes agent responses.
+React 18/19 and `'use client'` are supported. For Standard Schema validation, MCP output metadata,
+or formatted agent responses, use [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference).
 
 [Framework setup](/how-to/frameworks) · [API reference](/packages/usewebmcp/reference) ·
 [Schema guide](/how-to/use-schemas-and-structured-output)

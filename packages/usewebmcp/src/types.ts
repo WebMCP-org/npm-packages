@@ -1,18 +1,12 @@
-import type { StandardJSONSchemaV1, StandardSchemaV1 } from '@standard-schema/spec';
 import type { WebMCP } from 'webmcp-types';
 
-/** JSON Schema, or a schema implementing Standard JSON Schema v1. */
+/** The JSON Schema object accepted by the WebMCP tool contract. */
 export type ToolInputSchema = NonNullable<WebMCP.ModelContextTool['inputSchema']>;
 
-/** Input accepted by the returned execute function, before validation/transforms. */
-export type InferToolInput<T extends ToolInputSchema> = T extends StandardJSONSchemaV1
-  ? StandardJSONSchemaV1.InferInput<T>
-  : Parameters<WebMCP.ModelContextToolFromSchema<T>['execute']>[0];
-
-/** Input received by the implementation, after Standard Schema validation/transforms. */
-export type InferValidatedToolInput<T extends ToolInputSchema> = T extends StandardSchemaV1
-  ? StandardSchemaV1.InferOutput<T>
-  : InferToolInput<T>;
+/** Input inferred from the WebMCP JSON Schema. */
+export type InferToolInput<T extends ToolInputSchema> = Parameters<
+  WebMCP.ModelContextToolFromSchema<T>['execute']
+>[0];
 
 /** Current state for local and agent-triggered tool executions. */
 export interface ToolExecutionState<TResult = unknown> {
@@ -31,7 +25,7 @@ export type ToolExecuteFunction<
   TInputSchema extends ToolInputSchema = object,
   TResult = unknown,
 > = (
-  input: InferValidatedToolInput<TInputSchema>,
+  input: InferToolInput<TInputSchema>,
   options: WebMCP.ToolExecuteCallbackOptions
 ) => WebMCP.MaybePromise<TResult>;
 
@@ -46,10 +40,6 @@ export interface WebMCPConfig<
   enabled?: boolean;
   /** Origins allowed to discover/call the tool, enforced by the browser. */
   exposedTo?: WebMCP.ModelContextRegisterToolOptions['exposedTo'];
-  /** Format agent-facing results; local execution and state retain the original result. */
-  formatOutput?: (result: TResult) => unknown;
-  /** Format agent-facing failures; local execution continues to reject. Cancellation always rejects. */
-  formatError?: (error: Error) => unknown;
 }
 
 /** State and controls returned by useWebMCP. */

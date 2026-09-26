@@ -1,11 +1,9 @@
 ---
 title: 'usewebmcp reference'
-description: 'Reference for upstream WebMCP React hooks, Standard Schema validation, registration lifecycle, cancellation, and inferred types.'
-keywords: ['usewebmcp', 'useWebMCP', 'react', 'standard schema', 'reference']
+description: 'Reference for upstream WebMCP React hooks, JSON Schema inference, registration lifecycle, and cancellation.'
+keywords: ['usewebmcp', 'useWebMCP', 'react', 'JSON Schema', 'reference']
 icon: 'react'
 ---
-
-import StandardSchemaExample from '/snippets/packages/usewebmcp-standard-schema.mdx';
 
 import CounterExample from '/snippets/packages/usewebmcp-quickstart.mdx';
 
@@ -37,7 +35,7 @@ React 18 and 19 are supported. The published entry point preserves `'use client'
 | `execute(input, options?)` | `Promise<TResult>`            | Local execution with optional `{ signal }`              |
 | `reset()`                  | `void`                        | Clears observed execution state without cancelling work |
 | `isSupported`              | `boolean`                     | A registration API is available                         |
-| `registrationError`        | `Error \| null`               | Metadata conversion or registration failure             |
+| `registrationError`        | `Error \| null`               | Schema serialization or registration failure            |
 
 `isRegistered` is no longer returned. Use the runtime’s `getTools()` for confirmed discovery.
 `registrationError` describes setup failures separately from `state.error`; a null error does not confirm registration.
@@ -49,13 +47,11 @@ React 18 and 19 are supported. The published entry point preserves `'use client'
 | `name`                    | `string`                                             | Yes      | Tool identifier                                 |
 | `title`                   | `string`                                             | No       | Human-readable label                            |
 | `description`             | `string`                                             | Yes      | Tool description                                |
-| `inputSchema`             | JSON Schema or Standard JSON Schema v1               | No       | Input metadata and inference                    |
+| `inputSchema`             | WebMCP JSON Schema                                   | No       | Input metadata and type inference               |
 | `annotations`             | `WebMCP.ToolAnnotations`                             | No       | Upstream behavior hints                         |
-| `execute(input, options)` | `(input, { signal }) => TResult \| Promise<TResult>` | Yes      | Validated tool implementation                   |
+| `execute(input, options)` | `(input, { signal }) => TResult \| Promise<TResult>` | Yes      | Tool implementation                             |
 | `enabled`                 | `boolean`                                            | No       | Defaults to true; controls registration         |
 | `exposedTo`               | `string[]`                                           | No       | Forwarded to the browser's registration options |
-| `formatOutput`            | `(result: TResult) => unknown`                       | No       | Formats agent-facing results; async is awaited  |
-| `formatError`             | `(error: Error) => unknown`                          | No       | Formats agent-facing failures; async is awaited |
 
 `enabled: false` unregisters the tool while leaving local execution available. The browser enforces origin exposure; see the [Community Group draft](https://webmachinelearning.github.io/webmcp/#dictdef-modelcontextregistertooloptions).
 
@@ -70,37 +66,25 @@ React 18 and 19 are supported. The published entry point preserves `'use client'
 
 The handler always receives an `AbortSignal`, including on older runtimes that omit execution options. Runtimes that omit the options bag receive a fresh signal; runtime cancellation can propagate only when the runtime forwards its signal. Local calls can provide their own signal. Cancellation rejects the call and clears its pending state. Work that ignores cancellation cannot replace state when it finishes later.
 
-## Schemas and inference
+## JSON Schema and inference
 
-<StandardSchemaExample />
+Inline WebMCP JSON Schema literals infer caller and handler inputs through upstream types. Reusable schemas retain literals with `as const`. `TResult` is inferred from the handler's return value. The schema is registered as metadata; the hook passes runtime input to the handler without validation or transformation.
 
-Arguments `{ count: "2" }` become `{ count: 2, limit: 10 }` before the handler runs, producing `{ total: 12 }`.
-
-Inline JSON Schema literals infer caller and handler inputs through upstream types. Reusable schemas retain literals with `as const`. `TResult` is inferred from the handler's return value.
-
-[Standard JSON Schema v1](https://standardschema.dev/json-schema) supplies metadata through `~standard.jsonSchema.input()`, trying draft 2020-12 and then draft-07. When a schema also implements [Standard Schema v1](https://standardschema.dev/), every call runs `~standard.validate()` before the handler. Async validation is awaited. Callers supply the input type, while the handler receives the validated output type, including transforms and defaults.
-
-The hook calls the schema library's methods; it does not bundle a validation engine. Standard JSON Schema conversion and Standard Schema validation are separate interfaces.
-
-Validation errors skip the handler and reject local and agent calls by default. `formatError` can format agent failures. JSON Schema objects and converter-only schemas supply metadata and inference without adding runtime validation. A validator-only schema must also provide a JSON Schema converter. The [schema guide](/how-to/use-schemas-and-structured-output) covers React and direct registration. The [SDK schema adapter](/packages/webmcp-ts-sdk/reference#schema-boundary) converts metadata for direct MCP server registrations.
+For Standard Schema conversion and runtime validation, use [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference). For direct registration, the [schema guide](/how-to/use-schemas-and-structured-output) covers callback validation and the [SDK schema adapter](/packages/webmcp-ts-sdk/reference#schema-boundary) covers metadata conversion.
 
 ## Re-registration triggers
 
-Registration refreshes when serialized tool metadata, `enabled`, `exposedTo`, or explicit `deps` change. Equivalent metadata does not re-register a tool. The latest committed callback and validator apply without callback-reference-driven registration changes.
+Registration refreshes when serialized tool metadata, `enabled`, `exposedTo`, or explicit `deps` change. Equivalent metadata does not re-register a tool. The latest committed callback applies without callback-reference-driven registration changes.
 
-Treat input schemas as immutable. Conversion and serialization are memoized by `inputSchema` identity; replace the object when its contents change. A new object with equivalent serialized contents keeps the existing registration.
+Treat input schemas as immutable. Serialization is memoized by `inputSchema` identity; replace the object when its contents change. A new object with equivalent serialized contents keeps the existing registration.
 
 Committed callbacks are published with a layout effect in the browser and a passive effect on the server. Suspended or abandoned renders do not replace the active implementation. Cleanup aborts the component's registration signal.
 
 When the API is absent, the hook checks every 500 ms for up to 10 seconds to detect late extension injection. It stops checking after discovery or unmount. The hook reads `document.modelContext`; it does not fall back to `navigator.modelContext`. A registration that resolves or rejects after cleanup cannot change the replacement registration's state.
 
-## Tool responses
+## Results
 
-Successful agent calls return the handler's value unless `formatOutput` is supplied. Local execution and `state.lastResult` retain the original result. Thrown or returned `Error` objects reject both local and agent calls by default.
-
-`formatError(error)` can return an agent-facing failure value. Both formatters may be async and are awaited before execution settles. A formatted failure remains in `state.error` and does not increment `executionCount`. Local calls still reject, and cancellation always rejects without a formatted response. If `formatError` throws or rejects, the agent call rejects.
-
-`outputSchema`, MCP-specific annotations, and automatic text/`structuredContent` formatting belong to [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference#usewebmcpconfig-deps). Existing users needing that behavior can change the import to that package.
+Local execution resolves with the handler's raw result, which is also stored in `state.lastResult`. Thrown or returned `Error` objects reject. The hook does not wrap agent results in MCP `CallToolResult` values. For output schemas, MCP annotations, or automatic response formatting, use [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference#usewebmcpconfig-deps).
 
 ## Exported types
 
@@ -111,8 +95,7 @@ Successful agent calls return the handler's value unless `formatOutput` is suppl
 | `WebMCPReturn<TInputSchema, TResult>`        | Execution state, API availability, registration errors, and controls |
 | `ToolExecutionState<TResult>`                | Execution state                                                      |
 | `ToolExecuteFunction<TInputSchema, TResult>` | Handler signature                                                    |
-| `ToolInputSchema`                            | Accepted schema object                                               |
-| `InferToolInput<TInputSchema>`               | Caller input before validation                                       |
-| `InferValidatedToolInput<TInputSchema>`      | Handler input after validation                                       |
+| `ToolInputSchema`                            | Accepted WebMCP JSON Schema type                                     |
+| `InferToolInput<TInputSchema>`               | Input type inferred from the WebMCP JSON Schema                      |
 
-The second generic parameter of core configuration and return types is now the result type. The previous `InferOutput` helper and output-schema-based generics remain available from `@mcp-b/react-webmcp`.
+The second generic parameter of core configuration and return types is the result type. MCP output-schema helpers and schema-validated input types are available from `@mcp-b/react-webmcp`.

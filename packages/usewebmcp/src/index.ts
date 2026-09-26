@@ -2,7 +2,6 @@
 
 export type {
   InferToolInput,
-  InferValidatedToolInput,
   ToolExecuteFunction,
   ToolExecutionState,
   ToolInputSchema,
