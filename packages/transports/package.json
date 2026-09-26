@@ -73,7 +73,7 @@
     "test:browser": "VITEST_BROWSER=true vp test run",
     "test:browser:ui": "VITEST_BROWSER=true vp test --browser",
     "test:coverage": "vp test run --coverage --coverage.reportsDirectory=coverage/node && pnpm run test:browser --coverage --coverage.reportsDirectory=coverage/browser",
-    "test:e2e": "pnpm --filter @mcp-b/transports build && pnpm --filter @mcp-b/webmcp-polyfill build && pnpm --filter @mcp-b/webmcp-ts-sdk build && vp pack --filter e2e-extension && node e2e/build-extension.mjs && node --experimental-strip-types --test e2e/extension-runtime.e2e.test.ts",
+    "test:e2e": "pnpm --filter '@mcp-b/transports...' run build && vp pack --filter e2e-extension && node e2e/build-extension.mjs && node --experimental-strip-types --test e2e/extension-runtime.e2e.test.ts",
     "test:watch": "vp test",
     "typecheck": "tsc -p tsconfig.check.json && tsc -p e2e/tsconfig.extension.json --noEmit",
     "typecheck:consumer": "tsc -p type-tests/tsconfig.json && tsc -p type-tests/tsconfig.extension.json --types node,chrome && tsc -p type-tests/tsconfig.extension.json --types node,chrome-types"

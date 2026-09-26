@@ -37,7 +37,7 @@ Import `@mcp-b/global` once in your client entry point, then mount a component t
 This example uses Zod; use your existing Standard Schema implementation or plain JSON Schema as needed.
 Metadata changes refresh registration automatically. Use the optional second argument only when you
 need to force an additional registration refresh.
-Read the [`@mcp-b/react-webmcp` reference](/packages/react-webmcp/reference) for execution state,
+Read the [`@mcp-b/react-webmcp` reference](/packages/react-webmcp/reference) for optional execution state,
 prompt and resource hooks, and MCP client-provider hooks.
 
 ## Register a tool with `usewebmcp`
@@ -53,7 +53,9 @@ pnpm add usewebmcp react @mcp-b/webmcp-polyfill
 
 Both hooks convert Standard JSON Schema and call a supplied Standard Schema validator before
 execution. Follow the [schema guide](/how-to/use-schemas-and-structured-output) for transforms and
-direct browser registrations. Use `usewebmcp` for tool registration, raw results, and local execution state. Use
+direct browser registrations. Use `usewebmcp` for tool registration and raw results. Add an
+[execution-state plugin](https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-plugins#execution-state)
+and subscribe only where the UI needs it. Use
 [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference) to initialize the tool-only runtime.
 
 ## Handle server rendering

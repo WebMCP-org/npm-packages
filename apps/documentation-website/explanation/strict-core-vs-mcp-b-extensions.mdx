@@ -61,38 +61,36 @@ JSON Schema metadata. [Standard Schema](https://standardschema.dev/) lets an int
 library's validator. The library remains responsible for its refinements, defaults, transforms, and
 async checks.
 
-The shared [`usewebmcp` hook](/packages/usewebmcp/reference) owns the React callback, so it can run the
-supplied validator before either a local call or an agent call. This keeps validation consistent
-whether `document.modelContext` comes from the browser, the polyfill, or the MCP-B runtime. It adds
-no dependency on a validation engine. [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) uses
-the same callback and adds MCP result formatting and output metadata.
+[`@mcp-b/webmcp-plugins`](https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-plugins)
+owns the shared invocation runner and Standard Schema adapter. Native WebMCP, polyfilled tools,
+and the MCP bridge can use the same managed callback. The [`usewebmcp` hook](/packages/usewebmcp/reference)
+adds React registration lifetime and chooses that adapter from `inputSchema`.
+[`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) adds MCP result formatting.
 
 ```mermaid
 flowchart TD
-  Schema["Your schema library"] --> Metadata["Standard JSON Schema conversion"]
-  Metadata --> Browser["JSON metadata registered with WebMCP"]
-  Schema --> Validator["Supplied Standard Schema validator"]
-  Agent["Agent call"] --> Hook["React hook callback"]
-  Local["Local execute call"] --> Hook
-  Hook --> Validator
-  Validator -->|"Validated and transformed input"| Handler["Your tool implementation"]
+  Schema["Your schema library"] --> Metadata["JSON metadata for WebMCP"]
+  Schema --> Validate["Supplied validator and transforms"]
+  Call["Local or agent call"] --> Runner["Shared invocation runner"]
+  Runner --> Validate
+  Validate --> Consent["Optional consent"]
+  Consent --> Handler["Your handler"]
 ```
 
-The standalone polyfill keeps its browser contract focused on JSON Schema metadata. Adding an
-optional helper under [`@mcp-b/webmcp-polyfill/schema`](/packages/webmcp-polyfill/reference#schema-entry)
-does not change `document.modelContext.registerTool()` or make it call a validator. This is an
-adapter extension, not a browser API feature. Declarative forms separately use the browser's form
-constraint validation.
+The runner keeps validation ahead of consent, regardless of plugin array order. Named plugins
+wrap the call for state, tracing, or approval. Execution state is an optional store; React subscribes
+only where a component needs its snapshot. This separates registration from call-driven UI updates.
 
-The MCP route has another validation owner: the official server composed by
-[`BrowserMcpServer`](/packages/webmcp-ts-sdk/reference#schema-boundary). It can use a validator
-preserved by the schema adapter, but direct browser calls bypass that MCP server. React hooks
-therefore forward plain JSON metadata and keep vendor validation in their callback. Applying a
-string-to-number transform in both places would feed the first transform's number back into a
-validator expecting a string.
+The standalone polyfill owns browser behavior, including declarative form constraints. It does not
+install invocation plugins or call Standard Schema validators. Its `/schema` helper handles metadata
+and compatibility. Moving reusable invocation behavior into a separate package also keeps it useful
+when native browser support makes the fallback unnecessary.
 
-The [schema guide](/how-to/use-schemas-and-structured-output) shows how to keep one owner for vendor
-validation when registering directly, and how to add MCP output schemas independently. Upstream
-[`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) owns the core browser declarations;
-[`@mcp-b/webmcp-types`](/packages/webmcp-types/reference) derives compatibility and MCP extension types.
+The official MCP server adds protocol input/output validation. For managed callbacks, the bridge
+places those checks inside the shared invocation and avoids applying a vendor transform twice.
+Unwrapped direct browser calls bypass MCP server validation.
+
+The [schema guide](/how-to/use-schemas-and-structured-output) shows direct and React registration.
+Upstream [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) owns browser declarations;
+[`@mcp-b/webmcp-types`](/packages/webmcp-types/reference) derives MCP extension and compatibility types.
 Neither type package performs runtime validation.

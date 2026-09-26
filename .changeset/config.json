@@ -8,6 +8,7 @@
       "@mcp-b/smart-dom-reader",
       "@mcp-b/smart-dom-reader-server",
       "@mcp-b/webmcp-polyfill",
+      "@mcp-b/webmcp-plugins",
       "@mcp-b/webmcp-ts-sdk",
       "@mcp-b/transports",
       "@mcp-b/mcp-iframe",

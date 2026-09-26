@@ -11,3 +11,4 @@ export type {
 } from './types.js';
 export type { WebMCP } from 'webmcp-types';
 export { useWebMCP } from './useWebMCP.js';
+export { useToolExecutionState } from './useToolExecutionState.js';

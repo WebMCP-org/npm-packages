@@ -73,8 +73,8 @@ The relay discovers tools through a hidden iframe injected by `embed.js`. Add a 
 ```
 
 If your page already registers tools on `document.modelContext`, they are picked up automatically.
-Tools registered after `embed.js` loads are also discovered through `toolchange` events and a polling
-fallback; script order does not control discovery.
+Tools registered after `embed.js` loads are discovered through WebMCP `toolchange` events across the
+iframe bridge; script order does not control discovery.
 
 If you are new to WebMCP, this complete example loads `@mcp-b/global`, registers a tool, and adds the
 embed:
@@ -168,12 +168,12 @@ This lets multiple MCP clients share the same browser connections without manual
 
 ## Troubleshoot common issues
 
-| Problem                | Fix                                                                                                                          |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected` | Confirm the page loaded `embed.js` and the relay process is running                                                          |
-| `No tools listed`      | Confirm tools are registered on the page. The embed detects changes and polls every two seconds, regardless of script order. |
-| `Tool not found`       | The tab reloaded or disconnected. Call `webmcp_list_tools` to refresh                                                        |
-| Connection blocked     | Verify `--widget-origin` matches the WebSocket origin and the relay port matches `data-relay-port`                           |
+| Problem                | Fix                                                                                            |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| `No sources connected` | Confirm the page loaded `embed.js` and the relay process is running                            |
+| `No tools listed`      | Confirm the page registered tools and WebMCP is available in the host and widget frames        |
+| `Tool not found`       | The tab reloaded or disconnected. Call `webmcp_list_tools` to refresh                          |
+| Connection blocked     | Verify `--widget-origin` matches the WebSocket origin and relay port matches `data-relay-port` |
 
 After a disconnect, the widget retries the last endpoint once after about `500ms`, then scans after
 `10s`, `20s`, and `30s`. It then enters a dormant state that probes every two minutes; returning to

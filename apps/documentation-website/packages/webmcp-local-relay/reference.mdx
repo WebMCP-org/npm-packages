@@ -152,7 +152,8 @@ Add a script tag to expose a page's WebMCP tools to the relay:
 ```
 
 Tools registered on `document.modelContext` are picked up automatically, including tools registered
-after the embed loads. The embed listens for `toolchange` and polls every two seconds as a fallback.
+after the embed loads. The widget listens for WebMCP `toolchange` events through the iframe bridge;
+it does not poll for tool updates.
 
 ### Embed attributes
 
@@ -186,7 +187,7 @@ Increase the per-request timeout for tools that chain several slow API calls:
 
 The relay allows `65000` ms by default. If the page timeout is higher, start the relay with a slightly larger limit. For the `120000` ms page setting above, use `--invoke-timeout 125000`.
 
-The embed script fetches the sibling `widget.html`, injects configuration, and loads it as a hidden blob iframe that inherits the host page origin. The iframe opens a WebSocket to the relay on `localhost`. Self-hosted copies must serve both `embed.js` and `widget.html`; cross-origin hosts must allow the widget fetch with CORS. The relay fails closed if that fetch fails. Page code registers tools on `document.modelContext`. The embed discovers tools through asynchronous `getTools()` and executes the returned descriptor through the feature-detected, serialized-JSON `executeTool()` signature supported by the package and current Chrome implementation.
+The embed script fetches the sibling `widget.html`, injects configuration, and loads it as a hidden blob iframe that inherits the host page origin. The widget bundles the [upstream WebMCP polyfill](https://github.com/webmachinelearning/webmcp-polyfill) and calls its installer. It discovers tools through asynchronous `getTools()` and executes the returned descriptors with object input. When native WebMCP is unavailable, the polyfill frame bridge carries discovery, execution, and tool changes between the widget and host page; native WebMCP handles those calls when available. `postMessage` carries only reconnect and reload controls. The widget opens a WebSocket to the relay on `localhost`. Self-hosted copies must serve both `embed.js` and `widget.html`; cross-origin hosts must allow the widget fetch with CORS. The relay fails closed if that fetch fails.
 
 ## Reconnection and client mode
 
@@ -207,7 +208,7 @@ When a candidate port is owned by a compatible WebMCP relay, a second instance j
 The relay supports pages using:
 
 1. `@mcp-b/global` (recommended for the complete MCP-B runtime)
-2. Native Chrome with `document.modelContext.getTools()` and the serialized-JSON `executeTool()` signature that this relay requires
+2. Native Chrome with cross-frame `getTools()` and object-input `executeTool()`
 3. `@mcp-b/webmcp-polyfill`
 
 The browser embed always uses document-first discovery and executes the current
@@ -347,13 +348,13 @@ The package exports the following for programmatic use:
 
 ## Troubleshooting
 
-| Problem                  | Fix                                                                                                                                                 |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected`   | Ensure the page loaded `embed.js` and the relay process is running                                                                                  |
-| `No tools listed`        | Ensure tools are registered on the page. The embed listens for changes and polls every two seconds, so load order does not matter.                  |
-| `Tool not found`         | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                            |
-| Connection blocked       | Verify `--widget-origin` matches the WebSocket origin (for example, `https://myapp.com`) and the relay port matches `data-relay-port`               |
-| `Host response timeout:` | The host page took longer than the per-request timeout (default 60s) to respond. Increase via `data-request-timeout="<ms>"` on the embed script tag |
+| Problem                    | Fix                                                                                                                                                         |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `No sources connected`     | Ensure the page loaded `embed.js` and the relay process is running                                                                                          |
+| `No tools listed`          | Ensure the page registered tools and WebMCP is available in the host and widget frames                                                                      |
+| `Tool not found`           | Tab reloaded or disconnected; call `webmcp_list_tools` again to refresh                                                                                     |
+| Connection blocked         | Verify `--widget-origin` matches the WebSocket origin and the relay port matches `data-relay-port`                                                          |
+| `Tool execution timed out` | The page tool exceeded the per-request timeout (default 60s); increase it with `data-request-timeout="<ms>"` on the embed script and CLI `--invoke-timeout` |
 
 ## Related
 

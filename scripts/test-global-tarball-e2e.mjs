@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -84,26 +84,21 @@ async function main() {
   try {
     tempDir = await mkdtemp(path.join(tmpdir(), 'mcpb-global-tarball-'));
 
-    // Collect workspace:* dependencies from @mcp-b/global.
-    const globalPkg = JSON.parse(
-      await readFile(path.join(repoRoot, 'packages/global/package.json'), 'utf8')
+    // Include transitive workspace dependencies, including the shared invocation runtime.
+    const packages = JSON.parse(
+      execFileSync('pnpm', ['--filter', '@mcp-b/global...', 'list', '--depth', '-1', '--json'], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+      })
     );
-    const workspaceDeps = Object.entries(globalPkg.dependencies || {})
-      .filter(([, version]) => version.startsWith('workspace:'))
-      .map(([name]) => name);
-
-    // CI already built the workspace; local runs build before packing by default.
-    const tarballMap = new Map(); // @mcp-b/<name> -> absolute tarball path
-
-    for (const depName of workspaceDeps) {
-      const shortName = depName.replace('@mcp-b/', '');
-      const depDir = `packages/${shortName}`;
-      if (!skipBuild) runCommand('pnpm', ['-C', depDir, 'build']);
-      runCommand('pnpm', ['-C', depDir, 'pack', '--pack-destination', tempDir]);
+    const workspaceDeps = packages
+      .map(({ name }) => name)
+      .filter((name) => name !== '@mcp-b/global');
+    const tarballMap = new Map();
+    if (!skipBuild) runCommand('pnpm', ['-r', '--filter', '@mcp-b/global...', 'run', 'build']);
+    for (const pkg of packages) {
+      runCommand('pnpm', ['-C', pkg.path, 'pack', '--pack-destination', tempDir]);
     }
-
-    if (!skipBuild) runCommand('pnpm', ['-C', 'packages/global', 'build']);
-    runCommand('pnpm', ['-C', 'packages/global', 'pack', '--pack-destination', tempDir]);
 
     // Map each tarball back to its package name.
     const allTarballs = (await readdir(tempDir)).filter((f) => f.endsWith('.tgz'));

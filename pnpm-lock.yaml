@@ -15,6 +15,9 @@ catalogs:
     '@modelcontextprotocol/server':
       specifier: 2.0.0
       version: 2.0.0
+    '@simplewebauthn/browser':
+      specifier: ^14.0.0
+      version: 14.0.0
     '@types/chrome':
       specifier: ^0.2.7
       version: 0.2.7
@@ -247,6 +250,9 @@ importers:
       '@mcp-b/transports':
         specifier: workspace:*
         version: link:../../packages/transports
+      '@mcp-b/webmcp-plugins':
+        specifier: workspace:*
+        version: link:../../packages/webmcp-plugins
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
         version: 2.0.0
@@ -651,6 +657,9 @@ importers:
 
   packages/react-webmcp:
     dependencies:
+      '@mcp-b/webmcp-plugins':
+        specifier: workspace:*
+        version: link:../webmcp-plugins
       '@mcp-b/webmcp-polyfill':
         specifier: workspace:*
         version: link:../webmcp-polyfill
@@ -792,6 +801,9 @@ importers:
 
   packages/usewebmcp:
     dependencies:
+      '@mcp-b/webmcp-plugins':
+        specifier: workspace:*
+        version: link:../webmcp-plugins
       '@standard-schema/spec':
         specifier: ^1.1.0
         version: 1.1.0
@@ -916,6 +928,37 @@ importers:
         specifier: 'catalog:'
         version: '@voidzero-dev/vite-plus-test@0.1.24(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(@vitest/coverage-v8@4.1.8(@voidzero-dev/vite-plus-test@0.1.24))(esbuild@0.28.1)(happy-dom@20.8.9)(jiti@2.7.0)(sass@1.97.3)(terser@5.50.0)(tsx@4.23.13)(typescript@5.9.3)(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.97.3)(terser@5.50.0)(tsx@4.23.13)(yaml@2.8.3))(yaml@2.8.3)'
 
+  packages/webmcp-plugins:
+    dependencies:
+      '@simplewebauthn/browser':
+        specifier: 'catalog:'
+        version: 14.0.0
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
+      webmcp-types:
+        specifier: ^0.1.9
+        version: 0.1.9
+    devDependencies:
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.1
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 4.1.8(@voidzero-dev/vite-plus-test@0.1.24)
+      playwright:
+        specifier: 'catalog:'
+        version: 1.62.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.1.24(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.8(@voidzero-dev/vite-plus-test@0.1.24))(esbuild@0.28.1)(happy-dom@20.8.9)(jiti@2.7.0)(sass@1.97.3)(svelte@5.55.7(@typescript-eslint/types@8.68.0))(terser@5.50.0)(tsx@4.23.13)(typescript@5.9.3)(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.97.3)(terser@5.50.0)(tsx@4.23.13)(yaml@2.8.3))(yaml@2.8.3)
+      vitest:
+        specifier: 'catalog:'
+        version: '@voidzero-dev/vite-plus-test@0.1.24(@opentelemetry/api@1.9.1)(@types/node@26.4.0)(@vitest/coverage-v8@4.1.8(@voidzero-dev/vite-plus-test@0.1.24))(esbuild@0.28.1)(happy-dom@20.8.9)(jiti@2.7.0)(sass@1.97.3)(terser@5.50.0)(tsx@4.23.13)(typescript@5.9.3)(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.97.3)(terser@5.50.0)(tsx@4.23.13)(yaml@2.8.3))(yaml@2.8.3)'
+
   packages/webmcp-polyfill:
     dependencies:
       '@mcp-b/webmcp-types':
@@ -946,6 +989,9 @@ importers:
 
   packages/webmcp-ts-sdk:
     dependencies:
+      '@mcp-b/webmcp-plugins':
+        specifier: workspace:*
+        version: link:../webmcp-plugins
       '@mcp-b/webmcp-polyfill':
         specifier: workspace:*
         version: link:../webmcp-polyfill
@@ -5485,6 +5531,9 @@ packages:
   '@sigstore/verify@3.1.0':
     resolution: {integrity: sha512-mNe0Iigql08YupSOGv197YdHpPPr+EzDZmfCgMc7RPNaZTw5aLN01nBl6CHJOh3BGtnMIj83EeN4butBchc8Ag==}
     engines: {node: ^20.17.0 || >=22.9.0}
+
+  '@simplewebauthn/browser@14.0.0':
+    resolution: {integrity: sha512-1odWVqeEBTl7lJ9zMKLEsmTlnyrDO5iRcTvfMKKk1WThUnp/i8JJdffdj2icP+tty159s4PgwE3BiMoEW9NFow==}
 
   '@sindresorhus/is@5.6.0':
     resolution: {integrity: sha512-TV7t8GKYaJWsn00tFDqBw8+Uqmr8A0fRU1tvTQhyZzGv0sJCGRQL3JGMI3ucuKo3XIZdUP+Lx7/gh2t3lewy7g==}
@@ -16409,6 +16458,8 @@ snapshots:
       '@sigstore/bundle': 4.0.0
       '@sigstore/core': 3.1.0
       '@sigstore/protobuf-specs': 0.5.0
+
+  '@simplewebauthn/browser@14.0.0': {}
 
   '@sindresorhus/is@5.6.0': {}
 

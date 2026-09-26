@@ -12,6 +12,12 @@ supplies the package-supported `document.modelContext` surface.
 operations while providing MCP-B-only capabilities. `@mcp-b/global`
 initializes those layers and connects the selected browser transport.
 
+[`@mcp-b/webmcp-plugins`](https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-plugins)
+sits beside these installation layers. It owns the shared callback runner, supplied-schema
+validation, consent, optional execution state, and tracing. React hooks and the SDK share one
+runner instance; the polyfill does not depend on plugins. Importing plugins never installs a
+browser API. This keeps the same invocation behavior available with native WebMCP.
+
 Global initialization preserves the browser-shaped programming model:
 
 <Columns cols={3}>

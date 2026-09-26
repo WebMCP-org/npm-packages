@@ -193,22 +193,26 @@ Stops native reconciliation, aborts native mirrors, removes registrations, and c
 
 ## Schema boundary
 
-`BrowserMcpServer` normalizes JSON Schema and Standard JSON Schema inputs through the
-[polyfill's optional schema adapter](/packages/webmcp-polyfill/reference#schema-entry). If the schema
-also supplies `~standard.validate()`, the adapter preserves it for the composed `McpServer`.
-Otherwise the MCP server uses its `fromJsonSchema` adapter.
+`BrowserMcpServer` normalizes metadata with the
+[polyfill schema helper](/packages/webmcp-polyfill/reference#schema-entry).
+For unwrapped callbacks, the official MCP server runs a preserved Standard Schema validator
+or its JSON Schema adapter on MCP calls. Direct browser execution bypasses that validation.
 
-This validation runs on MCP client calls. Direct `executeTool()` calls and native mirrors execute the
-browser callback without passing through MCP validation. Validate in the callback when both paths
-can call a tool, and pass plain JSON metadata so the MCP server does not also apply the vendor
-transforms. The [schema guide](/how-to/use-schemas-and-structured-output) demonstrates this pattern;
-[`usewebmcp`](/packages/usewebmcp/reference) already applies it for React registrations.
+Callbacks created by
+[`@mcp-b/webmcp-plugins`](https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-plugins#register-a-callback-outside-react)
+are explicitly managed. Their JSON metadata is projected separately, and MCP input/output
+validation runs inside the shared invocation, where tracing and state observe failures.
+The vendor input transform runs once before consent and execution.
+[`usewebmcp`](/packages/usewebmcp/reference) creates managed callbacks automatically.
+The [schema guide](/how-to/use-schemas-and-structured-output) shows direct registration.
 
-`outputSchema` is enforced by the official MCP server on MCP calls. Direct browser calls do not
-perform that check. `PromptDescriptor.argsSchema` accepts `InputSchema`. Direct upstream server
-registrations support Zod 4.2 or newer and the official `fromJsonSchema` helper; Zod 3 is unsupported.
+`outputSchema` is enforced on MCP calls. Direct browser and local calls do not perform that check.
+MCP error classification applies to valid protocol responses, not arbitrary raw objects.
+Trusted protocol/trace metadata is passed separately from tool arguments.
 
-MCP requires object-root tool input schemas. An array-root WebMCP tool remains available through WebMCP but is omitted from MCP discovery with a warning.
+MCP requires object-root tool input schemas. Array-root WebMCP tools remain available through
+WebMCP and are omitted from MCP discovery with a warning. `PromptDescriptor.argsSchema` accepts
+`InputSchema`. Direct official SDK registrations support Zod 4.2 or newer; Zod 3 is unsupported.
 
 ## Exports
 

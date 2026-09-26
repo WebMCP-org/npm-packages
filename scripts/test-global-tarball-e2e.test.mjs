@@ -39,10 +39,19 @@ for (const failBrowser of [false, true]) {
 const fs = require('node:fs');
 const path = require('node:path');
 const args = process.argv.slice(2);
-if (args.includes('pack')) {
+if (args.includes('list')) {
+  console.log(JSON.stringify(['global', 'webmcp-ts-sdk', 'webmcp-plugins'].map(name => ({
+    name: '@mcp-b/' + name, path: path.join(process.cwd(), 'packages', name),
+  }))));
+} else if (args.includes('pack')) {
   const destination = args[args.indexOf('--pack-destination') + 1];
-  fs.writeFileSync(path.join(destination, 'mcp-b-global-1.0.0.tgz'), 'fixture');
+  const name = path.basename(args[args.indexOf('-C') + 1]);
+  fs.writeFileSync(path.join(destination, 'mcp-b-' + name + '-1.0.0.tgz'), 'fixture');
 } else if (args.includes('add')) {
+  const overrides = JSON.parse(fs.readFileSync('package.json')).pnpm.overrides;
+  for (const name of ['webmcp-ts-sdk', 'webmcp-plugins']) {
+    require('node:assert/strict').match(overrides['@mcp-b/' + name], /^file:/);
+  }
   for (const file of ['e2e/test-app/package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']) {
     fs.writeFileSync(file, 'temporary tarball dependency mutation');
   }

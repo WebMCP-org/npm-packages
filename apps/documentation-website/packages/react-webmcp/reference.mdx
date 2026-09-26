@@ -41,6 +41,21 @@ For client functionality:
 pnpm add @mcp-b/transports @modelcontextprotocol/client
 ```
 
+## Plugins and optional state
+
+`useWebMCP(config, deps?)` returns `execute`, `isSupported`, and `registrationError`.
+It does not allocate or subscribe to execution state. Attach an `executionState()` plugin and
+call `useToolExecutionState(execution)` to display status. The
+[shared React API](/packages/usewebmcp/reference#hooks) includes a complete example.
+
+The hook accepts named `plugins`, `binding`, and `checkBinding`. Standard Schema validation
+runs before consent. Managed MCP input/output validation and response classification stay inside
+the same invocation. An attached execution store records MCP error responses as failures;
+local calls retain raw objects, including those with `isError`.
+
+The [plugin package](https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-plugins)
+owns consent, state, tracing, and the framework-independent runner.
+
 ## Declarative form attributes
 
 Importing this package adds React JSX declarations for `toolname`, `tooltitle`,
@@ -89,19 +104,21 @@ The published entry point preserves `'use client'` and supports React 18/19 serv
 | `formatOutput`            | `(result: T) => unknown`                 | No       | Overrides MCP success formatting |
 | `formatError`             | `(error: Error) => unknown`              | No       | Overrides MCP error formatting   |
 
-**Returns:** `WebMCPReturn`, including `state`, `execute`, `reset`, `isSupported`, and `registrationError`.
+**Returns:** `WebMCPReturn`, containing `execute`, `isSupported`, and `registrationError`.
 Tool hooks no longer return `isRegistered`; use the runtime’s `getTools()` for confirmed discovery.
 
 Agent failures default to `{ content: [{ type: "text", text: error.message }], isError: true }`.
 `formatError` overrides this response. Both formatters may be async and are awaited. Local failures
-and cancellation always reject. `state.error` retains execution failures separately
+and cancellation always reject. An optional execution store retains failures separately
 from `registrationError`. See [response behavior](/packages/usewebmcp/reference#tool-responses).
 
 Native Chrome WebMCP does not currently define or enforce `outputSchema`. The
 React hooks use it for output typing and structured MCP responses.
+The handler's return type is inferred for local execution and plugins, even without an
+`outputSchema`. When supplied, the output schema constrains that result type.
 
 `enabled` controls registration, not local execution. See
-[registration configuration](/packages/usewebmcp/reference#config-fields) for state and
+[registration configuration](/packages/usewebmcp/reference#config-fields) for registration and
 in-flight execution behavior.
 
 ### `useWebMCPContext(name, description, getValue, options?)`
@@ -112,12 +129,12 @@ import { useWebMCPContext } from '@mcp-b/react-webmcp';
 
 Convenience wrapper around `useWebMCP` for read-only context tools. It automatically sets `readOnlyHint: true`, `idempotentHint: true`, `destructiveHint: false`, and `openWorldHint: false`.
 
-| Parameter     | Type                    | Description                                                 |
-| ------------- | ----------------------- | ----------------------------------------------------------- |
-| `name`        | `string`                | Tool identifier                                             |
-| `description` | `string`                | Description for AI assistants                               |
-| `getValue`    | `() => T`               | Function returning the current context value                |
-| `options`     | `{ enabled?: boolean }` | Optional registration control; `enabled` defaults to `true` |
+| Parameter     | Type                                              | Description                                                 |
+| ------------- | ------------------------------------------------- | ----------------------------------------------------------- |
+| `name`        | `string`                                          | Tool identifier                                             |
+| `description` | `string`                                          | Description for AI assistants                               |
+| `getValue`    | `() => T`                                         | Function returning the current context value                |
+| `options`     | `{ enabled?: boolean; plugins?: WebMCPPlugin[] }` | Optional registration control; `enabled` defaults to `true` |
 
 The `enabled` option has the same behavior as `useWebMCP`.
 
@@ -241,21 +258,28 @@ The tool hook forwards plain JSON metadata and keeps the supplied vendor validat
 
 ## Exported types
 
-| Type                      | Description                                              |
-| ------------------------- | -------------------------------------------------------- |
-| `InferOutput`             | Infers a tool result from an output schema               |
-| `InferToolInput`          | Caller input before validation                           |
-| `InferValidatedToolInput` | Handler input after validation and transforms            |
-| `WebMCP`                  | Upstream browser type namespace                          |
-| `ToolExecutionState`      | State exposed by `useWebMCP`                             |
-| `WebMCPConfig`            | Configuration accepted by `useWebMCP`                    |
-| `WebMCPReturn`            | Return value from `useWebMCP` and `useWebMCPContext`     |
-| `ToolInputSchema`         | Supported JSON Schema or Standard JSON Schema input type |
-| `McpClientProviderProps`  | Props accepted by `McpClientProvider`                    |
-| `WebMCPPromptConfig`      | Configuration accepted by `useWebMCPPrompt`              |
-| `WebMCPPromptReturn`      | Registration state returned by `useWebMCPPrompt`         |
-| `WebMCPResourceConfig`    | Configuration accepted by `useWebMCPResource`            |
-| `WebMCPResourceReturn`    | Registration state returned by `useWebMCPResource`       |
+| Type                                     | Description                                                      |
+| ---------------------------------------- | ---------------------------------------------------------------- |
+| `InferOutput`                            | Infers a tool result from an output schema                       |
+| `InferToolInput`                         | Caller input before validation                                   |
+| `InferValidatedToolInput`                | Handler input after validation and transforms                    |
+| `WebMCP`                                 | Upstream browser type namespace                                  |
+| `ToolExecutionState`                     | Optional execution observer snapshot                             |
+| `WebMCPConfig<TInput, TOutput, TResult>` | Hook configuration; inferred result constrained by output schema |
+| `WebMCPReturn<TOutput, TInput, TResult>` | Registration controls and typed local execution                  |
+| `ToolInputSchema`                        | Supported JSON Schema or Standard JSON Schema input type         |
+| `McpClientProviderProps`                 | Props accepted by `McpClientProvider`                            |
+| `WebMCPPromptConfig`                     | Configuration accepted by `useWebMCPPrompt`                      |
+| `WebMCPPromptReturn`                     | Registration state returned by `useWebMCPPrompt`                 |
+| `WebMCPResourceConfig`                   | Configuration accepted by `useWebMCPResource`                    |
+| `WebMCPResourceReturn`                   | Registration state returned by `useWebMCPResource`               |
+
+## Migration
+
+`useWebMCPTool` and the tool hook's implicit `state`/`reset` return are removed.
+Use `useWebMCP`, named `plugins`, and an explicit execution store/subscription.
+Plugin imports belong to `@mcp-b/webmcp-plugins`; the old polyfill entries are removed.
+`inputSchema: vendorSchema` remains supported. Prompt/resource registration status is unchanged.
 
 ## Related pages
 
