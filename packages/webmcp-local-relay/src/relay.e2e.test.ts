@@ -168,7 +168,8 @@ function buildBridgeFixtureScript(): string {
       }
       const result = await descriptor.__execute(inputObject);
       if (descriptor.name === 'sum') {
-        return JSON.stringify(result.content[0].text);
+        // Native forms return plain text; imperative tools serialize it as JSON.
+        return generation === 0 ? result.content[0].text : JSON.stringify(result.content[0].text);
       }
       return JSON.stringify(result);
     };

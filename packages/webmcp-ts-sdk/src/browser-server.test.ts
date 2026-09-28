@@ -853,6 +853,41 @@ describe('BrowserMcpServer', () => {
     await server.close();
   });
 
+  it.each([
+    ['submitted:/first', 'submitted:/first'],
+    ['', ''],
+    ['"quoted result"', 'quoted result'],
+    ['{"content":[{"type":"text","text":"MCP result"}]}', 'MCP result'],
+  ])('converts native result %j into MCP content', async (result, text) => {
+    const tool = {
+      name: 'native_result',
+      title: '',
+      description: 'Native result conversion',
+      origin: location.origin,
+      window,
+    };
+    server = new BrowserMcpServer(
+      { name: 'native-result-server', version: '1.0.0' },
+      {
+        native: {
+          ...createNativeModelContextStub(),
+          getTools: async () => [tool],
+          executeTool: async () => result,
+        },
+      }
+    );
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    client = new Client({ name: 'native-result-client', version: '1.0.0' });
+    await client.connect(clientTransport);
+    await server.syncNativeTools();
+
+    await expect(client.callTool({ name: tool.name, arguments: {} })).resolves.toMatchObject({
+      content: [{ type: 'text', text }],
+    });
+    await expect(server.executeTool(tool, {})).resolves.toBe(result);
+  });
+
   it('backfills only tools from its frame subtree and preserves descendant execution', async () => {
     const iframe = document.createElement('iframe');
     document.body.appendChild(iframe);

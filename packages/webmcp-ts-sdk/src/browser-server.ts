@@ -97,7 +97,13 @@ interface NativeBackfilledTool {
 }
 
 function parseNativeToolResult(serialized: string) {
-  const result: unknown = JSON.parse(serialized);
+  let result: unknown;
+  try {
+    result = JSON.parse(serialized);
+  } catch {
+    // Native declarative forms return plain text for string responses.
+    return normalizeToolResponse(serialized);
+  }
   return isInputRequiredResult(result) ? result : normalizeToolResponse(result);
 }
 

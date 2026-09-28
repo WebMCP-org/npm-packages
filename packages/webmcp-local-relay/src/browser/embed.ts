@@ -140,7 +140,13 @@ function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor | null {
 }
 
 function normalizeSerializedToolResult(serialized: string): CallToolResult {
-  const rawResult: unknown = JSON.parse(serialized);
+  let rawResult: unknown;
+  try {
+    rawResult = JSON.parse(serialized);
+  } catch {
+    // Native declarative forms return plain text for string responses.
+    return normalizeToolResponse(serialized);
+  }
 
   if (isJsonObject(rawResult) && rawResult.resultType === 'input_required') {
     return {

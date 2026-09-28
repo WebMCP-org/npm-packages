@@ -24,12 +24,14 @@ use `@mcp-b/global` to install the extended document API and default transport.
 + const result = await server.executeTool(tool, input);
 ```
 
-Use a descriptor from `await server.getTools()`, and parse the JSON-string result.
-Callbacks must return JSON-serializable values: the adapter no longer accepts
-unquoted strings or bare `null` from old native contexts, parses string discovery
-schemas, or falls back to stringifying unsupported callback results. Execution
-errors and browser access checks now follow the supplied context. Older native
-previews are preserved, not upgraded by polyfill installation.
+Use a descriptor from `await server.getTools()`. Direct execution preserves the
+underlying result: imperative tools return JSON strings, while native declarative
+forms can return plain text. MCP calls normalize both formats into MCP content.
+Callbacks must return JSON-serializable values. The adapter no longer accepts bare
+`null` from old native contexts, parses string discovery schemas, or falls back to
+stringifying unsupported callback results. Execution errors and browser access
+checks now follow the supplied context. Older native previews are preserved, not
+upgraded by polyfill installation.
 
 The adapter no longer implements a standalone WebMCP runtime for environments
 without a browser document. In service workers or Node.js, use

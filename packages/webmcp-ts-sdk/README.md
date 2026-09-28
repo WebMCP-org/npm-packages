@@ -76,7 +76,7 @@ const server = new BrowserMcpServer({ name: 'catalog-app', version: '1.0.0' }, {
 await server.syncNativeTools();
 ```
 
-`syncNativeTools()` resolves after reconciliation. Later native `toolchange` events trigger another reconciliation. The native context must implement the upstream object-input `executeTool()` contract, including JSON-serialized results.
+`syncNativeTools()` resolves after reconciliation. Later native `toolchange` events trigger another reconciliation. The native context must implement the upstream object-input `executeTool()` contract. MCP calls accept JSON-serialized results and plain text from native declarative forms. Direct `executeTool()` calls preserve the underlying context's result.
 
 ## Schema boundary
 

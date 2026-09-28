@@ -17,9 +17,9 @@ If you supply a custom runtime or test double:
 - Return discovery schemas as objects, not JSON strings. Malformed schemas are
   omitted from relay discovery.
 - Accept an input object in `executeTool()`, and return JSON-serialized output.
-  Bare `null` and unquoted-string compatibility results are no longer adapted;
-  execution failures must reject. Successful values are still converted to MCP
-  responses for relay clients.
+  Native declarative forms may also return plain text; the relay converts both
+  formats to MCP responses. Bare `null` results are no longer adapted, and
+  execution failures must reject.
 - Use `document.modelContext`; update older browser previews that implement a
   different contract. Polyfill installation preserves an existing native context.
 

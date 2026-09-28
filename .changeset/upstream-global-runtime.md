@@ -18,10 +18,11 @@ packages together for this major release.
 ```
 
 Feature-detect the context as before. `tool` must be a descriptor returned by
-`await context.getTools()`. Parse the returned JSON string with `JSON.parse(result)`;
-unquoted strings, bare `null` results, and serialized discovery schemas from older
-Chrome implementations are no longer adapted. Return JSON-serializable callback
-results and catch execution rejections.
+`await context.getTools()`. Imperative tools return JSON strings; native declarative
+forms can return plain text. Direct calls preserve that result, while MCP calls
+normalize both formats into MCP content. Bare `null` results and serialized
+discovery schemas from older Chrome implementations are no longer adapted. Return
+JSON-serializable callback results and catch execution rejections.
 
 Remove `installTestingShim` from `initializeWebModelContext()` options and
 `window.__webModelContextOptions`. `navigator.modelContextTesting` is removed;
