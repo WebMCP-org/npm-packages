@@ -64,7 +64,7 @@ React 18 and 19 are supported. The published entry point preserves `'use client'
 | `error`          | `Error \| null`   | Most recent execution error                |
 | `executionCount` | `number`          | Successful executions since the last reset |
 
-The handler always receives an `AbortSignal`, including on older runtimes that omit execution options. Runtimes that omit the options bag receive a fresh signal; runtime cancellation can propagate only when the runtime forwards its signal. Local calls can provide their own signal. Cancellation rejects the call and clears its pending state. Work that ignores cancellation cannot replace state when it finishes later.
+The handler receives the upstream execution `AbortSignal`. Local calls can provide their own signal or use a fresh one. Cancellation rejects the call and clears its pending state. Work that ignores cancellation cannot replace state when it finishes later.
 
 ## JSON Schema and inference
 

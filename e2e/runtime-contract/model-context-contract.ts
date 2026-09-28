@@ -9,12 +9,7 @@ import {
   type RuntimeContractTool,
 } from './core.js';
 
-export interface RuntimeContractModelContext {
-  registerTool(
-    tool: RuntimeContractTool,
-    options?: WebMCP.ModelContextRegisterToolOptions
-  ): void | Promise<void>;
-}
+export type RuntimeContractModelContext = Pick<WebMCP.ModelContext, 'registerTool'>;
 
 declare global {
   interface Window {
@@ -66,6 +61,6 @@ export async function installModelContextRuntimeContract(
     }
   );
 
-  Reflect.set(globalThis, '__WEBMCP_E2E__', controller);
+  window.__WEBMCP_E2E__ = controller;
   return controller;
 }

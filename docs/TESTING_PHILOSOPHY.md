@@ -41,7 +41,7 @@ Primary goal: high confidence in behavior with minimal brittle tests.
 Runtime API integration is related but separate:
 
 - direct `page.evaluate(...)` helpers
-- direct `navigator.modelContextTesting` probes outside the canonical native lane
+- probes of removed navigator aliases or testing shims
 - demos/showcases used for runtime exploration
 
 5. Artifact validation tests (publish confidence)

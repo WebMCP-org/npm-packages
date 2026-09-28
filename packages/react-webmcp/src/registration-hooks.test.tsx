@@ -18,7 +18,6 @@ beforeEach(async () => {
   cleanupWebModelContext();
   const channelId = `registration-hooks-${crypto.randomUUID()}`;
   initializeWebModelContext({
-    installTestingShim: false,
     transport: {
       iframeServer: false,
       tabServer: { channelId, allowedOrigins: [window.location.origin] },

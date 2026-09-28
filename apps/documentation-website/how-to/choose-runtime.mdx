@@ -56,9 +56,7 @@ compatibility, type inference, or extension behavior your application needs.
 | `usewebmcp`              | No                     | React tool hooks over an initialized `document.modelContext` |
 | `@mcp-b/react-webmcp`    | No                     | React tool, prompt, resource, and MCP client/provider hooks  |
 
-The standalone polyfill follows the upstream object-input `executeTool()` API. `@mcp-b/global`
-accepts object input and keeps a serialized-JSON compatibility overload; set
-`nativeExecuteToolInput: 'json'` when wrapping an older native implementation.
+Both the standalone polyfill and `@mcp-b/global` use upstream object-input `executeTool()` and return JSON-serialized results.
 
 ## Continue with the selected path
 

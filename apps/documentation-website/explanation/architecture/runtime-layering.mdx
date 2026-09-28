@@ -38,8 +38,7 @@ the tool-only polyfill, or an application to install the complete MCP-B runtime.
 Core tool registrations remain visible to native browser tooling, while
 cleanup can restore the context that existed before initialization.
 
-`navigator.modelContext` remains only as a deprecated compatibility alias. New
-integrations use `document.modelContext`.
+All integrations use `document.modelContext`.
 
 See the [`@mcp-b/global` reference](/packages/global/reference) and [Choose a
 runtime](/how-to/choose-runtime).

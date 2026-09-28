@@ -20,10 +20,7 @@ pnpm add @mcp-b/webmcp-ts-sdk @mcp-b/transports
 import { TabServerTransport } from '@mcp-b/transports';
 import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 
-const server = new BrowserMcpServer({
-  name: 'catalog-app',
-  version: '1.0.0',
-});
+const server = new BrowserMcpServer({ name: 'catalog-app', version: '1.0.0' });
 
 await server.connect(
   new TabServerTransport({
@@ -67,24 +64,25 @@ Prompt and resource discovery also belongs to MCP. Use a connected MCP client in
 
 ## Native integration
 
-Pass an existing context as `native`, then reconcile its current tools:
+The constructor uses `document.modelContext` automatically and installs the upstream polyfill when needed. It delegates browser discovery, execution, and access checks to that context. The document property continues to expose the underlying context; `@mcp-b/global` installs the extended API and connects its default transport. For service workers or Node.js, use the official `McpServer` directly.
+
+To select a context explicitly, pass it as `native`, then reconcile its current tools:
 
 ```ts
-const server = new BrowserMcpServer(
-  { name: 'catalog-app', version: '1.0.0' },
-  { native: document.modelContext }
-);
+const native = document.modelContext;
+if (!native) throw new Error('Install a WebMCP runtime first');
+const server = new BrowserMcpServer({ name: 'catalog-app', version: '1.0.0' }, { native });
 
 await server.syncNativeTools();
 ```
 
-`syncNativeTools()` resolves after reconciliation. Later native `toolchange` events trigger another reconciliation. Backfill requires Chrome's optional descriptor-based `executeTool()` extension.
+`syncNativeTools()` resolves after reconciliation. Later native `toolchange` events trigger another reconciliation. The native context must implement the upstream object-input `executeTool()` contract, including JSON-serialized results.
 
 ## Schema boundary
 
 `BrowserMcpServer` converts JSON Schema or Standard JSON Schema input metadata with the SDK schema adapter. When the supplied schema also has `~standard.validate()`, the adapter preserves that method for the official MCP server. For plain JSON Schema, the server uses the MCP SDK's `fromJsonSchema` adapter.
 
-This validation runs on **MCP client calls**. Direct `executeTool()` calls and native WebMCP mirrors invoke the browser callback without passing through MCP validation. Validate in that callback when exposing tools through both paths, and pass plain JSON metadata so the MCP SDK does not also apply the vendor transforms. The [`usewebmcp`](../usewebmcp/README.md) hook already does this for local and agent calls using the validator supplied in your schema.
+This validation runs on **MCP client calls**. Direct `executeTool()` calls and native WebMCP mirrors invoke the browser callback without passing through MCP validation. Validate in that callback when exposing tools through both paths, and pass plain JSON metadata so the MCP SDK does not also apply the vendor transforms. The [`@mcp-b/react-webmcp`](../react-webmcp/README.md) hook already does this for local and agent calls using the validator supplied in your schema.
 
 `outputSchema` is likewise enforced by the MCP server on MCP calls, not on direct browser calls. See [schemas and structured output](https://docs.mcp-b.ai/how-to/use-schemas-and-structured-output) for examples and [the package reference](https://docs.mcp-b.ai/packages/webmcp-ts-sdk/reference#schema-boundary) for the contracts.
 

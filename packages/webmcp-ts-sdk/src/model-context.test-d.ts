@@ -1,8 +1,5 @@
 import { expectTypeOf, test } from 'vitest';
 import type {
-  ChromeModelContext,
-  ChromeModelContextExecuteToolOptions,
-  ChromeModelContextExtensions,
   WebMCP,
   ModelContext,
   ModelContextExtensions,
@@ -12,43 +9,22 @@ import type {
   ToolListItem,
 } from './index.js';
 
-test('RegisteredTool.inputSchema spans both schema generations', () => {
-  // webmcp#241: an object from Chrome >=154.0.8013, a serialized string before.
-  expectTypeOf<RegisteredTool['inputSchema']>().toEqualTypeOf<object | string | undefined>();
+test('core contracts come directly from upstream WebMCP', () => {
+  expectTypeOf<RegisteredTool>().toEqualTypeOf<WebMCP.RegisteredTool>();
+  expectTypeOf<ModelContext>().toEqualTypeOf<WebMCP.ModelContext>();
 });
 
-test('ModelContext exposes the upstream producer API with optional runtime execution', () => {
+test('ModelContext exposes the upstream producer API with object-input execution', () => {
   expectTypeOf<ModelContext['registerTool']>().returns.toEqualTypeOf<Promise<void>>();
   expectTypeOf<ModelContext['getTools']>()
     .parameter(0)
     .toEqualTypeOf<ModelContextGetToolOptions | undefined>();
   expectTypeOf<ModelContext['getTools']>().returns.toEqualTypeOf<Promise<RegisteredTool[]>>();
-  expectTypeOf<NonNullable<ModelContext['executeTool']>>()
-    .parameter(1)
-    .toEqualTypeOf<object | undefined>();
-  expectTypeOf<NonNullable<ModelContext['executeTool']>>().returns.toEqualTypeOf<
-    Promise<string | null>
-  >();
+  expectTypeOf<ModelContext['executeTool']>().parameter(1).toEqualTypeOf<object | undefined>();
+  expectTypeOf<ModelContext['executeTool']>().returns.toEqualTypeOf<Promise<string>>();
 
   // @ts-expect-error Unregistration is owned by the registration AbortSignal.
   expectTypeOf<ModelContext['unregisterTool']>().toBeNever();
-});
-
-test('ChromeModelContext keeps the legacy JSON-string overload', () => {
-  expectTypeOf<ChromeModelContextExtensions['executeTool']>().toEqualTypeOf<
-    | ((
-        tool: RegisteredTool,
-        inputArguments: string,
-        options?: ChromeModelContextExecuteToolOptions
-      ) => Promise<string | null>)
-    | undefined
-  >();
-
-  const supportsBothExecuteToolInputs = (context: ChromeModelContext, tool: RegisteredTool) => {
-    context.executeTool?.(tool, {});
-    context.executeTool?.(tool, '{}');
-  };
-  expectTypeOf(supportsBothExecuteToolInputs).toBeFunction();
 });
 
 test('MCP-B extensions list tools without restoring removed compatibility methods', () => {
@@ -59,15 +35,12 @@ test('MCP-B extensions list tools without restoring removed compatibility method
 
 test('global declarations use the document-first API', () => {
   expectTypeOf<Document['modelContext']>().toEqualTypeOf<WebMCP.ModelContext | undefined>();
-  expectTypeOf<Navigator['modelContext']>().toEqualTypeOf<ModelContext | undefined>();
 });
 
 test('global modelContext properties are readonly', () => {
-  const assign = (documentRef: Document, navigatorRef: Navigator) => {
+  const assign = (documentRef: Document, context: ModelContext) => {
     // @ts-expect-error modelContext is a readonly Web IDL attribute.
-    documentRef.modelContext = {} as ModelContext;
-    // @ts-expect-error the deprecated alias is also readonly.
-    navigatorRef.modelContext = {} as ModelContext;
+    documentRef.modelContext = context;
   };
   expectTypeOf(assign).toBeFunction();
 });

@@ -305,7 +305,7 @@ export const siteConfig = {
         id: 2,
         question: 'Which API should new code use?',
         answer:
-          'Use document.modelContext. navigator.modelContext remains a deprecated compatibility alias, and navigator.modelContextTesting is testing-only compatibility.',
+          'Use document.modelContext with the upstream WebMCP types and polyfill. MCP-B adds prompts, resources, output schemas, and transports.',
       },
       {
         id: 3,

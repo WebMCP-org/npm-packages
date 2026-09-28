@@ -223,35 +223,20 @@ export class ContentDetection {
   /**
    * Detect page landmarks
    */
-  static detectLandmarks(doc: Document): Record<string, Element[]> {
-    const landmarks: Record<string, Element[]> = {
-      navigation: [],
-      main: [],
-      complementary: [],
-      contentinfo: [],
-      banner: [],
-      search: [],
-      form: [],
-      region: [],
+  static detectLandmarks(doc: Document) {
+    return {
+      navigation: Array.from(doc.querySelectorAll('nav, [role="navigation"]')),
+      main: Array.from(doc.querySelectorAll('main, [role="main"]')),
+      complementary: Array.from(doc.querySelectorAll('aside, [role="complementary"]')),
+      contentinfo: Array.from(doc.querySelectorAll('footer, [role="contentinfo"]')),
+      banner: Array.from(doc.querySelectorAll('header, [role="banner"]')),
+      search: Array.from(doc.querySelectorAll('[role="search"]')),
+      form: Array.from(
+        doc.querySelectorAll('form[aria-label], form[aria-labelledby], [role="form"]')
+      ),
+      region: Array.from(
+        doc.querySelectorAll('section[aria-label], section[aria-labelledby], [role="region"]')
+      ),
     };
-
-    // Find explicit landmarks
-    const landmarkSelectors = {
-      navigation: 'nav, [role="navigation"]',
-      main: 'main, [role="main"]',
-      complementary: 'aside, [role="complementary"]',
-      contentinfo: 'footer, [role="contentinfo"]',
-      banner: 'header, [role="banner"]',
-      search: '[role="search"]',
-      form: 'form[aria-label], form[aria-labelledby], [role="form"]',
-      region: 'section[aria-label], section[aria-labelledby], [role="region"]',
-    };
-
-    for (const [landmark, selector] of Object.entries(landmarkSelectors)) {
-      const elements = doc.querySelectorAll(selector);
-      landmarks[landmark] = Array.from(elements);
-    }
-
-    return landmarks;
   }
 }

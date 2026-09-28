@@ -1,9 +1,44 @@
-import { normalizeInputSchema } from './schema.js';
-import type { ModelContext } from './model-context.js';
+import { normalizeInputSchema, normalizeToolResponse } from './schema.js';
+import type { ModelContext, RegisteredTool } from './model-context.js';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
+import type { Transport } from '@modelcontextprotocol/server';
+import type { WebMcpToolInput } from './common.js';
+import type { PeerOriginTransport } from './browser-server.js';
 import { inputRequired } from '@modelcontextprotocol/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BrowserMcpServer, isBrowserMcpServer, type ResourceDescriptor } from './browser-server.js';
+
+function isCountThree(value: unknown): value is { count: 3 } {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    'count' in value &&
+    value.count === 3
+  );
+}
+
+describe('protocol response compatibility', () => {
+  it('preserves JSON-safe future content blocks without interpreting their payload', () => {
+    const response = {
+      content: [{ type: 'future-content', payload: { values: [1, true, null] } }],
+      structuredContent: { version: 3 },
+      isError: false,
+      _meta: { extension: 'future' },
+    };
+    expect(normalizeToolResponse(response)).toBe(response);
+  });
+
+  it('normalizes malformed protocol envelopes as ordinary tool values', () => {
+    const response = { content: [{ type: 7, payload: 'not a discriminated block' }] };
+    expect(normalizeToolResponse(response)).toEqual({
+      content: [{ type: 'text', text: JSON.stringify(response) }],
+      structuredContent: response,
+      isError: false,
+    });
+  });
+});
 
 let server: BrowserMcpServer | undefined;
 let client: Client | undefined;
@@ -18,28 +53,73 @@ afterEach(async () => {
 async function executeRegisteredTool(
   modelContext: BrowserMcpServer,
   name: string,
-  args: unknown = {}
-): Promise<string | null> {
+  args: WebMcpToolInput = {}
+): Promise<string> {
   const tool = (await modelContext.getTools()).find((candidate) => candidate.name === name);
   if (!tool) {
     throw new Error(`Tool not found: ${name}`);
   }
-  return modelContext.executeTool(tool, JSON.stringify(args));
+  return modelContext.executeTool(tool, args);
 }
 
 function createNativeModelContextStub(): ModelContext {
-  const nativeContext: Record<string, unknown> = {
-    registerTool: () => {},
-    listTools: () => [],
+  const nativeContext: ModelContext = {
+    executeTool: async () => {
+      throw new Error('Unexpected native execution');
+    },
+    registerTool: async () => {},
+    getTools: async () => [],
+    ontoolchange: null,
     addEventListener: () => {},
     removeEventListener: () => {},
     dispatchEvent: () => true,
   };
 
-  return nativeContext as unknown as ModelContext;
+  return nativeContext;
 }
 
 describe('BrowserMcpServer', () => {
+  it.each(['', 'text', 7, false, null, { nested: true }])(
+    'serializes the WebMCP result %j as JSON',
+    async (result) => {
+      server = new BrowserMcpServer({ name: 'json-results', version: '1.0.0' });
+      await server.registerTool({
+        name: 'result',
+        description: 'Returns a value',
+        execute: () => result,
+      });
+      await expect(executeRegisteredTool(server, 'result')).resolves.toBe(JSON.stringify(result));
+    }
+  );
+
+  it('rejects legacy string input and results that cannot cross the JSON boundary', async () => {
+    server = new BrowserMcpServer({ name: 'object-input', version: '1.0.0' });
+    await server.registerTool({
+      name: 'echo',
+      description: 'Echoes input',
+      execute: (input) => input,
+    });
+    const [tool] = await server.getTools();
+    if (!tool) throw new Error('Missing echo tool');
+    // @ts-expect-error WebMCP accepts an input object, not serialized JSON.
+    await expect(server.executeTool(tool, '{"value":1}')).rejects.toBeInstanceOf(TypeError);
+    await expect(server.executeTool(tool, [1, 2])).resolves.toBe('[1,2]');
+    await expect(server.executeTool(tool, { toJSON: () => undefined })).rejects.toBeInstanceOf(
+      TypeError
+    );
+    await expect(server.executeTool(tool, { toJSON: () => 'primitive' })).rejects.toMatchObject({
+      name: 'UnknownError',
+    });
+    await server.registerTool({
+      name: 'undefined',
+      description: 'Returns no JSON value',
+      execute: () => undefined,
+    });
+    await expect(executeRegisteredTool(server, 'undefined')).rejects.toMatchObject({
+      name: 'UnknownError',
+    });
+  });
+
   it('narrows branded model contexts', () => {
     server = new BrowserMcpServer({ name: 'guard-test', version: '1.0.0' });
     expect(isBrowserMcpServer(server)).toBe(true);
@@ -51,7 +131,7 @@ describe('BrowserMcpServer', () => {
     await server.registerTool({
       name: 'receiver',
       description: 'Captures its receiver',
-      async execute(this: unknown) {
+      async execute(this: undefined) {
         expect(this).toBeUndefined();
         return { ok: true };
       },
@@ -71,24 +151,29 @@ describe('BrowserMcpServer', () => {
 
     const tools = await server.getTools();
     await expect(
-      server.executeTool(tools.find(({ name }) => name === 'receiver')!, '{}')
+      server.executeTool(tools.find(({ name }) => name === 'receiver')!, {})
     ).resolves.toBe('{"ok":true}');
     await expect(
-      server.executeTool(tools.find(({ name }) => name === 'failure')!, '{}')
-    ).rejects.toMatchObject({ name: 'UnknownError', message: expect.stringContaining('boom') });
+      server.executeTool(tools.find(({ name }) => name === 'failure')!, {})
+    ).rejects.toMatchObject({ name: 'UnknownError', message: 'Tool execution failed' });
 
     const reason = { source: 'caller' };
     const controller = new AbortController();
-    const execution = server.executeTool(tools.find(({ name }) => name === 'abort')!, '{}', {
-      signal: controller.signal,
-    });
+    const execution = server.executeTool(
+      tools.find(({ name }) => name === 'abort')!,
+      {},
+      {
+        signal: controller.signal,
+      }
+    );
     controller.abort(reason);
     await expect(execution).rejects.toBe(reason);
   });
 
   it('preserves known annotations and returns detached tool metadata', async () => {
     server = new BrowserMcpServer({ name: 'metadata-test', version: '1.0.0' });
-    await Reflect.apply(server.registerTool, server, [
+    // @ts-expect-error Web IDL accepts a null options dictionary at runtime.
+    await server.registerTool(
       {
         name: 'annotated',
         description: 'Has annotations',
@@ -103,8 +188,8 @@ describe('BrowserMcpServer', () => {
         },
         async execute() {},
       },
-      null,
-    ]);
+      null
+    );
 
     const [listed] = server.listTools();
     expect(listed?.annotations).toEqual({
@@ -132,6 +217,7 @@ describe('BrowserMcpServer', () => {
     let registrationCount = 0;
     const nativeTools = [
       {
+        title: '',
         name: 'accepted',
         description: 'Accepted asynchronously',
         origin: window.location.origin,
@@ -190,6 +276,9 @@ describe('BrowserMcpServer', () => {
   it('allows an aborted pending native tool to be registered again immediately', async () => {
     const resolveNativeRegistrations: Array<() => void> = [];
     const native = Object.assign(new EventTarget(), {
+      executeTool: async () => {
+        throw new Error('Unexpected native execution');
+      },
       ontoolchange: null,
       registerTool() {
         return new Promise<void>((resolve) => resolveNativeRegistrations.push(resolve));
@@ -228,6 +317,7 @@ describe('BrowserMcpServer', () => {
       async getTools() {
         return [
           {
+            title: '',
             name: 'native_tool',
             description: 'Already registered by the browser',
             origin: window.location.origin,
@@ -291,7 +381,7 @@ describe('BrowserMcpServer', () => {
     expect(server.close()).toBe(closing);
     await closing;
     await expect(server.getTools()).rejects.toMatchObject({ name: 'InvalidStateError' });
-    await expect(server.executeTool(tool!, '{}')).rejects.toMatchObject({
+    await expect(server.executeTool(tool!, {})).rejects.toMatchObject({
       name: 'InvalidStateError',
     });
   });
@@ -343,7 +433,7 @@ describe('BrowserMcpServer', () => {
     });
   });
 
-  it('sorts local getTools fallback and supplies the WebMCP title default', async () => {
+  it('delegates discovery ordering and title defaults to upstream', async () => {
     const server = new BrowserMcpServer({ name: 'local-get-tools-test', version: '1.0.0' });
     for (const name of ['z_tool', 'a_tool']) {
       await server.registerTool({
@@ -423,9 +513,8 @@ describe('BrowserMcpServer', () => {
       '~standard': {
         version: 1 as const,
         vendor: 'test',
-        validate(value: unknown) {
-          const count = (value as { count?: unknown }).count;
-          return count === 3
+        validate(value: Parameters<StandardSchemaV1['~standard']['validate']>[0]) {
+          return isCountThree(value)
             ? { value: { count: 4 } }
             : { issues: [{ message: 'count must be 3' }] };
         },
@@ -474,7 +563,7 @@ describe('BrowserMcpServer', () => {
       });
 
       const [registeredTool] = await server.getTools();
-      await expect(server.executeTool(registeredTool!, '{"count":3}')).resolves.toContain(
+      await expect(server.executeTool(registeredTool!, { count: 3 })).resolves.toContain(
         'input_required'
       );
     } finally {
@@ -486,6 +575,10 @@ describe('BrowserMcpServer', () => {
   it('mirrors Standard Schema inputs to native as plain JSON Schema', async () => {
     const nativeRegisterTool = vi.fn();
     const nativeContext = Object.assign(new EventTarget(), {
+      executeTool: async () => {
+        throw new Error('Unexpected native execution');
+      },
+      ontoolchange: null,
       registerTool: nativeRegisterTool,
       async getTools() {
         return [];
@@ -493,13 +586,13 @@ describe('BrowserMcpServer', () => {
     });
     const server = new BrowserMcpServer(
       { name: 'standard-schema-native-mirror-test', version: '1.0.0' },
-      { native: nativeContext as unknown as ModelContext }
+      { native: nativeContext }
     );
     const inputSchema = {
       '~standard': {
         version: 1 as const,
         vendor: 'test',
-        validate(value: unknown) {
+        validate(value: Parameters<StandardSchemaV1['~standard']['validate']>[0]) {
           return { value };
         },
         jsonSchema: {
@@ -554,12 +647,13 @@ describe('BrowserMcpServer', () => {
     server.ontoolchange = () => order.push('re-added');
     server.dispatchEvent(new Event('toolchange'));
     expect(order).toEqual(['listener', 're-added']);
-    server.ontoolchange = {} as never;
+    // @ts-expect-error External JavaScript may assign a non-callable EventHandler value.
+    server.ontoolchange = {};
     expect(server.ontoolchange).toBeNull();
     await server.close();
   });
 
-  it('rejects a local registration when close wins its notification race', async () => {
+  it('cancels the upstream registration when close wins its notification race', async () => {
     const server = new BrowserMcpServer({ name: 'close-race-test', version: '1.0.0' });
     const listener = vi.fn();
     server.addEventListener('toolchange', listener);
@@ -568,7 +662,7 @@ describe('BrowserMcpServer', () => {
       description: 'Closes while registration is pending',
       async execute() {},
     });
-    const rejection = expect(registration).rejects.toMatchObject({ name: 'InvalidStateError' });
+    const rejection = expect(registration).rejects.toMatchObject({ name: 'AbortError' });
 
     await Promise.resolve();
     await server.close();
@@ -583,7 +677,11 @@ describe('BrowserMcpServer', () => {
     let server: BrowserMcpServer;
     let closing!: Promise<void>;
     const nativeContext = Object.assign(new EventTarget(), {
-      registerTool(tool: { name: string }, options?: { signal?: AbortSignal }) {
+      executeTool: async () => {
+        throw new Error('Unexpected native execution');
+      },
+      ontoolchange: null,
+      async registerTool(tool: { name: string }, options?: { signal?: AbortSignal }) {
         nativeTools.add(tool.name);
         options?.signal?.addEventListener('abort', () => nativeTools.delete(tool.name), {
           once: true,
@@ -596,7 +694,7 @@ describe('BrowserMcpServer', () => {
     });
     server = new BrowserMcpServer(
       { name: 'native-close-race-test', version: '1.0.0' },
-      { native: nativeContext as unknown as ModelContext }
+      { native: nativeContext }
     );
 
     await expect(
@@ -613,7 +711,11 @@ describe('BrowserMcpServer', () => {
   it('detaches registration cleanup before restoring a native context', async () => {
     const nativeTools = new Map<string, unknown>();
     const nativeContext = Object.assign(new EventTarget(), {
-      registerTool(tool: { name: string }, options?: { signal?: AbortSignal }) {
+      executeTool: async () => {
+        throw new Error('Unexpected native execution');
+      },
+      ontoolchange: null,
+      async registerTool(tool: { name: string }, options?: { signal?: AbortSignal }) {
         nativeTools.set(tool.name, tool);
         options?.signal?.addEventListener(
           'abort',
@@ -629,7 +731,7 @@ describe('BrowserMcpServer', () => {
     });
     const server = new BrowserMcpServer(
       { name: 'close-cleanup-test', version: '1.0.0' },
-      { native: nativeContext as unknown as ModelContext }
+      { native: nativeContext }
     );
     const controller = new AbortController();
 
@@ -650,7 +752,7 @@ describe('BrowserMcpServer', () => {
     expect(nativeTools.get(replacement.name)).toBe(replacement);
   });
 
-  it('preserves AbortSignal reasons for registration and Chrome execution', async () => {
+  it('preserves AbortSignal reasons for registration and upstream execution', async () => {
     const server = new BrowserMcpServer({ name: 'abort-reason-test', version: '1.0.0' });
     const registrationReason = { source: 'registration' };
     const registrationController = new AbortController();
@@ -710,7 +812,7 @@ describe('BrowserMcpServer', () => {
     const [tool] = await server.getTools();
     const executionReason = { source: 'execution' };
     const executionController = new AbortController();
-    const execution = server.executeTool(tool!, '{}', { signal: executionController.signal });
+    const execution = server.executeTool(tool!, {}, { signal: executionController.signal });
     executionController.abort(executionReason);
     await expect(execution).rejects.toBe(executionReason);
     await server.close();
@@ -727,10 +829,11 @@ describe('BrowserMcpServer', () => {
       })
     ).rejects.toMatchObject({ name: 'InvalidStateError' });
     await expect(
+      // @ts-expect-error External JavaScript can omit the required callback.
       server.registerTool({
         name: 'missing_execute_tool',
         description: 'Missing execute callback',
-      } as never)
+      })
     ).rejects.toBeInstanceOf(TypeError);
     await expect(
       server.registerTool(
@@ -756,22 +859,30 @@ describe('BrowserMcpServer', () => {
     const childWindow = iframe.contentWindow!;
     // The browser runner hosts this test document in a frame. A sibling's
     // parent is that same host, rather than the document served by this server.
-    const siblingWindow = { parent: window.parent } as Window;
+    const siblingFrame = window.parent.document.createElement('iframe');
+    window.parent.document.body.appendChild(siblingFrame);
+    const siblingWindow = siblingFrame.contentWindow!;
     const tools = [
       { name: 'own', window },
       { name: 'descendant', window: childWindow },
       { name: 'ancestor', window: window.parent },
       { name: 'sibling', window: siblingWindow },
-    ].map((tool) => ({ ...tool, description: tool.name, origin: location.origin }));
+    ].map((tool) => ({
+      ...tool,
+      title: tool.name,
+      description: tool.name,
+      origin: location.origin,
+    }));
     const executeTool = vi.fn(async () => JSON.stringify({ ok: true }));
     const native = Object.assign(new EventTarget(), {
-      registerTool: () => {},
+      ontoolchange: null,
+      registerTool: async () => {},
       getTools: async () => tools,
       executeTool,
     });
     server = new BrowserMcpServer(
       { name: 'frame-scope-server', version: '1.0.0' },
-      { native: native as unknown as ModelContext }
+      { native: native }
     );
     try {
       await server.syncNativeTools();
@@ -788,28 +899,22 @@ describe('BrowserMcpServer', () => {
       expect(executeTool).toHaveBeenCalledWith(tools[1], {}, expect.any(Object));
     } finally {
       iframe.remove();
+      siblingFrame.remove();
     }
   });
 
   it('does not repopulate tools when close races with native getTools', async () => {
-    type NativeTool = {
-      name: string;
-      description: string;
-      inputSchema: string;
-      origin: string;
-      window: Window;
-    };
-
-    let resolveGetTools!: (tools: NativeTool[]) => void;
+    let resolveGetTools!: (tools: RegisteredTool[]) => void;
     let markGetToolsStarted!: () => void;
     const getToolsStarted = new Promise<void>((resolve) => {
       markGetToolsStarted = resolve;
     });
     const nativeContext = Object.assign(new EventTarget(), {
-      registerTool: () => {},
+      ontoolchange: null,
+      registerTool: async () => {},
       getTools: () => {
         markGetToolsStarted();
-        return new Promise<NativeTool[]>((resolve) => {
+        return new Promise<RegisteredTool[]>((resolve) => {
           resolveGetTools = resolve;
         });
       },
@@ -818,7 +923,7 @@ describe('BrowserMcpServer', () => {
     });
     const server = new BrowserMcpServer(
       { name: 'native-close-race-server', version: '1.0.0' },
-      { native: nativeContext as unknown as ModelContext }
+      { native: nativeContext }
     );
 
     const sync = server.syncNativeTools();
@@ -826,9 +931,10 @@ describe('BrowserMcpServer', () => {
     const closing = server.close();
     resolveGetTools([
       {
+        title: '',
         name: 'late_native_tool',
         description: 'Resolved after close started',
-        inputSchema: JSON.stringify({ type: 'object', properties: {} }),
+        inputSchema: { type: 'object', properties: {} },
         origin: window.location.origin,
         window,
       },
@@ -842,26 +948,29 @@ describe('BrowserMcpServer', () => {
   it('skips a native tool with an unsupported schema dialect without blocking later tools', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const nativeContext = Object.assign(new EventTarget(), {
-      registerTool: () => {},
+      ontoolchange: null,
+      registerTool: async () => {},
       getTools: async () => [
         {
+          title: '',
           name: 'a_bad_native_schema',
           description: 'Cannot be compiled by the MCP validator',
-          inputSchema: JSON.stringify({
+          inputSchema: {
             $schema: 'https://json-schema.org/draft/2099-99/schema',
             type: 'object',
             properties: { value: { type: 'string' } },
-          }),
+          },
           origin: window.location.origin,
           window,
         },
         {
+          title: '',
           name: 'z_valid_native_schema',
           description: 'Should still be registered',
-          inputSchema: JSON.stringify({
+          inputSchema: {
             type: 'object',
             properties: { value: { type: 'string' } },
-          }),
+          },
           origin: window.location.origin,
           window,
         },
@@ -870,7 +979,7 @@ describe('BrowserMcpServer', () => {
     });
     const server = new BrowserMcpServer(
       { name: 'native-schema-isolation-server', version: '1.0.0' },
-      { native: nativeContext as unknown as ModelContext }
+      { native: nativeContext }
     );
 
     try {
@@ -887,15 +996,15 @@ describe('BrowserMcpServer', () => {
   });
 
   it('accepts an object inputSchema from native getTools', async () => {
-    // Chrome ≥154.0.8013 returns inputSchema as an object (webmcp#241); the
-    // serialized-string cases above cover the form older Chrome still sends.
     // Detachment from the page-world object is pinned by 'preserves known
     // annotations and returns detached tool metadata'.
     const objectSchema = { type: 'object', properties: { value: { type: 'string' } } };
     const nativeContext = Object.assign(new EventTarget(), {
-      registerTool: () => {},
+      ontoolchange: null,
+      registerTool: async () => {},
       getTools: async () => [
         {
+          title: '',
           name: 'object_schema_tool',
           description: 'Schema arrives as an object',
           inputSchema: objectSchema,
@@ -907,7 +1016,7 @@ describe('BrowserMcpServer', () => {
     });
     const server = new BrowserMcpServer(
       { name: 'native-object-schema-server', version: '1.0.0' },
-      { native: nativeContext as unknown as ModelContext }
+      { native: nativeContext }
     );
 
     try {
@@ -922,9 +1031,11 @@ describe('BrowserMcpServer', () => {
   it('skips a native tool whose object schema is not a plain object', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const nativeContext = Object.assign(new EventTarget(), {
-      registerTool: () => {},
+      ontoolchange: null,
+      registerTool: async () => {},
       getTools: async () => [
         {
+          title: '',
           name: 'array_schema_tool',
           description: 'An array is not a JSON Schema root',
           inputSchema: [],
@@ -932,9 +1043,18 @@ describe('BrowserMcpServer', () => {
           window,
         },
         {
+          title: '',
+          name: 'unserializable_schema_tool',
+          description: 'A schema cannot serialize to JSON',
+          inputSchema: { toJSON: () => undefined },
+          origin: window.location.origin,
+          window,
+        },
+        {
+          title: '',
           name: 'ok_tool',
           description: 'Still registered',
-          inputSchema: JSON.stringify({ type: 'object', properties: {} }),
+          inputSchema: { type: 'object', properties: {} },
           origin: window.location.origin,
           window,
         },
@@ -943,13 +1063,14 @@ describe('BrowserMcpServer', () => {
     });
     const server = new BrowserMcpServer(
       { name: 'native-malformed-schema-server', version: '1.0.0' },
-      { native: nativeContext as unknown as ModelContext }
+      { native: nativeContext }
     );
 
     try {
       await expect(server.syncNativeTools()).resolves.toBeUndefined();
       expect(server.listTools().map(({ name }) => name)).toEqual(['ok_tool']);
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('array_schema_tool'));
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('unserializable_schema_tool'));
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('input schema is malformed'));
     } finally {
       warn.mockRestore();
@@ -957,20 +1078,19 @@ describe('BrowserMcpServer', () => {
     }
   });
 
-  it('serves a parsed object inputSchema from getTools without native', async () => {
-    server = new BrowserMcpServer({ name: 'no-native-gettools', version: '1.0.0' });
-    await Reflect.apply(server.registerTool, server, [
+  it('delegates discovery of parsed input schemas to upstream', async () => {
+    server = new BrowserMcpServer({ name: 'upstream-gettools', version: '1.0.0' });
+    // @ts-expect-error Web IDL accepts a null options dictionary at runtime.
+    await server.registerTool(
       {
         name: 'local_tool',
         description: 'Registered without a native context',
         inputSchema: { type: 'object', properties: { value: { type: 'string' } } },
         async execute() {},
       },
-      null,
-    ]);
+      null
+    );
 
-    // Both in-repo producers emit the post-webmcp#241 object shape; only
-    // pre-154 Chrome still returns serialized strings.
     const [tool] = await server.getTools();
     expect(tool?.inputSchema).toEqual({
       type: 'object',
@@ -980,16 +1100,18 @@ describe('BrowserMcpServer', () => {
 
   it('refreshes native tool identity and metadata through MCP reconciliation', async () => {
     const firstNativeTool = {
+      title: '',
       name: 'refreshable_native_tool',
       description: 'Original metadata',
-      inputSchema: JSON.stringify({ type: 'object', properties: {} }),
+      inputSchema: { type: 'object', properties: {} },
       origin: window.location.origin,
       window,
     };
     let visibleNativeTool = firstNativeTool;
     const executedTools: Array<typeof firstNativeTool> = [];
     const nativeContext = Object.assign(new EventTarget(), {
-      registerTool: () => {},
+      ontoolchange: null,
+      registerTool: async () => {},
       getTools: async () => [visibleNativeTool],
       executeTool: async (tool: typeof firstNativeTool, input: { inputRequired?: boolean }) => {
         executedTools.push(tool);
@@ -1003,7 +1125,7 @@ describe('BrowserMcpServer', () => {
     });
     const server = new BrowserMcpServer(
       { name: 'native-refresh-server', version: '1.0.0' },
-      { native: nativeContext as unknown as ModelContext }
+      { native: nativeContext }
     );
     const client = new Client(
       { name: 'native-refresh-client', version: '1.0.0' },
@@ -1062,6 +1184,7 @@ describe('BrowserMcpServer', () => {
 
   it('forwards MCP cancellation to a backfilled native Chrome tool', async () => {
     const nativeTool = {
+      title: '',
       name: 'cancellable_native_tool',
       description: 'Waits for cancellation',
       origin: window.location.origin,
@@ -1069,12 +1192,13 @@ describe('BrowserMcpServer', () => {
     };
     let nativeSignal: AbortSignal | undefined;
     const nativeContext = Object.assign(new EventTarget(), {
-      registerTool: () => {},
+      ontoolchange: null,
+      registerTool: async () => {},
       getTools: async () => [nativeTool],
       executeTool: vi.fn(
         (
           _tool: typeof nativeTool,
-          _input: object,
+          _input: Parameters<NonNullable<ModelContext['executeTool']>>[1],
           options?: { signal?: AbortSignal }
         ): Promise<string> => {
           nativeSignal = options?.signal;
@@ -1088,7 +1212,7 @@ describe('BrowserMcpServer', () => {
     });
     const server = new BrowserMcpServer(
       { name: 'native-cancellation-server', version: '1.0.0' },
-      { native: nativeContext as unknown as ModelContext }
+      { native: nativeContext }
     );
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     await server.syncNativeTools();
@@ -1123,8 +1247,8 @@ describe('BrowserMcpServer', () => {
   it('uses AbortSignal cleanup for native mirrors', async () => {
     const nativeToolNames = new Set<string>();
     const nativeRegisterTool = vi.fn(
-      (
-        tool: Parameters<BrowserMcpServer['registerTool']>[0],
+      async (
+        tool: Parameters<ModelContext['registerTool']>[0],
         options?: { signal?: AbortSignal }
       ) => {
         nativeToolNames.add(tool.name);
@@ -1137,13 +1261,17 @@ describe('BrowserMcpServer', () => {
         );
       }
     );
-    const nativeContext = {
+    const nativeContext: ModelContext = {
+      executeTool: async () => {
+        throw new Error('Unexpected native execution');
+      },
+      ontoolchange: null,
       registerTool: nativeRegisterTool,
-      listTools: () => [...nativeToolNames].map((name) => ({ name })),
+      getTools: async () => [],
       addEventListener: () => {},
       removeEventListener: () => {},
       dispatchEvent: () => true,
-    } as unknown as ModelContext;
+    };
     const server = new BrowserMcpServer(
       { name: 'native-signal-test', version: '1.0.0' },
       {
@@ -1180,16 +1308,15 @@ describe('BrowserMcpServer', () => {
   });
 
   it('preserves raw WebMCP results at the native mirror boundary', async () => {
-    let mirroredTool: { execute(args: Record<string, unknown>): Promise<unknown> } | undefined;
+    let mirroredTool: Parameters<ModelContext['registerTool']>[0] | undefined;
     const server = new BrowserMcpServer(
       { name: 'native-raw-result-test', version: '1.0.0' },
       {
-        native: {
-          ...createNativeModelContextStub(),
-          registerTool(tool: typeof mirroredTool) {
+        native: Object.assign(createNativeModelContextStub(), {
+          async registerTool(tool: Parameters<ModelContext['registerTool']>[0]) {
             mirroredTool = tool;
           },
-        } as unknown as ModelContext,
+        }),
       }
     );
 
@@ -1201,7 +1328,9 @@ describe('BrowserMcpServer', () => {
       },
     });
 
-    await expect(mirroredTool?.execute({})).resolves.toEqual({ ok: true });
+    await expect(
+      mirroredTool?.execute({}, { signal: new AbortController().signal })
+    ).resolves.toEqual({ ok: true });
     await server.close();
   });
 
@@ -1212,13 +1341,17 @@ describe('BrowserMcpServer', () => {
         'NotAllowedError'
       );
     });
-    const nativeContext = {
+    const nativeContext: ModelContext = {
+      executeTool: async () => {
+        throw new Error('Unexpected native execution');
+      },
+      ontoolchange: null,
       registerTool: nativeRegisterTool,
       getTools: async () => [],
       addEventListener: () => {},
       removeEventListener: () => {},
       dispatchEvent: () => true,
-    } as unknown as ModelContext;
+    };
     const server = new BrowserMcpServer(
       { name: 'native-permissions-policy-test', version: '1.0.0' },
       {
@@ -1252,7 +1385,10 @@ describe('BrowserMcpServer', () => {
     let nativeCleanupSignal: AbortSignal | undefined;
     let nativeCleanupAbortCount = 0;
     const nativeRegisterTool = vi.fn(
-      (_tool: unknown, options?: { signal?: AbortSignal }): Promise<void> => {
+      (
+        _tool: Parameters<ModelContext['registerTool']>[0],
+        options?: { signal?: AbortSignal }
+      ): Promise<void> => {
         nativeCleanupSignal = options?.signal;
         nativeCleanupSignal?.addEventListener(
           'abort',
@@ -1264,13 +1400,17 @@ describe('BrowserMcpServer', () => {
         return Promise.reject(new Error('native async registration rejected'));
       }
     );
-    const nativeContext = {
+    const nativeContext: ModelContext = {
+      executeTool: async () => {
+        throw new Error('Unexpected native execution');
+      },
+      ontoolchange: null,
       registerTool: nativeRegisterTool,
-      listTools: () => [],
+      getTools: async () => [],
       addEventListener: () => {},
       removeEventListener: () => {},
       dispatchEvent: () => true,
-    } as unknown as ModelContext;
+    };
     const server = new BrowserMcpServer(
       { name: 'native-async-rejection-test', version: '1.0.0' },
       {
@@ -1310,7 +1450,10 @@ describe('BrowserMcpServer', () => {
   it('preserves a caller abort reason when native registration rejects on cleanup', async () => {
     let nativeCleanupSignal: AbortSignal | undefined;
     const nativeRegisterTool = vi.fn(
-      (_tool: unknown, options?: { signal?: AbortSignal }): Promise<void> => {
+      (
+        _tool: Parameters<ModelContext['registerTool']>[0],
+        options?: { signal?: AbortSignal }
+      ): Promise<void> => {
         nativeCleanupSignal = options?.signal;
         return new Promise((_, reject) => {
           nativeCleanupSignal?.addEventListener(
@@ -1321,13 +1464,17 @@ describe('BrowserMcpServer', () => {
         });
       }
     );
-    const nativeContext = {
+    const nativeContext: ModelContext = {
+      executeTool: async () => {
+        throw new Error('Unexpected native execution');
+      },
+      ontoolchange: null,
       registerTool: nativeRegisterTool,
-      listTools: () => [],
+      getTools: async () => [],
       addEventListener: () => {},
       removeEventListener: () => {},
       dispatchEvent: () => true,
-    } as unknown as ModelContext;
+    };
     const server = new BrowserMcpServer(
       { name: 'native-abort-rejection-test', version: '1.0.0' },
       {
@@ -1466,11 +1613,12 @@ describe('BrowserMcpServer', () => {
 
 describe('BrowserMcpServer exposedTo', () => {
   /** InMemoryTransport plus the peer-origin surface IframeChildTransport reports. */
-  function withPeerOrigin<T extends object>(transport: T, origin?: string) {
-    return Object.assign(transport, {
+  function withPeerOrigin<T extends Transport>(transport: T, origin?: string) {
+    const peer: Pick<PeerOriginTransport, 'clientOrigin' | 'onclientorigin'> = {
       clientOrigin: origin,
-      onclientorigin: undefined as ((origin: string) => void) | undefined,
-    });
+      onclientorigin: undefined,
+    };
+    return Object.assign(transport, peer);
   }
 
   async function connectPair(origin?: string) {
@@ -1559,35 +1707,36 @@ describe('BrowserMcpServer exposedTo', () => {
     }
   });
 
-  it.each(['file:///trusted/tool.html', 'moz-extension://abcdefghijklmnop'])(
-    'never treats an opaque peer as the allowed origin %s',
-    async (origin) => {
-      const { server, client, peered } = await connectPair('null');
-      try {
-        await server.registerTool(restricted, { exposedTo: [origin] });
-        peered.onclientorigin?.('null');
-        expect((await client.listTools()).tools).toEqual([]);
-        await expect(client.callTool({ name: restricted.name })).rejects.toThrow('disabled');
-      } finally {
-        await client.close();
-        await server.close();
-      }
+  it('never exposes a restricted tool to an opaque peer', async () => {
+    const { server, client, peered } = await connectPair('null');
+    try {
+      await server.registerTool(restricted, { exposedTo: ['https://parent.example'] });
+      peered.onclientorigin?.('null');
+      expect((await client.listTools()).tools).toEqual([]);
+      await expect(client.callTool({ name: restricted.name })).rejects.toThrow('disabled');
+    } finally {
+      await client.close();
+      await server.close();
     }
-  );
+  });
 
-  it.each(['chrome-extension://abcdefghijklmnop', 'moz-extension://abcdefghijklmnop'])(
-    'preserves exact extension-origin exposure for %s',
-    async (origin) => {
-      const { server, client } = await connectPair(origin);
-      try {
-        await server.registerTool(restricted, { exposedTo: [origin] });
-        expect((await client.listTools()).tools.map(({ name }) => name)).toContain(restricted.name);
-      } finally {
-        await client.close();
-        await server.close();
-      }
+  it.each([
+    'file:///trusted/tool.html',
+    'chrome-extension://abcdefghijklmnop',
+    'moz-extension://abcdefghijklmnop',
+  ])('rejects unsupported upstream exposure origins before publishing: %s', async (origin) => {
+    const { server, client } = await connectPair(origin);
+    try {
+      await expect(server.registerTool(restricted, { exposedTo: [origin] })).rejects.toMatchObject({
+        name: 'SecurityError',
+      });
+      expect(server.listTools()).toEqual([]);
+      expect((await client.listTools()).tools).toEqual([]);
+    } finally {
+      await client.close();
+      await server.close();
     }
-  );
+  });
 
   it('forgets the previous peer when reconnecting to an unidentified transport', async () => {
     const { server, client, peered } = await connectPair('https://parent.example');

@@ -9,10 +9,11 @@ if (new URLSearchParams(location.search).has('allow-tools-policy')) {
 }
 await import('@mcp-b/global');
 
-import type { BrowserMcpServer, ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
+import { type JsonObject, type ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
 import type { RegistrationHandle } from '@mcp-b/webmcp-ts-sdk';
+import { requireBrowserMcpServer } from './browser-mcp-server.js';
 
-const modelContext = document.modelContext as BrowserMcpServer;
+const modelContext = requireBrowserMcpServer();
 const wait = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 
@@ -30,7 +31,7 @@ await modelContext.registerTool({
     },
     required: ['a', 'b'],
   },
-  async execute(args: Record<string, unknown>) {
+  async execute(args: JsonObject) {
     await wait(Number(args.delayMs ?? 0));
     return {
       content: [{ type: 'text', text: String(Number(args.a) + Number(args.b)) }],

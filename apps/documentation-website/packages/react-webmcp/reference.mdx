@@ -17,7 +17,7 @@ import CalculatorExample from '/snippets/packages/react-webmcp-quickstart.mdx';
 
 `@mcp-b/react-webmcp` is the full React surface for MCP-B. It supports tool registration, prompt and resource hooks, and client/provider hooks for consuming MCP servers.
 
-Tool hooks register against `document.modelContext`. Prompt and resource hooks look up the MCP-B server on `document.modelContext`, then fall back to deprecated `navigator.modelContext` for older preview runtimes.
+Tool, prompt, and resource hooks use `document.modelContext`. Prompt and resource hooks require the MCP-B server installed by `@mcp-b/global`.
 
 ## Minimal example
 

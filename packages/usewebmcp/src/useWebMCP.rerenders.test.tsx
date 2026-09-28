@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, configure, render, renderHook } from 'vitest-browser-react/pure';
 import { useWebMCP } from './useWebMCP.js';
 
+declare global {
+  var IS_REACT_ACT_ENVIRONMENT: boolean | undefined;
+}
+
 function withProfiler(onRender: ProfilerOnRenderCallback) {
   return function Wrapper({ children }: PropsWithChildren) {
     return (
@@ -128,15 +132,15 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
     expect(register).toHaveBeenCalledTimes(1);
     expect(await context.getTools()).toEqual([]);
 
-    const actEnvironment = Reflect.get(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
-    Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
+    const actEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     try {
       await act(async () => {
         delayed.resolve();
         await register.mock.results[0]?.value;
       });
     } finally {
-      Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', actEnvironment);
+      globalThis.IS_REACT_ACT_ENVIRONMENT = actEnvironment;
     }
     expect(onRender).toHaveBeenCalledTimes(1);
     expect(await context.getTools()).toMatchObject([{ description: 'Revision 2' }]);

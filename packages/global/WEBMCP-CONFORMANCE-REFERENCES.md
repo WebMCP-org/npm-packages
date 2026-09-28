@@ -89,11 +89,11 @@ Goal: keep one place to track standards decisions, implementation details, and e
 Current MCP-B alignment note:
 
 - The current WebMCP draft and vendored upstream polyfill use `document.modelContext`, registration signals, `getTools()`, `toolchange`, and object-input `executeTool()`.
-- `getTools({ fromOrigins })` returns `RegisteredTool` values. Their `inputSchema` fields contain serialized JSON Schema.
+- `getTools({ fromOrigins })` returns `RegisteredTool` values. Their `inputSchema` fields contain JSON Schema objects.
 - The vendored polyfill registers an `abort` listener on `options.signal` and removes the tool when the signal aborts; pre-aborted signals reject with `AbortError`.
 - `BrowserMcpServer.registerTool(tool, options?)` accepts the same shape, resolves `undefined`, and forwards `options.signal` to the underlying native context when the caller provides one.
-- Older Chromium builds use serialized-JSON `executeTool` input; MCP-B exposes `nativeExecuteToolInput: 'json'` for those builds. The upstream polyfill and current draft use object input.
-- Current Chromium HEAD no longer exposes `navigator.modelContext` or `navigator.modelContextTesting`. MCP-B retains both only as deprecated optional compatibility surfaces.
+- MCP-B execution follows the upstream object-input API and returns JSON-serialized results.
+- Current Chromium HEAD no longer exposes `navigator.modelContext` or `navigator.modelContextTesting`. MCP-B also uses only `document.modelContext`.
 - Keep browser-surface tests explicit so experimental Chromium behavior is not mistaken for a WebMCP guarantee.
 
 Run commands:

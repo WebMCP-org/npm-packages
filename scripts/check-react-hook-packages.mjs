@@ -28,7 +28,13 @@ const run = (command, args, cwd = root) => {
 
 try {
   const tarballs = {};
-  for (const directory of ['webmcp-polyfill', 'webmcp-ts-sdk', 'usewebmcp', 'react-webmcp']) {
+  for (const directory of [
+    'webmcp-types',
+    'webmcp-polyfill',
+    'webmcp-ts-sdk',
+    'usewebmcp',
+    'react-webmcp',
+  ]) {
     const cwd = join(root, 'packages', directory);
     const manifest = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'));
     const { filename } = JSON.parse(
@@ -66,29 +72,29 @@ try {
     const consumer = join(temporary, `react-${version}`);
     mkdirSync(consumer);
     const major = version.split('.')[0];
+    const dependencies = {
+      usewebmcp: tarballs.usewebmcp,
+      react: version,
+      'react-dom': version,
+      '@types/react': major,
+      '@types/react-dom': major,
+      '@types/node': '22.17.2',
+      typescript: '5.9.3',
+      zod: '4.4.3',
+    };
+    if (extended) {
+      dependencies['@mcp-b/webmcp-types'] = tarballs['@mcp-b/webmcp-types'];
+      dependencies['@mcp-b/react-webmcp'] = tarballs['@mcp-b/react-webmcp'];
+      dependencies['@mcp-b/webmcp-ts-sdk'] = tarballs['@mcp-b/webmcp-ts-sdk'];
+      dependencies['webmcp-types'] = upstreamTypesVersion;
+    }
     writeFileSync(
       join(consumer, 'package.json'),
       JSON.stringify(
         {
           private: true,
           type: 'module',
-          dependencies: {
-            usewebmcp: tarballs.usewebmcp,
-            ...(extended
-              ? {
-                  '@mcp-b/react-webmcp': tarballs['@mcp-b/react-webmcp'],
-                  '@mcp-b/webmcp-ts-sdk': tarballs['@mcp-b/webmcp-ts-sdk'],
-                  'webmcp-types': upstreamTypesVersion,
-                }
-              : {}),
-            react: version,
-            'react-dom': version,
-            '@types/react': major,
-            '@types/react-dom': major,
-            '@types/node': '22.17.2',
-            typescript: '5.9.3',
-            zod: '4.4.3',
-          },
+          dependencies,
           pnpm: { overrides: tarballs },
         },
         null,
@@ -136,9 +142,18 @@ try {
         join(consumer, 'extended-types.ts'),
         `
 import type { WebMCP } from 'webmcp-types';
+import type { WebMCP as AliasedWebMCP } from '@mcp-b/webmcp-types';
 import { useWebMCP } from '@mcp-b/react-webmcp';
 import type { ToolAnnotations } from '@mcp-b/webmcp-ts-sdk';
 const context: WebMCP.ModelContext | undefined = document.modelContext;
+const aliasedContext: AliasedWebMCP.ModelContext | undefined = context;
+const schema = { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } as const;
+const aliasedTool: AliasedWebMCP.ModelContextToolFromSchema<typeof schema> = {
+  name: 'aliased', description: 'Forwarded upstream inference', inputSchema: schema,
+  execute: ({ query }) => query.toUpperCase(),
+};
+// @ts-expect-error - upstream inference rejects numeric input through the alias too
+aliasedTool.execute({ query: 123 }, { signal: new AbortController().signal });
 const annotations: ToolAnnotations = { readOnlyHint: true, idempotentHint: true };
 export function useExtendedTypes() {
   const tool = useWebMCP({
@@ -150,7 +165,7 @@ export function useExtendedTypes() {
   const result: Promise<{ length: number }> = tool.execute({ query: 'ok' });
   // @ts-expect-error - outputSchema constrains the handler return type
   useWebMCP({ name: 'wrong', description: 'Wrong result', outputSchema: { type: 'number' }, execute: () => 'wrong' });
-  return { context, result };
+  return { context, aliasedContext, result };
 }
 `
       );

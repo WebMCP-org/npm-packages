@@ -13,13 +13,11 @@ import { LocalRelayMcpServer } from './mcpRelayServer.js';
 // 0700 directory with an unpredictable name, so this is not a temp-file race.
 const persistPath = join(mkdtempSync(join(tmpdir(), 'webmcp-relay-test-')), 'relay-port.json');
 
-const execFileMock = vi.hoisted(() =>
-  vi.fn((_command: string, _args: string[], callback: (error: Error | null) => void) => {
+const execFileMock = vi.fn(
+  (_command: string, _args: readonly string[], callback: (cause: Error | null) => void) => {
     callback(null);
-  })
+  }
 );
-
-vi.mock('node:child_process', () => ({ execFile: execFileMock }));
 
 /**
  * Polls until `fn` returns a defined value.
@@ -41,6 +39,10 @@ async function waitFor<T>(
 
 type ClientToolList = Awaited<ReturnType<Client['listTools']>>;
 type ClientTool = ClientToolList['tools'][number];
+
+// Fixtures cover both object schemas and intentionally malformed serialized schemas.
+type BrowserToolFixture = Pick<ClientTool, 'name'> &
+  Partial<Omit<ClientTool, 'name' | 'inputSchema'>> & { inputSchema?: object | string };
 
 function createTestClient(): Client {
   return new Client(
@@ -68,30 +70,10 @@ async function waitForClientTool(client: Client, toolName: string): Promise<Clie
 /**
  * Extracts text items from MCP call tool result content.
  */
-function contentTextItems(result: unknown): string[] {
-  const content =
-    typeof result === 'object' && result !== null && 'content' in result
-      ? (result as { content?: unknown }).content
-      : undefined;
-  if (!Array.isArray(content)) {
-    return [];
-  }
-  return content
-    .map((item) => {
-      if (!item || typeof item !== 'object') {
-        return undefined;
-      }
-      const text = (item as { text?: unknown }).text;
-      return typeof text === 'string' ? text : undefined;
-    })
-    .filter((text): text is string => typeof text === 'string');
-}
+type ClientToolResult = Awaited<ReturnType<Client['callTool']>>;
 
-/**
- * Returns the first text content item when present.
- */
-function firstContentText(result: unknown): string {
-  return contentTextItems(result)[0] ?? '';
+function firstContentText(result: ClientToolResult): string {
+  return result.content.find((item) => item.type === 'text')?.text ?? '';
 }
 
 /**
@@ -109,7 +91,7 @@ async function createConnectedRelay(options?: { invokeTimeoutMs?: number }): Pro
     allowedOrigins: ['*'],
     invokeTimeoutMs: options?.invokeTimeoutMs ?? 500,
   });
-  const relay = new LocalRelayMcpServer({ bridge });
+  const relay = new LocalRelayMcpServer({ bridge, launchBrowser: execFileMock });
   await relay.start();
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -136,12 +118,7 @@ async function connectBrowser(
   options: {
     tabId: string;
     url: string;
-    tools: Array<{ name: string; description?: string; [key: string]: unknown }>;
-    onInvoke?: (msg: {
-      callId: string;
-      toolName: string;
-      args?: Record<string, unknown>;
-    }) => unknown;
+    tools: BrowserToolFixture[];
   }
 ): Promise<WebSocket> {
   const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`);
@@ -149,18 +126,6 @@ async function connectBrowser(
     ws.once('open', () => resolve());
     ws.once('error', reject);
   });
-
-  if (options.onInvoke) {
-    const handler = options.onInvoke;
-    ws.on('message', (raw) => {
-      const msg = JSON.parse(String(raw));
-      if (msg.type !== 'invoke') return;
-      const response = handler(msg);
-      if (response) {
-        ws.send(JSON.stringify(response));
-      }
-    });
-  }
 
   ws.send(
     JSON.stringify({
@@ -1064,7 +1029,7 @@ describe('LocalRelayMcpServer', () => {
 
       const list = await waitForClientToolList(client, toolName);
 
-      const expectedStaticSchemas: Record<string, Record<string, unknown>> = {
+      const expectedStaticSchemas = {
         webmcp_list_sources: {
           $schema: 'https://json-schema.org/draft/2020-12/schema',
           type: 'object',

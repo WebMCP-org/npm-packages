@@ -2,7 +2,8 @@
  * Utilities for working with MCP (Model Context Protocol) responses
  */
 
-import type { CallToolResult } from '@modelcontextprotocol/server';
+import { isCallToolResult } from '@modelcontextprotocol/server';
+import type { CallToolResult, JSONValue as JsonValue } from '@modelcontextprotocol/server';
 
 /**
  * Formatted result with extracted display text and error status
@@ -10,8 +11,12 @@ import type { CallToolResult } from '@modelcontextprotocol/server';
 export type FormattedMcpResult = {
   displayText: string;
   isError: boolean;
-  rawResult: unknown;
+  rawResult: CallToolResult | JsonValue | undefined;
 };
+
+function isString(value: JsonValue): value is string {
+  return typeof value === 'string';
+}
 
 /**
  * Parse an MCP tool response and extract displayable text content
@@ -30,7 +35,9 @@ export type FormattedMcpResult = {
  * // formatted.isError === false
  * ```
  */
-export function formatMcpResult(result: unknown): FormattedMcpResult {
+export function formatMcpResult(
+  result: CallToolResult | JsonValue | undefined
+): FormattedMcpResult {
   // Handle null/undefined
   if (result === null || result === undefined) {
     return {
@@ -40,47 +47,40 @@ export function formatMcpResult(result: unknown): FormattedMcpResult {
     };
   }
 
-  // Handle non-object results (strings, numbers, etc.)
-  if (typeof result !== 'object') {
+  if (!isCallToolResult(result)) {
     return {
-      displayText: String(result),
+      displayText: isString(result) ? result : (JSON.stringify(result, null, 2) ?? String(result)),
       isError: false,
       rawResult: result,
     };
   }
 
-  // Type guard for MCP response
-  const mcpResponse = result as CallToolResult;
-  const isError = Boolean(mcpResponse.isError);
+  const isError = result.isError ?? false;
 
-  // Extract text content from content array
-  if (mcpResponse.content && Array.isArray(mcpResponse.content)) {
-    const textContent = mcpResponse.content
-      .filter((item) => item.type === 'text' && 'text' in item && item.text)
-      .map((item) => ('text' in item ? item.text : ''))
-      .join('\n');
+  const textContent = result.content
+    .flatMap((item) => (item.type === 'text' && item.text ? [item.text] : []))
+    .join('\n');
 
-    if (textContent) {
-      return {
-        displayText: textContent,
-        isError,
-        rawResult: result,
-      };
-    }
+  if (textContent) {
+    return {
+      displayText: textContent,
+      isError,
+      rawResult: result,
+    };
+  }
 
-    // If no text content, try to show other content types
-    const otherContent = mcpResponse.content
-      .filter((item) => item.type !== 'text')
-      .map((item) => `[${item.type}]`)
-      .join(', ');
+  // If no text content, try to show other content types
+  const otherContent = result.content
+    .filter((item) => item.type !== 'text')
+    .map((item) => `[${item.type}]`)
+    .join(', ');
 
-    if (otherContent) {
-      return {
-        displayText: otherContent,
-        isError,
-        rawResult: result,
-      };
-    }
+  if (otherContent) {
+    return {
+      displayText: otherContent,
+      isError,
+      rawResult: result,
+    };
   }
 
   // Fallback: stringify the entire result

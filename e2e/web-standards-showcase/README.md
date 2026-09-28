@@ -2,8 +2,8 @@
 
 This app exercises the current native WebMCP surface in Chrome without loading
 an MCP-B runtime or polyfill. It uses `document.modelContext` for registration
-and discovery, and it feature-detects Chrome's optional `executeTool()`
-extension.
+and discovery, and it checks whether the browser exposes the current draft’s
+`executeTool()` method.
 
 The authoritative API definition lives in the
 [WebMCP specification](https://webmachinelearning.github.io/webmcp/). For
@@ -131,8 +131,6 @@ The showcase does not emulate removed native methods.
 
 Testing call logs, mock responses, and whole-context reset controls have no
 current WebMCP replacement. The separate
-`tests/chromium-native-api.spec.ts` lane intentionally tests MCP-B compatibility
-shims for those older integrations; it is not native conformance coverage.
 
 MCP `outputSchema` and `structuredContent` are also outside the strict WebMCP
 core. The showcase's structured-result template returns an ordinary structured

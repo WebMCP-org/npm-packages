@@ -3,7 +3,7 @@
  * stateless extraction function that always returns markdown-formatted results.
  */
 
-import type { ExtractionArgs, ExtractionMethod, ExtractionResult } from './bundle-types';
+import type { ExtractionRequest, ExtractionResult } from './bundle-types';
 import { SmartDOMReader } from './smart-dom-reader';
 import { MarkdownFormatter } from './markdown-formatter';
 import { ProgressiveExtractor } from './progressive';
@@ -21,19 +21,13 @@ function resolveDocument(frameSelector?: string): Document {
 
 // Export a function that will be available after the script is loaded
 // This will be wrapped in an IIFE by the bundler
-export function executeExtraction<M extends ExtractionMethod>(
-  method: M,
-  args: ExtractionArgs[M]
-): ExtractionResult {
+export function executeExtraction(...[method, args]: ExtractionRequest): ExtractionResult {
   try {
     let result: string;
 
-    // TS cannot narrow the indexed type `ExtractionArgs[M]` from a switch on `method`,
-    // so each arm restates the arg type it already knows it has.
     switch (method) {
       case 'extractStructure': {
-        const structureArgs = args as ExtractionArgs['extractStructure'];
-        const { selector, frameSelector, formatOptions } = structureArgs;
+        const { selector, frameSelector, formatOptions } = args;
         const doc = resolveDocument(frameSelector);
 
         const target = selector ? doc.querySelector(selector) : doc;
@@ -52,8 +46,7 @@ export function executeExtraction<M extends ExtractionMethod>(
       }
 
       case 'extractRegion': {
-        const regionArgs = args as ExtractionArgs['extractRegion'];
-        const { selector, mode, frameSelector, options, formatOptions } = regionArgs;
+        const { selector, mode, frameSelector, options, formatOptions } = args;
         const doc = resolveDocument(frameSelector);
 
         const extractOptions: ExtractionOptions = {
@@ -76,8 +69,7 @@ export function executeExtraction<M extends ExtractionMethod>(
       }
 
       case 'extractContent': {
-        const contentArgs = args as ExtractionArgs['extractContent'];
-        const { selector, frameSelector, options, formatOptions } = contentArgs;
+        const { selector, frameSelector, options, formatOptions } = args;
         const doc = resolveDocument(frameSelector);
 
         const extractOptions: ContentExtractionOptions = options || {};
@@ -97,8 +89,7 @@ export function executeExtraction<M extends ExtractionMethod>(
       }
 
       case 'extractInteractive': {
-        const interactiveArgs = args as ExtractionArgs['extractInteractive'];
-        const { selector, frameSelector, options, formatOptions } = interactiveArgs;
+        const { selector, frameSelector, options, formatOptions } = args;
         const doc = resolveDocument(frameSelector);
 
         const target = selector ? doc.querySelector(selector) : null;
@@ -120,8 +111,7 @@ export function executeExtraction<M extends ExtractionMethod>(
       }
 
       case 'extractFull': {
-        const fullArgs = args as ExtractionArgs['extractFull'];
-        const { selector, frameSelector, options, formatOptions } = fullArgs;
+        const { selector, frameSelector, options, formatOptions } = args;
         const doc = resolveDocument(frameSelector);
 
         const target = selector ? doc.querySelector(selector) : null;

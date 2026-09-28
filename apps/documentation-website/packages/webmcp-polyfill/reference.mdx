@@ -17,8 +17,7 @@ The [WebMCP draft](https://webmachinelearning.github.io/webmcp/) and upstream
 package define the core API.
 
 Use [`@mcp-b/global`](/packages/global/reference) for MCP-B runtime extensions,
-including transports, prompts and resources, declarative forms, compatibility
-shims, and MCP `outputSchema` support.
+including transports, prompts and resources, declarative forms, and MCP `outputSchema` support.
 
 ## Package entries
 
@@ -46,14 +45,6 @@ installWebMCP();
 Installation is idempotent and preserves an existing native context. It does
 nothing when the browser document is unavailable. Importing the ESM entry does
 not install the runtime as a side effect.
-
-`initializeWebMCPPolyfill()` remains as a deprecated alias:
-
-```ts
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
-
-initializeWebMCPPolyfill();
-```
 
 ## Core runtime
 

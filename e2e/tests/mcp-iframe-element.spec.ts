@@ -1,6 +1,9 @@
 import { expect, type Page, test } from '@playwright/test';
 import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 
+type NativeRegisterTool = NonNullable<Document['modelContext']>['registerTool'];
+type RegisterTool = (...args: Parameters<NativeRegisterTool>) => ReturnType<NativeRegisterTool>;
+
 const dynamicItemSnapshot = (page: Page) =>
   page.evaluate(() => {
     const element = window.mcpIframeHost.getMcpIframe();
@@ -47,10 +50,8 @@ test('bridges tools, resources, URI templates, and prompts', async ({ page }) =>
       return match;
     };
 
-    const tool = (await window.mcpIframeHost.getParentTool('calculate')) as {
-      title?: string;
-      annotations?: { readOnlyHint?: boolean };
-    };
+    const tool = await window.mcpIframeHost.getParentTool('calculate');
+    if (!tool) throw new Error('Parent tool is unavailable');
     const calculation = await window.mcpIframeHost.callTool('calculate', { a: 10, b: 20 });
     const calculationContent = calculation.content[0];
     const config = await window.mcpIframeHost.readResource(resource('iframe://config'));
@@ -74,9 +75,8 @@ test('bridges tools, resources, URI templates, and prompts', async ({ page }) =>
       resource('iframe://query{?q,lang}'),
       { q: 'a b', lang: 'en' }
     );
-    const prompt = (await window.mcpIframeHost.getPrompt('summarize', { text: 'hello' })) as {
-      messages: Array<{ content: { type: string; text?: string } }>;
-    };
+    const prompt = await window.mcpIframeHost.getPrompt('summarize', { text: 'hello' });
+    const promptContent = prompt.messages[0]?.content;
 
     return {
       tools: element.exposedTools,
@@ -92,7 +92,7 @@ test('bridges tools, resources, URI templates, and prompts', async ({ page }) =>
       segments: segments.contents[0]?.uri,
       fragment: fragment.contents[0]?.uri,
       query: query.contents[0]?.uri,
-      prompt: prompt.messages[0]?.content.text,
+      prompt: promptContent?.type === 'text' ? promptContent.text : undefined,
     };
   });
 
@@ -117,9 +117,26 @@ test('keeps ancestor tools out of child MCP servers while WebMCP discovers the f
   page,
 }) => {
   const tools = await page.evaluate(async () => {
-    const parent = document.modelContext as BrowserMcpServer;
+    function isBrowserMcpServer(context: unknown): context is BrowserMcpServer {
+      return (
+        context !== null &&
+        typeof context === 'object' &&
+        '__isBrowserMcpServer' in context &&
+        context.__isBrowserMcpServer === true
+      );
+    }
+
+    const parentContext = document.modelContext;
+    if (!isBrowserMcpServer(parentContext)) {
+      throw new Error('Parent MCP-B server is unavailable');
+    }
+    const parent = parentContext;
     const childWindow = window.mcpIframeHost.getMcpIframe().iframe?.contentWindow;
-    const child = childWindow?.document.modelContext as BrowserMcpServer;
+    const childContext = childWindow?.document.modelContext;
+    if (!isBrowserMcpServer(childContext)) {
+      throw new Error('Child MCP-B server is unavailable');
+    }
+    const child = childContext;
     const controller = new AbortController();
     await parent.registerTool(
       { name: 'parent_only', description: 'Parent tool', execute: async () => 'parent' },
@@ -127,21 +144,9 @@ test('keeps ancestor tools out of child MCP servers while WebMCP discovers the f
     );
     try {
       await Promise.all([parent.syncNativeTools(), child.syncNativeTools()]);
-      const testing = childWindow?.navigator.modelContextTesting;
-      if (!testing) throw new Error('Child testing shim is unavailable');
-      const ownTestingResult = await testing.executeTool('calculate', '{"a":1,"b":2}');
-      let hiddenToolError = '';
-      try {
-        await testing.executeTool('parent_only', '{}');
-      } catch (error) {
-        hiddenToolError = (error as Error).name;
-      }
       return {
         discovered: (await child.getTools()).map(({ name }) => name),
         childMcp: child.listTools().map(({ name }) => name),
-        childTesting: testing.listTools().map(({ name }) => name),
-        ownTestingResult,
-        hiddenToolError,
         parentMcp: parent
           .listTools()
           .map(({ name }) => name)
@@ -155,9 +160,6 @@ test('keeps ancestor tools out of child MCP servers while WebMCP discovers the f
     expect.arrayContaining(['calculate', 'child-iframe_calculate', 'parent_only'])
   );
   expect(tools.childMcp).toEqual(['calculate']);
-  expect(tools.childTesting).toEqual(['calculate']);
-  expect(tools.ownTestingResult).toContain('3');
-  expect(tools.hiddenToolError).toBe('UnknownError');
   expect(tools.parentMcp).toEqual(['calculate', 'child-iframe_calculate', 'parent_only']);
 });
 
@@ -223,16 +225,11 @@ test('reattaches once and lets the latest source replace a rapid channel change'
 
 test('keeps the replacement ready when an older refresh finishes', async ({ page }) => {
   const state = await page.evaluate(async () => {
-    type ParentRegisterTool = (tool: unknown, options?: unknown) => Promise<void>;
-
     const element = window.mcpIframeHost.getMcpIframe();
     const modelContext = document.modelContext;
     if (!modelContext) throw new Error('Parent model context is unavailable');
 
-    const writableModelContext = modelContext as unknown as {
-      registerTool: ParentRegisterTool;
-    };
-    const originalRegisterTool = writableModelContext.registerTool;
+    const originalRegisterTool = modelContext.registerTool;
     const registerTool = originalRegisterTool.bind(modelContext);
     const { promise: registrationGate, resolve: releaseRegistration } =
       Promise.withResolvers<void>();
@@ -240,13 +237,14 @@ test('keeps the replacement ready when an older refresh finishes', async ({ page
       Promise.withResolvers<void>();
     let delayNextRegistration = true;
 
-    writableModelContext.registerTool = async (tool, options) => {
+    const delayedRegisterTool: RegisterTool = async (tool, options) => {
       await registerTool(tool, options);
       if (!delayNextRegistration) return;
       delayNextRegistration = false;
       registrationCompleted();
       await registrationGate;
     };
+    modelContext.registerTool = delayedRegisterTool;
 
     try {
       const staleRefresh = element.refresh();
@@ -275,7 +273,7 @@ test('keeps the replacement ready when an older refresh finishes', async ({ page
       };
     } finally {
       releaseRegistration();
-      writableModelContext.registerTool = originalRegisterTool;
+      modelContext.registerTool = originalRegisterTool;
     }
   });
 

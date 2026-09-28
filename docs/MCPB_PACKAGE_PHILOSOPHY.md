@@ -19,7 +19,8 @@ To keep integration predictable, this repo separates:
   `document.modelContext` declaration.
 - `@mcp-b/webmcp-ts-sdk` owns MCP-B adapter and extension contracts, along with schema
   conversion helpers.
-- MCP-B extensions do not broaden the upstream core declaration. There is no separate MCP-B WebMCP types package.
+- MCP-B extensions do not broaden the upstream core declaration. `@mcp-b/webmcp-types`
+  temporarily forwards upstream exports for existing package consumers.
 
 Use when you want:
 
@@ -38,7 +39,7 @@ Use when you want:
 ### 3) `@mcp-b/global` (MCP-B Runtime Entry Point)
 
 - Orchestrates the polyfill, `BrowserMcpServer`, and browser transport.
-- Installs MCP-B aliases, declarative forms, testing helpers, and `outputSchema` extensions around the upstream runtime.
+- Installs declarative forms and MCP extensions, including `outputSchema`, around the upstream runtime.
 - Exports initialization and transport configuration types. The browser adapter and its extension types belong to `@mcp-b/webmcp-ts-sdk`.
 
 Use when you want:

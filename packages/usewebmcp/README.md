@@ -105,7 +105,7 @@ your import:
 import { useWebMCP } from '@mcp-b/react-webmcp';
 ```
 
-Both tool hooks remove `isRegistered`; use the runtime’s `getTools()` for confirmed discovery.
+Tool hooks expose `isSupported` and `registrationError`; use the runtime’s `getTools()` for confirmed discovery.
 Prompt and resource hooks retain their registration status. Core failures reject; the MCP adapter
 returns MCP error responses by default.
 

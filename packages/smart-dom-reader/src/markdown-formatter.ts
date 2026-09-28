@@ -114,7 +114,7 @@ function renderInteractive(
   const parts: string[] = [];
 
   const limit = <T>(arr: T[]) =>
-    typeof opts?.maxElements === 'number' ? arr.slice(0, opts.maxElements) : arr;
+    opts?.maxElements !== undefined ? arr.slice(0, opts.maxElements) : arr;
 
   if (inter.buttons.length) {
     parts.push('Buttons:');
@@ -284,8 +284,7 @@ export class MarkdownFormatter {
       lines.push('');
     }
     if (content.text.paragraphs?.length) {
-      const limit =
-        typeof opts.maxElements === 'number' ? opts.maxElements : content.text.paragraphs.length;
+      const limit = opts.maxElements ?? content.text.paragraphs.length;
       lines.push('Paragraphs:');
       for (const p of content.text.paragraphs.slice(0, limit))
         lines.push(`- ${truncate(p, opts.maxTextLength ?? 200)}`);
@@ -295,7 +294,7 @@ export class MarkdownFormatter {
       lines.push('Lists:');
       for (const list of content.text.lists) {
         lines.push(`- ${list.type.toUpperCase()}:`);
-        const limit = typeof opts.maxElements === 'number' ? opts.maxElements : list.items.length;
+        const limit = opts.maxElements ?? list.items.length;
         for (const item of list.items.slice(0, limit))
           lines.push(`  - ${truncate(item, opts.maxTextLength ?? 120)}`);
       }
@@ -306,7 +305,7 @@ export class MarkdownFormatter {
       lines.push('Tables:');
       for (const t of content.tables) {
         lines.push(`- Headers: ${t.headers.join(' | ')}`);
-        const limit = typeof opts.maxElements === 'number' ? opts.maxElements : t.rows.length;
+        const limit = opts.maxElements ?? t.rows.length;
         for (const row of t.rows.slice(0, limit)) lines.push(`  - ${row.join(' | ')}`);
       }
       lines.push('');
@@ -314,7 +313,7 @@ export class MarkdownFormatter {
 
     if (content.media?.length) {
       lines.push('Media:');
-      const limit = typeof opts.maxElements === 'number' ? opts.maxElements : content.media.length;
+      const limit = opts.maxElements ?? content.media.length;
       for (const m of content.media.slice(0, limit)) {
         lines.push(`- ${m.type.toUpperCase()}: ${m.alt ?? ''} ${m.src ? `→ ${m.src}` : ''}`.trim());
       }

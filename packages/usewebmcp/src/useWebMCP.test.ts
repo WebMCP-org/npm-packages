@@ -4,10 +4,20 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { cleanup, renderHook } from 'vitest-browser-react';
 import { useWebMCP } from './useWebMCP.js';
 
-async function executeRegisteredTool(
-  name: string,
-  args: Record<string, unknown> = {}
-): Promise<unknown> {
+type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
+type JsonObject = { [key: string]: JsonValue };
+
+interface CircularInputSchema {
+  type: string;
+  properties: Record<string, CircularInputSchema>;
+}
+
+interface CircularAnnotations {
+  readOnlyHint: boolean;
+  self?: CircularAnnotations;
+}
+
+async function executeRegisteredTool(name: string, args: JsonObject = {}): Promise<JsonValue> {
   const modelContext = document.modelContext;
   if (!modelContext || typeof modelContext.executeTool !== 'function') {
     throw new Error('Chrome descriptor execution is unavailable');
@@ -363,7 +373,7 @@ describe('useWebMCP in a browser runtime', () => {
     expect(hook.result.current.state.isExecuting).toBe(false);
   });
 
-  it('forwards native execution options and supplies options to older runtimes', async () => {
+  it('forwards execution signals through the upstream callback contract', async () => {
     const register = vi.spyOn(document.modelContext!, 'registerTool');
     const signals: AbortSignal[] = [];
     const hook = await renderHook(() =>
@@ -628,10 +638,9 @@ describe('useWebMCP in a browser runtime', () => {
     'reports circular %s without registering and recovers after correction',
     async (source) => {
       const register = vi.spyOn(document.modelContext, 'registerTool');
-      const properties: Record<string, unknown> = {};
-      const circular = { type: 'object', properties };
-      properties.self = circular;
-      const annotations: { readOnlyHint: boolean; self?: unknown } = { readOnlyHint: true };
+      const circular: CircularInputSchema = { type: 'object', properties: {} };
+      circular.properties.self = circular;
+      const annotations: CircularAnnotations = { readOnlyHint: true };
       annotations.self = annotations;
       const hook = await renderHook(
         ({ broken }) =>

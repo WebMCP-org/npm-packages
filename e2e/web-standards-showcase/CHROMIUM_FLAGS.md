@@ -107,8 +107,8 @@ console.log({
   getTools: typeof context?.getTools,
   toolchange: typeof context?.addEventListener,
   chromeExecuteToolExtension: typeof context?.executeTool,
-  deprecatedNavigatorAlias: typeof navigator.modelContext,
-  deprecatedTestingShim: typeof navigator.modelContextTesting,
+  deprecatedNavigatorAlias: 'modelContext' in navigator,
+  deprecatedTestingShim: 'modelContextTesting' in navigator,
 });
 ```
 
@@ -145,9 +145,9 @@ console.table(
 
 ### `executeTool` is missing
 
-`executeTool()` is an optional Chromium preview extension, not strict WebMCP
-core. Registration and `getTools()` discovery should still work. The Playwright
-execution assertion skips when the method is absent.
+`executeTool()` is part of the current WebMCP draft. Browser previews can lag
+the draft; the native showcase skips execution assertions when the method is
+absent. MCP-B requires the upstream execution contract.
 
 Do not fall back to `navigator.modelContextTesting.executeTool()` in native
 coverage. That would test a removed compatibility surface.

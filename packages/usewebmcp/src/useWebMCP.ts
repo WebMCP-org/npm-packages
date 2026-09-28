@@ -13,9 +13,10 @@ import type {
 
 const INITIAL_STATE = { isExecuting: false, lastResult: null, error: null, executionCount: 0 };
 const INITIAL_REGISTRATION = { isSupported: false, registrationError: null };
-const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+const useIsomorphicLayoutEffect = globalThis.window === undefined ? useEffect : useLayoutEffect;
 
 type ExecutionOutcome<T> = { result: T; output: unknown } | { error: Error; output?: unknown };
+type RegisteredToolInput = Parameters<WebMCP.ModelContextTool['execute']>[0];
 
 export interface WebMCPAdapter<TResult> {
   descriptor?: object;
@@ -24,17 +25,8 @@ export interface WebMCPAdapter<TResult> {
   formatError?: (error: Error) => WebMCP.MaybePromise<unknown>;
 }
 
-function toError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
-}
-
-function canRegister(context: unknown): context is Pick<WebMCP.ModelContext, 'registerTool'> {
-  return (
-    typeof context === 'object' &&
-    context !== null &&
-    'registerTool' in context &&
-    typeof context.registerTool === 'function'
-  );
+function toError(cause: unknown): Error {
+  return cause instanceof Error ? cause : new Error(String(cause));
 }
 
 function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, TResult = unknown>(
@@ -87,7 +79,7 @@ function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, 
 
   const run = useCallback(
     async (
-      input: unknown,
+      input: InferToolInput<TInputSchema> | RegisteredToolInput,
       options: WebMCP.ToolExecuteCallbackOptions = { signal: new AbortController().signal },
       forAgent = false
     ): Promise<ExecutionOutcome<TResult>> => {
@@ -105,6 +97,7 @@ function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, 
         signal.throwIfAborted();
         const operation = async (): Promise<ExecutionOutcome<TResult>> => {
           try {
+            // SAFETY: registered calls are validated by inputSchema; local calls are typed.
             const result = await executionConfig.execute(
               input as InferToolInput<TInputSchema>,
               options
@@ -182,7 +175,7 @@ function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, 
     let timer: ReturnType<typeof setInterval> | undefined;
     const register = () => {
       const context = document.modelContext;
-      const isSupported = canRegister(context);
+      const isSupported = typeof context?.registerTool === 'function';
       const { config: current, descriptor: tool, preparationError: error } = committed.current;
       setRegistration((previous) =>
         previous.isSupported === isSupported && previous.registrationError === (error ?? null)
@@ -190,7 +183,7 @@ function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, 
           : { isSupported, registrationError: error ?? null }
       );
       if (error || !enabled) return true;
-      if (!isSupported) return false;
+      if (!isSupported || !context) return false;
       const failed = (cause: unknown) => {
         if (controller.signal.aborted) return;
         controller.abort();

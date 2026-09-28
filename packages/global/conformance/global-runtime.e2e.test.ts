@@ -13,7 +13,7 @@ const TEST_INIT_OPTIONS: WebModelContextInitOptions = {
 };
 
 function resetGlobals(): void {
-  delete (window as unknown as { __webModelContext?: unknown }).__webModelContext;
+  Reflect.deleteProperty(window, '__webModelContext');
 }
 
 function cleanupRuntime(): void {

@@ -1,17 +1,13 @@
 ---
-type CornerPosition =
-  | "top-left"
-  | "top-right"
-  | "bottom-left"
-  | "bottom-right"
-  | "all";
+type CornerPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right" | "all";
+type CornerPositionName = Exclude<CornerPosition, "all">;
 
 interface Props {
   position?: CornerPosition;
   className?: string;
 }
 
-const { position = "all", className = "" } = Astro.props as Props;
+const { position = "all", className = "" } = Astro.props;
 
 const positionClasses = {
   "top-left": {
@@ -40,14 +36,9 @@ const positionClasses = {
   },
 } as const;
 
-const positions =
+const positions: CornerPositionName[] =
   position === "all"
-    ? ([
-        "top-left",
-        "top-right",
-        "bottom-left",
-        "bottom-right",
-      ] as const)
+    ? ["top-left", "top-right", "bottom-left", "bottom-right"]
     : [position];
 ---
 

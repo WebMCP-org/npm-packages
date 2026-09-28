@@ -65,7 +65,7 @@ try {
   });
   browser = await chromium.launch({
     headless: true,
-    ...(process.env.CHROME_BIN ? { executablePath: process.env.CHROME_BIN } : {}),
+    executablePath: process.env.CHROME_BIN,
     args: ['--enable-features=WebMCP'],
   });
   const page = await browser.newPage();

@@ -1,3 +1,5 @@
+import { isTcpAddress } from './portStrategy.js';
+import { z } from 'zod/v4';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,6 +9,22 @@ import { describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 
 import { RelayBridgeServer } from './bridgeServer.js';
+import {
+  RelayToBrowserMessageSchema,
+  RelayServerToClientMessageSchema,
+  type RelayHelloRejectedMessage,
+  type ServerHelloMessage,
+} from './schemas.js';
+
+const OutboundMessageSchema = z.union([
+  RelayToBrowserMessageSchema,
+  RelayServerToClientMessageSchema,
+]);
+type OutboundMessage = z.infer<typeof OutboundMessageSchema>;
+
+function readServerMessage(raw: WebSocket.RawData): OutboundMessage {
+  return OutboundMessageSchema.parse(JSON.parse(String(raw)));
+}
 
 // The relay caches its chosen port in ~/.webmcp/relay-port.json by default;
 // tests must never touch the developer's real home directory. mkdtemp gives a
@@ -97,7 +115,7 @@ async function getOpenPort(): Promise<number> {
   });
 
   const address = server.address();
-  if (!address || typeof address === 'string') {
+  if (!isTcpAddress(address)) {
     throw new Error('Expected an address info result');
   }
 
@@ -147,7 +165,7 @@ describe('RelayBridgeServer', () => {
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
       ws.on('message', (raw) => {
-        const msg = JSON.parse(String(raw));
+        const msg = readServerMessage(raw);
         if (msg.type !== 'invoke') return;
 
         ws.send(
@@ -162,7 +180,7 @@ describe('RelayBridgeServer', () => {
       });
 
       const result = await bridge.invokeTool(toolName, { message: 'hello' });
-      const text = (result.content?.[0] as { text?: string } | undefined)?.text;
+      const text = result.content.find((item) => item.type === 'text')?.text;
 
       expect(text).toBe('Echo:hello');
 
@@ -223,9 +241,9 @@ describe('RelayBridgeServer', () => {
         })
       );
 
-      const rejection = await new Promise<Record<string, unknown>>((resolve, reject) => {
+      const rejection = await new Promise<RelayHelloRejectedMessage>((resolve, reject) => {
         ws.on('message', (raw) => {
-          const message = JSON.parse(String(raw)) as Record<string, unknown>;
+          const message = readServerMessage(raw);
           if (message.type === 'hello/rejected') {
             resolve(message);
           }
@@ -258,10 +276,10 @@ describe('RelayBridgeServer', () => {
       await bridge.start();
 
       const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`);
-      const messages: Array<Record<string, unknown>> = [];
+      const messages: OutboundMessage[] = [];
       await new Promise<void>((resolve, reject) => {
         ws.on('message', (raw) => {
-          messages.push(JSON.parse(String(raw)) as Record<string, unknown>);
+          messages.push(readServerMessage(raw));
           if (
             messages.some((message) => message.type === 'server-hello') &&
             messages.some((message) => message.type === 'hello/accepted')
@@ -303,8 +321,12 @@ describe('RelayBridgeServer', () => {
       await bridge.start();
 
       const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`, ['webmcp-discovery.v1']);
-      const message = await new Promise<Record<string, unknown>>((resolve, reject) => {
-        ws.once('message', (raw) => resolve(JSON.parse(String(raw)) as Record<string, unknown>));
+      const message = await new Promise<ServerHelloMessage>((resolve, reject) => {
+        ws.once('message', (raw) => {
+          const message = readServerMessage(raw);
+          if (message.type !== 'server-hello') throw new Error('Expected server hello');
+          resolve(message);
+        });
         ws.once('error', reject);
       });
 
@@ -439,7 +461,7 @@ describe('RelayBridgeServer', () => {
       });
 
       ws.on('message', (raw) => {
-        const msg = JSON.parse(String(raw));
+        const msg = readServerMessage(raw);
         if (msg.type !== 'invoke') {
           return;
         }
@@ -451,7 +473,7 @@ describe('RelayBridgeServer', () => {
       const result = await bridge.invokeTool(toolName, {});
 
       expect(result.isError).toBe(true);
-      const text = (result.content?.[0] as { text?: string } | undefined)?.text ?? '';
+      const text = result.content.find((item) => item.type === 'text')?.text ?? '';
       expect(text).toMatch(/Tool returned an invalid result/i);
 
       ws.close();
@@ -533,9 +555,9 @@ describe('RelayBridgeServer', () => {
       const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`, {
         headers: { origin: 'https://evil.example.com' },
       });
-      const rejection = new Promise<Record<string, unknown>>((resolve) => {
+      const rejection = new Promise<RelayHelloRejectedMessage>((resolve) => {
         ws.on('message', (raw) => {
-          const message = JSON.parse(String(raw)) as Record<string, unknown>;
+          const message = readServerMessage(raw);
           if (message.type === 'hello/rejected') resolve(message);
         });
       });
@@ -578,7 +600,7 @@ describe('RelayBridgeServer', () => {
       const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`, 'webmcp-relay.v1', {
         headers: { origin: 'https://evil.example.com' },
       });
-      ws.on('message', (raw) => messages.push(JSON.parse(String(raw))));
+      ws.on('message', (raw) => messages.push(readServerMessage(raw)));
 
       const closeCode = await new Promise<number>((resolve, reject) => {
         ws.once('close', resolve);
@@ -618,9 +640,9 @@ describe('RelayBridgeServer', () => {
 
     try {
       await bridge.start();
-      const messages: Array<Record<string, unknown>> = [];
+      const messages: OutboundMessage[] = [];
       const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`, 'webmcp-relay.v1');
-      ws.on('message', (raw) => messages.push(JSON.parse(String(raw))));
+      ws.on('message', (raw) => messages.push(readServerMessage(raw)));
       await new Promise<void>((resolve, reject) => {
         ws.once('open', resolve);
         ws.once('error', reject);
@@ -790,8 +812,8 @@ describe('RelayBridgeServer', () => {
 
       let pings = 0;
       ws.on('message', (raw) => {
-        const message: unknown = JSON.parse(String(raw));
-        if ((message as { type?: unknown }).type !== 'ping') return;
+        const message = readServerMessage(raw);
+        if (message.type !== 'ping') return;
         pings++;
         ws.send(JSON.stringify({ type: 'pong' }));
       });
@@ -894,7 +916,7 @@ describe('RelayBridgeServer', () => {
       });
 
       ws.on('message', (raw) => {
-        const msg = JSON.parse(String(raw));
+        const msg = readServerMessage(raw);
         if (msg.type !== 'invoke') return;
         ws.send(
           JSON.stringify({
@@ -912,7 +934,7 @@ describe('RelayBridgeServer', () => {
       }
 
       const result = await bridge.invokeTool(toolName, {}, { sourceId: source.sourceId });
-      const text = (result.content?.[0] as { text?: string } | undefined)?.text;
+      const text = result.content.find((item) => item.type === 'text')?.text;
       expect(text).toBe('ok-src');
 
       ws.close();
@@ -939,7 +961,7 @@ describe('RelayBridgeServer', () => {
       });
 
       ws.on('message', (raw) => {
-        const msg = JSON.parse(String(raw));
+        const msg = readServerMessage(raw);
         if (msg.type !== 'invoke') return;
         ws.send(
           JSON.stringify({
@@ -953,7 +975,7 @@ describe('RelayBridgeServer', () => {
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
       const result = await bridge.invokeTool(toolName, {}, { requestTabId: 'tab-rt' });
-      const text = (result.content?.[0] as { text?: string } | undefined)?.text;
+      const text = result.content.find((item) => item.type === 'text')?.text;
       expect(text).toBe('ok-tab');
 
       ws.close();
@@ -1019,7 +1041,7 @@ describe('RelayBridgeServer', () => {
       });
       // The other source tries to spoof invocation messages before the selected source responds.
       ws1.on('message', (raw) => {
-        const msg = JSON.parse(String(raw));
+        const msg = readServerMessage(raw);
         if (msg.type !== 'invoke') return;
         ws2.send(
           JSON.stringify({
@@ -1046,7 +1068,7 @@ describe('RelayBridgeServer', () => {
 
       const invokePromise = bridge.invokeTool(toolAName, {});
       const result = await invokePromise;
-      const text = (result.content?.[0] as { text?: string } | undefined)?.text;
+      const text = result.content.find((item) => item.type === 'text')?.text;
       expect(text).toBe('ok-a');
 
       ws1.close();
@@ -1076,7 +1098,7 @@ describe('RelayBridgeServer', () => {
 
       const received = new Promise<{ type: string }>((resolve) => {
         ws.on('message', (raw) => {
-          const msg = JSON.parse(String(raw));
+          const msg = readServerMessage(raw);
           if (msg.type === 'reload') {
             resolve(msg);
           }
@@ -1296,7 +1318,7 @@ describe('RelayBridgeServer client mode', () => {
 
       // Set up browser source to respond to invocations
       ws.on('message', (raw) => {
-        const msg = JSON.parse(String(raw));
+        const msg = readServerMessage(raw);
         if (msg.type !== 'invoke') return;
         ws.send(
           JSON.stringify({
@@ -1336,7 +1358,7 @@ describe('RelayBridgeServer client mode', () => {
       // Invoke the tool through the client relay
       const toolName = firstClientTool.name;
       const result = await client.invokeTool(toolName, { message: 'hello' });
-      const text = (result.content?.[0] as { text?: string } | undefined)?.text;
+      const text = result.content.find((item) => item.type === 'text')?.text;
       expect(text).toBe('Echo:hello');
 
       ws.close();
@@ -1364,7 +1386,7 @@ describe('RelayBridgeServer client mode', () => {
       });
 
       ws.on('message', (raw) => {
-        const msg = JSON.parse(String(raw));
+        const msg = readServerMessage(raw);
         if (msg.type !== 'invoke') return;
         ws.send(
           JSON.stringify({
@@ -1396,7 +1418,7 @@ describe('RelayBridgeServer client mode', () => {
         result: { content?: unknown[] };
       }>((resolve) => {
         relayClient.on('message', (raw) => {
-          const msg = JSON.parse(String(raw));
+          const msg = readServerMessage(raw);
           if (msg.type === 'relay/result' && msg.callId === 'call-1') {
             resolve(msg);
           }
@@ -1412,7 +1434,7 @@ describe('RelayBridgeServer client mode', () => {
       );
 
       const relayResult = await resultPromise;
-      const text = (relayResult.result.content?.[0] as { text?: string } | undefined)?.text ?? '';
+      const text = relayResult.result.content.find((item) => item.type === 'text')?.text ?? '';
       expect(text).toBe('keys:0');
 
       relayClient.close();
@@ -1817,7 +1839,7 @@ describe('RelayBridgeServer client mode', () => {
 
       // When invoked, respond with a payload that exceeds maxPayloadBytes.
       ws.on('message', (raw) => {
-        const msg = JSON.parse(String(raw));
+        const msg = readServerMessage(raw);
         if (msg.type !== 'invoke') return;
         const oversizedText = 'x'.repeat(1024);
         ws.send(
@@ -1866,7 +1888,7 @@ describe('RelayBridgeServer client mode', () => {
           reject(new Error('Timed out waiting for relay/result'));
         }, 2000);
         relayClient.on('message', (raw) => {
-          const msg = JSON.parse(String(raw));
+          const msg = readServerMessage(raw);
           if (msg.type === 'relay/result' && msg.callId === 'call-missing') {
             clearTimeout(timer);
             resolve(msg);
@@ -1885,7 +1907,7 @@ describe('RelayBridgeServer client mode', () => {
 
       const relayResult = await resultPromise;
       expect(relayResult.result.isError).toBe(true);
-      const text = (relayResult.result.content?.[0] as { text?: string } | undefined)?.text ?? '';
+      const text = relayResult.result.content.find((item) => item.type === 'text')?.text ?? '';
       expect(text).toMatch(/No active browser source provides tool "no_such_tool"/);
 
       relayClient.close();

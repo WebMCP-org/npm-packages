@@ -1,78 +1,68 @@
-import type { WebMCP } from 'webmcp-types';
+import type { JsonObject } from '@mcp-b/webmcp-ts-sdk';
 import { expect, test } from '@playwright/test';
 
-type RegisteredTool = WebMCP.RegisteredTool;
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
 
-type ChromeModelContext = Omit<NonNullable<Document['modelContext']>, 'executeTool'> & {
-  executeTool(
-    tool: RegisteredTool,
-    input: object,
-    options?: { signal?: AbortSignal }
-  ): Promise<unknown>;
-};
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
-function isDirectOrWrappedText(value: unknown, expectedText: string): boolean {
+function parseTextResult(serialized: string): string | undefined {
+  try {
+    const parsed: unknown = JSON.parse(serialized);
+    if (!isJsonObject(parsed) || !Array.isArray(parsed.content)) return undefined;
+    const [first] = parsed.content;
+    if (!isJsonObject(first) || first.type !== 'text' || !isString(first.text)) return undefined;
+    return first.text;
+  } catch {
+    return undefined;
+  }
+}
+
+function isDirectOrWrappedText(value: string | null | undefined, expectedText: string): boolean {
+  if (value === null || value === undefined) return false;
   if (value === expectedText) {
     return true;
   }
-  if (typeof value !== 'string') {
-    return false;
-  }
-  try {
-    const parsed = JSON.parse(value) as {
-      content?: Array<{ type?: string; text?: string }>;
-    };
-    return parsed.content?.[0]?.type === 'text' && parsed.content?.[0]?.text === expectedText;
-  } catch {
-    return false;
-  }
+  return parseTextResult(value) === expectedText;
 }
 
 test.describe('Chrome WebMCP native smoke', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
-      const target = window as Window & {
-        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-        __WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__?: Navigator['modelContext'];
-      };
       const nativeContext = document.modelContext;
       if (!nativeContext) {
         throw new Error('Native WebMCP must be enabled before the MCP-B runtime starts');
       }
-      target.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = nativeContext;
-      target.__WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__ = navigator.modelContext;
+      window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = nativeContext;
     });
     await page.goto('/');
     await expect(page.locator('h1')).toContainText('Web Model Context API E2E Test');
     const capturedNativeContext = await page.evaluate(() =>
-      Boolean(
-        (window as Window & { __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: unknown })
-          .__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__
-      )
+      Boolean(window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__)
     );
     expect(capturedNativeContext).toBe(true);
   });
 
   test('exposes the native document.modelContext surface', async ({ page }) => {
     const surface = await page.evaluate(() => {
-      const raw = window as Window & {
-        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: ChromeModelContext;
-        __WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__?: unknown;
-      };
-      const context = raw.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
-      const activeContext = document.modelContext as
-        | (NonNullable<Document['modelContext']> & { listTools?: unknown })
-        | undefined;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      const activeContext = document.modelContext;
 
       return {
         hasDocumentModelContext: Boolean(context),
         hasRegisterTool: typeof context?.registerTool === 'function',
         hasGetTools: typeof context?.getTools === 'function',
         hasAddEventListener: typeof context?.addEventListener === 'function',
-        executeToolType: typeof context?.executeTool,
-        hasDeprecatedNavigatorAlias:
-          typeof raw.__WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__ !== 'undefined',
-        hasMcpBExtensions: typeof activeContext?.listTools === 'function',
+        executeToolHasValidShape:
+          context?.executeTool === undefined || typeof context.executeTool === 'function',
+        hasDeprecatedNavigatorAlias: 'modelContext' in navigator,
+        hasMcpBExtensions:
+          activeContext !== undefined &&
+          'listTools' in activeContext &&
+          typeof activeContext.listTools === 'function',
       };
     });
 
@@ -80,52 +70,46 @@ test.describe('Chrome WebMCP native smoke', () => {
     expect(surface.hasRegisterTool).toBe(true);
     expect(surface.hasGetTools).toBe(true);
     expect(surface.hasAddEventListener).toBe(true);
-    expect(['function', 'undefined']).toContain(surface.executeToolType);
+    expect(surface.executeToolHasValidShape).toBe(true);
     expect(surface.hasDeprecatedNavigatorAlias).toBe(false);
     expect(surface.hasMcpBExtensions).toBe(true);
   });
 
   test('getTools returns valid RegisteredTool entries for every tool', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context =
-        (
-          window as Window & {
-            __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-          }
-        ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }
 
+      const isString = (value: unknown): value is string => typeof value === 'string';
+      const isJsonObject = (value: unknown): value is JsonObject =>
+        typeof value === 'object' && value !== null && !Array.isArray(value);
       const tools = await context.getTools();
       const invalidEntries: Array<{ index: number; reason: string }> = [];
 
       tools.forEach((tool, index) => {
-        if (typeof tool.name !== 'string' || !tool.name) {
+        if (!isString(tool.name) || !tool.name) {
           invalidEntries.push({ index, reason: 'name' });
         }
-        if (typeof tool.description !== 'string') {
+        if (!isString(tool.description)) {
           invalidEntries.push({ index, reason: 'description' });
         }
-        if (typeof tool.origin !== 'string') {
+        if (!isString(tool.origin)) {
           invalidEntries.push({ index, reason: 'origin' });
         }
-        if (typeof tool.window !== 'object') {
+        if (!tool.window || tool.window.window !== tool.window) {
           invalidEntries.push({ index, reason: 'window' });
         }
         if (tool.inputSchema !== undefined) {
           // An object since webmcp#241; a serialized string from older Chrome.
-          if (typeof tool.inputSchema === 'string') {
+          if (isString(tool.inputSchema)) {
             try {
               JSON.parse(tool.inputSchema);
             } catch {
               invalidEntries.push({ index, reason: 'inputSchema-json' });
             }
-          } else if (
-            typeof tool.inputSchema !== 'object' ||
-            tool.inputSchema === null ||
-            Array.isArray(tool.inputSchema)
-          ) {
+          } else if (!isJsonObject(tool.inputSchema)) {
             invalidEntries.push({ index, reason: 'inputSchema-type' });
           }
         }
@@ -141,12 +125,7 @@ test.describe('Chrome WebMCP native smoke', () => {
 
   test('getTools tracks registerTool signal lifecycle operations', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context =
-        (
-          window as Window & {
-            __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-          }
-        ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }
@@ -201,20 +180,12 @@ test.describe('Chrome WebMCP native smoke', () => {
 
   test('getTools omits inputSchema when registration omits it', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context =
-        (
-          window as Window & {
-            __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-          }
-        ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }
 
-      const nativeContext = context as {
-        registerTool: (tool: unknown, options?: { signal?: AbortSignal }) => Promise<void>;
-        getTools: NonNullable<Document['modelContext']>['getTools'];
-      };
+      const nativeContext = context;
       const noSchemaName = `beta_no_schema_${Date.now()}`;
       const undefinedSchemaName = `beta_undefined_schema_${Date.now()}`;
       const noSchemaController = new AbortController();
@@ -230,17 +201,21 @@ test.describe('Chrome WebMCP native smoke', () => {
         },
         { signal: noSchemaController.signal }
       );
-      await nativeContext.registerTool(
-        {
-          name: undefinedSchemaName,
-          description: 'Undefined schema',
-          inputSchema: undefined,
-          async execute() {
-            return { content: [{ type: 'text', text: 'ok' }] };
-          },
+      const undefinedSchemaTool = {
+        name: undefinedSchemaName,
+        description: 'Undefined schema',
+        async execute() {
+          return { content: [{ type: 'text', text: 'ok' }] };
         },
-        { signal: undefinedSchemaController.signal }
-      );
+      };
+      Object.defineProperty(undefinedSchemaTool, 'inputSchema', {
+        configurable: true,
+        enumerable: true,
+        value: undefined,
+      });
+      await nativeContext.registerTool(undefinedSchemaTool, {
+        signal: undefinedSchemaController.signal,
+      });
 
       try {
         const tools = await nativeContext.getTools();
@@ -248,8 +223,8 @@ test.describe('Chrome WebMCP native smoke', () => {
         const undefinedSchemaTool = tools.find((tool) => tool.name === undefinedSchemaName);
         return {
           missingApi: false,
-          noSchemaType: typeof noSchemaTool?.inputSchema,
-          undefinedSchemaType: typeof undefinedSchemaTool?.inputSchema,
+          noSchemaIsUndefined: noSchemaTool?.inputSchema === undefined,
+          undefinedSchemaIsUndefined: undefinedSchemaTool?.inputSchema === undefined,
         };
       } finally {
         noSchemaController.abort();
@@ -258,19 +233,13 @@ test.describe('Chrome WebMCP native smoke', () => {
     });
 
     expect(result.missingApi).toBe(false);
-    expect(result.noSchemaType).toBe('undefined');
-    expect(result.undefinedSchemaType).toBe('undefined');
+    expect(result.noSchemaIsUndefined).toBe(true);
+    expect(result.undefinedSchemaIsUndefined).toBe(true);
   });
 
   test('executeTool accepts a discovered tool descriptor and object inputs', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = ((
-        window as Window & {
-          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-        }
-      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext) as
-        | ChromeModelContext
-        | undefined;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }
@@ -328,13 +297,7 @@ test.describe('Chrome WebMCP native smoke', () => {
 
   test('executeTool accepts array inputs', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = ((
-        window as Window & {
-          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-        }
-      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext) as
-        | ChromeModelContext
-        | undefined;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }
@@ -383,13 +346,7 @@ test.describe('Chrome WebMCP native smoke', () => {
 
   test('executeTool rejects serialized JSON strings with TypeError', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = ((
-        window as Window & {
-          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-        }
-      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext) as
-        | ChromeModelContext
-        | undefined;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }
@@ -435,13 +392,7 @@ test.describe('Chrome WebMCP native smoke', () => {
 
   test('executeTool rejects primitive inputs with TypeError', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = ((
-        window as Window & {
-          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-        }
-      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext) as
-        | ChromeModelContext
-        | undefined;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }
@@ -487,13 +438,7 @@ test.describe('Chrome WebMCP native smoke', () => {
 
   test('executeTool rejects a stale registered descriptor with UnknownError', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = ((
-        window as Window & {
-          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-        }
-      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext) as
-        | ChromeModelContext
-        | undefined;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }
@@ -554,13 +499,7 @@ test.describe('Chrome WebMCP native smoke', () => {
 
   test('executeTool maps thrown tool invocation failures to UnknownError', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = ((
-        window as Window & {
-          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-        }
-      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext) as
-        | ChromeModelContext
-        | undefined;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }
@@ -621,13 +560,7 @@ test.describe('Chrome WebMCP native smoke', () => {
 
   test('executeTool with aborted signal before call rejects', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = ((
-        window as Window & {
-          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-        }
-      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext) as
-        | ChromeModelContext
-        | undefined;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }
@@ -674,13 +607,7 @@ test.describe('Chrome WebMCP native smoke', () => {
 
   test('executeTool with aborted signal during pending tool rejects', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = ((
-        window as Window & {
-          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-        }
-      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext) as
-        | ChromeModelContext
-        | undefined;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }
@@ -709,14 +636,14 @@ test.describe('Chrome WebMCP native smoke', () => {
           return { missingApi: false, missingExecuteTool: false, missingTool: true };
         }
         const controller = new AbortController();
+        const parseError = (error: unknown): { name: string; message: string } =>
+          error instanceof Error
+            ? { name: error.name, message: error.message }
+            : { name: 'Error', message: String(error) };
         const pending = context
           .executeTool(tool, {}, { signal: controller.signal })
           .then((value) => ({ didThrow: false, value }))
-          .catch((error: unknown) => ({
-            didThrow: true,
-            name: error instanceof Error ? error.name : String(error),
-            message: error instanceof Error ? error.message : String(error),
-          }));
+          .catch((error) => ({ didThrow: true, ...parseError(error) }));
 
         setTimeout(() => controller.abort(), 10);
         return {
@@ -750,12 +677,7 @@ test.describe('Chrome WebMCP native smoke', () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const context =
-        (
-          window as Window & {
-            __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-          }
-        ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }

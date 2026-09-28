@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test';
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -14,8 +14,22 @@ const webMCPFlags = [
   '--enable-experimental-web-platform-features',
   '--enable-features=WebMCPTesting,DevToolsWebMCPSupport',
 ];
+const chromiumUse: NonNullable<PlaywrightTestConfig['use']> = {
+  ...devices['Desktop Chrome'],
+};
+if (chromiumChannel && !chromiumExecutablePath) {
+  chromiumUse.channel = chromiumChannel;
+}
 
-export default defineConfig({
+type ChromiumLaunchOptions = NonNullable<NonNullable<PlaywrightTestConfig['use']>['launchOptions']>;
+const launchOptions: ChromiumLaunchOptions = {};
+if (chromiumExecutablePath) launchOptions.executablePath = chromiumExecutablePath;
+if (enableWebMCPFlags) launchOptions.args = webMCPFlags;
+if (chromiumExecutablePath || enableWebMCPFlags) {
+  chromiumUse.launchOptions = launchOptions;
+}
+
+const config: PlaywrightTestConfig = {
   testDir: './tests',
   /* Run tests in files in parallel */
   fullyParallel: true,
@@ -24,7 +38,6 @@ export default defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
-  ...(process.env.CI ? { workers: 1 } : {}),
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [['html'], ['list'], ...(process.env.CI ? [['github'] as const] : [])],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
@@ -39,21 +52,7 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
-    {
-      name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        ...(chromiumChannel && !chromiumExecutablePath ? { channel: chromiumChannel } : {}),
-        ...(chromiumExecutablePath || enableWebMCPFlags
-          ? {
-              launchOptions: {
-                ...(chromiumExecutablePath ? { executablePath: chromiumExecutablePath } : {}),
-                ...(enableWebMCPFlags ? { args: webMCPFlags } : {}),
-              },
-            }
-          : {}),
-      },
-    },
+    { name: 'chromium', use: chromiumUse },
 
     // Uncomment to test on other browsers
     // {
@@ -75,4 +74,8 @@ export default defineConfig({
     stdout: 'ignore',
     stderr: 'pipe',
   },
-});
+};
+
+if (process.env.CI) config.workers = 1;
+
+export default defineConfig(config);

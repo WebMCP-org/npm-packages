@@ -1,3 +1,4 @@
+import { z } from 'zod/v4';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseConfig, parseHostMessage, startWidgetRuntime } from './widgetRuntime.js';
 
@@ -15,15 +16,24 @@ interface RelayConnection {
 }
 
 interface HostEvent {
-  data: unknown;
+  data: HostEvent['data'];
   origin: string;
   source: unknown;
 }
 
+interface PostedHostMessage {
+  type: string;
+  requestId?: string;
+  args?: unknown;
+  toolName?: unknown;
+}
+
+type ParentPostMessage = (payload: PostedHostMessage, targetOrigin: string) => void;
+
 interface HostWindow {
   addEventListener(type: 'message', listener: (event: HostEvent) => void): void;
-  dispatchMessage(origin: string, data: unknown): void;
-  parentPostMessage: ReturnType<typeof vi.fn>;
+  dispatchMessage(origin: string, data: HostEvent['data']): void;
+  parentPostMessage: ReturnType<typeof vi.fn<ParentPostMessage>>;
 }
 
 interface WidgetTestEnv {
@@ -111,19 +121,11 @@ function restoreGlobal(
     Object.defineProperty(globalThis, key, descriptor);
     return;
   }
-  delete (globalThis as Record<string, unknown>)[key];
+  Reflect.deleteProperty(globalThis, key);
 }
 
-function parseWireData(data: unknown): unknown {
-  if (typeof data !== 'string') {
-    return data;
-  }
-
-  try {
-    return JSON.parse(data);
-  } catch {
-    return data;
-  }
+function parseWireData(data: string) {
+  return z.object({ type: z.string() }).passthrough().parse(JSON.parse(data));
 }
 
 function buildSearch(
@@ -155,7 +157,7 @@ function buildSearch(
 
 function createHostWindow(): HostWindow {
   const listeners = new Set<(event: HostEvent) => void>();
-  const parentPostMessage = vi.fn();
+  const parentPostMessage = vi.fn<ParentPostMessage>();
 
   return {
     addEventListener(type: 'message', listener: (event: HostEvent) => void): void {
@@ -163,32 +165,25 @@ function createHostWindow(): HostWindow {
         listeners.add(listener);
       }
     },
-    dispatchMessage(origin: string, data: unknown): void {
+    dispatchMessage(origin: string, data: HostEvent['data']): void {
       for (const listener of listeners) {
-        listener({ origin, data, source: (globalThis.window as Window).parent });
+        listener({ origin, data, source: globalThis.window.parent });
       }
     },
     parentPostMessage,
   };
 }
 
-function getPostedMessages(
-  env: WidgetTestEnv,
-  type: string
-): Array<{ payload: Record<string, unknown>; targetOrigin: string }> {
+function getPostedMessages(env: WidgetTestEnv, type: string) {
   return env.hostWindow.parentPostMessage.mock.calls
     .map(([payload, targetOrigin]) => ({
-      payload: payload as Record<string, unknown>,
+      payload,
       targetOrigin,
     }))
     .filter(({ payload }) => payload?.type === type);
 }
 
-async function waitForPostedMessage(
-  env: WidgetTestEnv,
-  type: string,
-  index = 0
-): Promise<{ payload: Record<string, unknown>; targetOrigin: string }> {
+async function waitForPostedMessage(env: WidgetTestEnv, type: string, index = 0) {
   await vi.waitFor(() => {
     expect(getPostedMessages(env, type).length).toBeGreaterThan(index);
   });
@@ -265,12 +260,7 @@ function installEnvironment(options?: RelayOptions): WidgetTestEnv {
     socket.open((data) => {
       const payload = parseWireData(data);
       connection.messages.push(payload);
-      if (!payload || typeof payload !== 'object') {
-        return;
-      }
-
-      const message = payload as { type?: unknown };
-      if (message.type !== 'hello') {
+      if (payload.type !== 'hello') {
         return;
       }
 
@@ -389,9 +379,7 @@ describe('parseConfig', () => {
   });
 
   it('reads requestTimeout from __WEBMCP_RELAY_CONFIG global', () => {
-    const g = globalThis as typeof globalThis & {
-      __WEBMCP_RELAY_CONFIG?: Record<string, string>;
-    };
+    const g = globalThis;
     g.__WEBMCP_RELAY_CONFIG = {
       hostOrigin: APP_ORIGIN,
       requestTimeout: '90000',
@@ -400,7 +388,7 @@ describe('parseConfig', () => {
     try {
       expect(parseConfig('')).toMatchObject({ requestTimeoutMs: 90000 });
     } finally {
-      delete g.__WEBMCP_RELAY_CONFIG;
+      Reflect.deleteProperty(g, '__WEBMCP_RELAY_CONFIG');
     }
   });
 
@@ -428,9 +416,7 @@ describe('parseConfig', () => {
   });
 
   it('reads config from __WEBMCP_RELAY_CONFIG global when URL params are empty', () => {
-    const g = globalThis as typeof globalThis & {
-      __WEBMCP_RELAY_CONFIG?: Record<string, string>;
-    };
+    const g = globalThis;
     g.__WEBMCP_RELAY_CONFIG = {
       hostOrigin: APP_ORIGIN,
       hostTitle: 'Blob Widget',
@@ -454,14 +440,12 @@ describe('parseConfig', () => {
         tabId: 'blob-tab-1',
       });
     } finally {
-      delete g.__WEBMCP_RELAY_CONFIG;
+      Reflect.deleteProperty(g, '__WEBMCP_RELAY_CONFIG');
     }
   });
 
   it('prefers URL params over __WEBMCP_RELAY_CONFIG global', () => {
-    const g = globalThis as typeof globalThis & {
-      __WEBMCP_RELAY_CONFIG?: Record<string, string>;
-    };
+    const g = globalThis;
     g.__WEBMCP_RELAY_CONFIG = {
       hostOrigin: 'https://global.example.com',
       hostTitle: 'From Global',
@@ -488,7 +472,7 @@ describe('parseConfig', () => {
         tabId: 'url-tab',
       });
     } finally {
-      delete g.__WEBMCP_RELAY_CONFIG;
+      Reflect.deleteProperty(g, '__WEBMCP_RELAY_CONFIG');
     }
   });
 });
@@ -974,7 +958,7 @@ describe('widget runtime', () => {
 });
 
 describe('dormant reconnection', () => {
-  type Listener = (event: unknown) => void;
+  type Listener = (event: Event | HostEvent) => void;
 
   let savedWebSocket: typeof WebSocket;
   let wsUrls: string[];
@@ -1073,7 +1057,11 @@ describe('dormant reconnection', () => {
       wsUrls.push(socket.url);
       socket.fail();
     };
-    globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket;
+    Object.defineProperty(globalThis, 'WebSocket', {
+      configurable: true,
+      writable: true,
+      value: MockWebSocket,
+    });
   });
 
   afterEach(() => {
@@ -1134,10 +1122,10 @@ describe('dormant reconnection', () => {
 
     wsUrls.length = 0;
     for (const fn of env.winListeners.get('message') ?? []) {
-      (fn as (event: { origin: string; data: unknown; source: unknown }) => void)({
+      fn({
         origin: APP_ORIGIN,
         data: { type: 'webmcp.connect' },
-        source: (globalThis.window as Window).parent,
+        source: globalThis.window.parent,
       });
     }
     await vi.advanceTimersByTimeAsync(500);

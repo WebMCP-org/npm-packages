@@ -41,9 +41,10 @@ the test stops testing `registerTool`.
 When an E2E test does this:
 
 ```ts
-const testing = navigator.modelContextTesting as unknown as {
-  executeTool: (name: string, inputArgsJson: string) => Promise<string | null>;
-};
+const executeTool = document.modelContext.executeTool as unknown as (
+  name: string,
+  inputJson: string
+) => Promise<string | null>;
 ```
 
 the test stops proving that our browser API is typed correctly.
@@ -68,9 +69,10 @@ Examples of banned patterns:
 ```ts
 const registerTool = mc.registerTool as unknown as (tool: unknown) => Promise<void>;
 const ctx = document.modelContext as { listTools: () => unknown[] };
-const testing = navigator.modelContextTesting as unknown as {
-  executeTool: (name: string, inputArgsJson: string) => Promise<string | null>;
-};
+const executeTool = document.modelContext.executeTool as unknown as (
+  name: string,
+  inputJson: string
+) => Promise<string | null>;
 ```
 
 ### 2. No local redefinition of public boundaries
@@ -78,8 +80,6 @@ const testing = navigator.modelContextTesting as unknown as {
 Do not locally invent weaker versions of:
 
 - `document.modelContext`
-- `navigator.modelContext` (deprecated alias, still a public boundary)
-- `navigator.modelContextTesting`
 - `window`
 - `globalThis`
 - public tool or transport signatures
@@ -93,7 +93,6 @@ Bad:
 ```ts
 const mc = document.modelContext;
 const registerTool = mc.registerTool;
-const testing = navigator.modelContextTesting;
 ```
 
 Preferred:
@@ -107,7 +106,9 @@ await document.modelContext.registerTool({
   },
 });
 
-await navigator.modelContextTesting?.executeTool('ping', '{}');
+const ping = (await document.modelContext.getTools()).find((tool) => tool.name === 'ping');
+if (!ping) throw new Error('ping is not registered');
+await document.modelContext.executeTool(ping, {});
 ```
 
 Use the direct path so the code clearly exercises the real public surface.
@@ -147,17 +148,17 @@ E2E code is not exempt.
 Do not cast inside `page.evaluate(...)` to reach globals. Do not assign repo-owned globals to intermediate variables just to make access easier. Instead:
 
 1. define the global type in the relevant test project
-2. augment `Window`, `Navigator`, or `globalThis`
+2. augment `Window` or `globalThis` for test-owned properties; import upstream types for `Document`
 3. read the global directly
 
 Bad:
 
 ```ts
 const result = await page.evaluate(() => {
-  const testing = navigator.modelContextTesting as unknown as {
-    listTools: () => unknown[];
+  const context = document.modelContext as unknown as {
+    getTools: () => Promise<unknown[]>;
   };
-  return testing.listTools();
+  return context.getTools();
 });
 ```
 
@@ -165,7 +166,7 @@ Good direction:
 
 ```ts
 const result = await page.evaluate(() => {
-  return navigator.modelContextTesting?.listTools();
+  return document.modelContext.getTools();
 });
 ```
 
@@ -173,7 +174,7 @@ with the global declared in a `.d.ts` file owned by the test project.
 
 ### 5. Extension access requires narrowing, not casting
 
-`Navigator['modelContext']` is intentionally strict core.
+`Document['modelContext']` is intentionally strict core.
 
 If code needs MCP-B extension methods, use a real type guard or the owning package's extension type surface. Do not cast the core global to an extension shape.
 
@@ -230,16 +231,16 @@ If the test is about runtime behavior, use the runtime we publish.
 
 - use `@mcp-b/webmcp-polyfill` when testing strict core runtime behavior
 - use `@mcp-b/global` when testing MCP-B runtime and extension behavior
-- the polyfill installs `document.modelContext`; `@mcp-b/global` owns the deprecated `navigator.modelContext` alias and `navigator.modelContextTesting`
+- the polyfill installs `document.modelContext`; `@mcp-b/global` wraps it with MCP-B extensions
 
 Do not manually assign globals in runtime tests when the package under test already owns that setup.
 
 Bad:
 
 ```ts
-Object.defineProperty(navigator, 'modelContextTesting', {
+Object.defineProperty(document, 'modelContext', {
   configurable: true,
-  value: fakeTestingApi,
+  value: fakeModelContext,
 });
 ```
 
@@ -249,7 +250,9 @@ Preferred:
 import { initializeWebModelContext } from '@mcp-b/global';
 
 initializeWebModelContext();
-await navigator.modelContextTesting?.executeTool('ping', '{}');
+const ping = (await document.modelContext.getTools()).find((tool) => tool.name === 'ping');
+if (!ping) throw new Error('ping is not registered');
+await document.modelContext.executeTool(ping, {});
 ```
 
 Manual global installation is only acceptable in narrow contract tests where the point of the test is the type surface itself, not runtime behavior.
@@ -258,7 +261,7 @@ Manual global installation is only acceptable in narrow contract tests where the
 
 For browser test projects and examples:
 
-- add or update `.d.ts` files for `Window`, `Navigator`, and `globalThis`
+- add or update `.d.ts` files for test-owned `Window` and `globalThis` properties
 - keep the declaration next to the owning runtime or test project
 - make the test compile without per-call casts
 
@@ -266,32 +269,7 @@ For browser test projects and examples:
 
 If a helper installs globals or builds fixtures, the helper itself must be correctly typed.
 
-Bad:
-
-```ts
-function installTestingApi(testing: unknown) {
-  (navigator as any).modelContextTesting = testing;
-}
-```
-
-Good direction:
-
-```ts
-declare global {
-  interface Navigator {
-    modelContextTesting?: ModelContextTesting;
-  }
-}
-
-function installTestingApi(testing: ModelContextTesting) {
-  Object.defineProperty(navigator, 'modelContextTesting', {
-    configurable: true,
-    value: testing,
-  });
-}
-```
-
-Use this pattern only for narrow contract tests. For runtime tests, import the actual polyfill/runtime package instead.
+Use upstream `WebMCP.ModelContext` for context fixtures instead of redeclaring its methods. Import the actual polyfill/runtime package for runtime tests; reserve manual installation for tests of the installation boundary itself.
 
 ### 5. Use declaration-preserving schema definitions
 
@@ -345,7 +323,7 @@ Fix it so the nearest example matches the canonical package story:
   `@mcp-b/webmcp-ts-sdk`
 - `@mcp-b/webmcp-polyfill` installs strict core runtime globals
 - `@mcp-b/global` installs MCP-B runtime/extension globals
-- native Chromium tests use the real `document.modelContext.getTools()` surface and feature-detect Chrome's descriptor-based `executeTool()` extension; compatibility-shim coverage is kept in a separate lane
+- native Chromium tests use the real `document.modelContext.getTools()` and object-input `executeTool()` surfaces
 
 When you encounter local code that manually wires globals, casts to extension shapes, or invents helper aliases around repo-owned boundaries, do not normalize it. Update the code or docs so the local example teaches the same contract as the package docs.
 

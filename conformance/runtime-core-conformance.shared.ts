@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import type { ModelContext, WebMCP } from '@mcp-b/webmcp-ts-sdk';
+import type { WebMCP } from '@mcp-b/webmcp-ts-sdk';
 
 type ModelContextTool = WebMCP.ModelContextTool;
 
@@ -23,19 +23,12 @@ function uniqueToolName(prefix: string): string {
   return `${prefix}_${String(Date.now())}_${String(Math.random()).slice(2)}`;
 }
 
-function requireModelContext(): ModelContext {
+function requireModelContext(): NonNullable<Document['modelContext']> {
   const modelContext = document.modelContext;
   if (!modelContext) {
     throw new Error('Expected document.modelContext to be available');
   }
-  return modelContext as unknown as ModelContext;
-}
-
-function requireExecuteTool(modelContext: ModelContext) {
-  if (!modelContext.executeTool) {
-    throw new Error('Expected document.modelContext.executeTool to be available');
-  }
-  return modelContext.executeTool.bind(modelContext);
+  return modelContext;
 }
 
 async function listToolNames(): Promise<string[]> {
@@ -80,41 +73,8 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
     it('does not expose removed context APIs', () => {
       const modelContext = requireModelContext();
 
-      expect(typeof Reflect.get(modelContext, 'provideContext')).toBe('undefined');
-      expect(typeof Reflect.get(modelContext, 'clearContext')).toBe('undefined');
-    });
-
-    it('exposes document.modelContext as canonical surface with navigator compatibility alias', async () => {
-      const modelContext = requireModelContext();
-      const navigatorAlias = navigator.modelContext;
-      const toolName = uniqueToolName('canonical_alias_case');
-
-      expect(navigatorAlias).toBe(modelContext);
-      if (!navigatorAlias) {
-        throw new Error('Expected navigator.modelContext compatibility alias');
-      }
-
-      await registerAbortableTool({
-        name: toolName,
-        description: 'Canonical document surface tool',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'alias-ok' }] };
-        },
-      });
-
-      const documentTool = (await modelContext.getTools()).find((tool) => tool.name === toolName);
-      const navigatorTool = (await navigatorAlias.getTools()).find(
-        (tool) => tool.name === toolName
-      );
-      expect(documentTool).toBeDefined();
-      if (!navigatorTool) {
-        throw new Error(`Expected navigator.modelContext.getTools() to return ${toolName}`);
-      }
-
-      const serialized = await requireExecuteTool(navigatorAlias)(navigatorTool, {});
-      expect(serialized).toEqual(expect.any(String));
-      expect(serialized).toContain('alias-ok');
+      expect('provideContext' in modelContext).toBe(false);
+      expect('clearContext' in modelContext).toBe(false);
     });
 
     it('registerTool resolves undefined and duplicate names reject', async () => {
@@ -154,7 +114,7 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
 
       const tool = (await modelContext.getTools()).find((candidate) => candidate.name === toolName);
       if (!tool) throw new Error(`Expected getTools() to return ${toolName}`);
-      const serialized = await requireExecuteTool(modelContext)(tool, {});
+      const serialized = await modelContext.executeTool(tool, {});
       expect(serialized).toEqual(expect.any(String));
       expect(serialized).toContain('ok');
 
@@ -192,7 +152,9 @@ export function runRuntimeCoreConformanceSuite(options: RuntimeCoreConformanceOp
       const tool = tools.find((candidate) => candidate.name === toolName);
       if (!tool) throw new Error(`Expected getTools() to return ${toolName}`);
 
-      const serialized = await requireExecuteTool(modelContext)(tool, { value: 9 });
+      const serialized = await modelContext.executeTool(tool, {
+        value: 9,
+      });
       expect(serialized).toEqual(expect.any(String));
       expect(serialized).toContain('producer:9');
     });

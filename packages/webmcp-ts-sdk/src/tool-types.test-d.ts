@@ -1,3 +1,4 @@
+import type { WebMcpToolObjectInput } from './common.js';
 import { expectTypeOf, test } from 'vitest';
 import type {
   CallToolResult,
@@ -32,28 +33,26 @@ test('the standard callback accepts synchronous and asynchronous results', () =>
 
   expectTypeOf(syncTool.execute).returns.toEqualTypeOf<MaybePromise<number>>();
   expectTypeOf(asyncTool.execute).returns.toEqualTypeOf<MaybePromise<number>>();
-  expectTypeOf<Parameters<ModelContextTool['execute']>['length']>().toEqualTypeOf<1 | 2>();
+  expectTypeOf<Parameters<ModelContextTool['execute']>['length']>().toEqualTypeOf<2>();
 });
 
-test('the execute options bag is optional and carries the cancellation signal', () => {
+test('the execute options bag carries the cancellation signal', () => {
   const cancellable: ModelContextTool<{ value: number }, number> = {
     name: 'cancellable',
-    description: 'Reads the signal when the platform passes one',
-    execute: ({ value }, options) => (options?.signal.aborted ? -1 : value),
+    description: 'Reads the cancellation signal',
+    execute: ({ value }, options) => (options.signal.aborted ? -1 : value),
   };
 
-  expectTypeOf(cancellable.execute)
-    .parameter(1)
-    .toEqualTypeOf<ToolExecuteCallbackOptions | undefined>();
+  expectTypeOf(cancellable.execute).parameter(1).toEqualTypeOf<ToolExecuteCallbackOptions>();
   expectTypeOf<ToolExecuteCallbackOptions['signal']>().toEqualTypeOf<AbortSignal>();
 });
 
 test('the MCP-B descriptor keeps the standard callback shape', () => {
-  expectTypeOf<ToolDescriptor['execute']>().parameter(0).toEqualTypeOf<Record<string, unknown>>();
+  expectTypeOf<ToolDescriptor['execute']>().parameter(0).toEqualTypeOf<WebMcpToolObjectInput>();
   expectTypeOf<ToolDescriptor['execute']>()
     .parameter(1)
-    .toEqualTypeOf<ToolExecuteCallbackOptions | undefined>();
-  expectTypeOf<Parameters<ToolDescriptor['execute']>['length']>().toEqualTypeOf<1 | 2>();
+    .toEqualTypeOf<ToolExecuteCallbackOptions>();
+  expectTypeOf<Parameters<ToolDescriptor['execute']>['length']>().toEqualTypeOf<2>();
   expectTypeOf<ToolDescriptor['execute']>().returns.toEqualTypeOf<unknown>();
 });
 

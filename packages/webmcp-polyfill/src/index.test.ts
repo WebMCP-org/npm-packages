@@ -1,12 +1,9 @@
-import type { WebMCP } from 'webmcp-types';
 import { expect, it } from 'vitest';
-import { initializeWebMCPPolyfill, installWebMCP } from './index.js';
+import { installWebMCP } from './index.js';
 
-it('exposes the upstream installer and keeps the legacy initializer as an alias', async () => {
-  expect(initializeWebMCPPolyfill).toBe(installWebMCP);
-
+it('installs the upstream object-input API idempotently', async () => {
   installWebMCP();
-  const context = document.modelContext as WebMCP.ModelContext | undefined;
+  const context = document.modelContext;
   expect(context).toBeDefined();
 
   installWebMCP();
@@ -18,7 +15,12 @@ it('exposes the upstream installer and keeps the legacy initializer as an alias'
     {
       name: 'upstream_core_smoke',
       description: 'Exercises object-input execution from the upstream WebMCP polyfill',
-      execute: (input) => (input as { value: number }).value + 1,
+      execute: (input) => {
+        if (!('value' in input) || !Number.isFinite(input.value)) {
+          throw new TypeError('Expected a finite value');
+        }
+        return Number(input.value) + 1;
+      },
     },
     { signal: controller.signal }
   );

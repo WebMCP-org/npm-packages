@@ -1,21 +1,5 @@
-import type { InputSchema, ModelContext, RegisteredTool } from '@mcp-b/webmcp-ts-sdk';
+import type { JsonObject, JsonValue, RegisteredTool } from '@mcp-b/webmcp-ts-sdk';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-
-/**
- * An object since webmcp#241 (Chrome 154.0.8013); the native runner also spans
- * Chrome 152-154 builds that still return the serialized string, so both
- * generations resolve here.
- */
-function requireObjectInputSchema(tool: RegisteredTool): InputSchema {
-  const raw: unknown =
-    typeof tool.inputSchema === 'string' ? JSON.parse(tool.inputSchema) : tool.inputSchema;
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-    throw new Error(
-      `Expected ${tool.name} to expose a JSON Schema inputSchema, got ${JSON.stringify(raw)}`
-    );
-  }
-  return raw as InputSchema;
-}
 
 interface DeclarativeFormConformanceOptions {
   suiteName: string;
@@ -30,10 +14,10 @@ const FIXTURE_ATTRIBUTE = 'data-webmcp-declarative-conformance';
  * WebMCP is optional in browser runtimes. This suite runs after `install()`, so
  * absence is a harness failure rather than a supported state.
  */
-function requireModelContext(): ModelContext {
+function requireModelContext(): NonNullable<Document['modelContext']> {
   const modelContext = document.modelContext;
   if (!modelContext) throw new Error('Expected document.modelContext to be installed');
-  return modelContext as unknown as ModelContext;
+  return modelContext;
 }
 
 /**
@@ -47,6 +31,12 @@ function requireModelContext(): ModelContext {
 function submitRespondWith(event: SubmitEvent, agentResponse: Promise<unknown>): void {
   if (!event.respondWith) throw new Error('Expected SubmitEvent.respondWith to be installed');
   event.respondWith(agentResponse);
+}
+
+function isToolActivatedEvent(event: Event): event is Event & { toolName: string } {
+  return (
+    event.type === 'toolactivated' && 'toolName' in event && typeof event.toolName === 'string'
+  );
 }
 
 async function waitForTool(
@@ -81,7 +71,7 @@ async function waitForCondition(
   throw new Error(message);
 }
 
-async function executeTool(tool: RegisteredTool, input: Record<string, unknown>): Promise<unknown> {
+async function executeTool(tool: RegisteredTool, input: JsonObject): Promise<JsonValue | null> {
   const modelContext = requireModelContext();
   if (!modelContext.executeTool)
     throw new Error('Expected executeTool for declarative conformance');
@@ -134,7 +124,7 @@ export function runDeclarativeFormConformanceSuite(
         title: 'Search',
         description: 'Search the catalog',
       });
-      expect(requireObjectInputSchema(tool)).toEqual({
+      expect(tool.inputSchema).toEqual({
         type: 'object',
         properties: {
           query: { type: 'string', description: 'The search query' },
@@ -165,7 +155,7 @@ export function runDeclarativeFormConformanceSuite(
       const tool = await waitForTool(name);
 
       expect(tool.description).toBe('Search from a component');
-      expect(requireObjectInputSchema(tool)).toMatchObject({
+      expect(tool.inputSchema).toMatchObject({
         properties: { query: { type: 'string', description: 'Search query' } },
       });
     });
@@ -193,7 +183,7 @@ export function runDeclarativeFormConformanceSuite(
       );
 
       const tool = await waitForTool(name);
-      expect(requireObjectInputSchema(tool)).toEqual({
+      expect(tool.inputSchema).toEqual({
         type: 'object',
         properties: {
           invalid_pattern: { type: 'string' },
@@ -248,18 +238,28 @@ export function runDeclarativeFormConformanceSuite(
         `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
       );
       if (!form) throw new Error('Expected clobbering declarative form fixture');
-      Reflect.apply(EventTarget.prototype.addEventListener, form, [
+      EventTarget.prototype.addEventListener.call(
+        form,
         'submit',
         (event: Event) => {
           if (!(event instanceof SubmitEvent)) return;
           event.preventDefault();
           submitRespondWith(event, Promise.resolve('clobber-ok'));
         },
-        { once: true },
-      ]);
+        { once: true }
+      );
 
       const tool = await waitForTool(name);
-      const properties = requireObjectInputSchema(tool).properties ?? {};
+      const schema = tool.inputSchema;
+      if (
+        !schema ||
+        !('properties' in schema) ||
+        !schema.properties ||
+        typeof schema.properties !== 'object'
+      ) {
+        throw new Error('Expected an object properties schema');
+      }
+      const properties = schema.properties;
 
       expect(Object.keys(properties)).toEqual(parameterNames);
       expect(Object.hasOwn(properties, '__proto__')).toBe(true);
@@ -427,7 +427,7 @@ export function runDeclarativeFormConformanceSuite(
       window.addEventListener(
         'toolactivated',
         (event) => {
-          if (Reflect.get(event, 'toolName') === name) events.push('activated');
+          if (isToolActivatedEvent(event) && event.toolName === name) events.push('activated');
         },
         { once: true }
       );
@@ -601,7 +601,7 @@ export function runDeclarativeFormConformanceSuite(
       let activatedWithValue = '';
       let activatedWithFocusedSubmitter = false;
       const onActivated = (event: Event) => {
-        if (Reflect.get(event, 'toolName') !== name) return;
+        if (!isToolActivatedEvent(event) || event.toolName !== name) return;
         activatedWithValue = input.value;
         activatedWithFocusedSubmitter = document.activeElement === button;
       };
@@ -781,7 +781,7 @@ export function runDeclarativeFormConformanceSuite(
 
       const updated = await waitForTool(name, (tool) => tool.description === 'Updated form');
       expect(updated.title).toBe('Updated title');
-      expect(requireObjectInputSchema(updated)).toEqual({
+      expect(updated.inputSchema).toEqual({
         type: 'object',
         properties: {
           limit: {

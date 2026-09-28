@@ -1,3 +1,4 @@
+import { isTcpAddress } from './portStrategy.js';
 import { type ChildProcess, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
@@ -90,7 +91,7 @@ const RUNTIME_CASES: RuntimeCase[] = [
   },
 ];
 
-function jsonForInlineScript(value: unknown): string {
+function jsonForInlineScript(value: RuntimeMode): string {
   return JSON.stringify(value).replaceAll('<', '\\u003c');
 }
 
@@ -107,11 +108,12 @@ function buildBridgeFixtureScript(): string {
 
     const makeDescriptor = (tool) => ({
       name: tool.name,
+      title: tool.title ?? '',
       ...(tool.name === 'sum'
         ? { title: 'Add numbers', annotations: { readOnlyHint: true } }
         : {}),
       description: tool.description ?? '',
-      inputSchema: JSON.stringify(tool.inputSchema ?? { type: 'object', properties: {} }),
+      inputSchema: tool.inputSchema ?? { type: 'object', properties: {} },
       window,
       origin: location.origin,
       __execute: tool.execute,
@@ -166,7 +168,7 @@ function buildBridgeFixtureScript(): string {
       }
       const result = await descriptor.__execute(inputObject);
       if (descriptor.name === 'sum') {
-        return result.content[0].text;
+        return JSON.stringify(result.content[0].text);
       }
       return JSON.stringify(result);
     };
@@ -177,7 +179,6 @@ function buildBridgeFixtureScript(): string {
       configurable: true,
       value: context,
     });
-    delete navigator.modelContext;
 
     window.__WEBMCP_RELAY_FIXTURE__ = {
       snapshot: () => ({ ...counts }),
@@ -261,7 +262,7 @@ async function startHttpServer(
   });
 
   const address = server.address();
-  if (!address || typeof address === 'string') {
+  if (!isTcpAddress(address)) {
     throw new Error('Expected server to bind to an IP address');
   }
 
@@ -289,7 +290,7 @@ async function getOpenPort(): Promise<number> {
   });
 
   const address = holder.address();
-  if (!address || typeof address === 'string') {
+  if (!isTcpAddress(address)) {
     throw new Error('Expected holder server to bind to an IP address');
   }
 
@@ -318,27 +319,8 @@ async function waitForValue<T>(
   throw new Error(`Timed out after ${timeoutMs}ms`);
 }
 
-function contentTextItems(result: unknown): string[] {
-  const content =
-    typeof result === 'object' && result !== null && 'content' in result
-      ? Reflect.get(result, 'content')
-      : undefined;
-  if (!Array.isArray(content)) {
-    return [];
-  }
-  return content
-    .map((item) => {
-      if (!item || typeof item !== 'object') {
-        return undefined;
-      }
-      const text = Reflect.get(item, 'text');
-      return typeof text === 'string' ? text : undefined;
-    })
-    .filter((text): text is string => typeof text === 'string');
-}
-
-function firstContentText(result: unknown): string {
-  return contentTextItems(result)[0] ?? '';
+function firstContentText(result: Awaited<ReturnType<Client['callTool']>>): string {
+  return result.content.find((item) => item.type === 'text')?.text ?? '';
 }
 
 function buildHostPageHtml(options: {
@@ -407,11 +389,11 @@ function buildHostPageHtml(options: {
 
 function formatE2EError(
   label: string,
-  error: unknown,
+  cause: unknown,
   harness: Pick<E2EHarness, 'pageErrors' | 'pageConsole' | 'relayLogs'> | null,
   extraLogs: string[] = []
 ): Error {
-  const errorMsg = String(error instanceof Error ? error.message : error);
+  const errorMsg = String(cause instanceof Error ? cause.message : cause);
 
   if (!harness) {
     return new Error(`E2E failure (${label}): ${errorMsg}`);

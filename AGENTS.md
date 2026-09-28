@@ -80,7 +80,7 @@ the Diataxis framework.
 
 ### Commit Scopes
 
-Package scopes: `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-extension`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`
+Package scopes: `global`, `mcp-iframe`, `react-webmcp`, `smart-dom-reader`, `transports`, `usewebmcp`, `webmcp-extension`, `webmcp-local-relay`, `webmcp-polyfill`, `webmcp-ts-sdk`, `webmcp-types`
 
 Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
@@ -89,14 +89,10 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 ### WebMCP Proposal APIs
 
 - `document.modelContext` is the canonical current-draft WebMCP surface.
-- `navigator.modelContext` and `navigator.modelContextTesting` are MCP-B
-  compatibility surfaces owned by `@mcp-b/global`, not by the upstream core
-  polyfill.
-- The current Community Group draft and current Chrome (verified in the m152
-  native lane) accept an input object in `executeTool()`. Older Chrome accepts
-  serialized JSON; select `nativeExecuteToolInput: 'json'` for those contexts.
-  MCP-B retains a string-input overload for compatibility. Check the live draft
-  and package source before documenting it.
+- `executeTool()` accepts an input object and returns JSON-serialized output, as
+  defined by upstream `webmcp-types` and the polyfill. Legacy string input and
+  navigator aliases have been removed in this major release.
+- Check the live draft and package source before documenting browser behavior.
 - New examples and public documentation use `document.modelContext`.
 
 ### Package Layering
@@ -115,8 +111,7 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 ├─────────────────────────────────────────────────────┤
 │  @mcp-b/webmcp-polyfill                             │
 │  Bundles upstream webmachinelearning/webmcp-polyfill │
-│  at the pinned Git revision. Exposes installWebMCP()  │
-│  and a deprecated initializer alias.                 │
+│  at the pinned Git revision. Exposes installWebMCP().  │
 │  Standard WebMCP core only; no MCP-B extensions.      │
 ├─────────────────────────────────────────────────────┤
 │  Native browser API (if available)                   │
@@ -126,26 +121,25 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 ### Initialization Flow (`@mcp-b/global`)
 
-1. **Polyfill:** Preserve existing native/preinstalled contexts. Otherwise call `installWebMCP()` from `@mcp-b/webmcp-polyfill`. That package bundles the upstream source at the commit recorded in `packages/webmcp-polyfill/package.json`; `initializeWebMCPPolyfill()` remains as a deprecated alias. MCP-B declarative forms, navigator aliases, the testing shim, and `outputSchema` belong to `@mcp-b/global`.
-2. **Capture native:** A reference to the current document-first context is saved as `native`.
-3. **BrowserMcpServer:** Created with `{ native }`, so browser-facing tool registrations mirror down to the underlying context and native tools are reconciled through `getTools()`.
-4. **Replace:** Both compatibility surfaces expose the `BrowserMcpServer` instance, which adds `registerPrompt`, `registerResource`, `listTools`, and other MCP-B extensions. Browser-shaped execution uses `getTools()` plus feature-detected `executeTool(tool, inputObject)`.
+1. **Polyfill:** Preserve existing native/preinstalled contexts. Otherwise call `installWebMCP()` from `@mcp-b/webmcp-polyfill`. That package bundles the upstream source at the commit recorded in `packages/webmcp-polyfill/package.json`. MCP-B declarative forms and `outputSchema` belong to `@mcp-b/global`.
+2. **Capture native:** A reference to the current document context is saved as `native`.
+3. **BrowserMcpServer:** Uses the page's context by default, installing the upstream polyfill when needed. Global passes its captured `{ native }` explicitly. Browser-facing tool registrations mirror down to that context and native tools are reconciled through `getTools()`.
+4. **Replace:** `document.modelContext` exposes the `BrowserMcpServer` instance, which adds `registerPrompt`, `registerResource`, `listTools`, and other MCP-B extensions. Browser-shaped execution uses `getTools()` plus `executeTool(tool, inputObject)`.
 5. **Cleanup:** `cleanupWebModelContext()` restores the original native/polyfill context.
 
 ### What Lives Where
 
-| Method / capability        | Current draft | `@mcp-b/webmcp-polyfill` |   `@mcp-b/global` / BrowserMcpServer    |
-| -------------------------- | :-----------: | :----------------------: | :-------------------------------------: |
-| `registerTool()`           |       Y       |            Y             |           Y (mirrors to core)           |
-| `getTools()`               |       Y       |            Y             |          Y (delegates to core)          |
-| `ontoolchange`             |       Y       |            Y             |                    Y                    |
-| `executeTool(tool, input)` |  Y (object)   |        Y (object)        | Y (object and JSON compatibility input) |
-| MCP-B declarative forms    |       -       |            -             |                    Y                    |
-| Navigator alias/testing    |       -       |            -             |                    Y                    |
-| `outputSchema`             |       -       |            -             |                    Y                    |
-| `registerPrompt()`         |       -       |            -             |                    Y                    |
-| `registerResource()`       |       -       |            -             |                    Y                    |
-| `listTools()`              |       -       |            -             |                    Y                    |
+| Method / capability        | Current draft | `@mcp-b/webmcp-polyfill` | `@mcp-b/global` / BrowserMcpServer |
+| -------------------------- | :-----------: | :----------------------: | :--------------------------------: |
+| `registerTool()`           |       Y       |            Y             |        Y (mirrors to core)         |
+| `getTools()`               |       Y       |            Y             |       Y (delegates to core)        |
+| `ontoolchange`             |       Y       |            Y             |                 Y                  |
+| `executeTool(tool, input)` |  Y (object)   |        Y (object)        |             Y (object)             |
+| MCP-B declarative forms    |       -       |            -             |                 Y                  |
+| `outputSchema`             |       -       |            -             |                 Y                  |
+| `registerPrompt()`         |       -       |            -             |                 Y                  |
+| `registerResource()`       |       -       |            -             |                 Y                  |
+| `listTools()`              |       -       |            -             |                 Y                  |
 
 ### Extension Integration (`@mcp-b/webmcp-extension`)
 
@@ -158,6 +152,8 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 - Upstream `webmcp-types` owns the WebMCP browser contracts and `document.modelContext`
   declaration.
+- `@mcp-b/webmcp-types` forwards upstream exports for existing package consumers;
+  new code imports `webmcp-types` directly. Both legacy core packages are temporary aliases.
 - `@mcp-b/webmcp-ts-sdk` owns MCP-B adapter and extension contracts plus schema helpers.
 - `@mcp-b/global` declares the MCP-B globals that its runtime installs.
 

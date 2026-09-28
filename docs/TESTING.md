@@ -116,10 +116,7 @@ This lane keeps direct runtime and demo validation for:
 
 - `e2e/tests/tab-transport.spec.ts`
 - `e2e/tests/mcp-iframe-element.spec.ts`
-- `e2e/tests/chromium-native-api.spec.ts` (historical filename; explicitly
-  tests MCP-B extensions and the deprecated `modelContextTesting`
-  compatibility shim)
-- `e2e/tests/notification-batching.spec.ts`
+
 - `e2e/tests/chrome-beta-webmcp.spec.ts`
 - `e2e/playwright-native-showcase.config.ts`
 

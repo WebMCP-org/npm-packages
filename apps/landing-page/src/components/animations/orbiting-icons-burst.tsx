@@ -31,16 +31,8 @@ function renderIcon(icon: ReactNode | OrbitingIconName | undefined, className: s
     return null;
   }
 
-  if (typeof icon !== 'string') {
-    return icon;
-  }
-
-  switch (icon) {
-    case 'vercel':
-      return <Icons.vercel className={className} />;
-    default:
-      return null;
-  }
+  if (icon === 'vercel') return <Icons.vercel className={className} />;
+  return icon;
 }
 
 export function OrbitingIconsBurst({
@@ -70,17 +62,15 @@ export function OrbitingIconsBurst({
     };
   });
 
-  const itemsGroupedByRay = normalizedItems.reduce(
-    (acc, item) => {
-      if (!acc[item.normalizedRay]) {
-        acc[item.normalizedRay] = [];
-      }
-      acc[item.normalizedRay].push(item);
-      acc[item.normalizedRay].sort((a, b) => a.distance - b.distance);
-      return acc;
-    },
-    {} as Record<number, Array<(typeof normalizedItems)[number]>>
-  );
+  const itemsGroupedByRay = new Map<number, Array<(typeof normalizedItems)[number]>>();
+  for (const item of normalizedItems) {
+    const ray = itemsGroupedByRay.get(item.normalizedRay) ?? [];
+    ray.push(item);
+    itemsGroupedByRay.set(item.normalizedRay, ray);
+  }
+  for (const ray of itemsGroupedByRay.values()) {
+    ray.sort((a, b) => a.distance - b.distance);
+  }
 
   return (
     <div
@@ -115,7 +105,7 @@ export function OrbitingIconsBurst({
       {/* Connecting Lines - Render first so they appear behind icons */}
       {showConnectingLines &&
         rays.map((ray) => {
-          const itemsOnRay = itemsGroupedByRay[ray.id] ?? [];
+          const itemsOnRay = itemsGroupedByRay.get(ray.id) ?? [];
           const nearestItem = itemsOnRay[0];
 
           return (

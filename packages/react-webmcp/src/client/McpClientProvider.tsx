@@ -412,8 +412,8 @@ export function McpClientProvider({
       providerCloseRef.current = closeToken;
       closePromiseRef.current = client
         .close()
-        .catch((error: unknown) => {
-          console.error('[ReactWebMCP:McpClientProvider]', 'Failed to close MCP client:', error);
+        .catch((cause: unknown) => {
+          console.error('[ReactWebMCP:McpClientProvider]', 'Failed to close MCP client:', cause);
         })
         .finally(() => {
           if (providerCloseRef.current === closeToken) {

@@ -21,6 +21,8 @@ const SELECTORS = {
   COUNTER_EXECUTIONS: '[data-testid="counter-executions"]',
 } as const;
 
+type TestToolArguments = { amount: number } | { postId: string };
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -77,7 +79,7 @@ async function listToolNames(page: Page): Promise<string[]> {
 async function callToolViaClient(
   page: Page,
   toolName: string,
-  args: Record<string, unknown>
+  args: TestToolArguments
 ): Promise<void> {
   await page.evaluate(
     async ({ name, arguments_ }) => {
@@ -134,16 +136,14 @@ test.describe('Production Build - Runtime Integration Tests', () => {
 
   test('exposes MCP-B extensions over the WebMCP runtime', async ({ page }) => {
     const apiCheck = await page.evaluate(() => {
-      const context = document.modelContext as
-        | (NonNullable<Document['modelContext']> & { listTools?: unknown })
-        | undefined;
-      const testing = navigator.modelContextTesting;
+      const context = document.modelContext;
       return {
         hasContext: Boolean(context),
         hasGetTools: typeof context?.getTools === 'function',
-        hasMcpBListTools: typeof context?.listTools === 'function',
-        hasTestingListTools: typeof testing?.listTools === 'function',
-        hasTestingExecuteTool: typeof testing?.executeTool === 'function',
+        hasMcpBListTools:
+          context !== undefined &&
+          'listTools' in context &&
+          typeof context.listTools === 'function',
       };
     });
 
@@ -151,8 +151,6 @@ test.describe('Production Build - Runtime Integration Tests', () => {
       hasContext: true,
       hasGetTools: true,
       hasMcpBListTools: true,
-      hasTestingListTools: true,
-      hasTestingExecuteTool: true,
     });
   });
 

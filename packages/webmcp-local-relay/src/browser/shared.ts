@@ -1,3 +1,5 @@
+import { z } from 'zod/v4';
+import type { WebMcpToolObjectInput } from '@mcp-b/webmcp-ts-sdk';
 /**
  * Shared browser utilities for the relay embed and widget.
  *
@@ -15,8 +17,15 @@ export const RELAY_ENDPOINT_CACHE_KEY = '__webmcp_relay_endpoint';
 /**
  * Checks if a value is a plain JSON object (not null, not an array).
  */
-export function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+const JsonObjectSchema = z.record(z.string(), z.unknown());
+
+export function isJsonObject(value: unknown): value is WebMcpToolObjectInput {
+  return parseJsonObject(value) !== undefined;
+}
+
+export function parseJsonObject(value: unknown): WebMcpToolObjectInput | undefined {
+  const parsed = JsonObjectSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
 }
 
 /**
@@ -36,7 +45,7 @@ export function createRequestId(): string {
 /**
  * Normalizes user-controlled values before writing them to plain-text logs.
  */
-export function sanitizeLogText(value: unknown): string {
+export function sanitizeLogText(value: string | number): string {
   return String(value).replace(/[\r\n]/g, '');
 }
 

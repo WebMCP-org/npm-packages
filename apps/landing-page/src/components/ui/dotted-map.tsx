@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/preserve-manual-memoization */
 import * as React from 'react';
 import { createMap } from 'svg-dotted-map';
 
@@ -7,15 +6,6 @@ import { cn } from '@/lib/utils';
 interface Marker {
   lat: number;
   lng: number;
-  size?: number;
-}
-
-interface MapPoint {
-  x: number;
-  y: number;
-}
-
-interface ProcessedMarker extends MapPoint {
   size?: number;
 }
 
@@ -41,20 +31,16 @@ export function DottedMap({
   className,
   style,
 }: DottedMapProps) {
-  const { points, addMarkers } = createMap({
-    width,
-    height,
-    mapSamples,
-  }) as {
-    points: MapPoint[];
-    addMarkers: (markers: Marker[]) => ProcessedMarker[];
-  };
+  const map = React.useMemo(
+    () => createMap({ width, height, mapSamples }),
+    [width, height, mapSamples]
+  );
 
-  const processedMarkers = addMarkers(markers);
+  const processedMarkers = map.addMarkers(markers);
 
   // Compute stagger helpers in a single, simple pass
   const { xStep, yToRowIndex } = React.useMemo(() => {
-    const sorted = [...points].sort((a, b) => a.y - b.y || a.x - b.x);
+    const sorted = [...map.points].sort((a, b) => a.y - b.y || a.x - b.x);
     const rowMap = new Map<number, number>();
     let step = 0;
     let prevY = Number.NaN;
@@ -75,7 +61,7 @@ export function DottedMap({
     }
 
     return { xStep: step || 1, yToRowIndex: rowMap };
-  }, [points]);
+  }, [map.points]);
 
   return (
     <svg
@@ -83,7 +69,7 @@ export function DottedMap({
       className={cn('text-gray-500 dark:text-gray-500', className)}
       style={{ width: '100%', height: '100%', ...style }}
     >
-      {points.map((point, index) => {
+      {map.points.map((point, index) => {
         const rowIndex = yToRowIndex.get(point.y) ?? 0;
         const offsetX = stagger && rowIndex % 2 === 1 ? xStep / 2 : 0;
         return (

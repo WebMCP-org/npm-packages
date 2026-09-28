@@ -1,3 +1,6 @@
+import type { StandardJSONSchemaV1 } from '@standard-schema/spec';
+import type { WebMCP } from 'webmcp-types';
+
 export type {
   CallToolResult,
   ContentBlock,
@@ -7,15 +10,18 @@ export type {
 } from '@modelcontextprotocol/server';
 
 /** JSON Schema object accepted at the WebMCP boundary. */
-export interface InputSchema {
+type StandardJsonSchemaObject = ReturnType<StandardJSONSchemaV1.Converter['input']>;
+
+export interface InputSchema extends StandardJsonSchemaObject {
   type?: unknown;
-  properties?: Readonly<Record<string, unknown>> | undefined;
+  properties?: Readonly<StandardJsonSchemaObject> | undefined;
   required?: readonly string[] | undefined;
-  [keyword: string]: unknown;
 }
 
-/** Values accepted by WebMCP tool callbacks. */
-export type WebMcpToolInput = Record<string, unknown> | unknown[];
+/** Object or array values accepted at the WebMCP runtime boundary. */
+export type WebMcpToolObjectInput = Parameters<WebMCP.ToolExecuteCallback>[0];
+export type WebMcpToolInput = WebMcpToolObjectInput | unknown[];
+export type WebMcpToolResult = Awaited<ReturnType<WebMCP.ToolExecuteCallback>>;
 
 /** Handle returned by MCP-B registration helpers. */
 export interface RegistrationHandle {

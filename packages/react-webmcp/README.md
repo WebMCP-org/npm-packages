@@ -52,7 +52,7 @@ Native WebMCP and the standalone polyfill do not advertise MCP `outputSchema` me
 ## Compare hooks
 
 Use `usewebmcp` for raw browser tools. This package adds MCP responses, prompts, resources,
-and client hooks. Both share registration, validation, execution state, and cancellation.
+and client hooks. Both share registration, execution state, and cancellation.
 
 [Performance comparison](https://docs.mcp-b.ai/packages/usewebmcp/overview#performance-comparison) ·
 [Feature matrix](https://docs.mcp-b.ai/packages/usewebmcp/overview#feature-comparison)
@@ -65,7 +65,7 @@ and client hooks. Both share registration, validation, execution state, and canc
 - Local execution and React state retain your value. Agent calls receive MCP formatting; `formatOutput` can override it.
 - `formatError` defaults to an MCP response with `isError: true`. Async formatters are awaited; local failures and cancellation always reject.
 
-[Input example](../usewebmcp/README.md#validate-input-with-your-schema-library) ·
+[Input example](#mcp-breact-webmcp) ·
 [Schema guide](https://docs.mcp-b.ai/how-to/use-schemas-and-structured-output) ·
 [Output reference](https://docs.mcp-b.ai/packages/react-webmcp/reference#schema-compatibility)
 
@@ -111,7 +111,7 @@ Wrap your UI in `McpClientProvider`, supplying stable client and transport insta
 ## State and lifecycle
 
 The tool hook returns `state`, `execute`, `reset`, `isSupported`, and `registrationError`.
-`isRegistered` was removed from tool hooks; use the runtime’s `getTools()` for discovery.
+Use the runtime’s `getTools()` to confirm registration; `isSupported` only reports API availability.
 Prompt and resource hooks retain `isRegistered`.
 Use `enabled: false` to unregister, and the handler's `{ signal }` for cancellation.
 React 18/19, SSR, StrictMode, and `'use client'` are supported.

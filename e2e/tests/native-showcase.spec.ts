@@ -1,19 +1,12 @@
 import { expect, type Page, test } from '@playwright/test';
 
-type ChromeModelContext = NonNullable<Document['modelContext']>;
-
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    const target = window as Window & {
-      __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-      __WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__?: Navigator['modelContext'];
-    };
     const nativeContext = document.modelContext;
     if (!nativeContext) {
       throw new Error('Native document.modelContext must exist before the showcase starts');
     }
-    target.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = nativeContext;
-    target.__WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__ = navigator.modelContext;
+    window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = nativeContext;
   });
 });
 
@@ -33,12 +26,7 @@ async function waitForIframeReady(page: Page): Promise<void> {
 
 async function getToolNames(page: Page): Promise<string[]> {
   return page.evaluate(async () => {
-    const context =
-      (
-        window as Window & {
-          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-        }
-      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+    const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
     if (!context) throw new Error('document.modelContext is unavailable');
     return (await context.getTools()).map((tool) => tool.name);
   });
@@ -83,22 +71,16 @@ test.describe('Native API Detection', () => {
     await openShowcase(page);
 
     const surface = await page.evaluate(() => {
-      const captured = window as Window & {
-        __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: ChromeModelContext;
-        __WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__?: Navigator['modelContext'];
-        __WEBMCP_SHOWCASE_RAW_SURFACE__?: Record<string, boolean>;
-      };
-      const context = captured.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
-
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
       return {
         hasModelContext: Boolean(context),
         hasRegisterTool: typeof context?.registerTool === 'function',
         hasGetTools: typeof context?.getTools === 'function',
         hasAddEventListener: typeof context?.addEventListener === 'function',
-        executeToolType: typeof context?.executeTool,
-        hasDeprecatedNavigatorAlias:
-          typeof captured.__WEBMCP_RAW_NAVIGATOR_MODEL_CONTEXT__ !== 'undefined',
-        rawSurface: captured.__WEBMCP_SHOWCASE_RAW_SURFACE__,
+        executeToolHasValidShape:
+          context?.executeTool === undefined || typeof context.executeTool === 'function',
+        hasDeprecatedNavigatorAlias: 'modelContext' in navigator,
+        rawSurface: window.__WEBMCP_SHOWCASE_RAW_SURFACE__,
       };
     });
 
@@ -106,7 +88,7 @@ test.describe('Native API Detection', () => {
     expect(surface.hasRegisterTool).toBe(true);
     expect(surface.hasGetTools).toBe(true);
     expect(surface.hasAddEventListener).toBe(true);
-    expect(['function', 'undefined']).toContain(surface.executeToolType);
+    expect(surface.executeToolHasValidShape).toBe(true);
     expect(surface.hasDeprecatedNavigatorAlias).toBe(false);
     expect(surface.rawSurface).toMatchObject({
       hasModelContext: true,
@@ -121,9 +103,7 @@ test.describe('Native API Detection', () => {
     await openShowcase(page);
 
     const implementation = await page.evaluate(() => {
-      const rawContext = (
-        window as Window & { __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'] }
-      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      const rawContext = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
       return {
         hasRawContext: Boolean(rawContext),
         remainsActive: rawContext === document.modelContext,
@@ -202,12 +182,7 @@ test.describe('Native API Semantics', () => {
 
   test('registerTool exposes registered tools and abort cleanup removes them', async ({ page }) => {
     const state = await page.evaluate(async () => {
-      const context =
-        (
-          window as Window & {
-            __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-          }
-        ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }
@@ -269,12 +244,7 @@ test.describe('Native API Semantics', () => {
 
   test('multiple registered tools clean up through AbortSignal', async ({ page }) => {
     const state = await page.evaluate(async () => {
-      const context =
-        (
-          window as Window & {
-            __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-          }
-        ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }
@@ -336,13 +306,7 @@ test.describe('Native API Semantics', () => {
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const context = ((
-        window as Window & {
-          __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: Document['modelContext'];
-        }
-      ).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext) as
-        | ChromeModelContext
-        | undefined;
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
       if (!context) {
         return { missingApi: true };
       }

@@ -1,5 +1,6 @@
-import type { InputSchema, WebMcpToolInput } from './common.js';
+import type { InputSchema, WebMcpToolObjectInput } from './common.js';
 import type { JsonSchemaType as McpJsonSchema } from '@modelcontextprotocol/server';
+import type { WebMCP } from 'webmcp-types';
 
 /** JSON Schema Draft 2020-12 accepted by the inference helpers. */
 export type JsonSchemaForInference = McpJsonSchema;
@@ -11,7 +12,7 @@ type EmptyObject = Record<never, never>;
 type ConstValue<TSchema> = TSchema extends { const: infer TValue } ? TValue : never;
 type EnumValue<TSchema> = TSchema extends { enum: readonly (infer TValue)[] } ? TValue : never;
 type Properties<TSchema> = TSchema extends {
-  properties: infer TProperties extends Readonly<Record<string, unknown>>;
+  properties: infer TProperties extends NonNullable<InputSchema['properties']>;
 }
   ? TProperties
   : EmptyObject;
@@ -28,8 +29,8 @@ type AdditionalProperties<TSchema> = TSchema extends { additionalProperties: fal
   : keyof Properties<TSchema> extends never
     ? TSchema extends { additionalProperties: infer TAdditional extends object }
       ? Record<string, InferJsonSchema<TAdditional>>
-      : Record<string, unknown>
-    : Record<string, unknown>;
+      : WebMcpToolObjectInput
+    : WebMcpToolObjectInput;
 
 type InferObject<TSchema> = Simplify<
   {
@@ -87,9 +88,7 @@ export type InferJsonSchema<TSchema> = TSchema extends false
           : EnumValue<TSchema>
         : ConstValue<TSchema>;
 
-/** Infers the object or array passed to a WebMCP tool callback. */
-export type InferArgsFromInputSchema<TSchema> = [
-  Extract<Exclude<InferJsonSchema<TSchema>, null | undefined>, WebMcpToolInput>,
-] extends [never]
-  ? WebMcpToolInput
-  : Extract<Exclude<InferJsonSchema<TSchema>, null | undefined>, WebMcpToolInput>;
+/** Uses WebMCP's schema inference for the callback input. */
+export type InferArgsFromInputSchema<TSchema extends object> = Parameters<
+  WebMCP.ModelContextToolFromSchema<TSchema>['execute']
+>[0];

@@ -56,7 +56,9 @@
     "@changesets/cli": "^2.29.8",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
+    "@oxlint/plugins": "catalog:",
     "jiti": "^2.6.1",
+    "oxlint": "catalog:",
     "syncpack": "^13.0.0",
     "vite-plus": "catalog:"
   },

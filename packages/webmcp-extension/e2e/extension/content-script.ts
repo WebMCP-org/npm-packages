@@ -86,7 +86,7 @@ async function run(): Promise<void> {
   );
   let sawDynamicTool = false;
   let resolveDynamicRemoval!: () => void;
-  let rejectDynamicRemoval!: (reason: unknown) => void;
+  let rejectDynamicRemoval!: (reason: Error) => void;
   const dynamicRemoval = new Promise<void>((resolve, reject) => {
     resolveDynamicRemoval = resolve;
     rejectDynamicRemoval = reject;
@@ -126,7 +126,7 @@ async function run(): Promise<void> {
         );
         document.documentElement.dataset.webmcpExtensionBfcacheRestored = 'true';
       })
-      .catch((error: unknown) => {
+      .catch((error) => {
         document.documentElement.dataset.webmcpExtensionError =
           error instanceof Error ? error.message : String(error);
       });

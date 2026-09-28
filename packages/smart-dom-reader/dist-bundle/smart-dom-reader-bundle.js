@@ -136,30 +136,20 @@ var SmartDOMReaderBundle = (function (exports) {
      * Detect page landmarks
      */
     static detectLandmarks(doc) {
-      const landmarks = {
-        navigation: [],
-        main: [],
-        complementary: [],
-        contentinfo: [],
-        banner: [],
-        search: [],
-        form: [],
-        region: [],
+      return {
+        navigation: Array.from(doc.querySelectorAll('nav, [role="navigation"]')),
+        main: Array.from(doc.querySelectorAll('main, [role="main"]')),
+        complementary: Array.from(doc.querySelectorAll('aside, [role="complementary"]')),
+        contentinfo: Array.from(doc.querySelectorAll('footer, [role="contentinfo"]')),
+        banner: Array.from(doc.querySelectorAll('header, [role="banner"]')),
+        search: Array.from(doc.querySelectorAll('[role="search"]')),
+        form: Array.from(
+          doc.querySelectorAll('form[aria-label], form[aria-labelledby], [role="form"]')
+        ),
+        region: Array.from(
+          doc.querySelectorAll('section[aria-label], section[aria-labelledby], [role="region"]')
+        ),
       };
-      for (const [landmark, selector] of Object.entries({
-        navigation: 'nav, [role="navigation"]',
-        main: 'main, [role="main"]',
-        complementary: 'aside, [role="complementary"]',
-        contentinfo: 'footer, [role="contentinfo"]',
-        banner: 'header, [role="banner"]',
-        search: '[role="search"]',
-        form: 'form[aria-label], form[aria-labelledby], [role="form"]',
-        region: 'section[aria-label], section[aria-labelledby], [role="region"]',
-      })) {
-        const elements = doc.querySelectorAll(selector);
-        landmarks[landmark] = Array.from(elements);
-      }
-      return landmarks;
     }
   };
   //#endregion
@@ -390,8 +380,8 @@ var SmartDOMReaderBundle = (function (exports) {
         const tag = current.nodeName.toLowerCase();
         let descriptor = tag;
         if (current.id) descriptor = `${tag}#${current.id}`;
-        else if (current.className && typeof current.className === 'string') {
-          const firstClass = current.className.split(' ')[0];
+        else {
+          const firstClass = current.getAttribute('class')?.split(' ')[0];
           if (firstClass) descriptor = `${tag}.${firstClass}`;
         }
         const role = current.getAttribute('role');
@@ -486,11 +476,9 @@ var SmartDOMReaderBundle = (function (exports) {
         for (const [attr, value] of Object.entries(filter.attributeValues)) {
           const attrValue = element.getAttribute(attr);
           if (!attrValue) return false;
-          if (typeof value === 'string') {
-            if (attrValue !== value) return false;
-          } else if (value instanceof RegExp) {
+          if (value instanceof RegExp) {
             if (!value.test(attrValue)) return false;
-          }
+          } else if (attrValue !== value) return false;
         }
       if (filter.withinSelectors?.length) {
         let isWithin = false;
@@ -631,21 +619,25 @@ var SmartDOMReaderBundle = (function (exports) {
      * Get interaction information for an element (compact format)
      */
     static getInteractionInfo(element) {
-      const htmlElement = element;
       const interaction = {};
+      const view = element.ownerDocument.defaultView ?? window;
       if (
-        htmlElement.onclick ||
+        ('onclick' in element && element.onclick) ||
         element.getAttribute('onclick') ||
         element.matches('button, a[href], [role="button"], [tabindex]:not([tabindex="-1"])')
       )
         interaction.click = true;
       if (
-        htmlElement.onchange ||
+        ('onchange' in element && element.onchange) ||
         element.getAttribute('onchange') ||
         element.matches('input, select, textarea')
       )
         interaction.change = true;
-      if (htmlElement.onsubmit || element.getAttribute('onsubmit') || element.matches('form'))
+      if (
+        ('onsubmit' in element && element.onsubmit) ||
+        element.getAttribute('onsubmit') ||
+        element.matches('form')
+      )
         interaction.submit = true;
       if (element.matches('a[href], button[type="submit"]')) interaction.nav = true;
       if (element.hasAttribute('disabled') || element.getAttribute('aria-disabled') === 'true')
@@ -654,7 +646,13 @@ var SmartDOMReaderBundle = (function (exports) {
       const ariaRole = element.getAttribute('role');
       if (ariaRole) interaction.role = ariaRole;
       if (element.matches('input, textarea, select, button')) {
-        const form = element.form || element.closest('form');
+        const form =
+          (element instanceof view.HTMLInputElement ||
+          element instanceof view.HTMLTextAreaElement ||
+          element instanceof view.HTMLSelectElement ||
+          element instanceof view.HTMLButtonElement
+            ? element.form
+            : null) || element.closest('form');
         if (form) interaction.form = SelectorGenerator.generateSelectors(form).css;
       }
       return interaction;
@@ -663,11 +661,14 @@ var SmartDOMReaderBundle = (function (exports) {
      * Get text content of an element (limited length)
      */
     static getElementText(element, options) {
-      if (element.matches('input, textarea')) {
-        const input = element;
-        return input.value || input.placeholder || '';
-      }
-      if (element.matches('img')) return element.alt || '';
+      const view = element.ownerDocument.defaultView ?? window;
+      if (element.matches('input, textarea'))
+        return element instanceof view.HTMLInputElement ||
+          element instanceof view.HTMLTextAreaElement
+          ? element.value || element.placeholder || ''
+          : '';
+      if (element.matches('img'))
+        return element instanceof view.HTMLImageElement ? element.alt || '' : '';
       const text = element.textContent?.trim() || '';
       const maxLength = options?.textTruncateLength;
       if (maxLength && text.length > maxLength) return `${text.substring(0, maxLength)}...`;
@@ -1068,8 +1069,7 @@ var SmartDOMReaderBundle = (function (exports) {
   }
   function renderInteractive(inter, opts) {
     const parts = [];
-    const limit = (arr) =>
-      typeof opts?.maxElements === 'number' ? arr.slice(0, opts.maxElements) : arr;
+    const limit = (arr) => (opts?.maxElements !== void 0 ? arr.slice(0, opts.maxElements) : arr);
     if (inter.buttons.length) {
       parts.push('Buttons:');
       for (const el of limit(inter.buttons)) parts.push(elementLine(el, opts));
@@ -1204,8 +1204,7 @@ var SmartDOMReaderBundle = (function (exports) {
         lines.push('');
       }
       if (content.text.paragraphs?.length) {
-        const limit =
-          typeof opts.maxElements === 'number' ? opts.maxElements : content.text.paragraphs.length;
+        const limit = opts.maxElements ?? content.text.paragraphs.length;
         lines.push('Paragraphs:');
         for (const p of content.text.paragraphs.slice(0, limit))
           lines.push(`- ${truncate(p, opts.maxTextLength ?? 200)}`);
@@ -1215,7 +1214,7 @@ var SmartDOMReaderBundle = (function (exports) {
         lines.push('Lists:');
         for (const list of content.text.lists) {
           lines.push(`- ${list.type.toUpperCase()}:`);
-          const limit = typeof opts.maxElements === 'number' ? opts.maxElements : list.items.length;
+          const limit = opts.maxElements ?? list.items.length;
           for (const item of list.items.slice(0, limit))
             lines.push(`  - ${truncate(item, opts.maxTextLength ?? 120)}`);
         }
@@ -1225,15 +1224,14 @@ var SmartDOMReaderBundle = (function (exports) {
         lines.push('Tables:');
         for (const t of content.tables) {
           lines.push(`- Headers: ${t.headers.join(' | ')}`);
-          const limit = typeof opts.maxElements === 'number' ? opts.maxElements : t.rows.length;
+          const limit = opts.maxElements ?? t.rows.length;
           for (const row of t.rows.slice(0, limit)) lines.push(`  - ${row.join(' | ')}`);
         }
         lines.push('');
       }
       if (content.media?.length) {
         lines.push('Media:');
-        const limit =
-          typeof opts.maxElements === 'number' ? opts.maxElements : content.media.length;
+        const limit = opts.maxElements ?? content.media.length;
         for (const m of content.media.slice(0, limit))
           lines.push(
             `- ${m.type.toUpperCase()}: ${m.alt ?? ''} ${m.src ? `→ ${m.src}` : ''}`.trim()
@@ -1338,7 +1336,7 @@ var SmartDOMReaderBundle = (function (exports) {
       if (options.includeLists !== false) {
         const lists = element.querySelectorAll('ul, ol');
         result.text.lists = Array.from(lists).map((list) => ({
-          type: list.tagName.toLowerCase(),
+          type: list.tagName.toLowerCase() === 'ul' ? 'ul' : 'ol',
           items: Array.from(list.querySelectorAll('li')).map((li) =>
             ProgressiveExtractor.getTextContent(li, options.maxTextLength)
           ),
@@ -1548,7 +1546,7 @@ var SmartDOMReaderBundle = (function (exports) {
       throw new Error(`Cannot access iframe: ${frameSelector}`);
     return iframe.contentDocument;
   }
-  function executeExtraction(method, args) {
+  function executeExtraction(...[method, args]) {
     try {
       let result;
       switch (method) {

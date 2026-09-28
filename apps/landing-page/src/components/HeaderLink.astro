@@ -1,11 +1,11 @@
 ---
 import type { HTMLAttributes } from 'astro/types';
 
-type Props = HTMLAttributes<'a'>;
+type Props = HTMLAttributes<'a'> & { href: string };
 
 const { href, class: className, ...props } = Astro.props;
 const pathname = Astro.url.pathname.replace(/\/$/, '');
-const hrefNormalized = (href as string).replace(/\/$/, '');
+const hrefNormalized = href.replace(/\/$/, '');
 const isActive =
   pathname === hrefNormalized ||
   (hrefNormalized !== '' && pathname.startsWith(hrefNormalized));

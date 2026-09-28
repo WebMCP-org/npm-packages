@@ -1,14 +1,11 @@
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 
 export { cleanupWebModelContext, initializeWebModelContext };
+export type { WebMCP } from '@mcp-b/webmcp-polyfill';
 
-export type {
-  ModelContextTesting,
-  TransportConfiguration,
-  WebModelContextInitOptions,
-} from './types.js';
+export type { TransportConfiguration, WebModelContextInitOptions } from './types.js';
 
-if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+if (globalThis.window !== undefined && globalThis.document !== undefined) {
   const options = window.__webModelContextOptions;
   const shouldAutoInitialize = options?.autoInitialize !== false;
 

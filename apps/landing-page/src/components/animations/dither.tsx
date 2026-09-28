@@ -340,8 +340,6 @@ export function Dither({
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const updateTheme = () => {
       setIsDark(document.documentElement.classList.contains('dark') || mediaQuery.matches);

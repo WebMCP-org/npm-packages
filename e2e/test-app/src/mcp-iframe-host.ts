@@ -2,9 +2,15 @@ import '@mcp-b/global';
 
 import { TabClientTransport } from '@mcp-b/transports';
 import { normalizeToolResponse } from '@mcp-b/webmcp-ts-sdk/schema';
-import type { MCPIframeElement } from '@mcp-b/mcp-iframe/element';
-import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
-import { Client, UriTemplate, type Variables } from '@modelcontextprotocol/client';
+import { MCPIframeElement } from '@mcp-b/mcp-iframe/element';
+import { type JsonObject, type RegisteredTool } from '@mcp-b/webmcp-ts-sdk';
+import {
+  Client,
+  UriTemplate,
+  type GetPromptResult,
+  type Variables,
+} from '@modelcontextprotocol/client';
+import { requireBrowserMcpServer } from './browser-mcp-server.js';
 
 const useCustomTag = new URLSearchParams(location.search).has('custom');
 const tagName = useCustomTag ? 'custom-mcp-iframe' : 'mcp-iframe';
@@ -16,13 +22,13 @@ if (useCustomTag) {
   await import('@mcp-b/mcp-iframe');
 }
 
-const modelContext = document.modelContext as BrowserMcpServer;
+const modelContext = requireBrowserMcpServer();
 const mcpClient = new Client(
   { name: 'mcp-iframe-e2e-client', version: '1.0.0' },
   { versionNegotiation: { mode: 'auto' } }
 );
 const mcpClientReady = mcpClient.connect(new TabClientTransport({ targetOrigin: location.origin }));
-const mcpIframe = document.createElement(tagName) as MCPIframeElement;
+const mcpIframe = createMcpIframeElement(tagName);
 mcpIframe.id = 'child-iframe';
 mcpIframe.setAttribute('src', '/iframe-child.html');
 mcpIframe.setAttribute('width', '640');
@@ -37,12 +43,12 @@ mcpIframe.addEventListener('mcp-iframe-error', (event) => {
   document.body.dataset.error = String(event.detail.error);
 });
 
-async function callTool(name: string, args: Record<string, unknown>) {
+async function callTool(name: string, args: JsonObject) {
   const tool = (await modelContext.getTools()).find(
     (candidate) => candidate.name === `${mcpIframe.itemPrefix}${name}`
   );
   if (!tool) throw new Error(`Tool not found: ${name}`);
-  const result = await modelContext.executeTool(tool, JSON.stringify(args));
+  const result = await modelContext.executeTool(tool, args);
   if (result === null) throw new Error('Tool execution was interrupted');
   return normalizeToolResponse(JSON.parse(result));
 }
@@ -74,6 +80,14 @@ function addCollidingChildResources(): void {
   child.addCollidingResources();
 }
 
+function createMcpIframeElement(tagName: string): MCPIframeElement {
+  const element = document.createElement(tagName);
+  if (!(element instanceof MCPIframeElement)) {
+    throw new Error(`Expected <${tagName}> to be registered as an MCPIframeElement`);
+  }
+  return element;
+}
+
 declare global {
   interface Window {
     mcpIframeHost: {
@@ -82,8 +96,8 @@ declare global {
       callTool: typeof callTool;
       readResource: typeof readResource;
       readResourceTemplate: typeof readResourceTemplate;
-      getPrompt: (name: string, args: Record<string, string>) => Promise<unknown>;
-      getParentTool: (name: string) => Promise<unknown>;
+      getPrompt: (name: string, args: Record<string, string>) => Promise<GetPromptResult>;
+      getParentTool: (name: string) => Promise<RegisteredTool | undefined>;
       setDynamicItems: typeof setDynamicItems;
       stopChildRuntime: typeof stopChildRuntime;
     };

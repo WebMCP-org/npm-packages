@@ -1,21 +1,34 @@
 import { initializeWebModelContext } from '@mcp-b/global';
-import type { CallToolResult, ChromeModelContext, ModelContext } from '@mcp-b/webmcp-ts-sdk';
+import { CallToolResultSchema } from '@modelcontextprotocol/core';
+import type {
+  CallToolResult,
+  BrowserMcpServer,
+  JsonObject,
+  ModelContext,
+} from '@mcp-b/webmcp-ts-sdk';
 import { StrictMode, createElement } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { z } from 'zod';
 import { useWebMCP } from './useWebMCP.js';
 
-const TEST_CHANNEL_ID = `usewebmcp-browser-${Date.now()}`;
-
-function hasDescriptorExecution(context: ModelContext): context is ChromeModelContext {
-  return 'executeTool' in context && typeof context.executeTool === 'function';
+interface CircularOutput {
+  self?: CircularOutput;
+  ok?: boolean;
 }
 
-async function executeRegisteredTool(
-  name: string,
-  args: Record<string, unknown> = {}
-): Promise<CallToolResult> {
+const TEST_CHANNEL_ID = `usewebmcp-browser-${Date.now()}`;
+
+type ExecutableModelContext = Omit<ModelContext, 'executeTool'> &
+  Pick<BrowserMcpServer, 'executeTool'>;
+
+function hasDescriptorExecution(
+  context: ModelContext | undefined
+): context is ExecutableModelContext {
+  return context !== undefined && typeof context.executeTool === 'function';
+}
+
+async function executeRegisteredTool(name: string, args: JsonObject = {}): Promise<CallToolResult> {
   const modelContext = document.modelContext;
   if (!hasDescriptorExecution(modelContext)) {
     throw new Error('Chrome descriptor execution is unavailable');
@@ -26,12 +39,12 @@ async function executeRegisteredTool(
     throw new Error(`Tool not found: ${name}`);
   }
 
-  const serialized = await modelContext.executeTool(tool, JSON.stringify(args));
+  const serialized = await modelContext.executeTool(tool, args);
   if (serialized === null) {
     throw new Error(`Tool execution was interrupted: ${name}`);
   }
 
-  return JSON.parse(serialized) as CallToolResult;
+  return CallToolResultSchema.parse(JSON.parse(serialized));
 }
 
 async function findTool(name: string) {
@@ -120,14 +133,14 @@ describe('useWebMCP in a browser runtime', () => {
   });
 
   it('records non-serializable schema output as an execution error', async () => {
-    const cyclic: { self?: unknown } = {};
+    const cyclic: CircularOutput = {};
     cyclic.self = cyclic;
     const { act, result } = await renderHook(() =>
       useWebMCP({
         name: 'browser_invalid_output',
         description: 'Returns invalid structured output',
         outputSchema: { type: 'object', properties: { ok: { type: 'boolean' } } } as const,
-        execute: async () => cyclic as { ok?: boolean },
+        execute: async () => cyclic,
       })
     );
 

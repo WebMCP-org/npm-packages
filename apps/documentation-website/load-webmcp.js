@@ -128,8 +128,8 @@
     document.head.appendChild(script);
   };
 
-  if (typeof requestIdleCallback === 'function') {
-    requestIdleCallback(load);
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(load);
   } else {
     setTimeout(load, 0);
   }

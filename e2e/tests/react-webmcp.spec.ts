@@ -607,7 +607,28 @@ test.describe('React WebMCP Combined Hook Tests', () => {
 // ============================================================================
 
 /** Shape the test app's `counter_get` tool declares in its outputSchema. */
-type CounterOutput = { counter?: number; timestamp?: string };
+type CounterOutput = { counter: number; timestamp: string };
+
+/** Validate the untrusted structured content returned by the MCP client. */
+function isCounterOutput(value: unknown): value is CounterOutput {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    'counter' in value &&
+    typeof value.counter === 'number' &&
+    'timestamp' in value &&
+    typeof value.timestamp === 'string'
+  );
+}
+
+function parseCounterOutput(value: unknown): CounterOutput {
+  if (!isCounterOutput(value)) {
+    throw new Error('counter_get returned invalid structuredContent');
+  }
+
+  return value;
+}
 
 test.describe('React WebMCP structuredContent Tests', () => {
   test.beforeEach(async ({ page }) => {
@@ -620,37 +641,18 @@ test.describe('React WebMCP structuredContent Tests', () => {
   });
 
   test('should return structuredContent for tools with outputSchema', async ({ page }) => {
-    const result = await page.evaluate(async () => {
+    const structuredContent = await page.evaluate(async () => {
       const client = window.mcpClient;
       if (!client) {
         throw new Error('mcpClient not available');
       }
 
-      try {
-        const response = await client.callTool({ name: 'counter_get', arguments: {} });
-        const structuredContent = response.structuredContent as
-          | { counter?: unknown; timestamp?: unknown }
-          | undefined;
-
-        return {
-          success: true,
-          hasStructuredContent: typeof structuredContent === 'object' && structuredContent !== null,
-          counterType: typeof structuredContent?.counter,
-          timestampType: typeof structuredContent?.timestamp,
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
+      const response = await client.callTool({ name: 'counter_get', arguments: {} });
+      return response.structuredContent;
     });
+    const parsed = parseCounterOutput(structuredContent);
 
-    // Verify the tool call was successful
-    expect(result.success).toBe(true);
-    expect(result.hasStructuredContent).toBe(true);
-    expect(result.counterType).toBe('number');
-    expect(result.timestampType).toBe('string');
+    expect(parsed).toEqual({ counter: expect.any(Number), timestamp: expect.any(String) });
   });
 
   test('should normalize JSON results without outputSchema', async ({ page }) => {
@@ -692,20 +694,12 @@ test.describe('React WebMCP structuredContent Tests', () => {
       }
 
       const response = await client.callTool({ name: 'counter_get', arguments: {} });
-      const structured = response.structuredContent as CounterOutput | undefined;
-
-      return {
-        counter: structured?.counter,
-        hasTimestamp: typeof structured?.timestamp === 'string',
-        timestampIsISO:
-          typeof structured?.timestamp === 'string' &&
-          /^\d{4}-\d{2}-\d{2}T/.test(structured.timestamp),
-      };
+      return response.structuredContent;
     });
+    const structured = parseCounterOutput(result);
 
-    expect(typeof result.counter).toBe('number');
-    expect(result.hasTimestamp).toBe(true);
-    expect(result.timestampIsISO).toBe(true);
+    expect(structured.counter).toEqual(expect.any(Number));
+    expect(structured.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   test('should validate structuredContent reflects updated state', async ({ page }) => {
@@ -716,33 +710,21 @@ test.describe('React WebMCP structuredContent Tests', () => {
       }
 
       const first = await client.callTool({ name: 'counter_get', arguments: {} });
-      const response1 = (first.structuredContent ?? {}) as CounterOutput;
-      const initialCounter = response1.counter;
 
       await client.callTool({ name: 'counter_increment', arguments: { amount: 5 } });
 
       const second = await client.callTool({ name: 'counter_get', arguments: {} });
-      const response2 = (second.structuredContent ?? {}) as CounterOutput;
-      const updatedCounter = response2.counter;
-      const hasBothCounters =
-        typeof initialCounter === 'number' && typeof updatedCounter === 'number';
 
       return {
-        initialCounter,
-        updatedCounter,
-        incrementedBy5: hasBothCounters && updatedCounter === initialCounter + 5,
-        hasValidTimestamp: typeof response1.timestamp === 'string',
+        first: first.structuredContent,
+        second: second.structuredContent,
       };
     });
+    const first = parseCounterOutput(results.first);
+    const second = parseCounterOutput(results.second);
 
     // Verify the counter was incremented correctly
-    expect(results.incrementedBy5).toBe(true);
-    expect(results.hasValidTimestamp).toBe(true);
-    expect(typeof results.initialCounter).toBe('number');
-    expect(typeof results.updatedCounter).toBe('number');
-    if (typeof results.initialCounter !== 'number' || typeof results.updatedCounter !== 'number') {
-      throw new Error('Missing counter values in structuredContent');
-    }
-    expect(results.updatedCounter).toBe(results.initialCounter + 5);
+    expect(first.timestamp).toEqual(expect.any(String));
+    expect(second.counter).toBe(first.counter + 5);
   });
 });

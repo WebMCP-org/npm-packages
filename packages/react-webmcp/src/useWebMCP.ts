@@ -12,7 +12,7 @@ import { useWebMCPWithAdapter, type WebMCPAdapter } from 'usewebmcp/internal';
 import type { WebMCPConfig as CoreWebMCPConfig } from 'usewebmcp';
 import type { InferOutput, InferValidatedToolInput, WebMCPConfig, WebMCPReturn } from './types.js';
 
-function isStandardSchema(schema: object): schema is StandardSchemaV1 {
+function isStandardSchema(schema: ToolInputSchema): schema is ToolInputSchema & StandardSchemaV1 {
   const standard = '~standard' in schema ? schema['~standard'] : undefined;
   return (
     typeof standard === 'object' &&
@@ -28,10 +28,16 @@ async function validateInput<T extends ToolInputSchema>(
   schema: T | undefined,
   input: unknown
 ): Promise<InferValidatedToolInput<T>> {
-  if (!schema || !isStandardSchema(schema)) return input as InferValidatedToolInput<T>;
+  if (!schema || !isStandardSchema(schema)) {
+    // SAFETY: the registered JSON Schema validates agent calls; local callers use InferToolInput.
+    return input as InferValidatedToolInput<T>;
+  }
 
   const result = await schema['~standard'].validate(input);
-  if ('value' in result) return result.value as InferValidatedToolInput<T>;
+  if ('value' in result) {
+    // SAFETY: Standard Schema's successful result is its declared output; the guard preserves T.
+    return result.value as InferValidatedToolInput<T>;
+  }
   throw new TypeError(
     `Invalid tool input: ${(result.issues ?? []).map((issue) => issue.message).join('; ')}`
   );
@@ -86,5 +92,6 @@ export function useWebMCP<
       config.formatError ??
       ((error) => ({ content: [{ type: 'text', text: error.message }], isError: true })),
   };
+  // SAFETY: the adapter validates Standard Schemas and the core registration uses the normalized JSON Schema.
   return useWebMCPWithAdapter(coreConfig, deps, adapter) as WebMCPReturn<TOutput, TInput>;
 }

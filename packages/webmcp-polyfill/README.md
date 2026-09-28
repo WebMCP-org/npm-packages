@@ -1,16 +1,24 @@
 # @mcp-b/webmcp-polyfill
 
-`@mcp-b/webmcp-polyfill` bundles the upstream WebMCP polyfill from
-[webmachinelearning/webmcp-polyfill](https://github.com/webmachinelearning/webmcp-polyfill)
-at revision `439c6c341f1c632c63498ba206e2bd8471cb8efb`. It installs the standard
+This package is a compatibility alias for the upstream
+[WebMCP polyfill](https://github.com/webmachinelearning/webmcp-polyfill), distributed
+under the existing MCP-B package name with vendored upstream source.
+
+**This package will eventually be removed. Please migrate to the official upstream
+polyfill when its release is available.** There is no removal date yet. Follow the
+[upstream installation instructions](https://github.com/webmachinelearning/webmcp-polyfill#readme)
+for its current distribution and setup.
+
+Until then, this package bundles upstream revision
+`439c6c341f1c632c63498ba206e2bd8471cb8efb`. It installs the standard
 `document.modelContext` API when the browser does not provide one. The upstream
 implementation and types are the source of truth for this core runtime.
 
 Use [`@mcp-b/global`](../global/README.md) when you need MCP-B features such as
-transports, prompts, resources, declarative forms, compatibility shims, or MCP
+transports, prompts, resources, declarative forms, or MCP
 `outputSchema` support.
 
-## Install
+## Use the compatibility package
 
 ```bash
 pnpm add @mcp-b/webmcp-polyfill
@@ -31,14 +39,6 @@ if (!context) throw new Error('WebMCP is unavailable');
 
 The call is idempotent and preserves an existing native context. It does
 nothing when no browser document is available.
-
-`initializeWebMCPPolyfill()` remains as a deprecated alias for compatibility:
-
-```ts
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
-
-initializeWebMCPPolyfill();
-```
 
 For a script tag, load the IIFE before registering tools:
 

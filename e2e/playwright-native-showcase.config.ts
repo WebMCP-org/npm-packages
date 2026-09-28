@@ -10,7 +10,6 @@ import { MACOS_CHROME_EXECUTABLE_PATHS, resolveChromeExecutable } from './chrome
 const tabTransportPort = Number.parseInt(process.env.PLAYWRIGHT_NATIVE_SHOWCASE_PORT ?? '5174', 10);
 const nativeShowcaseBaseUrl = `http://localhost:${tabTransportPort}`;
 const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
-const nativeShowcaseChannel = process.env.PLAYWRIGHT_NATIVE_SHOWCASE_CHANNEL;
 const MIN_NATIVE_CHROME_MAJOR = 152;
 const nativeShowcaseExecutablePath = resolveChromeExecutable({
   candidates: [
@@ -54,9 +53,6 @@ export default defineConfig({
       name: 'chromium-native',
       use: {
         ...devices['Desktop Chrome'],
-        ...(nativeShowcaseChannel && !nativeShowcaseExecutablePath
-          ? { channel: nativeShowcaseChannel }
-          : {}),
       },
     },
   ],

@@ -1,0 +1,34 @@
+{
+  "name": "@mcp-b/webmcp-types",
+  "version": "5.1.0",
+  "description": "Compatibility alias for upstream webmcp-types; use webmcp-types directly",
+  "homepage": "https://github.com/webmachinelearning/webmcp-types",
+  "bugs": {
+    "url": "https://github.com/WebMCP-org/npm-packages/issues"
+  },
+  "license": "MIT",
+  "author": "Alex Nahas",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebMCP-org/npm-packages.git",
+    "directory": "packages/webmcp-types"
+  },
+  "files": [
+    "index.d.ts"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "webmcp-types": "^0.1.9"
+  }
+}

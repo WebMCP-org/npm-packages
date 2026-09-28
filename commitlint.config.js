@@ -16,6 +16,7 @@ export default {
         'webmcp-local-relay',
         'webmcp-polyfill',
         'webmcp-ts-sdk',
+        'webmcp-types',
 
         // Examples
         'examples',

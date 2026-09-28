@@ -1,12 +1,18 @@
-import type { CallToolResult, TextContent } from '@modelcontextprotocol/server';
-import type { InputSchema, JsonObject } from '@mcp-b/webmcp-ts-sdk';
+import type { CallToolResult, TextContent, fromJsonSchema } from '@modelcontextprotocol/server';
+import type { JsonObject, JsonValue, WebMCP } from '@mcp-b/webmcp-ts-sdk';
+
+type RuntimeContractInput = Parameters<WebMCP.ToolExecuteCallback>[0];
+export type RuntimeToolArguments =
+  | { a: number; b: number }
+  | { value: string }
+  | { reason: string };
 
 const BASE_TOOL_NAMES = ['echo', 'sum', 'always_fail'] as const;
 export const DYNAMIC_TOOL_NAME = 'dynamic_tool';
 
 export interface RuntimeInvocationRecord {
   name: string;
-  arguments: Record<string, unknown>;
+  arguments: JsonObject;
 }
 
 export interface RuntimeContractController {
@@ -22,11 +28,15 @@ export interface RuntimeContractOptions {
   dynamicToolName?: string;
 }
 
-export interface RuntimeContractTool {
-  name: string;
-  description: string;
-  inputSchema: InputSchema;
-  execute(args: Record<string, unknown>): Promise<CallToolResult>;
+export interface RuntimeContractTool extends Omit<
+  WebMCP.ModelContextTool,
+  'inputSchema' | 'execute'
+> {
+  inputSchema: Parameters<typeof fromJsonSchema>[0];
+  execute: (
+    input: RuntimeContractInput,
+    options?: WebMCP.ToolExecuteCallbackOptions
+  ) => Promise<CallToolResult>;
 }
 
 export interface RuntimeContractTools {
@@ -40,20 +50,48 @@ export interface RuntimeContractState {
 }
 
 function textResult(text: string, structuredContent?: JsonObject): CallToolResult {
-  return {
-    content: [{ type: 'text', text }],
-    ...(structuredContent ? { structuredContent } : {}),
-  };
+  const result: CallToolResult = { content: [{ type: 'text', text }] };
+  if (structuredContent) result.structuredContent = structuredContent;
+  return result;
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every(isJsonValue);
+  return typeof value === 'object' && Object.values(value).every(isJsonValue);
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every(isJsonValue)
+  );
+}
+
+function toJsonObject(args: RuntimeContractInput): JsonObject {
+  const serialized = JSON.stringify(args);
+  if (serialized === undefined) {
+    throw new TypeError('Tool arguments must be JSON serializable');
+  }
+
+  const parsed: unknown = JSON.parse(serialized);
+  if (!isJsonObject(parsed)) {
+    throw new TypeError('Tool arguments must be a JSON object');
+  }
+  return parsed;
 }
 
 function recordInvocation(
   state: RuntimeContractState,
   name: string,
-  args: Record<string, unknown>
+  args: RuntimeContractInput
 ): void {
   state.invocations.push({
     name,
-    arguments: structuredClone(args),
+    arguments: toJsonObject(args),
   });
 }
 

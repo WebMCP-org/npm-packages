@@ -6,7 +6,6 @@
  * parent page's Model Context API.
  *
  * The iframe should expose its MCP server through `document.modelContext`.
- * Older runtimes that only expose `navigator.modelContext` remain supported.
  *
  * @example
  * ```html
@@ -49,6 +48,7 @@ import {
   Client,
   UriTemplate,
   type GetPromptResult,
+  type CallToolRequestParams,
   type Prompt,
   type ReadResourceResult,
   type Resource,
@@ -208,14 +208,14 @@ export interface MCPIframeEventMap {
 export class MCPIframeElement extends HTMLElement {
   declare addEventListener: (<K extends keyof MCPIframeEventMap>(
     type: K,
-    listener: (this: MCPIframeElement, event: MCPIframeEventMap[K]) => unknown,
+    listener: (this: MCPIframeElement, event: MCPIframeEventMap[K]) => void,
     options?: boolean | AddEventListenerOptions
   ) => void) &
     HTMLElement['addEventListener'];
 
   declare removeEventListener: (<K extends keyof MCPIframeEventMap>(
     type: K,
-    listener: (this: MCPIframeElement, event: MCPIframeEventMap[K]) => unknown,
+    listener: (this: MCPIframeElement, event: MCPIframeEventMap[K]) => void,
     options?: boolean | EventListenerOptions
   ) => void) &
     HTMLElement['removeEventListener'];
@@ -557,16 +557,16 @@ export class MCPIframeElement extends HTMLElement {
     );
   }
 
-  #dispatchError(error: unknown, context: string): void {
-    console.error(`[MCPIframe] ${context}:`, error);
+  #dispatchError(cause: unknown, context: string): void {
+    console.error(`[MCPIframe] ${context}:`, cause);
     this.dispatchEvent(
-      new CustomEvent<MCPIframeErrorEventDetail>('mcp-iframe-error', { detail: { error } })
+      new CustomEvent<MCPIframeErrorEventDetail>('mcp-iframe-error', { detail: { error: cause } })
     );
   }
 
-  #failConnection(connection: Connection, error: unknown, context: string): void {
+  #failConnection(connection: Connection, cause: unknown, context: string): void {
     if (!this.#invalidateConnection(connection)) return;
-    this.#dispatchError(error, context);
+    this.#dispatchError(cause, context);
     void this.#closeConnection(connection);
   }
 
@@ -600,7 +600,7 @@ export class MCPIframeElement extends HTMLElement {
     prefix: string,
     isActive: () => boolean
   ): Promise<void> {
-    const modelContext: ModelContext | undefined = document.modelContext ?? navigator.modelContext;
+    const modelContext: ModelContext | undefined = document.modelContext;
     if (!modelContext) {
       throw new Error('Model Context API not available on parent');
     }
@@ -639,7 +639,10 @@ export class MCPIframeElement extends HTMLElement {
       const prefixedName = `${prefix}${tool.name}`;
       if (isDuplicateRegistration(connection.toolRegistrations, prefixedName, 'tool')) continue;
 
-      const descriptor: ModelContextTool<Record<string, unknown>, CallToolResult> & {
+      const descriptor: ModelContextTool<
+        NonNullable<CallToolRequestParams['arguments']>,
+        CallToolResult
+      > & {
         inputSchema: InputSchema;
       } = {
         name: prefixedName,
@@ -791,7 +794,10 @@ export class MCPIframeElement extends HTMLElement {
     return Number.isSafeInteger(timeout) && timeout > 0 ? timeout : DEFAULT_CALL_TIMEOUT;
   }
 
-  async #callIframeTool(toolName: string, args: Record<string, unknown>): Promise<CallToolResult> {
+  async #callIframeTool(
+    toolName: string,
+    args: NonNullable<CallToolRequestParams['arguments']>
+  ): Promise<CallToolResult> {
     return this.#requireClient().callTool(
       { name: toolName, arguments: args },
       { timeout: this.#getCallTimeout() }
@@ -849,7 +855,8 @@ declare global {
 
 /** Register the custom element with a custom tag name */
 export function registerMCPIframeElement(tagName = 'mcp-iframe'): void {
-  if (typeof customElements !== 'undefined' && !customElements.get(tagName)) {
-    customElements.define(tagName, MCPIframeElement);
+  const registry = globalThis.customElements;
+  if (registry && !registry.get(tagName)) {
+    registry.define(tagName, MCPIframeElement);
   }
 }

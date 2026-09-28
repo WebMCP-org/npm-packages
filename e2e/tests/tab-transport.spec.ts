@@ -1,10 +1,10 @@
 import { expect, type Page, test } from '@playwright/test';
-import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 
 const listRegisteredToolNames = (page: Page): Promise<string[]> =>
-  page.evaluate(() =>
-    (document.modelContext as BrowserMcpServer).listTools().map((tool) => tool.name)
-  );
+  page.evaluate(async () => {
+    const tools = await document.modelContext?.getTools();
+    return tools?.map((tool) => tool.name) ?? [];
+  });
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -260,122 +260,5 @@ test.describe('Prompts API Tests', () => {
 
     await expect(page.locator('#register-dynamic-prompt')).toBeEnabled();
     await expect(page.locator('#unregister-dynamic-prompt')).toBeDisabled();
-  });
-});
-
-test.describe('Model Context Testing API Tests', () => {
-  test('should have navigator.modelContextTesting API available', async ({ page }) => {
-    const hasTestingAPI = await page.evaluate(() => 'modelContextTesting' in navigator);
-    expect(hasTestingAPI).toBe(true);
-  });
-
-  test('should detect testing API implementation type', async ({ page }) => {
-    await page.click('#check-testing-api');
-
-    const status = page.locator('#testing-api-status');
-    await expect(status).toHaveAttribute('data-testing-api', 'available');
-
-    const apiType = await status.getAttribute('data-testing-api-type');
-    expect(['native', 'polyfill']).toContain(apiType);
-
-    const logEntries = await page.locator('#log .log-entry').allTextContents();
-    expect(
-      logEntries.some((entry) => entry.includes('navigator.modelContextTesting is available'))
-    ).toBe(true);
-  });
-
-  test('should expose core testing API methods', async ({ page }) => {
-    const methods = await page.evaluate(() => {
-      const testingAPI = navigator.modelContextTesting;
-      if (!testingAPI) return [];
-
-      return ['listTools', 'executeTool', 'addEventListener'].filter(
-        (method) => typeof testingAPI[method as keyof typeof testingAPI] === 'function'
-      );
-    });
-
-    expect(methods).toHaveLength(3);
-    expect(methods).toContain('listTools');
-    expect(methods).toContain('executeTool');
-    expect(methods).toContain('addEventListener');
-  });
-
-  test('should list base tools via modelContextTesting.listTools()', async ({ page }) => {
-    const toolNames = await page.evaluate(() => {
-      const testingAPI = navigator.modelContextTesting;
-      if (!testingAPI) return [];
-      return testingAPI.listTools().map((tool: { name: string }) => tool.name);
-    });
-
-    expect(toolNames).toContain('incrementCounter');
-    expect(toolNames).toContain('decrementCounter');
-    expect(toolNames).toContain('resetCounter');
-    expect(toolNames).toContain('getCounter');
-  });
-
-  test('should execute a tool via modelContextTesting.executeTool()', async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const testingAPI = navigator.modelContextTesting;
-      if (!testingAPI) return null;
-      return await testingAPI.executeTool('getCounter', '{}');
-    });
-
-    expect(result).not.toBeNull();
-    expect(typeof result).toBe('string');
-  });
-
-  test('should fire toolchange event on tool registration', async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const modelContext = document.modelContext;
-      if (!modelContext) throw new Error('document.modelContext is unavailable');
-      const testingAPI = navigator.modelContextTesting;
-      if (!testingAPI) return { count: 0, toolName: null };
-
-      let count = 0;
-      const toolChanged = new Promise<void>((resolve) => {
-        testingAPI.addEventListener(
-          'toolchange',
-          () => {
-            count++;
-            resolve();
-          },
-          { once: true }
-        );
-      });
-
-      const toolName = `testingCallbackTool_${Date.now()}`;
-      const controller = new AbortController();
-      await modelContext.registerTool(
-        {
-          name: toolName,
-          description: 'Callback test tool',
-          inputSchema: { type: 'object', properties: {} },
-          async execute() {
-            return { content: [{ type: 'text', text: 'ok' }] };
-          },
-        },
-        { signal: controller.signal }
-      );
-
-      await toolChanged;
-      controller.abort();
-
-      return { count, toolName };
-    });
-
-    expect(result.count).toBeGreaterThan(0);
-    if (result.toolName) {
-      await expect
-        .poll(async () =>
-          page.evaluate(
-            (toolName) =>
-              navigator.modelContextTesting
-                ?.listTools()
-                .some((tool: { name: string }) => tool.name === toolName) ?? false,
-            result.toolName
-          )
-        )
-        .toBe(false);
-    }
   });
 });

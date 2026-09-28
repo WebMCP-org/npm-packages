@@ -1,3 +1,4 @@
+import { z } from 'zod/v4';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 
@@ -8,6 +9,8 @@ import {
   DEFAULT_RELAY_PORT_RANGE_END,
   defaultRelayPortPersistPath,
   persistPort,
+  isTcpAddress,
+  type PortStrategyOptions,
 } from './portStrategy.js';
 import {
   CallToolResultSchema,
@@ -36,6 +39,8 @@ const RELAY_INTERNAL_PROTOCOL = 'webmcp-relay.v1';
 const RELAY_SERVER_MESSAGE_TIMEOUT_MS = 750;
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const HEARTBEAT_DEAD_THRESHOLD_MS = 25_000;
+const RawMessageTypeSchema = z.object({ type: z.unknown().optional() });
+const RelayProtocolTypeSchema = z.string().startsWith('relay/');
 const SUPPORTED_SUBPROTOCOLS = new Set([
   RELAY_BROWSER_PROTOCOL,
   RELAY_DISCOVERY_PROTOCOL,
@@ -301,13 +306,14 @@ export class RelayBridgeServer extends EventEmitter {
       return;
     }
 
-    const candidates = await buildPortCandidates({
+    const strategyOptions: PortStrategyOptions = {
       defaultPort: this.preferredPort,
-      ...(this.portExplicitlySet ? { fixedPort: this.preferredPort } : {}),
       host: this.host,
       persistPath: this.persistPath,
       rangeEnd: this.portRangeEnd,
-    });
+    };
+    if (this.portExplicitlySet) strategyOptions.fixedPort = this.preferredPort;
+    const candidates = await buildPortCandidates(strategyOptions);
 
     for (const candidate of candidates) {
       try {
@@ -342,10 +348,10 @@ export class RelayBridgeServer extends EventEmitter {
     );
   }
 
-  private isAddressInUseError(error: unknown): boolean {
+  private isAddressInUseError(cause: unknown): boolean {
     return (
-      error instanceof Error &&
-      ('code' in error ? error.code === 'EADDRINUSE' : error.message.includes('EADDRINUSE'))
+      cause instanceof Error &&
+      ('code' in cause ? cause.code === 'EADDRINUSE' : cause.message.includes('EADDRINUSE'))
     );
   }
 
@@ -581,7 +587,7 @@ export class RelayBridgeServer extends EventEmitter {
     this._mode = 'server';
 
     const address = wss.address();
-    if (address && typeof address !== 'string') {
+    if (isTcpAddress(address)) {
       this.desiredPort = address.port;
     }
 
@@ -613,11 +619,10 @@ export class RelayBridgeServer extends EventEmitter {
     args: RelayInvokeArgs,
     options: { sourceId?: string; requestTabId?: string }
   ): Promise<RelayCallToolResult> {
-    const resolved = this.registry.resolveInvocation({
-      toolName,
-      ...(options.sourceId === undefined ? {} : { sourceId: options.sourceId }),
-      ...(options.requestTabId === undefined ? {} : { requestTabId: options.requestTabId }),
-    });
+    const invocation: Parameters<RelayRegistry['resolveInvocation']>[0] = { toolName };
+    if (options.sourceId !== undefined) invocation.sourceId = options.sourceId;
+    if (options.requestTabId !== undefined) invocation.requestTabId = options.requestTabId;
+    const resolved = this.registry.resolveInvocation(invocation);
 
     if (!resolved) {
       throw new Error(`No active browser source provides tool "${toolName}"`);
@@ -683,10 +688,7 @@ export class RelayBridgeServer extends EventEmitter {
       return;
     }
 
-    const typeField =
-      typeof parsedJson === 'object' && parsedJson !== null && 'type' in parsedJson
-        ? parsedJson.type
-        : undefined;
+    const typeField = RawMessageTypeSchema.safeParse(parsedJson).data?.type;
     const socket = this.socketByConnectionId.get(connectionId);
     if (!socket) {
       return;
@@ -704,7 +706,7 @@ export class RelayBridgeServer extends EventEmitter {
       return;
     }
 
-    if (typeof typeField === 'string' && typeField.startsWith('relay/')) {
+    if (RelayProtocolTypeSchema.safeParse(typeField).success) {
       process.stderr.write(
         `[webmcp-local-relay] warn: connection ${connectionId} used the relay protocol without negotiating it\n`
       );
@@ -843,7 +845,7 @@ export class RelayBridgeServer extends EventEmitter {
         const { callId, toolName, args } = message;
         void this.invokeToolLocally(toolName, args ?? {}, {}).then(
           (result) => this.sendRelayResult(connectionId, callId, result),
-          (error: unknown) =>
+          (error) =>
             this.sendRelayResult(connectionId, callId, {
               content: [
                 {
@@ -1159,8 +1161,7 @@ export class RelayBridgeServer extends EventEmitter {
 
     const message = RelayServerToClientMessageSchema.safeParse(parsed);
     if (!message.success) {
-      const typeField =
-        typeof parsed === 'object' && parsed !== null && 'type' in parsed ? parsed.type : 'unknown';
+      const typeField = RawMessageTypeSchema.safeParse(parsed).data?.type ?? 'unknown';
       process.stderr.write(
         `[webmcp-local-relay] warn: invalid relay server message (type=${typeField}): ${message.error.message}\n`
       );

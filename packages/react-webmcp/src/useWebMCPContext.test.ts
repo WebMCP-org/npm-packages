@@ -1,5 +1,6 @@
 import { initializeWebModelContext } from '@mcp-b/global';
-import type { CallToolResult, ChromeModelContext, ModelContext } from '@mcp-b/webmcp-ts-sdk';
+import { CallToolResultSchema } from '@modelcontextprotocol/core';
+import type { BrowserMcpServer, CallToolResult, ModelContext } from '@mcp-b/webmcp-ts-sdk';
 import { Suspense, createElement } from 'react';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
@@ -7,7 +8,10 @@ import { useWebMCPContext } from './useWebMCPContext.js';
 
 const TEST_CHANNEL_ID = `useWebMCPContext-browser-${Date.now()}`;
 
-function hasDescriptorExecution(context: ModelContext): context is ChromeModelContext {
+type ExecutableModelContext = Omit<ModelContext, 'executeTool'> &
+  Pick<BrowserMcpServer, 'executeTool'>;
+
+function hasDescriptorExecution(context: ModelContext): context is ExecutableModelContext {
   return 'executeTool' in context && typeof context.executeTool === 'function';
 }
 
@@ -22,12 +26,12 @@ async function executeRegisteredTool(name: string): Promise<CallToolResult> {
     throw new Error(`Tool not found: ${name}`);
   }
 
-  const serialized = await modelContext.executeTool(tool, '{}');
+  const serialized = await modelContext.executeTool(tool, {});
   if (serialized === null) {
     throw new Error(`Tool execution was interrupted: ${name}`);
   }
 
-  return JSON.parse(serialized) as CallToolResult;
+  return CallToolResultSchema.parse(JSON.parse(serialized));
 }
 
 describe('useWebMCPContext in a browser runtime', () => {

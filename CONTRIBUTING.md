@@ -159,6 +159,7 @@ Package scopes (all in `packages/` directory):
 - `webmcp-local-relay` - @mcp-b/webmcp-local-relay
 - `webmcp-polyfill` - @mcp-b/webmcp-polyfill
 - `webmcp-ts-sdk` - @mcp-b/webmcp-ts-sdk
+- `webmcp-types` - compatibility alias for upstream webmcp-types
 
 Repository-wide scopes:
 

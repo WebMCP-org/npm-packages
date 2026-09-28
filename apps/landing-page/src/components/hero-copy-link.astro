@@ -11,7 +11,7 @@ interface Props {
   mode?: 'link' | 'panel';
 }
 
-const { text, href, variant, preview, mode = 'link' } = Astro.props as Props;
+const { text, href, variant, preview, mode = 'link' } = Astro.props;
 const popoverId = `hero-popover-${variant}`;
 const isExternal = href.startsWith('http');
 const showImage = Boolean(preview.image);

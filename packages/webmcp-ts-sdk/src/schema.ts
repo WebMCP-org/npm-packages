@@ -1,5 +1,10 @@
-import type { CallToolResult, JSONValue as JsonValue } from '@modelcontextprotocol/server';
-import type { InputSchema, WebMcpToolInput } from './common.js';
+import type {
+  CallToolResult,
+  StandardSchemaWithJSON,
+  JSONValue as JsonValue,
+  JSONObject as JsonObject,
+} from '@modelcontextprotocol/server';
+import type { InputSchema, WebMcpToolInput, WebMcpToolObjectInput } from './common.js';
 import type { ToolDescriptor, WebMcpToolAnnotations } from './tool.js';
 import type { StandardJSONSchemaV1, StandardSchemaV1 } from '@standard-schema/spec';
 
@@ -7,9 +12,6 @@ type StandardInputValidatorSchema = StandardSchemaV1<WebMcpToolInput, WebMcpTool
 type StandardInputJsonSchema = StandardJSONSchemaV1<WebMcpToolInput, WebMcpToolInput>;
 
 const DEFAULT_INPUT_SCHEMA: InputSchema = { type: 'object', properties: {} };
-const FAILED_TO_PARSE_INPUT_ARGUMENTS_MESSAGE = 'Failed to parse input arguments';
-const TOOL_INVOCATION_FAILED_MESSAGE =
-  'Tool was executed but the invocation failed. For example, the script function threw an error';
 const STANDARD_JSON_SCHEMA_TARGETS = ['draft-2020-12', 'draft-07'] as const;
 const VALID_TOOL_NAME_RE = /^[A-Za-z0-9_.-]{1,128}$/u;
 
@@ -20,8 +22,13 @@ export interface NormalizedInputSchema {
   registeredInputSchema?: string;
 }
 
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
+/** Narrows a non-null, non-array object to WebMCP's tool callback input. */
+export function isPlainObject(value: unknown): value is WebMcpToolObjectInput {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isWebIdlObject(value: unknown): value is object {
+  return value !== null && (typeof value === 'object' || typeof value === 'function');
 }
 
 function toDomString(value: unknown): string {
@@ -31,14 +38,29 @@ function toDomString(value: unknown): string {
   return String(value);
 }
 
+/** Unconverted Web IDL tool members; each is coerced or validated before invocation. */
+export interface ToolRegistrationDictionary {
+  name?: unknown;
+  description?: unknown;
+  title?: unknown;
+  annotations?: unknown;
+  inputSchema?: ToolDescriptor<WebMcpToolInput>['inputSchema'];
+  outputSchema?: ToolDescriptor<WebMcpToolInput>['outputSchema'];
+  execute?: unknown;
+}
+
 export function coerceWebMcpToolDescriptor<TArgs extends WebMcpToolInput>(
   tool: ToolDescriptor<TArgs>
 ): ToolDescriptor<TArgs>;
-export function coerceWebMcpToolDescriptor(tool: object): ToolDescriptor<WebMcpToolInput>;
-export function coerceWebMcpToolDescriptor(tool: object): ToolDescriptor<WebMcpToolInput> {
-  const name: unknown = Reflect.get(tool, 'name');
-  const description: unknown = Reflect.get(tool, 'description');
-  const title: unknown = Reflect.get(tool, 'title');
+export function coerceWebMcpToolDescriptor(
+  tool: ToolRegistrationDictionary
+): ToolDescriptor<WebMcpToolInput>;
+export function coerceWebMcpToolDescriptor(
+  tool: ToolRegistrationDictionary
+): ToolDescriptor<WebMcpToolInput> {
+  const name = tool.name;
+  const description = tool.description;
+  const title = tool.title;
   if (name === undefined) {
     throw new TypeError('Tool "name" is required');
   }
@@ -46,55 +68,46 @@ export function coerceWebMcpToolDescriptor(tool: object): ToolDescriptor<WebMcpT
     throw new TypeError('Tool "description" is required');
   }
 
-  const annotations: unknown = Reflect.get(tool, 'annotations');
+  const annotations = tool.annotations;
   const annotationMembers = isPlainObject(annotations) ? annotations : {};
-  const inputSchema: unknown = Reflect.get(tool, 'inputSchema');
-  const outputSchema: unknown = Reflect.get(tool, 'outputSchema');
-  const execute: unknown = Reflect.get(tool, 'execute');
+  const inputSchema = tool.inputSchema;
+  const outputSchema = tool.outputSchema;
+  const execute = tool.execute;
 
-  // Web IDL dictionaries read known members without retaining the caller's object.
-  // The cast is load-bearing: `execute` stays unnarrowed until validateWebMcpToolDescriptor().
-  return {
-    name: toDomString(name),
-    ...(title === undefined
-      ? {}
-      : {
-          title: toDomString(title).toWellFormed(),
-        }),
-    description: toDomString(description),
-    ...(inputSchema === undefined ? {} : { inputSchema }),
-    ...(outputSchema === undefined ? {} : { outputSchema }),
-    execute,
-    ...(annotations === undefined
-      ? {}
-      : {
-          annotations: {
-            ...(annotationMembers.title === undefined
-              ? {}
-              : { title: toDomString(annotationMembers.title).toWellFormed() }),
-            readOnlyHint: Boolean(annotationMembers.readOnlyHint),
-            ...(annotationMembers.destructiveHint === undefined
-              ? {}
-              : { destructiveHint: Boolean(annotationMembers.destructiveHint) }),
-            ...(annotationMembers.idempotentHint === undefined
-              ? {}
-              : { idempotentHint: Boolean(annotationMembers.idempotentHint) }),
-            ...(annotationMembers.openWorldHint === undefined
-              ? {}
-              : { openWorldHint: Boolean(annotationMembers.openWorldHint) }),
-            untrustedContentHint: Boolean(annotationMembers.untrustedContentHint),
-            ...(annotationMembers.consequentialHint === undefined
-              ? {}
-              : { consequentialHint: Boolean(annotationMembers.consequentialHint) }),
-            ...(annotationMembers.debugging === undefined
-              ? {}
-              : { debugging: Boolean(annotationMembers.debugging) }),
-          },
-        }),
-  } as ToolDescriptor<WebMcpToolInput>;
+  const coercedName = toDomString(name);
+  const coercedTitle = title === undefined ? undefined : toDomString(title).toWellFormed();
+  const coercedDescription = toDomString(description);
+  const invocation = { name: coercedName, description: coercedDescription, execute };
+  const descriptor: Omit<ToolDescriptor<WebMcpToolInput>, 'execute'> & { execute: unknown } =
+    invocation;
+  if (coercedTitle !== undefined) descriptor.title = coercedTitle;
+  if (inputSchema !== undefined) descriptor.inputSchema = inputSchema;
+  if (outputSchema !== undefined) descriptor.outputSchema = outputSchema;
+  if (annotations !== undefined) {
+    const normalized: ToolDescriptor<WebMcpToolInput>['annotations'] = {
+      readOnlyHint: false,
+      untrustedContentHint: false,
+    };
+    if (annotationMembers.title !== undefined) {
+      normalized.title = toDomString(annotationMembers.title).toWellFormed();
+    }
+    normalized.readOnlyHint = Boolean(annotationMembers.readOnlyHint);
+    for (const name of ['destructiveHint', 'idempotentHint', 'openWorldHint'] as const) {
+      if (annotationMembers[name] !== undefined)
+        normalized[name] = Boolean(annotationMembers[name]);
+    }
+    normalized.untrustedContentHint = Boolean(annotationMembers.untrustedContentHint);
+    for (const name of ['consequentialHint', 'debugging'] as const) {
+      if (annotationMembers[name] !== undefined)
+        normalized[name] = Boolean(annotationMembers[name]);
+    }
+    descriptor.annotations = normalized;
+  }
+  validateWebMcpToolDescriptor(descriptor);
+  return descriptor;
 }
 
-function isJsonObjectRecord(value: unknown): value is Record<string, unknown> {
+function isJsonObjectRecord(value: unknown): value is WebMcpToolObjectInput {
   if (!isPlainObject(value)) {
     return false;
   }
@@ -139,10 +152,19 @@ function toJsonValue(value: unknown): JsonValue | undefined {
   return isJsonValue(value) ? value : undefined;
 }
 
-function hasCallToolResultShape(
-  value: unknown
-): value is Record<string, unknown> & { content: unknown[] } {
-  return isPlainObject(value) && Array.isArray(value.content);
+interface ProtocolToolResponse extends JsonObject {
+  content: Array<JsonObject & { type: string }>;
+}
+
+function isProtocolToolResponse(value: unknown): value is ProtocolToolResponse {
+  return (
+    isPlainObject(value) &&
+    isJsonValue(value) &&
+    Array.isArray(value.content) &&
+    value.content.every((item) => isPlainObject(item) && typeof item.type === 'string') &&
+    (value.isError === undefined || typeof value.isError === 'boolean') &&
+    (value._meta === undefined || isPlainObject(value._meta))
+  );
 }
 
 function serializeTextContent(value: unknown): string {
@@ -155,44 +177,38 @@ function serializeTextContent(value: unknown): string {
 }
 
 export function normalizeToolResponse(value: unknown): CallToolResult {
-  // Preserve protocol-evolving content blocks at this compatibility boundary.
-  if (hasCallToolResultShape(value)) return value as CallToolResult;
+  if (isProtocolToolResponse(value)) {
+    // SAFETY: The envelope is JSON-safe, content entries are objects with string discriminators,
+    // isError is boolean when present, and _meta is an object when present. Future content types
+    // intentionally pass through unchanged; this version-skew bridge does not claim those blocks
+    // belong to the current SDK's closed ContentBlock union.
+    return value as CallToolResult;
+  }
   const structuredContent = toJsonValue(value);
-  return {
+  const result: CallToolResult = {
     content: [{ type: 'text', text: serializeTextContent(value) }],
-    ...(structuredContent === undefined ? {} : { structuredContent }),
     isError: false,
   };
-}
-
-export function createUnknownError(message: string): Error {
-  return new DOMException(message, 'UnknownError');
-}
-
-export function createToolInvocationFailedError(error: unknown): Error {
-  return createUnknownError(
-    error instanceof Error
-      ? `${TOOL_INVOCATION_FAILED_MESSAGE}: ${error.message}`
-      : TOOL_INVOCATION_FAILED_MESSAGE
-  );
+  if (structuredContent !== undefined) result.structuredContent = structuredContent;
+  return result;
 }
 
 export function createInvalidStateError(message: string): Error {
   return new DOMException(message, 'InvalidStateError');
 }
 
-export function validateWebMcpToolDescriptor<TArgs extends WebMcpToolInput>(
-  tool: ToolDescriptor<TArgs>
-): void {
+export function validateWebMcpToolDescriptor<
+  T extends { name: string; description: string; execute: unknown },
+>(tool: T): asserts tool is T & { execute: ToolDescriptor<WebMcpToolInput>['execute'] } {
   if (tool.name === '') {
     throw createInvalidStateError('Tool "name" must be a non-empty string');
   }
-  if (typeof tool.name !== 'string' || !VALID_TOOL_NAME_RE.test(tool.name)) {
+  if (!VALID_TOOL_NAME_RE.test(tool.name)) {
     throw createInvalidStateError(
       'Tool "name" must be 1–128 characters and contain only ASCII alphanumeric, underscore, hyphen, or period'
     );
   }
-  if (typeof tool.description !== 'string' || tool.description.length === 0) {
+  if (tool.description.length === 0) {
     throw createInvalidStateError('Tool "description" must be a non-empty string');
   }
   if (typeof tool.execute !== 'function') {
@@ -201,49 +217,23 @@ export function validateWebMcpToolDescriptor<TArgs extends WebMcpToolInput>(
 }
 
 export function toWebMcpAnnotations(annotations: WebMcpToolAnnotations): WebMcpToolAnnotations {
-  return {
+  const normalized: WebMcpToolAnnotations = {
     readOnlyHint: annotations.readOnlyHint ?? false,
     untrustedContentHint: annotations.untrustedContentHint ?? false,
-    ...(annotations.consequentialHint === undefined
-      ? {}
-      : { consequentialHint: annotations.consequentialHint }),
-    ...(annotations.debugging === undefined ? {} : { debugging: annotations.debugging }),
   };
-}
-
-export function parseChromeToolInput(input: string): WebMcpToolInput {
-  try {
-    const value: unknown = JSON.parse(input);
-    if (Array.isArray(value) || isPlainObject(value)) return value;
-  } catch {
-    // Chrome reports invalid JSON and non-object inputs as UnknownError.
+  if (annotations.consequentialHint !== undefined) {
+    normalized.consequentialHint = annotations.consequentialHint;
   }
-  throw createUnknownError(FAILED_TO_PARSE_INPUT_ARGUMENTS_MESSAGE);
+  if (annotations.debugging !== undefined) normalized.debugging = annotations.debugging;
+  return normalized;
 }
 
-export function serializeChromeToolResult(value: unknown): string {
-  if ((typeof value === 'object' && value !== null) || typeof value === 'function') {
-    try {
-      const serialized = JSON.stringify(value);
-      if (serialized) return serialized;
-    } catch {
-      // Chromium falls back to string conversion when JSON serialization fails.
-    }
-  }
-  return String(value) || 'Operation succeeded';
-}
-
-export function withAbortSignal<T>(
-  operation: Promise<T>,
-  signal?: AbortSignal,
-  getAbortReason: () => unknown = () => signal?.reason
-): Promise<T> {
-  if (!signal) return operation;
-  if (signal.aborted) return Promise.reject(getAbortReason());
+export function withAbortSignal<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason);
   return new Promise<T>((resolve, reject) => {
     const onAbort = () => {
       cleanup();
-      reject(getAbortReason());
+      reject(signal.reason);
     };
     const cleanup = () => signal.removeEventListener('abort', onAbort);
 
@@ -253,7 +243,7 @@ export function withAbortSignal<T>(
         cleanup();
         resolve(value);
       },
-      (error: unknown) => {
+      (error: ErrorOptions['cause']) => {
         cleanup();
         reject(error);
       }
@@ -261,112 +251,14 @@ export function withAbortSignal<T>(
   });
 }
 
-function isPotentiallyTrustworthyOrigin(url: URL): boolean {
-  const originUrl = url.origin === 'null' ? url : new URL(url.origin);
-  const protocol = originUrl.protocol;
-  if (['https:', 'wss:', 'file:', 'chrome-extension:', 'moz-extension:'].includes(protocol)) {
-    return true;
-  }
-
-  const hostname = originUrl.hostname.toLowerCase();
-  const ipv4 = hostname.split('.');
-  const isLoopbackIpv4 =
-    ipv4.length === 4 &&
-    ipv4.every((part) => /^\d{1,3}$/u.test(part) && Number(part) <= 255) &&
-    Number(ipv4[0]) === 127;
-  return (
-    hostname === '::1' ||
-    hostname === '[::1]' ||
-    hostname === 'localhost' ||
-    hostname === 'localhost.' ||
-    hostname.endsWith('.localhost') ||
-    hostname.endsWith('.localhost.') ||
-    isLoopbackIpv4
-  );
+interface StandardProperties {
+  version?: unknown;
+  vendor?: unknown;
+  validate?: unknown;
+  jsonSchema?: unknown;
 }
 
-export function validatePotentiallyTrustworthyOrigins(
-  origins: readonly string[] | undefined
-): void {
-  for (const origin of origins ?? []) {
-    let parsed: URL;
-    try {
-      parsed = new URL(origin);
-    } catch {
-      throw new DOMException(`Invalid or untrustworthy origin: ${String(origin)}`, 'SecurityError');
-    }
-    if (!isPotentiallyTrustworthyOrigin(parsed)) {
-      throw new DOMException(`Invalid or untrustworthy origin: ${origin}`, 'SecurityError');
-    }
-  }
-}
-
-export function validateWebMcpAccess(ownerDocument: Document | null): void {
-  validateOriginAgentCluster();
-  if (!ownerDocument) return;
-
-  const DOMExceptionConstructor = ownerDocument.defaultView?.DOMException ?? DOMException;
-  let fullyActive = false;
-  try {
-    const ownerWindow = ownerDocument.defaultView;
-    fullyActive = Boolean(ownerWindow && ownerWindow.document === ownerDocument);
-  } catch {
-    // A navigated cross-origin WindowProxy is not the document's active window.
-  }
-  if (!fullyActive) {
-    throw new DOMExceptionConstructor(
-      'The associated document is not fully active',
-      'InvalidStateError'
-    );
-  }
-
-  const policy: unknown =
-    Reflect.get(ownerDocument, 'permissionsPolicy') ?? Reflect.get(ownerDocument, 'featurePolicy');
-  if (policy && typeof policy === 'object') {
-    const features = Reflect.get(policy, 'features');
-    const allowsFeature = Reflect.get(policy, 'allowsFeature');
-    if (typeof features === 'function' && typeof allowsFeature === 'function') {
-      const supported: unknown = Reflect.apply(features, policy, []);
-      if (Array.isArray(supported) && supported.includes('tools')) {
-        if (Reflect.apply(allowsFeature, policy, ['tools']) === true) return;
-        throw new DOMExceptionConstructor(
-          'WebMCP is disabled by Permissions Policy',
-          'NotAllowedError'
-        );
-      }
-    }
-  }
-
-  const ownerWindow = ownerDocument.defaultView;
-  if (!ownerWindow || ownerWindow.parent === ownerWindow) return;
-  try {
-    void ownerWindow.parent.document;
-    return;
-  } catch {
-    // Without native policy support, cross-origin frames fail closed.
-  }
-  throw new DOMExceptionConstructor(
-    'WebMCP in cross-origin frames requires native Permissions Policy support',
-    'NotAllowedError'
-  );
-}
-
-export function validateOriginAgentCluster(): void {
-  if (globalThis.originAgentCluster === false && globalThis.location?.protocol !== 'file:') {
-    throw new DOMException('', 'SecurityError');
-  }
-}
-
-export function validateExecutableOrigin(origin: unknown): void {
-  try {
-    if (new URL(String(origin)).origin !== 'null') return;
-  } catch {
-    // Invalid and opaque origins share the WebMCP NotSupportedError result.
-  }
-  throw new DOMException(`Unsupported tool origin: ${String(origin)}`, 'NotSupportedError');
-}
-
-function getStandardProps(value: unknown): Record<string, unknown> | null {
+function readStandardProperties(value: unknown): StandardProperties | null {
   if (!isPlainObject(value)) {
     return null;
   }
@@ -380,17 +272,32 @@ function getStandardProps(value: unknown): Record<string, unknown> | null {
 }
 
 function isStandardInputValidatorSchema(value: unknown): value is StandardInputValidatorSchema {
-  const standard = getStandardProps(value);
+  const standard = readStandardProperties(value);
   return Boolean(standard && standard.version === 1 && typeof standard.validate === 'function');
 }
 
 function isStandardInputJsonSchema(value: unknown): value is StandardInputJsonSchema {
-  const standard = getStandardProps(value);
+  const standard = readStandardProperties(value);
   if (!standard || standard.version !== 1 || !isPlainObject(standard.jsonSchema)) {
     return false;
   }
 
   return typeof standard.jsonSchema.input === 'function';
+}
+
+export function isMcpStandardSchema(
+  value: unknown
+): value is StandardSchemaWithJSON<WebMcpToolObjectInput> {
+  const standard = readStandardProperties(value);
+  return Boolean(
+    standard &&
+    standard.version === 1 &&
+    typeof standard.vendor === 'string' &&
+    typeof standard.validate === 'function' &&
+    isPlainObject(standard.jsonSchema) &&
+    typeof standard.jsonSchema.input === 'function' &&
+    typeof standard.jsonSchema.output === 'function'
+  );
 }
 
 function preserveStandardSchema(
@@ -442,10 +349,7 @@ export function normalizeInputSchema(
     );
   }
 
-  if (
-    inputSchema === null ||
-    (typeof inputSchema !== 'object' && typeof inputSchema !== 'function')
-  ) {
+  if (!isWebIdlObject(inputSchema)) {
     throw new TypeError('inputSchema must be an object');
   }
   const registeredInputSchema = serializeInputSchema(inputSchema);
@@ -469,7 +373,7 @@ export function normalizeInputSchema(
 }
 
 export function serializeInputSchema(schema: unknown): string {
-  if (schema === null || (typeof schema !== 'object' && typeof schema !== 'function')) {
+  if (!isWebIdlObject(schema)) {
     throw new TypeError('inputSchema must be an object');
   }
   const serialized = JSON.stringify(schema);

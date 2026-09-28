@@ -16,8 +16,7 @@ pnpm add @mcp-b/mcp-iframe
 
 Both pages must expose `document.modelContext`. The parent needs the MCP-B
 resource and prompt extensions from `@mcp-b/global` when the iframe exposes
-those capabilities. The deprecated `navigator.modelContext` surface is used
-only as a fallback for older runtimes.
+those capabilities.
 
 ## Use the default element
 

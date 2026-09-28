@@ -3,8 +3,9 @@ import type { WebMCP } from 'webmcp-types';
 
 test('ModelContext is the non-constructible Web IDL interface object', () => {
   const context = document.modelContext;
-  if (typeof ModelContext !== 'undefined') {
-    expectTypeOf(context instanceof ModelContext).toEqualTypeOf<boolean>();
+  const modelContextConstructor = globalThis.ModelContext;
+  if (modelContextConstructor !== undefined) {
+    expectTypeOf(context instanceof modelContextConstructor).toEqualTypeOf<boolean>();
   }
 
   // @ts-expect-error The interface object is only for branding and instanceof.
@@ -13,7 +14,9 @@ test('ModelContext is the non-constructible Web IDL interface object', () => {
   expectTypeOf<typeof ModelContext>().toExtend<
     | (Function & {
         readonly prototype: WebMCP.ModelContext;
-        [Symbol.hasInstance](value: unknown): value is WebMCP.ModelContext;
+        [Symbol.hasInstance](
+          value: Parameters<Function[typeof Symbol.hasInstance]>[0]
+        ): value is WebMCP.ModelContext;
       })
     | undefined
   >();

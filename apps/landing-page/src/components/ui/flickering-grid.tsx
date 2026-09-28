@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -30,23 +30,6 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
-
-  const memoizedColor = useMemo(() => {
-    const toRGBA = (color: string) => {
-      if (typeof window === 'undefined') {
-        return `rgba(0, 0, 0,`;
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = 1;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return 'rgba(255, 0, 0,';
-      ctx.fillStyle = color;
-      ctx.fillRect(0, 0, 1, 1);
-      const [r, g, b] = Array.from(ctx.getImageData(0, 0, 1, 1).data);
-      return `rgba(${r}, ${g}, ${b},`;
-    };
-    return toRGBA(color);
-  }, [color]);
 
   const setupCanvas = useCallback(
     (canvas: HTMLCanvasElement, width: number, height: number) => {
@@ -90,13 +73,12 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
       dpr: number
     ) => {
       ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = 'transparent';
-      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = color;
 
       for (let i = 0; i < cols; i++) {
         for (let j = 0; j < rows; j++) {
           const opacity = squares[i * rows + j];
-          ctx.fillStyle = `${memoizedColor}${opacity})`;
+          ctx.globalAlpha = opacity;
           ctx.fillRect(
             i * (squareSize + gridGap) * dpr,
             j * (squareSize + gridGap) * dpr,
@@ -105,8 +87,9 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
           );
         }
       }
+      ctx.globalAlpha = 1;
     },
-    [memoizedColor, squareSize, gridGap]
+    [color, squareSize, gridGap]
   );
 
   useEffect(() => {

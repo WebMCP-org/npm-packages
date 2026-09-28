@@ -240,9 +240,6 @@ Runtime dispatch behavior in the browser embed/widget layer:
   upstream API.
 - Refreshes the descriptor before every invocation so Chrome never receives a
   stale registration object.
-- When older Chrome requires JSON-string input, configure
-  `window.__webModelContextOptions.nativeExecuteToolInput = 'json'` before
-  loading `@mcp-b/global`; its bridge translates the relay's object input.
 
 ### WebMCP Standard Status
 

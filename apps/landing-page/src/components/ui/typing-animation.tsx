@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useInView } from 'motion/react';
-import type { ElementType, RefObject } from 'react';
+import type { ElementType } from 'react';
 import type { MotionProps } from 'motion/react';
 
 import { cn } from '@/lib/utils';
@@ -49,8 +49,8 @@ export function TypingAnimation({
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [currentCharIndex, setCurrentCharIndex] = useState(0);
   const [phase, setPhase] = useState<'typing' | 'pause' | 'deleting'>('typing');
-  const elementRef = useRef<HTMLElement | null>(null);
-  const isInView = useInView(elementRef as RefObject<Element>, {
+  const elementRef = useRef<Element>(null);
+  const isInView = useInView(elementRef, {
     amount: 0.3,
     once: true,
   });

@@ -55,7 +55,7 @@ describe('isLoopbackHost', () => {
 
 describe('createRequestId', () => {
   it('returns a string', () => {
-    expect(typeof createRequestId()).toBe('string');
+    expect(createRequestId()).toBeTypeOf('string');
   });
 
   it('returns crypto.randomUUID', () => {

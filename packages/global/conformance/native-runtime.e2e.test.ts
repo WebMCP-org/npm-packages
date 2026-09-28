@@ -8,17 +8,12 @@ type ModelContext = Omit<WebMCP.ModelContext, 'executeTool'> & {
 type ModelContextTool = WebMCP.ModelContextTool;
 type RegisteredTool = WebMCP.RegisteredTool;
 
-type NativeRegisterTool = (
-  tool: ModelContextTool,
-  options?: { signal?: AbortSignal }
-) => Promise<void>;
-
 type NativeExecuteTool = NonNullable<ModelContext['executeTool']>;
 
 const registeredControllers: AbortController[] = [];
 
 function requireNativeModelContext(): ModelContext {
-  const modelContext = document.modelContext as ModelContext | undefined;
+  const modelContext = document.modelContext;
   if (!modelContext) {
     throw new Error('Expected native document.modelContext with WebMCP enabled');
   }
@@ -26,9 +21,8 @@ function requireNativeModelContext(): ModelContext {
 }
 
 function getNativeExecuteTool(modelContext: ModelContext): NativeExecuteTool | undefined {
-  return typeof modelContext.executeTool === 'function'
-    ? modelContext.executeTool.bind(modelContext)
-    : undefined;
+  const executeTool = modelContext.executeTool;
+  return typeof executeTool === 'function' ? executeTool.bind(modelContext) : undefined;
 }
 
 function uniqueToolName(prefix: string): string {
@@ -45,7 +39,7 @@ async function listNativeToolNames(): Promise<string[]> {
 
 function registerNativeTool(tool: ModelContextTool, signal?: AbortSignal): Promise<void> {
   const modelContext = requireNativeModelContext();
-  const registerTool = modelContext.registerTool as NativeRegisterTool;
+  const registerTool = modelContext.registerTool;
   return registerTool.call(modelContext, tool, signal ? { signal } : undefined);
 }
 
@@ -72,9 +66,9 @@ describe('Native WebMCP conformance', () => {
   it('exposes the standard document.modelContext surface', () => {
     const modelContext = requireNativeModelContext();
 
-    expect(typeof modelContext.registerTool).toBe('function');
-    expect(typeof modelContext.getTools).toBe('function');
-    expect(typeof modelContext.addEventListener).toBe('function');
+    expect(modelContext.registerTool).toBeTypeOf('function');
+    expect(modelContext.getTools).toBeTypeOf('function');
+    expect(modelContext.addEventListener).toBeTypeOf('function');
     expect('unregisterTool' in modelContext).toBe(false);
     expect('provideContext' in modelContext).toBe(false);
     expect('clearContext' in modelContext).toBe(false);

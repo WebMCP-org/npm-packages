@@ -114,7 +114,6 @@ initializeWebModelContext({
   transport: {
     tabServer: { allowedOrigins: ['https://app.example'] },
   },
-  installTestingShim: true,
 });
 ```
 
@@ -123,12 +122,11 @@ initialization before the module body can configure it.
 
 Useful options:
 
-| Option                   | Default | Purpose                                                               |
-| ------------------------ | ------- | --------------------------------------------------------------------- |
-| `autoInitialize`         | `true`  | Disable when you want to call `initializeWebModelContext()` yourself  |
-| `transport.tabServer`    | auto    | Configure or disable the tab transport                                |
-| `transport.iframeServer` | auto    | Configure or disable iframe transport                                 |
-| `installTestingShim`     | `true`  | Install `navigator.modelContextTesting` when no implementation exists |
+| Option                   | Default | Purpose                                                              |
+| ------------------------ | ------- | -------------------------------------------------------------------- |
+| `autoInitialize`         | `true`  | Disable when you want to call `initializeWebModelContext()` yourself |
+| `transport.tabServer`    | auto    | Configure or disable the tab transport                               |
+| `transport.iframeServer` | auto    | Configure or disable iframe transport                                |
 
 The initializer is side-effect-only. Repeated and cross-bundle calls are no-ops;
 application code continues through `document.modelContext`.
@@ -139,18 +137,14 @@ Initialization does four things:
 
 1. Calls `installWebMCP()` from `@mcp-b/webmcp-polyfill` if no native
    `document.modelContext` exists. The package bundles the pinned upstream
-   implementation; its deprecated `initializeWebMCPPolyfill()` alias remains
-   available to existing callers.
+   implementation.
 2. Captures the current strict core context as `native`.
 3. Creates a `BrowserMcpServer` with `{ native }`.
 4. Replaces `document.modelContext` with that server so strict core calls mirror
    down while MCP-B extensions remain available.
 
-`@mcp-b/global` owns the deprecated `navigator.modelContext` alias and the
-optional `navigator.modelContextTesting` shim. The standalone core polyfill
-does not install either surface. Global adds these extensions when it wraps a
-native context or an upstream polyfill that the app installed earlier.
-Declarative forms and MCP `outputSchema` also belong to `@mcp-b/global`.
+Declarative forms, prompts, resources, transports, and MCP `outputSchema` belong
+to `@mcp-b/global`. All packages use `document.modelContext` for the browser API.
 
 ## Output schemas
 
@@ -170,12 +164,9 @@ Quick console checks:
 
 ```ts
 console.log(Boolean(document.modelContext));
-console.log(Boolean(navigator.modelContextTesting));
 
 const tools = await document.modelContext.getTools();
 console.log(tools.map((tool) => tool.name));
 ```
 
-Use `navigator.modelContextTesting` only for MCP-B compatibility tests and
-older tooling. Current native Chrome tests use `getTools()` and the
-object-input `executeTool()` method from upstream WebMCP types.
+Use `getTools()` and object-input `executeTool()` from upstream WebMCP types.

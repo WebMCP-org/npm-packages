@@ -3,11 +3,15 @@ import type { JSONRPCMessage, Transport, TransportSendOptions } from '@modelcont
 
 /** The runtime Port methods used by this transport, independent of Chrome ambient types. */
 export interface ExtensionPort {
-  postMessage(message: unknown): void;
+  postMessage(message: JSONRPCMessage | { type: 'keep-alive'; timestamp: number }): void;
   disconnect(): void;
   onMessage: {
-    addListener(callback: (message: unknown) => void): void;
-    removeListener(callback: (message: unknown) => void): void;
+    addListener(
+      callback: (message: Parameters<typeof JSONRPCMessageSchema.parse>[0]) => void
+    ): void;
+    removeListener(
+      callback: (message: Parameters<typeof JSONRPCMessageSchema.parse>[0]) => void
+    ): void;
   };
   onDisconnect: {
     addListener(callback: () => void): void;
@@ -27,7 +31,9 @@ export class ExtensionServerTransport implements Transport {
   private _port: ExtensionPort | undefined;
   private _started = false;
   private _closed = false;
-  private _messageHandler: ((message: unknown) => void) | undefined;
+  private _messageHandler:
+    | ((message: Parameters<typeof JSONRPCMessageSchema.parse>[0]) => void)
+    | undefined;
   private _disconnectHandler: (() => void) | undefined;
   private _keepAliveTimer: ReturnType<typeof setInterval> | undefined;
   private readonly _keepAliveInterval: number | undefined;
@@ -60,7 +66,7 @@ export class ExtensionServerTransport implements Transport {
     const port = this._port;
     if (!port) throw new Error('Port not available');
 
-    this._messageHandler = (message: unknown) => {
+    this._messageHandler = (message) => {
       this._connectionInfo.lastMessageAt = Date.now();
       this._connectionInfo.messageCount++;
       try {

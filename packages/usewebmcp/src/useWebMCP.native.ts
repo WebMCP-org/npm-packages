@@ -13,8 +13,8 @@ function requireNativeModelContext() {
 
 beforeAll(() => {
   const context = requireNativeModelContext();
-  expect(typeof context.registerTool).toBe('function');
-  expect(typeof context.getTools).toBe('function');
+  expect(context.registerTool).toBeTypeOf('function');
+  expect(context.getTools).toBeTypeOf('function');
 });
 
 it('registers, executes, and cleans up through native WebMCP in StrictMode', async () => {

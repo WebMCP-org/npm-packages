@@ -18,7 +18,12 @@ export type ModelContext = NonNullable<Document['modelContext']>;
 // App-specific types (not in packages)
 // ============================================================================
 
-export interface DetectionResult {
-  isNative: boolean;
-  message: string;
+export type DetectionResult =
+  | { isNative: true; message: string; context: ModelContext }
+  | { isNative: false; message: string };
+
+declare global {
+  interface Window {
+    __WEBMCP_SHOWCASE_RAW_SURFACE__?: Record<string, boolean>;
+  }
 }

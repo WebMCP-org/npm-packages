@@ -63,7 +63,7 @@ async function restoreFiles(originalFileContents) {
   await Promise.all(
     filesToRestore.map(async (filePath) => {
       const original = originalFileContents.get(filePath);
-      if (typeof original === 'string') {
+      if (original !== undefined) {
         await writeFile(filePath, original, 'utf8');
       }
     })

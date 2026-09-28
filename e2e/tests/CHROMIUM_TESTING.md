@@ -1,6 +1,6 @@
 # Chromium native contract testing
 
-This guide separates native Chrome coverage from MCP-B compatibility coverage.
+This guide describes native Chrome and MCP-B runtime coverage.
 
 ## Native boundary
 
@@ -10,11 +10,9 @@ runtime or polyfill. They use:
 - `registerTool(tool, { signal })`
 - `await getTools()`
 - `toolchange` events
-- Chrome's optional `executeTool(registeredTool, inputJson)` extension
+- `executeTool(registeredTool, inputObject)`
 
-`executeTool()` receives a descriptor returned by `getTools()`. Tests
-feature-detect the method because it is a Chromium preview extension, not strict
-WebMCP core.
+`executeTool()` receives a descriptor returned by `getTools()`. Calls use the object-input contract from upstream `webmcp-types`.
 
 Current Chrome no longer exposes `navigator.modelContext` as the canonical
 surface. `navigator.modelContextTesting` is also outside the current native
@@ -61,38 +59,12 @@ Relevant files:
 - `playwright-chrome-beta-webmcp.config.ts`
 - `playwright-native-showcase.config.ts`
 
-## MCP-B compatibility lane
+## MCP-B runtime coverage
 
-`tests/chromium-native-api.spec.ts` has a historical filename. It runs against
-the `@mcp-b/global` test app in ordinary Playwright Chromium and intentionally
-checks:
-
-- MCP-B `listTools()` and signal-owned registration cleanup
-- the deprecated `navigator.modelContextTesting` compatibility shim
-- shim execution, event, and error behavior
-
-It is runtime integration coverage, not native Chromium conformance.
-
-Run it from `e2e/`:
+The ordinary Playwright Chromium lane verifies the global runtime through
+`document.modelContext`, MCP transports, and iframe bridges. Run it from `e2e/`:
 
 ```bash
-pnpm test:chromium-native-api
+pnpm test:runtime-contract
+pnpm test:tab-transport
 ```
-
-Testing call history, mock responses, arbitrary by-name unregistration, and a
-global context reset have no current WebMCP replacement. Keep those assertions
-in compatibility suites rather than presenting them as native behavior.
-
-## Native showcase
-
-Run the interactive native lane with:
-
-```bash
-pnpm test:native-showcase
-pnpm test:native-showcase:headed
-pnpm test:native-showcase:ui
-```
-
-See
-[`web-standards-showcase/CHROMIUM_FLAGS.md`](../web-standards-showcase/CHROMIUM_FLAGS.md)
-for Chrome selection, launch flags, and troubleshooting.

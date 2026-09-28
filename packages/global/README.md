@@ -24,9 +24,9 @@
 
 ## Package Selection
 
-- Use upstream `webmcp-types` for standard browser contracts and `@mcp-b/webmcp-ts-sdk` for MCP-B extensions and compatibility types.
+- Use upstream `webmcp-types` for standard browser contracts and `@mcp-b/webmcp-ts-sdk` for MCP-B extensions.
 - Use `@mcp-b/webmcp-polyfill` when you only need strict WebMCP runtime polyfill behavior.
-- Use `@mcp-b/global` when you want MCPB integration features (bridge transport, prompts/resources, testing helpers, extension APIs).
+- Use `@mcp-b/global` when you want MCPB integration features (bridge transport, prompts/resources, extension APIs).
 
 ## Upstream runtime
 
@@ -38,9 +38,7 @@ upstream `webmcp-types` declarations. Consumers do not install or build a Git
 dependency.
 
 `@mcp-b/global` layers MCP-B transports, prompts, resources, declarative forms,
-the deprecated `navigator.modelContext` alias, and the optional
-`navigator.modelContextTesting` shim on the upstream runtime. It also provides
-MCP `outputSchema` metadata and structured MCP responses. Existing native
+MCP `outputSchema` metadata, and structured MCP responses on the upstream runtime. Existing native
 contexts take precedence and receive the same MCP-B extensions when wrapped,
 including when the upstream polyfill was installed before `@mcp-b/global`.
 `cleanupWebModelContext()` removes the MCP-B adapter and its form registrations;
@@ -48,15 +46,6 @@ the upstream context remains installed for the document lifetime. The core
 polyfill does not provide these MCP-B extensions.
 
 `executeTool(tool, inputObject)` follows the current draft and returns JSON.
-The existing string-input overload remains supported and preserves the older
-Chrome result convention. For an older native Chrome context that accepts JSON
-strings, set `nativeExecuteToolInput: 'json'` before automatic initialization:
-
-```html
-<script>
-  window.__webModelContextOptions = { nativeExecuteToolInput: 'json' };
-</script>
-```
 
 ## Quick Start
 
@@ -290,15 +279,13 @@ Tools may return an MCP `CallToolResult` object:
 interface WebModelContextInitOptions {
   transport?: TransportConfiguration;
   autoInitialize?: boolean;
-  installTestingShim?: boolean;
 }
 ```
 
-| Option               | Default     | Description                                                                     |
-| -------------------- | ----------- | ------------------------------------------------------------------------------- |
-| `transport`          | Auto-detect | Transport layer configuration (tab server and/or iframe)                        |
-| `autoInitialize`     | `true`      | Whether to auto-initialize on import                                            |
-| `installTestingShim` | `true`      | Installs `navigator.modelContextTesting` only when no implementation is present |
+| Option           | Default     | Description                                              |
+| ---------------- | ----------- | -------------------------------------------------------- |
+| `transport`      | Auto-detect | Transport layer configuration (tab server and/or iframe) |
+| `autoInitialize` | `true`      | Whether to auto-initialize on import                     |
 
 ### Transport Configuration
 
@@ -359,18 +346,14 @@ To prevent auto-initialization:
 
 ## Testing
 
-`navigator.modelContextTesting` provides a testing shim that stays in sync with registered tools:
+Use the same document API as application code:
 
 ```typescript
-// List registered tools
-const tools = navigator.modelContextTesting?.listTools();
-// [{ name: 'search-products', description: '...', inputSchema: '...' }]
-
-// Execute a tool (input args as JSON string)
-const result = await navigator.modelContextTesting?.executeTool(
-  'search-products',
-  '{"query": "laptop"}'
-);
+const context = document.modelContext;
+if (!context) throw new Error('WebMCP is unavailable');
+const tool = (await context.getTools()).find(({ name }) => name === 'search-products');
+if (!tool) throw new Error('Search tool is unavailable');
+const result = JSON.parse(await context.executeTool(tool, { query: 'laptop' }));
 ```
 
 ## Feature Detection
@@ -553,12 +536,12 @@ import type { TransportConfiguration, WebModelContextInitOptions } from '@mcp-b/
 ```
 
 Import core browser contracts from upstream `webmcp-types`. Use
-`@mcp-b/webmcp-ts-sdk` for MCP-B extensions and compatibility types.
+`@mcp-b/webmcp-ts-sdk` for MCP-B extensions.
 
 ## Tool Routing Contract
 
 - MCP `tools/list`, `tools/call`, and tool list update notifications are sourced from the `BrowserMcpServer` registry.
-- Native and polyfill tool backfill use `getTools()` plus `executeTool()` when present, with `navigator.modelContextTesting` kept for preview/testing compatibility.
+- Native and polyfill tool backfill use `getTools()` and object-input `executeTool()`.
 
 ## Related Packages
 

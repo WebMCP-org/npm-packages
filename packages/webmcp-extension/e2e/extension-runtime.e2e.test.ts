@@ -1,3 +1,4 @@
+import type { AddressInfo } from 'node:net';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
@@ -6,6 +7,10 @@ import { dirname, resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { chromium, type BrowserContext, type Page } from 'playwright';
+
+function isTcpAddress(address: AddressInfo | string | null): address is AddressInfo {
+  return address !== null && typeof address !== 'string';
+}
 
 const packageDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const extensionDirectory = resolve(packageDirectory, 'e2e/dist/extension');
@@ -182,7 +187,7 @@ before(async () => {
     server.listen(0, '127.0.0.1', resolvePromise);
   });
   const address = server.address();
-  if (!address || typeof address === 'string') throw new Error('Fixture server has no TCP port');
+  if (!isTcpAddress(address)) throw new Error('Fixture server has no TCP port');
   origin = `http://127.0.0.1:${address.port}`;
 });
 

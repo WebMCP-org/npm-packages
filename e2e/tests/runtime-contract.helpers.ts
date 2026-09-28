@@ -4,9 +4,12 @@ import {
   DYNAMIC_TOOL_NAME,
   firstTextContent,
   getCanonicalToolNames,
+  type RuntimeToolArguments,
 } from '../runtime-contract/core.js';
+import type { JsonObject } from '@mcp-b/webmcp-ts-sdk';
 
 export { DYNAMIC_TOOL_NAME, firstTextContent, getCanonicalToolNames };
+export type { RuntimeToolArguments } from '../runtime-contract/core.js';
 
 export async function waitForRuntimePage(page: Page, path: string): Promise<void> {
   await page.goto(path);
@@ -49,7 +52,7 @@ export async function listClientToolNames(page: Page): Promise<string[]> {
 export async function callClientTool(
   page: Page,
   name: string,
-  args: Record<string, unknown>
+  args: RuntimeToolArguments
 ): Promise<CallToolResult | undefined> {
   return page.evaluate(
     async ({ toolName, toolArgs }) => {
@@ -65,7 +68,7 @@ export async function callClientTool(
 export async function callClientToolForError(
   page: Page,
   name: string,
-  args: Record<string, unknown>
+  args: RuntimeToolArguments
 ): Promise<string> {
   return page.evaluate(
     async ({ toolName, toolArgs }) => {
@@ -101,7 +104,7 @@ export async function resetInvocations(host: RuntimeHost): Promise<void> {
 
 export async function readInvocations(
   host: RuntimeHost
-): Promise<Array<{ name: string; arguments: Record<string, unknown> }>> {
+): Promise<Array<{ name: string; arguments: JsonObject }>> {
   return host.evaluate(() => window.__WEBMCP_E2E__?.readInvocations() ?? []);
 }
 

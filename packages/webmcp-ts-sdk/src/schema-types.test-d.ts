@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
+import type { WebMcpToolObjectInput } from './common.js';
 import type {
-  CallToolResult,
   InferArgsFromInputSchema,
   InferJsonSchema,
   InputSchema,
@@ -9,11 +9,12 @@ import type {
   ModelContextWithExtensions,
   ToolDescriptor,
   ToolDescriptorFromSchema,
-  WebMcpToolInput,
 } from './index.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import type { JsonSchemaType } from '@modelcontextprotocol/server';
+import type { WebMCP } from 'webmcp-types';
 
-const closedSchema = {
+const inputSchema = {
   type: 'object',
   properties: {
     query: { type: 'string' },
@@ -33,15 +34,122 @@ const outputSchema = {
   additionalProperties: false,
 } as const satisfies JsonSchemaForInference;
 
-declare const runtimeSchema: InputSchema;
 declare const registerStandardTool: ModelContext['registerTool'];
 declare const registerTool: ModelContextWithExtensions['registerTool'];
+declare const runtimeSchema: InputSchema;
 
-test('JsonSchemaForInference is owned by the upstream MCP SDK', () => {
+type UpstreamInput<T extends object> = Parameters<
+  WebMCP.ModelContextToolFromSchema<T>['execute']
+>[0];
+
+test('JSON Schema constraints come from the MCP SDK', () => {
   expectTypeOf<JsonSchemaForInference>().toEqualTypeOf<JsonSchemaType>();
 });
 
-test('InferJsonSchema handles primitive, literal, union, and array schemas', () => {
+test('input inference delegates to the upstream WebMCP tool type', () => {
+  expectTypeOf<InferArgsFromInputSchema<typeof inputSchema>>().toEqualTypeOf<
+    UpstreamInput<typeof inputSchema>
+  >();
+
+  registerStandardTool({
+    name: 'search',
+    description: 'Search docs',
+    inputSchema,
+    execute(args) {
+      expectTypeOf(args).toEqualTypeOf<{ query: string; limit?: number }>();
+      return args.query;
+    },
+  });
+
+  registerTool({
+    name: 'search_summary',
+    description: 'Search with summary',
+    inputSchema,
+    outputSchema,
+    execute(args) {
+      expectTypeOf(args).toEqualTypeOf<{ query: string; limit?: number }>();
+      return { total: 1, items: [args.query] };
+    },
+  });
+});
+
+test('runtime schemas use upstream callback inference', () => {
+  registerStandardTool({
+    name: 'runtime',
+    description: 'Runtime schema',
+    inputSchema: runtimeSchema,
+    execute(args) {
+      expectTypeOf(args).toEqualTypeOf<UpstreamInput<InputSchema>>();
+      return args;
+    },
+  });
+});
+
+test('standard registration uses upstream array inference', () => {
+  registerStandardTool({
+    name: 'sum',
+    description: 'Sum numbers',
+    inputSchema: { type: 'array', items: { type: 'number' } },
+    execute(args) {
+      expectTypeOf(args).toEqualTypeOf<number[]>();
+      return args.length;
+    },
+  });
+});
+
+test('MCP-B output schemas infer structured content', () => {
+  type Output = InferJsonSchema<typeof outputSchema>;
+  expectTypeOf<Output>().toEqualTypeOf<{
+    total: number;
+    items?: string[];
+  }>();
+  expectTypeOf<InferJsonSchema<{ type: 'number' }>>().toEqualTypeOf<number>();
+
+  type ToolInput = Parameters<
+    ToolDescriptorFromSchema<typeof inputSchema, typeof outputSchema>['execute']
+  >[0];
+  expectTypeOf<ToolInput>().toEqualTypeOf<UpstreamInput<typeof inputSchema>>();
+
+  const descriptor = {
+    name: 'search_summary',
+    description: 'Search with summary',
+    inputSchema,
+    outputSchema,
+    execute: ({ query }) => ({ total: 1, items: [query] }),
+  } satisfies ToolDescriptorFromSchema<typeof inputSchema, typeof outputSchema>;
+  registerStandardTool(descriptor);
+
+  // @ts-expect-error total is required by outputSchema.
+  registerTool({
+    name: 'invalid_summary',
+    description: 'Invalid summary',
+    inputSchema,
+    outputSchema,
+    execute(args) {
+      return { items: [args.query] };
+    },
+  });
+
+  // @ts-expect-error wrapped responses must carry schema-compatible structuredContent.
+  registerTool({
+    name: 'invalid_wrapped_summary',
+    description: 'Invalid wrapped summary',
+    inputSchema,
+    outputSchema,
+    execute(args): CallToolResult {
+      return { content: [{ type: 'text', text: args.query }] };
+    },
+  });
+
+  const explicit: ToolDescriptor<{ id: string }, CallToolResult, 'lookup'> = {
+    name: 'lookup',
+    description: 'Look up an item',
+    execute: ({ id }) => ({ content: [{ type: 'text', text: id }] }),
+  };
+  expectTypeOf(explicit.name).toEqualTypeOf<'lookup'>();
+});
+
+test('MCP-B output inference retains primitive, literal, and array support', () => {
   expectTypeOf<InferJsonSchema<{ type: 'string' }>>().toEqualTypeOf<string>();
   expectTypeOf<InferJsonSchema<{ type: 'integer' }>>().toEqualTypeOf<number>();
   expectTypeOf<InferJsonSchema<{ type: 'boolean' }>>().toEqualTypeOf<boolean>();
@@ -54,174 +162,22 @@ test('InferJsonSchema handles primitive, literal, union, and array schemas', () 
   >();
   expectTypeOf<InferJsonSchema<{ type: 'array'; items: false }>>().toEqualTypeOf<never[]>();
   expectTypeOf<InferJsonSchema<{ type: 'array'; items: true }>>().toEqualTypeOf<unknown[]>();
-});
-
-test('typeless object keywords infer objects while unsupported compositions stay unknown', () => {
-  type ObjectValue = InferJsonSchema<{
-    properties: { query: { type: 'string' } };
-    required: ['query'];
-  }>;
-  expectTypeOf<ObjectValue>().toEqualTypeOf<{ query: string; [key: string]: unknown }>();
   expectTypeOf<InferJsonSchema<{}>>().toBeUnknown();
   expectTypeOf<InferJsonSchema<{ $ref: '#/$defs/item' }>>().toBeUnknown();
-  expectTypeOf<
-    InferJsonSchema<{ oneOf: [{ type: 'string' }, { type: 'number' }] }>
-  >().toBeUnknown();
 });
 
-test('object inference respects required keys and additional properties', () => {
-  type Closed = InferArgsFromInputSchema<typeof closedSchema>;
-  type Open = InferArgsFromInputSchema<{
-    type: 'object';
+test('MCP-B output object inference retains map and closed-object behavior', () => {
+  type OpenObject = InferJsonSchema<{
     properties: { query: { type: 'string' } };
     required: ['query'];
   }>;
-
-  expectTypeOf<Closed>().toEqualTypeOf<{ query: string; limit?: number }>();
-  expectTypeOf<Open>().toEqualTypeOf<{ query: string; [key: string]: unknown }>();
+  type UpstreamObject = { query: string } & WebMcpToolObjectInput;
+  expectTypeOf<OpenObject>().toMatchTypeOf<UpstreamObject>();
+  expectTypeOf<UpstreamObject>().toMatchTypeOf<OpenObject>();
+  expectTypeOf<InferJsonSchema<{ type: 'object'; additionalProperties: false }>>().toEqualTypeOf<
+    Record<string, never>
+  >();
   expectTypeOf<
-    InferArgsFromInputSchema<{ type: 'object'; additionalProperties: false }>
-  >().toEqualTypeOf<Record<string, never>>();
-
-  // @ts-expect-error query is required.
-  const missingQuery: Closed = {};
-  void missingQuery;
-});
-
-test('widened required arrays make known fields optional', () => {
-  type Args = InferArgsFromInputSchema<{
-    type: 'object';
-    properties: { query: { type: 'string' }; limit: { type: 'integer' } };
-    required: string[];
-  }>;
-  expectTypeOf<Args>().toEqualTypeOf<{
-    query?: string;
-    limit?: number;
-    [key: string]: unknown;
-  }>();
-});
-
-test('additionalProperties infers maps but keeps named extras unknown', () => {
-  type MapArgs = InferArgsFromInputSchema<{
-    type: 'object';
-    additionalProperties: { type: 'integer' };
-  }>;
-  type NamedArgs = InferArgsFromInputSchema<{
-    type: 'object';
-    properties: { query: { type: 'string' } };
-    required: ['query'];
-    additionalProperties: { type: 'integer' };
-  }>;
-
-  expectTypeOf<MapArgs>().toEqualTypeOf<Record<string, number>>();
-  expectTypeOf<NamedArgs>().toEqualTypeOf<{ query: string; [key: string]: unknown }>();
-});
-
-test('argument inference preserves arrays and safely widens runtime schemas', () => {
-  expectTypeOf<
-    InferArgsFromInputSchema<{ type: 'array'; items: { type: 'number' } }>
-  >().toEqualTypeOf<number[]>();
-  expectTypeOf<InferArgsFromInputSchema<InputSchema>>().toEqualTypeOf<WebMcpToolInput>();
-  expectTypeOf<InferArgsFromInputSchema<{}>>().toEqualTypeOf<WebMcpToolInput>();
-  expectTypeOf<InferArgsFromInputSchema<{ type: 'null' }>>().toEqualTypeOf<WebMcpToolInput>();
-  expectTypeOf<
-    InferArgsFromInputSchema<{
-      type: ['object', 'null'];
-      properties: { query: { type: 'string' } };
-      required: ['query'];
-      additionalProperties: false;
-    }>
-  >().toEqualTypeOf<{ query: string }>();
-});
-
-test('standard registration contextually infers literal object and array inputs', () => {
-  registerStandardTool({
-    name: 'search',
-    description: 'Search docs',
-    inputSchema: closedSchema,
-    execute(args) {
-      expectTypeOf(args).toEqualTypeOf<{ query: string; limit?: number }>();
-      return args.query;
-    },
-  });
-
-  registerStandardTool({
-    name: 'sum',
-    description: 'Sum numbers',
-    inputSchema: { type: 'array', items: { type: 'number' } },
-    execute(args) {
-      expectTypeOf(args).toEqualTypeOf<number[]>();
-      return args.length;
-    },
-  });
-});
-
-test('upstream registration uses a record fallback while MCP-B retains its compatibility input', () => {
-  registerStandardTool({
-    name: 'runtime',
-    description: 'Runtime schema',
-    inputSchema: runtimeSchema,
-    execute(args) {
-      expectTypeOf(args).toEqualTypeOf<Record<string, unknown>>();
-      return args;
-    },
-  });
-
-  type Args = Parameters<ToolDescriptorFromSchema<InputSchema>['execute']>[0];
-  expectTypeOf<Args>().toEqualTypeOf<WebMcpToolInput>();
-});
-
-test('extension registration infers and enforces structured output', () => {
-  registerTool({
-    name: 'search_summary',
-    description: 'Search with summary',
-    inputSchema: closedSchema,
-    outputSchema,
-    execute(args) {
-      return { total: 1, items: [args.query] };
-    },
-  });
-
-  // @ts-expect-error total is required by outputSchema.
-  registerTool({
-    name: 'invalid_summary',
-    description: 'Invalid summary',
-    inputSchema: closedSchema,
-    outputSchema,
-    execute(args) {
-      return { items: [args.query] };
-    },
-  });
-
-  // @ts-expect-error wrapped responses must carry schema-compatible structuredContent.
-  registerTool({
-    name: 'invalid_wrapped_summary',
-    description: 'Invalid wrapped summary',
-    inputSchema: closedSchema,
-    outputSchema,
-    execute(args): CallToolResult {
-      return { content: [{ type: 'text', text: args.query }] };
-    },
-  });
-});
-
-test('typed extension descriptors remain compatible with the standard document surface', () => {
-  const descriptor = {
-    name: 'search_summary',
-    description: 'Search with summary',
-    inputSchema: closedSchema,
-    outputSchema,
-    execute: ({ query }) => ({ total: 1, items: [query] }),
-  } satisfies ToolDescriptorFromSchema<typeof closedSchema, typeof outputSchema>;
-
-  registerStandardTool(descriptor);
-});
-
-test('explicit descriptors remain available when inference is not enough', () => {
-  const descriptor: ToolDescriptor<{ id: string }, CallToolResult, 'lookup'> = {
-    name: 'lookup',
-    description: 'Look up an item',
-    execute: ({ id }) => ({ content: [{ type: 'text', text: id }] }),
-  };
-  expectTypeOf(descriptor.name).toEqualTypeOf<'lookup'>();
+    InferJsonSchema<{ type: 'object'; additionalProperties: { type: 'integer' } }>
+  >().toEqualTypeOf<Record<string, number>>();
 });

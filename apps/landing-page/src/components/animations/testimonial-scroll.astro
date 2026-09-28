@@ -12,7 +12,11 @@ interface Testimonial {
   suffix?: string;
 }
 
-const { testimonials } = Astro.props as { testimonials: Testimonial[] };
+interface Props {
+  testimonials: Testimonial[];
+}
+
+const { testimonials } = Astro.props;
 
 const firstRow = testimonials.slice(0, Math.ceil(testimonials.length / 2));
 const secondRow = testimonials.slice(Math.ceil(testimonials.length / 2));

@@ -28,7 +28,6 @@ interface DotPatternProps extends React.SVGProps<SVGSVGElement> {
   cr?: number;
   className?: string;
   glow?: boolean;
-  [key: string]: unknown;
 }
 
 /**

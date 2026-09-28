@@ -187,7 +187,7 @@
           throw new Error(`Tool not found: ${name}`);
         }
 
-        const serialized = await modelContext.executeTool(tool, JSON.stringify(args));
+        const serialized = await modelContext.executeTool(tool, args);
         if (serialized === null) {
           throw new Error('Tool execution was interrupted');
         }

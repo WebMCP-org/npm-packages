@@ -27,13 +27,22 @@ export function detectNativeAPI(): DetectionResult {
   return {
     isNative: true,
     message: 'Native Chromium Web Model Context API detected in the native-only showcase.',
+    context,
   };
 }
 
 /**
  * Get detailed API information for debugging
  */
-export function getAPIInfo(): Record<string, unknown> {
+export interface NativeApiInfo {
+  modelContext: {
+    available: boolean;
+    methods: string[];
+    constructorName: string | undefined;
+  };
+}
+
+export function getAPIInfo(): NativeApiInfo {
   const ctx = document.modelContext;
 
   return {

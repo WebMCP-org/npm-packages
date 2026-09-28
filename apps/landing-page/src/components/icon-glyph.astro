@@ -1,11 +1,4 @@
 ---
-interface Props {
-  name: string;
-  className?: string;
-}
-
-const { name, className = "" } = Astro.props as Props;
-
 const icons = {
   "arrow-right": {
     viewBox: "0 0 14 14",
@@ -54,7 +47,13 @@ const icons = {
   },
 } as const;
 
-const icon = icons[name as keyof typeof icons];
+interface Props {
+  name: keyof typeof icons;
+  className?: string;
+}
+
+const { name, className = "" } = Astro.props;
+const icon = icons[name];
 
 if (!icon) {
   throw new Error(`Unknown icon glyph: ${name}`);

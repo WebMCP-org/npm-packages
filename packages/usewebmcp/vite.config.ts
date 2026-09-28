@@ -3,6 +3,10 @@ import { defineConfig } from 'vite-plus';
 
 const isCI = process.env.CI === 'true';
 const native = process.env.WEBMCP_NATIVE === '1';
+const launchArgs = [native ? '--enable-features=WebMCP' : '--disable-features=WebMCP'];
+const launchOptions = process.env.CHROME_BIN
+  ? { executablePath: process.env.CHROME_BIN, args: launchArgs }
+  : { args: launchArgs };
 
 export default defineConfig({
   // Prebundle every React test entry to avoid reloads that invalidate render counts.
@@ -32,10 +36,7 @@ export default defineConfig({
     browser: {
       enabled: true,
       provider: playwright({
-        launchOptions: {
-          ...(process.env.CHROME_BIN ? { executablePath: process.env.CHROME_BIN } : {}),
-          args: [native ? '--enable-features=WebMCP' : '--disable-features=WebMCP'],
-        },
+        launchOptions,
       }),
       instances: [{ browser: 'chromium' }],
       headless: true,

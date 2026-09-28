@@ -3,27 +3,24 @@
 
 // Import the global package to initialize document.modelContext
 import '@mcp-b/global';
-import type { BrowserMcpServer, PromptDescriptor, ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
-import type { ModelContextTesting } from '@mcp-b/global';
+import { type PromptDescriptor, type ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
 import type { RegistrationHandle, ToolDescriptor } from '@mcp-b/webmcp-ts-sdk';
+import { requireBrowserMcpServer } from './browser-mcp-server.js';
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) {
     throw new Error(`Required DOM element not found: ${id}`);
   }
+  // SAFETY: Call sites name static fixture elements and pass their authored HTML element type.
   return element as T;
 }
 
-const modelContext = document.modelContext as BrowserMcpServer;
+const modelContext = requireBrowserMcpServer();
 const baseToolControllers: AbortController[] = [];
 let baseResourceRegistrations: RegistrationHandle[] = [];
 let basePromptRegistrations: RegistrationHandle[] = [];
 let dynamicToolController: AbortController | null = null;
-
-function getTestingAPI(): ModelContextTesting | undefined {
-  return navigator.modelContextTesting;
-}
 
 type RegisteredToolDescriptor = ToolDescriptor & { inputSchema: object };
 
@@ -89,9 +86,6 @@ const callDynamicBtn = requireElement<HTMLButtonElement>('call-dynamic');
 const replaceBaseToolsBtn = requireElement<HTMLButtonElement>('replace-base-tools');
 const listAllToolsBtn = requireElement<HTMLButtonElement>('list-all-tools');
 const clearLogBtn = requireElement<HTMLButtonElement>('clear-log');
-
-const testingApiStatusEl = requireElement<HTMLDivElement>('testing-api-status');
-const checkTestingApiBtn = requireElement<HTMLButtonElement>('check-testing-api');
 
 // Resource DOM elements
 const resourcesStatusEl = requireElement<HTMLDivElement>('resources-status');
@@ -673,35 +667,6 @@ function unregisterDynamicPrompt() {
   }
 }
 
-// Check if modelContextTesting API is available
-function checkTestingAPI() {
-  if (testingApiStatusEl) {
-    if ('modelContextTesting' in navigator) {
-      const testingAPI = getTestingAPI();
-      const isNative =
-        testingAPI && !testingAPI.constructor.name.includes('WebModelContextTesting');
-
-      testingApiStatusEl.textContent = `Testing API: Available ✅ (${isNative ? 'Native' : 'Polyfill'})`;
-      testingApiStatusEl.style.background = '#d4edda';
-      testingApiStatusEl.setAttribute('data-testing-api', 'available');
-      testingApiStatusEl.setAttribute('data-testing-api-type', isNative ? 'native' : 'polyfill');
-
-      log(
-        `navigator.modelContextTesting is available (${isNative ? 'Native' : 'Polyfill'})`,
-        'success'
-      );
-
-      const methods = ['listTools', 'executeTool', 'addEventListener'];
-      log(`Available methods: ${methods.join(', ')}`, 'info');
-    } else {
-      testingApiStatusEl.textContent = 'Testing API: Not Available ❌';
-      testingApiStatusEl.style.background = '#f8d7da';
-      testingApiStatusEl.setAttribute('data-testing-api', 'unavailable');
-      log('navigator.modelContextTesting is NOT available', 'error');
-    }
-  }
-}
-
 // Event listeners
 incrementBtn.addEventListener('click', () => {
   log('Increment button clicked (would call incrementCounter tool)', 'info');
@@ -731,8 +696,6 @@ clearLogBtn.addEventListener('click', () => {
   log('Log cleared');
 });
 
-checkTestingApiBtn.addEventListener('click', checkTestingAPI);
-
 // Resource event listeners
 registerBaseResourcesBtn.addEventListener('click', registerBaseResources);
 registerDynamicResourceBtn.addEventListener('click', registerDynamicResource);
@@ -743,43 +706,6 @@ registerBasePromptsBtn.addEventListener('click', registerBasePrompts);
 registerDynamicPromptBtn.addEventListener('click', registerDynamicPrompt);
 unregisterDynamicPromptBtn.addEventListener('click', unregisterDynamicPrompt);
 
-// Historical MCP-B compatibility event listeners
-const chromiumButtons = {
-  unregisterTool: document.getElementById('chromium-unregister-tool'),
-  clearContext: document.getElementById('chromium-clear-context'),
-  executeTool: document.getElementById('chromium-execute-tool'),
-  listTools: document.getElementById('chromium-list-tools'),
-  callbackRegister: document.getElementById('chromium-test-callback-register'),
-  callbackUnregister: document.getElementById('chromium-test-callback-unregister'),
-  callbackProvide: document.getElementById('chromium-test-callback-provide'),
-  callbackClear: document.getElementById('chromium-test-callback-clear'),
-};
-
-if (chromiumButtons.unregisterTool) {
-  chromiumButtons.unregisterTool.addEventListener('click', testChromiumUnregisterTool);
-}
-if (chromiumButtons.clearContext) {
-  chromiumButtons.clearContext.addEventListener('click', testChromiumClearContext);
-}
-if (chromiumButtons.executeTool) {
-  chromiumButtons.executeTool.addEventListener('click', testChromiumExecuteTool);
-}
-if (chromiumButtons.listTools) {
-  chromiumButtons.listTools.addEventListener('click', testChromiumListTools);
-}
-if (chromiumButtons.callbackRegister) {
-  chromiumButtons.callbackRegister.addEventListener('click', testChromiumCallbackRegister);
-}
-if (chromiumButtons.callbackUnregister) {
-  chromiumButtons.callbackUnregister.addEventListener('click', testChromiumCallbackUnregister);
-}
-if (chromiumButtons.callbackProvide) {
-  chromiumButtons.callbackProvide.addEventListener('click', testChromiumCallbackProvide);
-}
-if (chromiumButtons.callbackClear) {
-  chromiumButtons.callbackClear.addEventListener('click', testChromiumCallbackClear);
-}
-
 // Initialize
 updateCounterDisplay();
 log('Application initialized');
@@ -787,477 +713,6 @@ log('Application initialized');
 if (checkAPIAvailability()) {
   void registerBaseTools().then(() => {
     log('✅ Test app ready! Use buttons to test two-bucket system.', 'success');
-  });
-}
-
-// Historical MCP-B compatibility test functions
-
-// Test compatibility removal
-function testChromiumUnregisterTool() {
-  try {
-    log('Testing MCP-B compatibility removal...', 'info');
-
-    if (!hasRegisteredTool(DYNAMIC_TOOL_NAME)) {
-      log('No dynamic tool registered. Register one first.', 'error');
-      return;
-    }
-
-    const toolName = DYNAMIC_TOOL_NAME;
-    dynamicToolController?.abort();
-    dynamicToolController = null;
-
-    dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
-    dynamicStatusEl.style.background = '#f5f5f5';
-    registerDynamicBtn.disabled = false;
-    unregisterDynamicBtn.disabled = true;
-    callDynamicBtn.disabled = true;
-
-    log(`Tool unregistered via AbortSignal cleanup: ${toolName}`, 'success');
-  } catch (error) {
-    log(`AbortSignal cleanup failed: ${error}`, 'error');
-  }
-}
-
-// Test AbortSignal cleanup.
-function testChromiumClearContext() {
-  try {
-    log('Testing AbortSignal cleanup...', 'info');
-
-    for (const controller of baseToolControllers.splice(0)) {
-      controller.abort();
-    }
-    if (dynamicToolController) {
-      dynamicToolController.abort();
-      dynamicToolController = null;
-    }
-
-    dynamicStatusEl.textContent = 'Dynamic tool status: Not registered';
-    dynamicStatusEl.style.background = '#f5f5f5';
-    registerDynamicBtn.disabled = false;
-    unregisterDynamicBtn.disabled = true;
-    callDynamicBtn.disabled = true;
-
-    log('All tools cleared via AbortSignal cleanup', 'success');
-  } catch (error) {
-    log(`AbortSignal cleanup failed: ${error}`, 'error');
-  }
-}
-
-// Test deprecated testing-shim execution
-async function testChromiumExecuteTool() {
-  if (!('modelContextTesting' in navigator)) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  const testingAPI = getTestingAPI();
-  if (!testingAPI) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  try {
-    log('Testing compatibility executeTool()...', 'info');
-
-    const tools = await modelContext.getTools();
-    if (tools.length === 0) {
-      log('No tools registered. Register tools first.', 'error');
-      return;
-    }
-
-    const firstTool = tools[0];
-    if (!firstTool) {
-      log('No tool available to execute', 'error');
-      return;
-    }
-    const inputJson = JSON.stringify({});
-
-    log(`Calling executeTool("${firstTool.name}", "${inputJson}")`, 'info');
-    const result = await testingAPI.executeTool(firstTool.name, inputJson);
-
-    log(`executeTool() succeeded with result: ${JSON.stringify(result)}`, 'success');
-  } catch (error) {
-    log(`executeTool() failed: ${error}`, 'error');
-  }
-}
-
-// Test deprecated testing-shim discovery
-function testChromiumListTools() {
-  if (!('modelContextTesting' in navigator)) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  const testingAPI = getTestingAPI();
-  if (!testingAPI) {
-    log('modelContextTesting API not available', 'error');
-    return;
-  }
-
-  try {
-    log('Testing compatibility listTools()...', 'info');
-
-    const tools = testingAPI.listTools();
-    log(`listTools() returned ${tools.length} tools`, 'success');
-
-    if (tools.length > 0) {
-      const firstTool = tools[0];
-      if (!firstTool) {
-        return;
-      }
-      log(`First tool: ${firstTool.name}`, 'info');
-      log(`inputSchema is string: ${typeof firstTool.inputSchema === 'string'}`, 'info');
-
-      // Verify it's valid JSON
-      try {
-        if (typeof firstTool.inputSchema === 'string') {
-          JSON.parse(firstTool.inputSchema);
-        }
-        log('inputSchema is valid JSON ✅', 'success');
-      } catch {
-        log('inputSchema is NOT valid JSON ❌', 'error');
-      }
-    }
-  } catch (error) {
-    log(`listTools() failed: ${error}`, 'error');
-  }
-}
-
-// Test toolchange on registerTool
-function testChromiumCallbackRegister() {
-  try {
-    log('Testing toolchange on registerTool...', 'info');
-
-    let callbackFired = false;
-    modelContext.addEventListener(
-      'toolchange',
-      () => {
-        callbackFired = true;
-        log('Callback fired on registerTool!', 'success');
-      },
-      { once: true }
-    );
-
-    // Register a tool to trigger callback
-    const controller = new AbortController();
-    void modelContext.registerTool(
-      {
-        name: 'callbackTest1',
-        description: 'Test callback',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'test' }] };
-        },
-      },
-      { signal: controller.signal }
-    );
-
-    setTimeout(() => {
-      controller.abort();
-      if (callbackFired) {
-        const statusEl = document.getElementById('chromium-callback-status');
-        if (statusEl) statusEl.setAttribute('data-register-fired', 'true');
-        log('Callback test passed ✅', 'success');
-      } else {
-        log('Callback did NOT fire ❌', 'error');
-      }
-    }, 100);
-  } catch (error) {
-    log(`Callback test failed: ${error}`, 'error');
-  }
-}
-
-// Test toolchange on AbortSignal unregistration
-function testChromiumCallbackUnregister() {
-  try {
-    log('Testing toolchange on AbortSignal unregistration...', 'info');
-
-    let callbackFired = false;
-    modelContext.addEventListener(
-      'toolchange',
-      () => {
-        callbackFired = true;
-        log('toolchange fired on AbortSignal cleanup!', 'success');
-      },
-      { once: true }
-    );
-
-    // Unregister the dynamic tool to trigger callback
-    if (hasRegisteredTool(DYNAMIC_TOOL_NAME)) {
-      dynamicToolController?.abort();
-      dynamicToolController = null;
-
-      setTimeout(() => {
-        if (callbackFired) {
-          const statusEl = document.getElementById('chromium-callback-status');
-          if (statusEl) statusEl.setAttribute('data-unregister-fired', 'true');
-          log('Callback test passed ✅', 'success');
-        } else {
-          log('Callback did NOT fire ❌', 'error');
-        }
-      }, 100);
-    } else {
-      log('No dynamic tool to unregister', 'error');
-    }
-  } catch (error) {
-    log(`Callback test failed: ${error}`, 'error');
-  }
-}
-
-// Test grouped registration toolchange.
-async function testChromiumCallbackProvide() {
-  try {
-    log('Testing toolchange on grouped registration...', 'info');
-
-    let callbackFired = false;
-    modelContext.addEventListener(
-      'toolchange',
-      () => {
-        callbackFired = true;
-        log('Callback fired on registerTool!', 'success');
-      },
-      { once: true }
-    );
-
-    // Register a tool to trigger callback
-    await replaceOwnedTools([
-      {
-        name: 'callbackTest2',
-        description: 'Test callback',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'test' }] };
-        },
-      },
-    ]);
-
-    setTimeout(() => {
-      if (callbackFired) {
-        const statusEl = document.getElementById('chromium-callback-status');
-        if (statusEl) statusEl.setAttribute('data-provide-fired', 'true');
-        log('Callback test passed ✅', 'success');
-      } else {
-        log('Callback did NOT fire ❌', 'error');
-      }
-    }, 100);
-  } catch (error) {
-    log(`Callback test failed: ${error}`, 'error');
-  }
-}
-
-// Test toolchange on bulk AbortSignal cleanup.
-function testChromiumCallbackClear() {
-  try {
-    log('Testing toolchange on bulk AbortSignal cleanup...', 'info');
-
-    let callbackFired = false;
-    modelContext.addEventListener(
-      'toolchange',
-      () => {
-        callbackFired = true;
-        log('Callback fired on AbortSignal cleanup!', 'success');
-      },
-      { once: true }
-    );
-
-    // Abort base registrations to trigger callback
-    for (const controller of baseToolControllers.splice(0)) {
-      controller.abort();
-    }
-
-    setTimeout(() => {
-      if (callbackFired) {
-        const statusEl = document.getElementById('chromium-callback-status');
-        if (statusEl) statusEl.setAttribute('data-clear-fired', 'true');
-        log('Callback test passed ✅', 'success');
-      } else {
-        log('Callback did NOT fire ❌', 'error');
-      }
-    }, 100);
-  } catch (error) {
-    log(`Callback test failed: ${error}`, 'error');
-  }
-}
-
-// ==================== NOTIFICATION BATCHING TESTS ====================
-
-/**
- * Tests for microtask-based notification batching.
- * These tests verify that rapid tool registrations
- * are coalesced into a single notification.
- */
-
-let toolNotificationCount = 0;
-
-function listenForToolChanges(listener: () => void): () => void {
-  modelContext.addEventListener('toolchange', listener);
-  return () => modelContext.removeEventListener('toolchange', listener);
-}
-
-function registerTemporaryTool(name: string, text: string): AbortController {
-  const controller = new AbortController();
-  void modelContext.registerTool(
-    {
-      name,
-      description: `Temporary notification test tool: ${name}`,
-      inputSchema: { type: 'object', properties: {} },
-      async execute() {
-        return { content: [{ type: 'text', text }] };
-      },
-    },
-    { signal: controller.signal }
-  );
-  return controller;
-}
-
-// Test: Register N tools rapidly (synchronously) and count notifications
-function testRapidToolRegistration(count: number): Promise<{
-  registeredCount: number;
-  notificationCount: number;
-}> {
-  return new Promise((resolve) => {
-    log(`Testing rapid registration of ${count} tools...`, 'info');
-
-    toolNotificationCount = 0;
-    const stopListening = listenForToolChanges(() => toolNotificationCount++);
-
-    // Register N tools synchronously (should batch into 1 notification)
-    const registrations: AbortController[] = [];
-    for (let i = 0; i < count; i++) {
-      registrations.push(registerTemporaryTool(`batchTestTool_${i}`, `Tool ${i} executed`));
-    }
-
-    log(`Registered ${registrations.length} tools synchronously`, 'info');
-
-    setTimeout(() => {
-      stopListening();
-
-      const result = {
-        registeredCount: registrations.length,
-        notificationCount: toolNotificationCount,
-      };
-
-      log(
-        `Result: ${result.registeredCount} tools registered, ${result.notificationCount} notification(s) sent`,
-        result.notificationCount <= 1 ? 'success' : 'error'
-      );
-
-      registrations.forEach((controller) => controller.abort());
-
-      resolve(result);
-    }, 50);
-  });
-}
-
-// Test: Register tools across multiple tasks (should send multiple notifications)
-function testMultiTaskToolRegistration(count: number): Promise<{
-  registeredCount: number;
-  notificationCount: number;
-}> {
-  return new Promise((resolve) => {
-    log(`Testing multi-task registration of ${count} tools...`, 'info');
-
-    toolNotificationCount = 0;
-    const stopListening = listenForToolChanges(() => toolNotificationCount++);
-    const registrations: AbortController[] = [];
-    let registered = 0;
-
-    function registerNext() {
-      if (registered >= count) {
-        setTimeout(() => {
-          stopListening();
-
-          const result = {
-            registeredCount: registrations.length,
-            notificationCount: toolNotificationCount,
-          };
-
-          log(
-            `Result: ${result.registeredCount} tools registered across tasks, ${result.notificationCount} notification(s) sent`,
-            result.notificationCount === count ? 'success' : 'info'
-          );
-
-          registrations.forEach((controller) => controller.abort());
-
-          resolve(result);
-        }, 50);
-        return;
-      }
-
-      const i = registered++;
-      registrations.push(registerTemporaryTool(`multiTaskTool_${i}`, `Tool ${i} executed`));
-
-      setTimeout(registerNext, 10);
-    }
-
-    registerNext();
-  });
-}
-
-// Test: Mixed rapid and delayed registrations
-function testMixedRegistrationBatching(): Promise<{
-  phase1Notifications: number;
-  phase2Notifications: number;
-  phase3Notifications: number;
-}> {
-  return new Promise((resolve) => {
-    log('Testing mixed registration batching...', 'info');
-
-    let phase1Notifications = 0;
-    let phase2Notifications = 0;
-    let phase3Notifications = 0;
-    let currentPhase = 1;
-
-    const stopListening = listenForToolChanges(() => {
-      if (currentPhase === 1) phase1Notifications++;
-      else if (currentPhase === 2) phase2Notifications++;
-      else if (currentPhase === 3) phase3Notifications++;
-    });
-    const registrations: AbortController[] = [];
-
-    // Phase 1: Register 5 tools synchronously (should batch to 1 notification)
-    for (let i = 0; i < 5; i++) {
-      registrations.push(registerTemporaryTool(`mixedPhase1_${i}`, 'test'));
-    }
-
-    // After microtask, move to phase 2
-    setTimeout(() => {
-      currentPhase = 2;
-
-      // Phase 2: Register 3 more tools synchronously (should batch to 1 notification)
-      for (let i = 0; i < 3; i++) {
-        registrations.push(registerTemporaryTool(`mixedPhase2_${i}`, 'test'));
-      }
-
-      setTimeout(() => {
-        currentPhase = 3;
-
-        // Phase 3: Register 2 more tools synchronously (should batch to 1 notification)
-        for (let i = 0; i < 2; i++) {
-          registrations.push(registerTemporaryTool(`mixedPhase3_${i}`, 'test'));
-        }
-
-        setTimeout(() => {
-          stopListening();
-          const result = {
-            phase1Notifications,
-            phase2Notifications,
-            phase3Notifications,
-          };
-
-          log(
-            `Result: Phase1=${phase1Notifications}, Phase2=${phase2Notifications}, Phase3=${phase3Notifications}`,
-            phase1Notifications === 1 && phase2Notifications === 1 && phase3Notifications === 1
-              ? 'success'
-              : 'error'
-          );
-
-          registrations.forEach((controller) => controller.abort());
-
-          resolve(result);
-        }, 50);
-      }, 50);
-    }, 50);
   });
 }
 
@@ -1272,17 +727,6 @@ declare global {
       replaceBaseTools: () => Promise<void>;
       listAllTools: () => void;
       getAPIStatus: () => boolean;
-      checkTestingAPI: () => void;
-      hasTestingAPI: () => boolean;
-      // Historical MCP-B compatibility tests
-      testChromiumUnregisterTool: () => void;
-      testChromiumClearContext: () => void;
-      testChromiumExecuteTool: () => Promise<void>;
-      testChromiumListTools: () => void;
-      testChromiumCallbackRegister: () => void;
-      testChromiumCallbackUnregister: () => void;
-      testChromiumCallbackProvide: () => Promise<void>;
-      testChromiumCallbackClear: () => void;
       // Resource tests
       registerBaseResources: () => void;
       registerDynamicResource: () => void;
@@ -1291,20 +735,6 @@ declare global {
       registerBasePrompts: () => void;
       registerDynamicPrompt: () => void;
       unregisterDynamicPrompt: () => void;
-      // Notification batching tests
-      testRapidToolRegistration: (count: number) => Promise<{
-        registeredCount: number;
-        notificationCount: number;
-      }>;
-      testMultiTaskToolRegistration: (count: number) => Promise<{
-        registeredCount: number;
-        notificationCount: number;
-      }>;
-      testMixedRegistrationBatching: () => Promise<{
-        phase1Notifications: number;
-        phase2Notifications: number;
-        phase3Notifications: number;
-      }>;
     };
   }
 }
@@ -1318,17 +748,6 @@ window.testApp = {
   replaceBaseTools,
   listAllTools,
   getAPIStatus: () => 'modelContext' in document,
-  checkTestingAPI,
-  hasTestingAPI: () => 'modelContextTesting' in navigator,
-  // Historical MCP-B compatibility tests
-  testChromiumUnregisterTool,
-  testChromiumClearContext,
-  testChromiumExecuteTool,
-  testChromiumListTools,
-  testChromiumCallbackRegister,
-  testChromiumCallbackUnregister,
-  testChromiumCallbackProvide,
-  testChromiumCallbackClear,
   // Resource tests
   registerBaseResources,
   registerDynamicResource,
@@ -1337,8 +756,4 @@ window.testApp = {
   registerBasePrompts,
   registerDynamicPrompt,
   unregisterDynamicPrompt,
-  // Notification batching tests
-  testRapidToolRegistration,
-  testMultiTaskToolRegistration,
-  testMixedRegistrationBatching,
 };

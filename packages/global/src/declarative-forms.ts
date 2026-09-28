@@ -1,4 +1,7 @@
-import type { InputSchema, ModelContext, WebMcpToolInput } from '@mcp-b/webmcp-ts-sdk';
+import type { InputSchema, ModelContext, WebMcpToolInput, WebMCP } from '@mcp-b/webmcp-ts-sdk';
+import type { JsonSchemaType } from '@modelcontextprotocol/server';
+
+type WebMcpToolResult = Awaited<ReturnType<WebMCP.ToolExecuteCallback>>;
 
 type DeclarativeControl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 type Submitter = HTMLButtonElement | HTMLInputElement;
@@ -15,7 +18,7 @@ interface DeclarativeRegistration {
   controller: AbortController;
   fingerprint: string;
   form: HTMLFormElement;
-  cancelPending?: (reason: unknown) => void;
+  cancelPending?: (reason: ErrorOptions['cause']) => void;
 }
 
 interface ActiveSubmission {
@@ -25,7 +28,7 @@ interface ActiveSubmission {
 }
 
 const agentInvokedEvents = new WeakSet<SubmitEvent>();
-const agentResponses = new WeakMap<SubmitEvent, Promise<unknown>>();
+const agentResponses = new WeakMap<SubmitEvent, Promise<WebMcpToolResult>>();
 const activeSubmissions = new WeakMap<HTMLFormElement, ActiveSubmission>();
 
 export function isAgentInvokedSubmitEvent(event: SubmitEvent): boolean {
@@ -40,7 +43,7 @@ export function isAgentInvokedSubmitEvent(event: SubmitEvent): boolean {
 
 export function respondWithAgentSubmitEvent(
   event: SubmitEvent,
-  agentResponse: Promise<unknown>
+  agentResponse: Promise<WebMcpToolResult>
 ): void {
   if (!isAgentInvokedSubmitEvent(event)) {
     throw new DOMException(
@@ -89,7 +92,7 @@ export function installWebMCPDeclarativeExtensions(context: ModelContext): () =>
       configurable: true,
       enumerable: true,
       writable: true,
-      value(this: SubmitEvent, agentResponse: Promise<unknown>) {
+      value(this: SubmitEvent, agentResponse: Promise<WebMcpToolResult>) {
         respondWithAgentSubmitEvent(this, agentResponse);
       },
     });
@@ -123,31 +126,31 @@ function isControl(element: Element): element is DeclarativeControl {
 }
 
 function getFormControls(form: HTMLFormElement): HTMLFormControlsCollection {
-  return Reflect.get(HTMLFormElement.prototype, 'elements', form);
+  return Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, 'elements')?.get?.call(form);
 }
 
 function getFormAttribute(form: HTMLFormElement, name: string): string | null {
-  return Reflect.apply(Element.prototype.getAttribute, form, [name]);
+  return Element.prototype.getAttribute.call(form, name);
 }
 
 function formHasAttribute(form: HTMLFormElement, name: string): boolean {
-  return Reflect.apply(Element.prototype.hasAttribute, form, [name]);
+  return Element.prototype.hasAttribute.call(form, name);
 }
 
 function isFormConnected(form: HTMLFormElement): boolean {
-  return Reflect.get(Node.prototype, 'isConnected', form);
+  return Object.getOwnPropertyDescriptor(Node.prototype, 'isConnected')?.get?.call(form);
 }
 
 function getOpenShadowRoot(element: Element): ShadowRoot | null {
-  return Reflect.get(Element.prototype, 'shadowRoot', element);
+  return Object.getOwnPropertyDescriptor(Element.prototype, 'shadowRoot')?.get?.call(element);
 }
 
 function checkFormValidity(form: HTMLFormElement): boolean {
-  return Reflect.apply(HTMLFormElement.prototype.checkValidity, form, []);
+  return HTMLFormElement.prototype.checkValidity.call(form);
 }
 
 function requestFormSubmit(form: HTMLFormElement, submitter?: Submitter): void {
-  Reflect.apply(HTMLFormElement.prototype.requestSubmit, form, submitter ? [submitter] : []);
+  HTMLFormElement.prototype.requestSubmit.call(form, submitter);
 }
 
 function getControls(form: HTMLFormElement): DeclarativeControl[] {
@@ -225,11 +228,11 @@ function parameterDescription(
 }
 
 function withDescription(
-  schema: Record<string, unknown>,
+  schema: JsonSchemaType,
   form: HTMLFormElement,
   controls: readonly DeclarativeControl[],
   extra?: string
-): Record<string, unknown> {
+): JsonSchemaType {
   const description = parameterDescription(form, controls);
   const combined = description && extra ? `${description} (${extra})` : description || extra;
   return combined ? { ...schema, description: combined } : schema;
@@ -258,8 +261,8 @@ function validPattern(input: HTMLInputElement): string | undefined {
   }
 }
 
-function numberSchema(input: HTMLInputElement, includePattern = true): Record<string, unknown> {
-  const schema: Record<string, unknown> = { type: 'number' };
+function numberSchema(input: HTMLInputElement, includePattern = true): JsonSchemaType {
+  const schema: JsonSchemaType = { type: 'number' };
   const minimum = validNumberAttribute(input, 'min');
   const maximum = validNumberAttribute(input, 'max');
   if (minimum !== undefined) schema.minimum = minimum;
@@ -288,10 +291,7 @@ function temporalFormat(input: HTMLInputElement, datePrefix: string): string {
   return `${datePrefix}$`;
 }
 
-function optionSchemas(options: readonly HTMLOptionElement[]): {
-  anyOf: Record<string, unknown>[];
-  enum: string[];
-} {
+function optionSchemas(options: readonly HTMLOptionElement[]) {
   return {
     anyOf: options.map((option) => ({
       type: 'string',
@@ -302,14 +302,13 @@ function optionSchemas(options: readonly HTMLOptionElement[]): {
   };
 }
 
-function groupChoiceSchemas(controls: readonly HTMLInputElement[]): {
-  anyOf: Record<string, unknown>[];
-  enum: string[];
-} {
+function groupChoiceSchemas(controls: readonly HTMLInputElement[]) {
   return {
     anyOf: controls.map((control) => {
       const title = labelText(control);
-      return { type: 'string', const: control.value, ...(title ? { title } : {}) };
+      const schema: JsonSchemaType = { type: 'string', const: control.value };
+      if (title) schema.title = title;
+      return schema;
     }),
     enum: controls.map((control) => control.value),
   };
@@ -318,7 +317,7 @@ function groupChoiceSchemas(controls: readonly HTMLInputElement[]): {
 function parameterSchema(
   form: HTMLFormElement,
   controls: readonly DeclarativeControl[]
-): Record<string, unknown> | undefined {
+): JsonSchemaType | undefined {
   const first = controls[0];
   if (!first) return undefined;
 
@@ -357,7 +356,7 @@ function parameterSchema(
   }
 
   if (TEXT_INPUT_TYPES.has(first.type)) {
-    const schema: Record<string, unknown> = { type: 'string' };
+    const schema: JsonSchemaType = { type: 'string' };
     const pattern = validPattern(first);
     if (pattern !== undefined) schema.pattern = pattern;
     return withDescription(schema, form, controls);
@@ -434,7 +433,7 @@ function parameterSchema(
 }
 
 function synthesizeSchema(form: HTMLFormElement): InputSchema {
-  const properties: Record<string, unknown> = {};
+  const properties: Record<string, JsonSchemaType> = {};
   const required: string[] = [];
   for (const [name, controls] of controlGroups(form)) {
     if (!name) continue;
@@ -494,11 +493,13 @@ function inputAcceptsValue(input: HTMLInputElement, value: string): boolean {
   return probe.value !== '';
 }
 
-function validatesParameter(
+type FormParameterValue = string | boolean | number | unknown[];
+
+function isFormParameterValue(
   form: HTMLFormElement,
   controls: readonly DeclarativeControl[],
   value: unknown
-): boolean {
+): value is FormParameterValue {
   const first = controls[0];
   if (!first || !parameterSchema(form, controls)) return false;
 
@@ -550,7 +551,7 @@ function setNativeChecked(control: HTMLInputElement, checked: boolean): void {
   );
 }
 
-function fillParameter(controls: readonly DeclarativeControl[], value: unknown): void {
+function fillParameter(controls: readonly DeclarativeControl[], value: FormParameterValue): void {
   const first = controls[0];
   if (!first) return;
 
@@ -620,16 +621,27 @@ function fillParameter(controls: readonly DeclarativeControl[], value: unknown):
   }
 }
 
+function isAbortError(error: unknown): error is { name: 'AbortError' } {
+  return (
+    error !== null &&
+    (typeof error === 'object' || typeof error === 'function') &&
+    'name' in error &&
+    error.name === 'AbortError'
+  );
+}
+
 function fillForm(form: HTMLFormElement, input: WebMcpToolInput): void {
   if (Array.isArray(input)) throw new TypeError('Declarative tool input must be an object');
   const groups = controlGroups(form);
+  const parameters: Array<{ controls: DeclarativeControl[]; value: FormParameterValue }> = [];
   for (const [name, value] of Object.entries(input)) {
     const controls = groups.get(name);
-    if (!controls || !validatesParameter(form, controls, value)) {
+    if (!controls || !isFormParameterValue(form, controls, value)) {
       throw new TypeError(`Invalid value for declarative form parameter "${name}"`);
     }
+    parameters.push({ controls, value });
   }
-  for (const [name, value] of Object.entries(input)) fillParameter(groups.get(name) ?? [], value);
+  for (const { controls, value } of parameters) fillParameter(controls, value);
 }
 
 function findSubmitter(form: HTMLFormElement): Submitter | undefined {
@@ -663,7 +675,7 @@ function waitForSubmission(
   toolName: string,
   autosubmit: boolean,
   submitter: Submitter | undefined
-): Promise<unknown> {
+): Promise<WebMcpToolResult> {
   const { form } = registration;
   registration.cancelPending?.(new DOMException('Tool execution cancelled', 'UnknownError'));
 
@@ -671,7 +683,7 @@ function waitForSubmission(
     let settled = false;
 
     const cleanup = () => {
-      Reflect.apply(EventTarget.prototype.removeEventListener, form, ['invalid', onInvalid, true]);
+      EventTarget.prototype.removeEventListener.call(form, 'invalid', onInvalid, true);
       activeSubmissions.delete(form);
       if (registration.cancelPending === cancel) delete registration.cancelPending;
     };
@@ -681,11 +693,11 @@ function waitForSubmission(
       cleanup();
       callback();
     };
-    const cancel = (reason: unknown) => finish(() => reject(reason));
-    const settleResponse = (response: Promise<unknown>) => {
+    const cancel = (reason: ErrorOptions['cause']) => finish(() => reject(reason));
+    const settleResponse = (response: Promise<WebMcpToolResult>) => {
       response.then(
         (value) => finish(() => resolve(value)),
-        (error: unknown) => finish(() => reject(error))
+        (cause: ErrorOptions['cause']) => finish(() => reject(cause))
       );
     };
     const onInvalid = (event: Event) => {
@@ -716,7 +728,7 @@ function waitForSubmission(
       },
     });
     registration.cancelPending = cancel;
-    Reflect.apply(EventTarget.prototype.addEventListener, form, ['invalid', onInvalid, true]);
+    EventTarget.prototype.addEventListener.call(form, 'invalid', onInvalid, true);
 
     if (!autosubmit) {
       submitter?.focus();
@@ -793,7 +805,7 @@ export function installDeclarativeForms(document: Document, context: ModelContex
   function sync(): void {
     observeRoot(document);
     for (const root of observers.keys()) {
-      if (root instanceof ShadowRoot && !Reflect.get(Node.prototype, 'isConnected', root.host)) {
+      if (root instanceof ShadowRoot && !root.host.isConnected) {
         stopObservingRoot(root);
       }
     }
@@ -892,15 +904,15 @@ export function installDeclarativeForms(document: Document, context: ModelContex
           },
           { signal: controller.signal }
         )
-        .catch((error: unknown) => {
+        .catch((cause: ErrorOptions['cause']) => {
           controller.abort();
           // Invalid toolname/tooldescription attributes reject here. Without this the
           // form silently never becomes a tool, with no diagnostic in any channel.
           // Aborts are ordinary teardown, not a failure worth reporting.
-          if ((error as { name?: unknown } | null)?.name === 'AbortError') return;
+          if (isAbortError(cause)) return;
           console.error(
             `[webmcp] declarative form tool "${definition.name}" was not registered:`,
-            error
+            cause
           );
         });
     }
@@ -918,8 +930,9 @@ export function installDeclarativeForms(document: Document, context: ModelContex
       if (
         active &&
         root.mode === 'open' &&
-        Reflect.get(Node.prototype, 'ownerDocument', this) === document &&
-        Reflect.get(Node.prototype, 'isConnected', this)
+        Object.getOwnPropertyDescriptor(Node.prototype, 'ownerDocument')?.get?.call(this) ===
+          document &&
+        Object.getOwnPropertyDescriptor(Node.prototype, 'isConnected')?.get?.call(this)
       ) {
         observeRoot(root);
       }

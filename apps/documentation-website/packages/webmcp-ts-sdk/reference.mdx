@@ -34,9 +34,11 @@ new BrowserMcpServer(serverInfo: Implementation, options?: BrowserMcpServerOptio
 
 `BrowserMcpServerOptions` extends the upstream `ServerOptions` type.
 
-| Property | Type            | Description                                              |
-| -------- | --------------- | -------------------------------------------------------- |
-| `native` | `ModelContext?` | Context that receives mirrored WebMCP tool registrations |
+| Property | Type            | Description                                                      |
+| -------- | --------------- | ---------------------------------------------------------------- |
+| `native` | `ModelContext?` | Optional context override; defaults to the page's WebMCP context |
+
+The constructor uses `document.modelContext`, installing the upstream polyfill when needed. It leaves that document property pointing to the underlying context. Use `@mcp-b/global` to install the extended API on the document and connect its default transport. In service workers or Node.js, use the official `McpServer` directly.
 
 The constructor passes the remaining options to `McpServer` and enables list-change support for tools, resources, and prompts.
 
@@ -65,7 +67,7 @@ registerTool(
 ): Promise<void>
 ```
 
-Registers a WebMCP descriptor and its MCP representation. When `native` is set, registration succeeds only after the native mirror accepts the tool.
+Registers a WebMCP descriptor and its MCP representation. Registration succeeds only after the upstream context accepts the tool.
 
 | Option      | Type           | Description                                                 |
 | ----------- | -------------- | ----------------------------------------------------------- |
@@ -77,7 +79,7 @@ connected peer's origin appears in that list. `BrowserMcpServer` reads the origi
 from transports that report one, such as
 [`IframeChildTransport`](/packages/transports/reference#iframechildtransport).
 Restricted tools fail closed: they stay hidden before the first peer origin
-arrives, and on transports that never report one.
+arrives, and on transports that never report one. The supplied WebMCP context also validates the origin list before the tool is published. The vendored polyfill rejects opaque origins and browser-specific extension schemes.
 
 `exposedTo` only narrows. The child transport's `allowedOrigins` still decides
 who may connect, and enforcement is the page's own JavaScript rather than the
@@ -92,19 +94,19 @@ Invalid descriptors, duplicate names, blocked Permissions Policy, and pre-aborte
 getTools(options?: ModelContextGetToolOptions): Promise<RegisteredTool[]>
 ```
 
-Returns browser descriptors. With `native`, the call delegates to `native.getTools()`. Without `native`, a non-empty `fromOrigins` array rejects because local code cannot perform cross-document discovery.
+Delegates to `native.getTools(options)`. The supplied context owns discovery, frame access, and Permissions Policy checks.
 
 ### `executeTool(tool, input, options?)`
 
 ```ts "Execute tool signature"
 executeTool(
   tool: RegisteredTool,
-  input: object | string,
-  options?: ChromeModelContextExecuteToolOptions
-): Promise<string | null>
+  input: object = {},
+  options?: WebMCP.ModelContextExecuteToolOptions
+): Promise<string>
 ```
 
-Executes a descriptor returned by `getTools()`. Object input follows the current WebMCP draft; serialized JSON remains accepted as an MCP-B compatibility overload. The optional signal aborts the call. Native execution uses object input by default; set `nativeExecuteToolInput: 'json'` when wrapping an older native implementation.
+Executes a descriptor returned by `getTools()` with an input object and returns its result as JSON. The optional signal aborts the call.
 
 ### Tool change events
 
@@ -134,7 +136,7 @@ Returns a clone of the adapter's MCP-B tool metadata, including `outputSchema` w
 syncNativeTools(): Promise<void>
 ```
 
-Reconciles the adapter with tools already visible through `native.getTools()`. Backfill uses the native context's descriptor-based `executeTool()` when available, with object input by default or serialized JSON when `nativeExecuteToolInput: 'json'` is configured. Later native `toolchange` events reconcile additions, metadata changes, and removals.
+Reconciles the adapter with tools already visible through `native.getTools()`. Backfill uses the native context’s `executeTool()` with object input. Later native `toolchange` events reconcile additions, metadata changes, and removals.
 
 Use the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd) recommended by Chrome's WebMCP documentation to inspect native and mirrored tools.
 
@@ -212,7 +214,7 @@ MCP requires object-root tool input schemas. An array-root WebMCP tool remains a
 ## Exports
 
 The root exports `BrowserMcpServer`, `isBrowserMcpServer`, `ModelContext`, `RegisteredTool`,
-`ModelContextExtensions`, `ModelContextWithExtensions`, `ChromeModelContext`, `InputSchema`,
+`ModelContextExtensions`, `ModelContextWithExtensions`, `InputSchema`,
 `ToolDescriptor`, `ToolDescriptorFromSchema`, `ToolAnnotations`, `JsonSchemaForInference`,
 `InferJsonSchema`, `InferArgsFromInputSchema`, and `ToolResultFromOutputSchema`. `WebMCP` is the
 upstream namespace re-exported from `webmcp-types`; use it directly for standard browser contracts.

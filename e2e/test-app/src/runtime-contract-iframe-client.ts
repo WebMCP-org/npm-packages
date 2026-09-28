@@ -6,6 +6,7 @@ function requireElement<T extends HTMLElement>(id: string): T {
   if (!element) {
     throw new Error(`Required DOM element not found: ${id}`);
   }
+  // SAFETY: Call sites name static fixture elements and pass their authored HTML element type.
   return element as T;
 }
 

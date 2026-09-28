@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/webmcp-polyfill",
   "version": "5.1.0",
-  "description": "Upstream WebMCP polyfill for document.modelContext, bundled for MCP-B packages",
+  "description": "Compatibility alias distributing the upstream WebMCP polyfill as vendored source",
   "keywords": [
     "browser",
     "model-context",

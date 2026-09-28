@@ -2,7 +2,6 @@ import { execFile } from 'node:child_process';
 
 import {
   fromJsonSchema,
-  type JsonSchemaType,
   McpServer,
   type RegisteredTool,
   type Transport,
@@ -12,11 +11,28 @@ import { z } from 'zod/v4';
 
 import { RelayBridgeServer, type RelayBridgeServerOptions } from './bridgeServer.js';
 import type { AggregatedTool, SourceInfo } from './registry.js';
+import type { RelayInvokeArgs } from './protocol.js';
+
+const JsonSchemaObjectSchema = z.record(z.string(), z.unknown());
+
+interface RelaySourcesResult {
+  mode?: 'client';
+  count: number;
+  sources: SourceInfo[];
+}
 
 /**
  * Base options shared by all {@link LocalRelayMcpServer} configurations.
  */
+type BrowserLauncher = (
+  command: string,
+  args: readonly string[],
+  callback: (cause: Error | null) => void
+) => void;
+
 interface LocalRelayMcpServerBaseOptions {
+  /** Platform launcher; override to run without opening a browser. */
+  launchBrowser?: BrowserLauncher;
   /**
    * MCP server name reported during initialization.
    */
@@ -49,6 +65,7 @@ export class LocalRelayMcpServer {
   readonly bridge: RelayBridgeServer;
 
   private readonly mcpServer: McpServer;
+  private readonly launchBrowser: BrowserLauncher;
   private readonly dynamicTools = new Map<string, { handle: RegisteredTool; signature: string }>();
 
   private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -59,6 +76,7 @@ export class LocalRelayMcpServer {
    */
   constructor(options: LocalRelayMcpServerOptions = {}) {
     this.bridge = options.bridge ?? new RelayBridgeServer(options.bridgeOptions);
+    this.launchBrowser = options.launchBrowser ?? execFile;
 
     this.mcpServer = new McpServer({
       name: options.serverName ?? 'webmcp-local-relay',
@@ -161,11 +179,11 @@ export class LocalRelayMcpServer {
         const sources = clientMode
           ? this.bridge.listSourcesFromRelay()
           : this.bridge.registry.listSources();
-        const info = {
-          ...(clientMode ? { mode: 'client' as const } : {}),
+        const info: RelaySourcesResult = {
           count: sources.length,
           sources,
         };
+        if (clientMode) info.mode = 'client';
         return {
           content: [{ type: 'text', text: JSON.stringify(info, null, 2) }],
           structuredContent: info,
@@ -335,7 +353,7 @@ export class LocalRelayMcpServer {
           ? 'explorer.exe'
           : 'xdg-open';
     return new Promise((resolve, reject) => {
-      execFile(command, [safeUrl], (err) => {
+      this.launchBrowser(command, [safeUrl], (err) => {
         if (err) reject(err);
         else resolve();
       });
@@ -456,46 +474,47 @@ export class LocalRelayMcpServer {
    * Registers a single dynamic tool and returns a removal handle.
    */
   private registerDynamicTool(tool: AggregatedTool): RegisteredTool {
-    // `AggregatedTool` has already passed the SDK's ToolSchema validation.
-    // JsonSchemaType's exact optional properties are structurally narrower
-    // than the protocol Tool type even though both describe JSON Schema.
-    const inputSchema = fromJsonSchema<Record<string, unknown>>(tool.inputSchema as JsonSchemaType);
-    const outputSchema = tool.outputSchema
-      ? fromJsonSchema(tool.outputSchema as JsonSchemaType)
-      : undefined;
-
-    return this.mcpServer.registerTool(
-      tool.name,
-      {
-        ...(tool.title !== undefined ? { title: tool.title } : {}),
-        description: this.dynamicToolDescription(tool),
-        inputSchema,
-        ...(outputSchema ? { outputSchema } : {}),
-        ...(tool.annotations ? { annotations: tool.annotations } : {}),
-        ...(tool.icons ? { icons: tool.icons } : {}),
-        ...(tool._meta ? { _meta: tool._meta } : {}),
-      },
-      async (args: Record<string, unknown>) => {
-        try {
-          return await this.bridge.invokeTool(tool.name, args);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          const details = err instanceof Error ? (err.stack ?? err.message) : String(err);
-          process.stderr.write(
-            `[webmcp-local-relay] error: dynamic tool "${tool.name}" invocation failed: ${details}\n`
-          );
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: `Failed to invoke relayed tool "${tool.name}": ${message}`,
-              },
-            ],
-            isError: true,
-          };
-        }
-      }
+    // Validate the container before handing JSON Schema validation to the SDK compiler.
+    const inputSchema = fromJsonSchema<RelayInvokeArgs>(
+      JsonSchemaObjectSchema.parse(tool.inputSchema)
     );
+    const outputSchema =
+      tool.outputSchema !== undefined
+        ? fromJsonSchema(JsonSchemaObjectSchema.parse(tool.outputSchema))
+        : undefined;
+
+    const registration: {
+      [K in 'title' | 'annotations' | 'icons' | '_meta']?: Exclude<AggregatedTool[K], undefined>;
+    } & {
+      description: string;
+      inputSchema: typeof inputSchema;
+      outputSchema?: NonNullable<typeof outputSchema>;
+    } = { description: this.dynamicToolDescription(tool), inputSchema };
+    if (tool.title !== undefined) registration.title = tool.title;
+    if (outputSchema) registration.outputSchema = outputSchema;
+    if (tool.annotations) registration.annotations = tool.annotations;
+    if (tool.icons) registration.icons = tool.icons;
+    if (tool._meta) registration._meta = tool._meta;
+    return this.mcpServer.registerTool(tool.name, registration, async (args: RelayInvokeArgs) => {
+      try {
+        return await this.bridge.invokeTool(tool.name, args);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        const details = err instanceof Error ? (err.stack ?? err.message) : String(err);
+        process.stderr.write(
+          `[webmcp-local-relay] error: dynamic tool "${tool.name}" invocation failed: ${details}\n`
+        );
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `Failed to invoke relayed tool "${tool.name}": ${message}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    });
   }
 
   /**
