@@ -37,9 +37,11 @@ pnpm --filter mcp-e2e-tests test:native-contract:default
 pnpm --filter mcp-e2e-tests test:native-showcase
 
 # Shared WebMCP conformance lanes
-# Core WebMCP install, registration, execution, and abort smoke test
+# Standalone polyfill tests include core smoke and declarative forms
+pnpm --filter @mcp-b/webmcp-polyfill test --browser.headless
+# Core install, registration, execution, and abort smoke test only
 pnpm --filter @mcp-b/webmcp-polyfill test:smoke
-# MCP-B runtime and standalone polyfill declarative forms (shared suite)
+# MCP-B runtime and declarative forms
 pnpm --filter @mcp-b/global test:conformance:global
 
 # Pinned upstream WebMCP WPT (requires .reference/wpt and Chrome Canary)
@@ -207,10 +209,14 @@ workflow pins its WPT revision and injects
 runs an explicit allowlist of imperative tests for the strict core surface.
 Frame-tree, origin-policy, and navigation WPT are excluded because they require
 native browser behavior. The shared declarative-form suite runs against both
-`@mcp-b/global` and the standalone polyfill through
-`pnpm --filter @mcp-b/global test:conformance:global`. The standalone polyfill
-also has a separate install, registration, execution, and abort smoke test.
-The default `@mcp-b/global` test run includes both declarative harnesses.
+`@mcp-b/global` and the standalone polyfill. The polyfill harness lives in
+`packages/webmcp-polyfill/src/declarative-forms.test.ts` and runs with that
+package's default `test` and `test:coverage` scripts. Its `test:smoke` script
+runs only the core install, registration, execution, and abort check. The
+global harness runs through `test:conformance:global` and the package's default
+test script. `test:conformance:matrix` runs the polyfill tests, global
+conformance, and native conformance in sequence.
+
 The selected upstream WPT allowlist covers imperative core behavior only.
 The pinned WPT revision's omitted imperative cases still expect JSON-string
 `executeTool()` input or older annotations; refresh the pin before restoring

@@ -188,9 +188,9 @@ the shared local/CI runner live in
 [`scripts/run-webmcp-wpt.mjs`](./scripts/run-webmcp-wpt.mjs). The WPT lane builds
 the standalone polyfill, disables native WebMCP, injects the bundle, and runs
 an explicit page-local imperative allowlist against the strict upstream core.
-The shared declarative-form suite runs against both the global runtime and the
-standalone polyfill through `@mcp-b/global` test configuration. Frame-tree,
-origin-policy, and navigation WPT are excluded because they require native
+The shared declarative-form suite runs in both the global and standalone polyfill
+packages. Their default test and coverage scripts include their respective
+harnesses. Frame-tree, origin-policy, and navigation WPT are excluded because they require native
 coverage. When changing covered behavior, run the shared conformance suite and
 replay the WPT lane with
 `CHROME_BIN=/path/to/chrome-canary pnpm test:wpt`. Update the WPT pin

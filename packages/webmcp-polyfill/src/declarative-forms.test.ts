@@ -1,5 +1,5 @@
 import { runDeclarativeFormConformanceSuite } from '../../../conformance/declarative-forms-conformance.shared.js';
-import { installWebMCP } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from './index.js';
 
 runDeclarativeFormConformanceSuite({
   suiteName: 'Standalone polyfill declarative forms',

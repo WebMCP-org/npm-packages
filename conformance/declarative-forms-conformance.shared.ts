@@ -1,4 +1,4 @@
-import type { JsonObject, JsonValue, RegisteredTool } from '@mcp-b/webmcp-ts-sdk';
+import type { WebMCP } from '../packages/webmcp-polyfill/src/index.js';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 interface DeclarativeFormConformanceOptions {
@@ -41,8 +41,8 @@ function isToolActivatedEvent(event: Event): event is Event & { toolName: string
 
 async function waitForTool(
   name: string,
-  predicate: (tool: RegisteredTool) => boolean = () => true
-): Promise<RegisteredTool> {
+  predicate: (tool: WebMCP.RegisteredTool) => boolean = () => true
+): Promise<WebMCP.RegisteredTool> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const tool = (await requireModelContext().getTools()).find(
       (candidate) => candidate.name === name
@@ -71,7 +71,10 @@ async function waitForCondition(
   throw new Error(message);
 }
 
-async function executeTool(tool: RegisteredTool, input: JsonObject): Promise<JsonValue | null> {
+async function executeTool(
+  tool: WebMCP.RegisteredTool,
+  input: Parameters<WebMCP.ModelContext['executeTool']>[1]
+): Promise<Awaited<ReturnType<WebMCP.ToolExecuteCallback>>> {
   const modelContext = requireModelContext();
   if (!modelContext.executeTool)
     throw new Error('Expected executeTool for declarative conformance');

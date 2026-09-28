@@ -2,7 +2,11 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "lib": ["ES2024", "DOM", "DOM.Iterable"]
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    // The shared conformance suite lives outside this package.
+    "paths": {
+      "vitest": ["./node_modules/vitest"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
