@@ -64,7 +64,7 @@ export const siteConfig = {
   },
   hero: {
     badge: {
-      icon: 'stacked-icons',
+      icon: 'stacked-icons' as const,
       text: 'The WebMCP Company',
     },
     title: [
@@ -251,14 +251,14 @@ export const siteConfig = {
     blocks: [
       {
         id: 1,
-        icon: 'magic-click',
+        icon: 'magic-click' as const,
         title: 'Publish a focused tool surface',
         description:
           'Register typed tools through document.modelContext with clear schemas and product-level permission checks.',
       },
       {
         id: 2,
-        icon: 'magic-star',
+        icon: 'magic-star' as const,
         title: 'Choose the right connection',
         description:
           'Use the extension for browser experiences, local relay for desktop clients, or transports for embedded integrations.',
@@ -286,7 +286,7 @@ export const siteConfig = {
     },
   },
   testimonialSection: {
-    badge: { icon: 'quote', text: 'Open source' },
+    badge: { icon: 'quote' as const, text: 'Open source' },
     title: { before: 'Built in the ', highlight: 'open', after: '' },
     description: 'Follow implementation, releases, and package history in the public repositories.',
     testimonials: [],

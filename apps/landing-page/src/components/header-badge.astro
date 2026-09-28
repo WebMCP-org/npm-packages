@@ -1,8 +1,9 @@
 ---
 import IconGlyph from "@/components/icon-glyph.astro";
+import type { ComponentProps } from "astro/types";
 
 interface Props {
-  icon: string;
+  icon: ComponentProps<typeof IconGlyph>["name"];
   text: string;
   className?: string;
 }

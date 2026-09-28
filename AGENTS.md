@@ -36,9 +36,9 @@ Both apps are pnpm workspace members.
 
 ### `apps/landing-page` — `@mcp-b/landing-page`
 
-Landing page at [mcp-b.ai](https://mcp-b.ai) (also `www.mcp-b.ai`). Astro 6
+Landing page at [mcp-b.ai](https://mcp-b.ai) (also `www.mcp-b.ai`). Astro 7
 (`output: 'server'`) deployed to Cloudflare Workers via `@astrojs/cloudflare`
-v13. Dev runs on real workerd (Vite Environment API).
+v14. Dev runs on real workerd (Vite Environment API).
 
 - `pnpm dev` (`wrangler types` → `astro dev`), `pnpm build` (`wrangler types` → `astro check` → `astro build`), `pnpm preview`.
 - Cloudflare runtime: env via `import { env } from 'cloudflare:workers'`; `Astro.request.cf`; execution context at `Astro.locals.cfContext`. Do NOT use `Astro.locals.runtime` (removed from `@astrojs/cloudflare` in v13, used with Astro 6).
