@@ -79,10 +79,12 @@ Goal: keep one place to track standards decisions, implementation details, and e
 
 - Shared suite: `conformance/runtime-core-conformance.shared.ts`
 - Global runtime entry: `packages/global/conformance/global-runtime.e2e.test.ts`
+- Standalone polyfill declarative entry: `packages/global/conformance/polyfill-runtime.e2e.test.ts`
+- Both declarative entries run in the default `@mcp-b/global` test configuration.
 - Polyfill runtime smoke test: `packages/webmcp-polyfill/src/index.test.ts`
 - Native Chromium runtime entry: `conformance/native-runtime.e2e.test.ts`
 - Shared declarative suite: `conformance/declarative-forms-conformance.shared.ts`
-- Pinned upstream declarative and page-local imperative WPT:
+- Pinned upstream page-local imperative WPT:
   - Selection and runner: `scripts/run-webmcp-wpt.mjs`
   - CI revision and job: `.github/workflows/e2e.yml`
 
@@ -102,7 +104,7 @@ Run commands:
   - `CHROME_BIN="/path/to/chrome-canary" pnpm test:wpt`
 - WebMCP polyfill smoke test (non-native Chromium):
   - `pnpm --filter @mcp-b/webmcp-polyfill run test:smoke`
-- Global runtime (non-native Chromium):
+- Global runtime and standalone polyfill declarative forms (non-native Chromium):
   - `pnpm --filter @mcp-b/global run test:conformance:global`
 - WebMCP polyfill smoke test through the global matrix alias:
   - `pnpm --filter @mcp-b/global run test:smoke:polyfill`

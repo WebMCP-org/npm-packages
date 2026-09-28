@@ -54,5 +54,5 @@ The upstream declaration uses `document.modelContext`, object input to
 `executeTool()`, a JSON-string execution result, and object-valued discovery
 schemas. `RegisteredTool.title` is required (it may be `''`); update test doubles
 that omitted it. Navigator aliases/testing declarations are gone. `SubmitEvent`
-extensions are declared by `@mcp-b/global`, and the polyfill's global `ModelContext`
+extensions are declared by `@mcp-b/webmcp-polyfill`, and its global `ModelContext`
 interface-object declaration lives in `@mcp-b/webmcp-polyfill`.

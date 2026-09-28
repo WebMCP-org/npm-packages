@@ -75,7 +75,7 @@
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
-    "test:conformance:global": "vp test run conformance/global-runtime.e2e.test.ts --browser.headless",
+    "test:conformance:global": "vp test run conformance/global-runtime.e2e.test.ts conformance/polyfill-runtime.e2e.test.ts --browser.headless",
     "test:conformance:matrix": "pnpm run test:smoke:polyfill && pnpm run test:conformance:global && pnpm run test:conformance:native",
     "test:conformance:native": "vp test run --config vitest.conformance.native.config.ts --browser.headless",
     "test:smoke:polyfill": "pnpm --filter @mcp-b/webmcp-polyfill run test:smoke",

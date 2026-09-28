@@ -2,12 +2,10 @@ import { IframeChildTransport, TabServerTransport } from '@mcp-b/transports';
 import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer, isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import type { Transport } from '@modelcontextprotocol/server';
-import { installWebMCPDeclarativeExtensions } from './declarative-forms.js';
 import type { WebModelContextInitOptions } from './types.js';
 
 interface RuntimeState {
   server: BrowserMcpServer;
-  cleanupForms: () => void;
   transport: Transport;
   previousDocumentModelContextDescriptor: PropertyDescriptor | undefined;
 }
@@ -45,10 +43,8 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     return;
   }
 
-  // Native and preinstalled contexts take precedence; otherwise install upstream.
-  if (!existingContext) {
-    installWebMCP();
-  }
+  // Preserve native/core contexts and add declarative support when it is missing.
+  installWebMCP();
   // Capture the upstream context before installing MCP-B extensions.
   const native = document.modelContext;
   if (!native) {
@@ -74,12 +70,8 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
   // Create the MCP server with native mirroring.
   const hostname = window.location.hostname || 'localhost';
   const server = new BrowserMcpServer({ name: `${hostname}-webmcp`, version: '1.0.0' }, { native });
-  let cleanupForms = () => {};
 
   try {
-    if (!('agentInvoked' in SubmitEvent.prototype) || !('respondWith' in SubmitEvent.prototype)) {
-      cleanupForms = installWebMCPDeclarativeExtensions(native);
-    }
     Object.defineProperty(document, 'modelContext', {
       configurable: true,
       enumerable: true,
@@ -88,12 +80,10 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     });
     runtime = {
       server,
-      cleanupForms,
       transport,
       previousDocumentModelContextDescriptor,
     };
   } catch (error) {
-    cleanupForms();
     void server.close();
     void transport.close();
     throw error;
@@ -126,15 +116,14 @@ export function cleanupWebModelContext(): void {
     return;
   }
 
-  const { server, transport, cleanupForms, previousDocumentModelContextDescriptor } = runtime;
+  const { server, transport, previousDocumentModelContextDescriptor } = runtime;
   runtime = null;
 
-  cleanupForms();
   void server.close();
   void transport.close();
 
   // Restore the descriptors that existed before we wrapped with BrowserMcpServer.
-  // The upstream polyfill remains installed for the lifetime of the document.
+  // The polyfill and declarative forms remain installed for the lifetime of the document.
   if (previousDocumentModelContextDescriptor) {
     Object.defineProperty(document, 'modelContext', previousDocumentModelContextDescriptor);
   } else {

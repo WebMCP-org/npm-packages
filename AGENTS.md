@@ -112,7 +112,7 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 │  @mcp-b/webmcp-polyfill                             │
 │  Bundles upstream webmachinelearning/webmcp-polyfill │
 │  at the pinned Git revision. Exposes installWebMCP().  │
-│  Standard WebMCP core only; no MCP-B extensions.      │
+│  Core plus temporary MCP-B declarative forms.        │
 ├─────────────────────────────────────────────────────┤
 │  Native browser API (if available)                   │
 │  document.modelContext provided by the browser.      │
@@ -121,11 +121,11 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 ### Initialization Flow (`@mcp-b/global`)
 
-1. **Polyfill:** Preserve existing native/preinstalled contexts. Otherwise call `installWebMCP()` from `@mcp-b/webmcp-polyfill`. That package bundles the upstream source at the commit recorded in `packages/webmcp-polyfill/package.json`. MCP-B declarative forms and `outputSchema` belong to `@mcp-b/global`.
+1. **Polyfill:** Call `installWebMCP()` from `@mcp-b/webmcp-polyfill`. It preserves existing native/preinstalled contexts and adds declarative support when missing. That package bundles the upstream source at the commit recorded in `packages/webmcp-polyfill/package.json` and temporarily retains MCP-B declarative forms. MCP `outputSchema` belongs to `@mcp-b/global`.
 2. **Capture native:** A reference to the current document context is saved as `native`.
 3. **BrowserMcpServer:** Uses the page's context by default, installing the upstream polyfill when needed. Global passes its captured `{ native }` explicitly. Browser-facing tool registrations mirror down to that context and native tools are reconciled through `getTools()`.
 4. **Replace:** `document.modelContext` exposes the `BrowserMcpServer` instance, which adds `registerPrompt`, `registerResource`, `listTools`, and other MCP-B extensions. Browser-shaped execution uses `getTools()` plus `executeTool(tool, inputObject)`.
-5. **Cleanup:** `cleanupWebModelContext()` restores the original native/polyfill context.
+5. **Cleanup:** `cleanupWebModelContext()` restores the original native/polyfill context. The polyfill and its form layer remain installed for the document lifetime.
 
 ### What Lives Where
 
@@ -135,7 +135,7 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 | `getTools()`               |       Y       |            Y             |       Y (delegates to core)        |
 | `ontoolchange`             |       Y       |            Y             |                 Y                  |
 | `executeTool(tool, input)` |  Y (object)   |        Y (object)        |             Y (object)             |
-| MCP-B declarative forms    |       -       |            -             |                 Y                  |
+| MCP-B declarative forms    |       -       |            Y             |          Y (via polyfill)          |
 | `outputSchema`             |       -       |            -             |                 Y                  |
 | `registerPrompt()`         |       -       |            -             |                 Y                  |
 | `registerResource()`       |       -       |            -             |                 Y                  |
@@ -188,7 +188,8 @@ the shared local/CI runner live in
 [`scripts/run-webmcp-wpt.mjs`](./scripts/run-webmcp-wpt.mjs). The WPT lane builds
 the standalone polyfill, disables native WebMCP, injects the bundle, and runs
 an explicit page-local imperative allowlist against the strict upstream core.
-MCP-B declarative-form conformance runs through `@mcp-b/global`. Frame-tree,
+The shared declarative-form suite runs against both the global runtime and the
+standalone polyfill through `@mcp-b/global` test configuration. Frame-tree,
 origin-policy, and navigation WPT are excluded because they require native
 coverage. When changing covered behavior, run the shared conformance suite and
 replay the WPT lane with

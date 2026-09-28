@@ -236,7 +236,7 @@ Chrome DevTools integration now lives entirely upstream; its WebMCP changes have
 # Full runtime: polyfill + MCP bridge (most users start here)
 pnpm add @mcp-b/global
 
-# Strict WebMCP core polyfill only (no MCP extensions)
+# WebMCP polyfill with temporary declarative forms (no MCP bridge)
 pnpm add @mcp-b/webmcp-polyfill
 
 # Official WebMCP TypeScript definitions (dev dependency)
@@ -267,7 +267,7 @@ pnpm add @mcp-b/smart-dom-reader
 
 | Package                                              | Version                                                                                                             | Description                                                          |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| [@mcp-b/webmcp-polyfill](./packages/webmcp-polyfill) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill) | Vendored upstream `document.modelContext` polyfill                   |
+| [@mcp-b/webmcp-polyfill](./packages/webmcp-polyfill) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill) | Vendored upstream polyfill plus temporary declarative forms          |
 | [@mcp-b/global](./packages/global)                   | [![npm](https://img.shields.io/npm/v/@mcp-b/global)](https://www.npmjs.com/package/@mcp-b/global)                   | Full runtime — polyfill + MCP bridge (prompts, resources, transport) |
 | [@mcp-b/webmcp-ts-sdk](./packages/webmcp-ts-sdk)     | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)     | Browser adapter, MCP-B extensions, and schema helpers                |
 
@@ -315,7 +315,7 @@ pnpm add @mcp-b/smart-dom-reader
 ├────────────── @mcp-b/webmcp-ts-sdk ──────────────────────┤
 │  BrowserMcpServer — wraps native/polyfill context        │
 ├────────────── @mcp-b/webmcp-polyfill ────────────────────┤
-│  WebMCP core + optional Chrome executeTool extension    │
+│  WebMCP core + temporary declarative forms              │
 ├──────────────────────────────────────────────────────────┤
 │  Native browser API (when available)                     │
 └──────────────────────────────────────────────────────────┘

@@ -33,8 +33,8 @@ does not replace or wrap the website API: site code still registers tools with
 polyfilled declarative runtime. Both tool types use the same `listTools()` and
 `callTool()` methods from the isolated content script.
 
-The extension does not scan forms itself. `@mcp-b/global` owns the page runtime,
-including its [declarative support and compatibility boundary](/reference/webmcp/declarative-api).
+The extension does not scan forms itself. `@mcp-b/global` sets up the page runtime;
+the polyfill supplies its [temporary declarative layer](/reference/webmcp/declarative-api) when native support is absent.
 
 The shipped content scripts target top-level pages only. Native Chrome still
 exposes imperative and declarative tools from same-origin child documents

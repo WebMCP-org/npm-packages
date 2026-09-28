@@ -32,10 +32,10 @@ must be upgraded to the current object-input contract.
 
 ### Extensions and TypeScript
 
-Declarative forms (`toolname`, `tooldescription`, and related attributes),
-`SubmitEvent.agentInvoked`/`respondWith()`, MCP output schemas, prompts, and resources
-belong to this package's runtime. If you previously loaded only the standalone
-polyfill for forms, install and import `@mcp-b/global` in your browser entry.
+Declarative forms (`toolname`, `tooldescription`, and related attributes) and
+`SubmitEvent.agentInvoked`/`respondWith()` remain available from the standalone
+polyfill while upstream support is pending. MCP output schemas, prompts, and
+resources belong to this package's runtime.
 
 Core declarations now come from `webmcp-types`. The temporary
 `@mcp-b/webmcp-types` alias only forwards the upstream `WebMCP` namespace. Import
@@ -58,9 +58,9 @@ use MCP discovery or `listTools()` when you need MCP output metadata.
 
 ### Cleanup and frames
 
-`cleanupWebModelContext()` removes the MCP-B layer, form hooks, and transports,
-then restores the underlying context. The core polyfill stays installed for the
-document lifetime. Use registration AbortControllers to remove your tools and
+`cleanupWebModelContext()` removes the MCP-B layer and transports, then restores
+the underlying context. The core polyfill and its form layer stay installed for
+the document lifetime. Use registration AbortControllers to remove your tools and
 invocation signals to cancel work.
 
 Browser discovery and execution now use upstream frame and origin behavior.

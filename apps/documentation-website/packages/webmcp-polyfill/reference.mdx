@@ -16,8 +16,11 @@ standard `document.modelContext` runtime when the browser does not provide one.
 The [WebMCP draft](https://webmachinelearning.github.io/webmcp/) and upstream
 package define the core API.
 
-Use [`@mcp-b/global`](/packages/global/reference) for MCP-B runtime extensions,
-including transports, prompts and resources, declarative forms, and MCP `outputSchema` support.
+This package temporarily retains declarative forms and `SubmitEvent` extensions
+until upstream supports them. Existing browser contexts and native form hooks
+are preserved; missing form hooks are filled in. Use
+[`@mcp-b/global`](/packages/global/reference) for transports, prompts, resources,
+and MCP `outputSchema` support.
 
 ## Package entries
 
@@ -55,15 +58,16 @@ signatures and behavior. The polyfill follows the current object-input
 `executeTool()` shape and supports registration cancellation through
 `AbortSignal`.
 
-The core package does not provide:
+The package does not provide:
 
 - `cleanupWebMCPPolyfill()` or another uninstall operation.
 - A `navigator.modelContext` alias or `navigator.modelContextTesting` shim.
-- Declarative forms or `SubmitEvent` extensions.
 - MCP `outputSchema` metadata.
+- MCP prompts, resources, or transports.
 
-These MCP-B extensions belong to [`@mcp-b/global`](/packages/global/reference).
-The upstream context remains installed for the lifetime of its document.
+For MCP features, use [`@mcp-b/global`](/packages/global/reference).
+The upstream context and temporary form layer remain installed for the lifetime
+of the document.
 
 MCP-B schema conversion and response helpers are exported by the
 [`@mcp-b/webmcp-ts-sdk/schema` adapter](/packages/webmcp-ts-sdk/reference#schema-boundary).

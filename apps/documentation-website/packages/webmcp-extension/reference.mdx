@@ -106,9 +106,9 @@ The MAIN-world runtime also discovers annotated forms:
 </form>
 ```
 
-`@mcp-b/global` adopts native declarative behavior when available and installs
-the polyfilled form runtime otherwise. Form tools and JavaScript registrations
-both appear in the isolated client's `listTools()` result and run through
+`@mcp-b/global` adopts native declarative behavior when available; otherwise,
+`@mcp-b/webmcp-polyfill` installs the temporary form runtime. Form tools and
+JavaScript registrations both appear in the isolated client's `listTools()` result and run through
 `callTool()`. `listChanged.tools` reports form additions, definition changes,
 and removals.
 

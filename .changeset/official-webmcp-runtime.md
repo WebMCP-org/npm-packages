@@ -3,11 +3,13 @@
 ---
 
 **Breaking: replace the MCP-B core implementation with the upstream WebMCP polyfill.**
+Declarative forms remain available until upstream supports them.
 This package vendors [upstream revision `439c6c3`](https://github.com/webmachinelearning/webmcp-polyfill/tree/439c6c341f1c632c63498ba206e2bd8471cb8efb)
 and uses `webmcp-types@^0.1.9` for the browser contract.
 
 The existing package name remains available as a temporary compatibility alias.
-It will eventually be removed; no removal date is set. Follow the
+It will eventually be removed; no removal date is set. Sites using declarative
+forms should keep it until the upstream polyfill supports them. Follow the
 [official upstream installation instructions](https://github.com/webmachinelearning/webmcp-polyfill#readme)
 when migrating to its distribution. Until that release is available, keep using
 `@mcp-b/webmcp-polyfill` with the changes below.
@@ -63,13 +65,13 @@ descriptor from `getTools()` and an input object:
 
 | Previous use of the core package                                                              | Migration                                                                                   |
 | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Declarative forms, `SubmitEvent.agentInvoked`, or `respondWith()`                             | Install and import `@mcp-b/global` in the browser entry.                                    |
+| Declarative forms, `SubmitEvent.agentInvoked`, or `respondWith()`                             | Keep using this package until upstream declarative support is available.                    |
 | MCP `outputSchema`, prompts, resources, or transports                                         | Use `@mcp-b/global`, or configure `BrowserMcpServer` from `@mcp-b/webmcp-ts-sdk`.           |
 | `@mcp-b/webmcp-polyfill/schema`                                                               | Import schema conversion and MCP response helpers from `@mcp-b/webmcp-ts-sdk/schema`.       |
 | Legacy Chrome input/result parsing, error factories, or browser-access helpers from `/schema` | Remove them; the upstream context owns browser execution, serialization, and access checks. |
 
 `cleanupWebModelContext()` from `@mcp-b/global` removes its extensions and restores
-the underlying context; it does not uninstall the core polyfill.
+the underlying context; it does not uninstall the core polyfill or its form layer.
 
 If you use `withAbortSignal` from the new schema entry, pass an explicit signal
 and remove the former third `getAbortReason` argument. Await the operation directly

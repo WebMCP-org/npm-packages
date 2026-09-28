@@ -6,7 +6,7 @@ keywords:
 icon: 'puzzle-piece'
 ---
 
-`@mcp-b/webmcp-polyfill` vendors the upstream WebMCP polyfill and installs its standard `document.modelContext` surface when the browser does not provide one. It provides browser-facing tool registration, discovery, and object-input execution without MCP-B extensions.
+`@mcp-b/webmcp-polyfill` vendors the upstream WebMCP polyfill and installs its standard `document.modelContext` surface when the browser does not provide one. It provides browser-facing tool registration, discovery, and object-input execution. A temporary MCP-B layer adds declarative forms and `SubmitEvent` extensions until upstream supports them. Existing browser contexts and native form hooks are preserved; missing form hooks are filled in.
 
 ## When to use this package
 
@@ -25,7 +25,7 @@ This package bundles the upstream polyfill source. [`@mcp-b/global`](/packages/g
 
 ## First step
 
-Initialize the polyfill before your app registers tools. The [reference page](/packages/webmcp-polyfill/reference) documents the upstream installer and core API. For declarative forms, compatibility shims, or MCP `outputSchema`, use the [global runtime](/packages/global/reference).
+Initialize the polyfill before your app registers tools. The [reference page](/packages/webmcp-polyfill/reference) documents the upstream installer, core API, and temporary form layer. For prompts, resources, transports, or MCP `outputSchema`, use the [global runtime](/packages/global/reference).
 
 ## Related pages
 

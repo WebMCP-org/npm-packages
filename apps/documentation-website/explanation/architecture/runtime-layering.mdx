@@ -8,6 +8,8 @@ icon: 'bars-staggered'
 MCP-B keeps browser tool contracts separate from its server runtime and
 transport adapters. A native implementation or `@mcp-b/webmcp-polyfill`
 supplies the package-supported `document.modelContext` surface.
+The polyfill temporarily retains declarative forms until upstream supports them;
+native form behavior is unchanged.
 `@mcp-b/webmcp-ts-sdk` adds `BrowserMcpServer`, which mirrors core tool
 operations while providing MCP-B-only capabilities. `@mcp-b/global`
 initializes those layers and connects the selected browser transport.
@@ -31,7 +33,7 @@ Initialization returns no server handle. Application and library code keeps
 using `document.modelContext` normally, whether the active implementation is
 native, polyfilled, or wrapped by MCP-B. Cleanup restores the property
 descriptors that existed before wrapping; it does not uninstall the separately
-owned polyfill.
+owned polyfill or its form layer.
 
 This separation allows a library to depend only on types, a site to use only
 the tool-only polyfill, or an application to install the complete MCP-B runtime.

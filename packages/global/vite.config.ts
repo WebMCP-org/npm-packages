@@ -62,7 +62,7 @@ export default defineConfig({
       }),
       instances: [{ browser: 'chromium' }],
     },
-    include: ['src/**/*.{test,spec}.{ts,tsx}', 'conformance/global-runtime.e2e.test.ts'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}', 'conformance/{global,polyfill}-runtime.e2e.test.ts'],
     // Limit concurrency in CI to prevent resource exhaustion
     maxConcurrency: isCI ? 2 : 10,
     fileParallelism: !isCI,

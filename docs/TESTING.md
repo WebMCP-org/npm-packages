@@ -37,9 +37,9 @@ pnpm --filter mcp-e2e-tests test:native-contract:default
 pnpm --filter mcp-e2e-tests test:native-showcase
 
 # Shared WebMCP conformance lanes
-# Strict core WebMCP install, registration, execution, and abort smoke test
+# Core WebMCP install, registration, execution, and abort smoke test
 pnpm --filter @mcp-b/webmcp-polyfill test:smoke
-# MCP-B runtime and declarative-form extensions
+# MCP-B runtime and standalone polyfill declarative forms (shared suite)
 pnpm --filter @mcp-b/global test:conformance:global
 
 # Pinned upstream WebMCP WPT (requires .reference/wpt and Chrome Canary)
@@ -206,11 +206,12 @@ workflow pins its WPT revision and injects
 `packages/webmcp-polyfill/dist/index.iife.js` with native WebMCP disabled. It
 runs an explicit allowlist of imperative tests for the strict core surface.
 Frame-tree, origin-policy, and navigation WPT are excluded because they require
-native browser behavior. MCP-B declarative-form tests run in the
-`@mcp-b/global` conformance lane, alongside the MCP-B runtime extensions. The
-standalone polyfill test is an install, registration, execution, and abort
-smoke test. The selected upstream WPT allowlist provides behavioral
-conformance coverage.
+native browser behavior. The shared declarative-form suite runs against both
+`@mcp-b/global` and the standalone polyfill through
+`pnpm --filter @mcp-b/global test:conformance:global`. The standalone polyfill
+also has a separate install, registration, execution, and abort smoke test.
+The default `@mcp-b/global` test run includes both declarative harnesses.
+The selected upstream WPT allowlist covers imperative core behavior only.
 The pinned WPT revision's omitted imperative cases still expect JSON-string
 `executeTool()` input or older annotations; refresh the pin before restoring
 them.

@@ -1,5 +1,23 @@
-import type { InputSchema, ModelContext, WebMcpToolInput, WebMCP } from '@mcp-b/webmcp-ts-sdk';
-import type { JsonSchemaType } from '@modelcontextprotocol/server';
+import type { WebMCP } from 'webmcp-types';
+
+type InputSchema = NonNullable<WebMCP.ModelContextTool['inputSchema']>;
+type WebMcpToolInput = Parameters<WebMCP.ToolExecuteCallback>[0];
+// webmcp-types accepts any schema object. This is the subset generated from form controls.
+interface FormParameterSchema {
+  type: 'string' | 'number' | 'boolean' | 'array';
+  description?: string;
+  title?: string;
+  const?: string;
+  enum?: string[];
+  anyOf?: FormParameterSchema[];
+  items?: FormParameterSchema;
+  uniqueItems?: boolean;
+  minimum?: number;
+  maximum?: number;
+  multipleOf?: number;
+  pattern?: string;
+  format?: string;
+}
 
 type WebMcpToolResult = Awaited<ReturnType<WebMCP.ToolExecuteCallback>>;
 
@@ -31,7 +49,7 @@ const agentInvokedEvents = new WeakSet<SubmitEvent>();
 const agentResponses = new WeakMap<SubmitEvent, Promise<WebMcpToolResult>>();
 const activeSubmissions = new WeakMap<HTMLFormElement, ActiveSubmission>();
 
-export function isAgentInvokedSubmitEvent(event: SubmitEvent): boolean {
+function isAgentInvokedSubmitEvent(event: SubmitEvent): boolean {
   return (
     event.isTrusted &&
     (agentInvokedEvents.has(event) ||
@@ -41,7 +59,7 @@ export function isAgentInvokedSubmitEvent(event: SubmitEvent): boolean {
   );
 }
 
-export function respondWithAgentSubmitEvent(
+function respondWithAgentSubmitEvent(
   event: SubmitEvent,
   agentResponse: Promise<WebMcpToolResult>
 ): void {
@@ -71,10 +89,11 @@ export function respondWithAgentSubmitEvent(
   }
 }
 
-/** Installs the MCP-B declarative form and SubmitEvent extensions. */
-export function installWebMCPDeclarativeExtensions(context: ModelContext): () => void {
+/** Retains declarative forms until the vendored upstream implements them. */
+export function installWebMCPDeclarativeExtensions(context: WebMCP.ModelContext): void {
   const prototype = SubmitEvent.prototype;
-  const installedProperties: Array<'agentInvoked' | 'respondWith'> = [];
+  // Native support and earlier bundle installations already own these hooks.
+  if ('agentInvoked' in prototype && 'respondWith' in prototype) return;
 
   if (!('agentInvoked' in prototype)) {
     Object.defineProperty(prototype, 'agentInvoked', {
@@ -84,7 +103,6 @@ export function installWebMCPDeclarativeExtensions(context: ModelContext): () =>
         return isAgentInvokedSubmitEvent(this);
       },
     });
-    installedProperties.push('agentInvoked');
   }
 
   if (!('respondWith' in prototype)) {
@@ -96,14 +114,9 @@ export function installWebMCPDeclarativeExtensions(context: ModelContext): () =>
         respondWithAgentSubmitEvent(this, agentResponse);
       },
     });
-    installedProperties.push('respondWith');
   }
 
-  const cleanupForms = installDeclarativeForms(document, context);
-  return () => {
-    cleanupForms();
-    for (const key of installedProperties) Reflect.deleteProperty(prototype, key);
-  };
+  installDeclarativeForms(document, context);
 }
 
 const TEXT_INPUT_TYPES = new Set(['email', 'password', 'search', 'tel', 'text', 'url']);
@@ -228,11 +241,11 @@ function parameterDescription(
 }
 
 function withDescription(
-  schema: JsonSchemaType,
+  schema: FormParameterSchema,
   form: HTMLFormElement,
   controls: readonly DeclarativeControl[],
   extra?: string
-): JsonSchemaType {
+): FormParameterSchema {
   const description = parameterDescription(form, controls);
   const combined = description && extra ? `${description} (${extra})` : description || extra;
   return combined ? { ...schema, description: combined } : schema;
@@ -261,8 +274,8 @@ function validPattern(input: HTMLInputElement): string | undefined {
   }
 }
 
-function numberSchema(input: HTMLInputElement, includePattern = true): JsonSchemaType {
-  const schema: JsonSchemaType = { type: 'number' };
+function numberSchema(input: HTMLInputElement, includePattern = true): FormParameterSchema {
+  const schema: FormParameterSchema = { type: 'number' };
   const minimum = validNumberAttribute(input, 'min');
   const maximum = validNumberAttribute(input, 'max');
   if (minimum !== undefined) schema.minimum = minimum;
@@ -294,7 +307,7 @@ function temporalFormat(input: HTMLInputElement, datePrefix: string): string {
 function optionSchemas(options: readonly HTMLOptionElement[]) {
   return {
     anyOf: options.map((option) => ({
-      type: 'string',
+      type: 'string' as const,
       const: option.value,
       title: option.textContent ?? '',
     })),
@@ -306,7 +319,7 @@ function groupChoiceSchemas(controls: readonly HTMLInputElement[]) {
   return {
     anyOf: controls.map((control) => {
       const title = labelText(control);
-      const schema: JsonSchemaType = { type: 'string', const: control.value };
+      const schema: FormParameterSchema = { type: 'string', const: control.value };
       if (title) schema.title = title;
       return schema;
     }),
@@ -317,7 +330,7 @@ function groupChoiceSchemas(controls: readonly HTMLInputElement[]) {
 function parameterSchema(
   form: HTMLFormElement,
   controls: readonly DeclarativeControl[]
-): JsonSchemaType | undefined {
+): FormParameterSchema | undefined {
   const first = controls[0];
   if (!first) return undefined;
 
@@ -356,7 +369,7 @@ function parameterSchema(
   }
 
   if (TEXT_INPUT_TYPES.has(first.type)) {
-    const schema: JsonSchemaType = { type: 'string' };
+    const schema: FormParameterSchema = { type: 'string' };
     const pattern = validPattern(first);
     if (pattern !== undefined) schema.pattern = pattern;
     return withDescription(schema, form, controls);
@@ -433,7 +446,7 @@ function parameterSchema(
 }
 
 function synthesizeSchema(form: HTMLFormElement): InputSchema {
-  const properties: Record<string, JsonSchemaType> = {};
+  const properties: Record<string, FormParameterSchema> = {};
   const required: string[] = [];
   for (const [name, controls] of controlGroups(form)) {
     if (!name) continue;
@@ -745,8 +758,7 @@ function waitForSubmission(
 }
 
 /** Installs the DOM-backed half of the draft Declarative WebMCP API. */
-export function installDeclarativeForms(document: Document, context: ModelContext): () => void {
-  let active = true;
+function installDeclarativeForms(document: Document, context: WebMCP.ModelContext): void {
   const registrations = new Map<HTMLFormElement, DeclarativeRegistration>();
   const blockedDefinitions = new Map<HTMLFormElement, string>();
   const observers = new Map<Document | ShadowRoot, MutationObserver>();
@@ -918,7 +930,6 @@ export function installDeclarativeForms(document: Document, context: ModelContex
     }
   }
 
-  let restoreAttachShadow = () => {};
   const elementPrototype = document.defaultView?.Element.prototype;
   const attachShadowDescriptor = elementPrototype
     ? Object.getOwnPropertyDescriptor(elementPrototype, 'attachShadow')
@@ -928,7 +939,6 @@ export function installDeclarativeForms(document: Document, context: ModelContex
     const attachShadow = function (this: Element, init: ShadowRootInit): ShadowRoot {
       const root = nativeAttachShadow.call(this, init);
       if (
-        active &&
         root.mode === 'open' &&
         Object.getOwnPropertyDescriptor(Node.prototype, 'ownerDocument')?.get?.call(this) ===
           document &&
@@ -942,14 +952,8 @@ export function installDeclarativeForms(document: Document, context: ModelContex
       ...attachShadowDescriptor,
       value: attachShadow,
     });
-    restoreAttachShadow = () => {
-      if (elementPrototype.attachShadow === attachShadow) {
-        Object.defineProperty(elementPrototype, 'attachShadow', attachShadowDescriptor);
-      }
-    };
   }
 
-  let restoreFormSubmit = () => {};
   const formPrototype = document.defaultView?.HTMLFormElement.prototype;
   const submitDescriptor = formPrototype
     ? Object.getOwnPropertyDescriptor(formPrototype, 'submit')
@@ -958,30 +962,12 @@ export function installDeclarativeForms(document: Document, context: ModelContex
     const nativeSubmit = formPrototype.submit;
     const submit = function (this: HTMLFormElement): void {
       nativeSubmit.call(this);
-      if (active) activeSubmissions.get(this)?.direct();
+      activeSubmissions.get(this)?.direct();
     };
     Object.defineProperty(formPrototype, 'submit', { ...submitDescriptor, value: submit });
-    restoreFormSubmit = () => {
-      if (formPrototype.submit === submit) {
-        Object.defineProperty(formPrototype, 'submit', submitDescriptor);
-      }
-    };
   }
 
   // ponytail: a whole-tree rescan keeps DOM ownership obvious; index forms if this
   // becomes measurable on pages with thousands of annotated controls.
   sync();
-
-  return () => {
-    active = false;
-    restoreFormSubmit();
-    restoreAttachShadow();
-    for (const root of observers.keys()) stopObservingRoot(root);
-    blockedDefinitions.clear();
-    for (const registration of registrations.values()) {
-      registration.cancelPending?.(new DOMException('Tool execution cancelled', 'UnknownError'));
-      registration.controller.abort();
-    }
-    registrations.clear();
-  };
 }

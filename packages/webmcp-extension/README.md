@@ -72,9 +72,10 @@ Annotated forms use the same extension connection:
 </form>
 ```
 
-`@mcp-b/global` uses native declarative support when available and installs the
-polyfilled form runtime otherwise. Imperative registrations and annotated forms
-both appear in `client.listTools()` and run through `client.callTool()`. The
+`@mcp-b/global` uses native declarative support when available. Otherwise,
+`@mcp-b/webmcp-polyfill` installs its temporary form layer. Imperative
+registrations and annotated forms both appear in `client.listTools()` and run
+through `client.callTool()`. The
 extension adds no separate DOM scanner or declarative client API. See the
 [declarative API reference](https://docs.mcp-b.ai/reference/webmcp/declarative-api)
 for the evolving browser behavior and polyfill compatibility boundary.

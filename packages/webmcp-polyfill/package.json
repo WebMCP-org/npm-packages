@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/webmcp-polyfill",
   "version": "5.1.0",
-  "description": "Compatibility alias distributing the upstream WebMCP polyfill as vendored source",
+  "description": "Vendored upstream WebMCP polyfill with retained declarative forms support",
   "keywords": [
     "browser",
     "model-context",

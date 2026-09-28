@@ -18,9 +18,4 @@ declare global {
   interface Window {
     __webModelContextOptions?: WebModelContextInitOptions;
   }
-
-  interface SubmitEvent {
-    readonly agentInvoked?: boolean;
-    respondWith?(agentResponse: Promise<unknown>): void;
-  }
 }

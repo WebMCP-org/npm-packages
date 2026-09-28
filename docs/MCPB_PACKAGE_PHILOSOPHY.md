@@ -30,16 +30,17 @@ Use when you want:
 ### 2) `@mcp-b/webmcp-polyfill` (Canonical Core Runtime)
 
 - Bundles the upstream WebMCP polyfill source at the revision recorded in its package manifest.
-- Installs the standard `document.modelContext` runtime only.
+- Installs the standard `document.modelContext` runtime plus temporary MCP-B
+  declarative forms and `SubmitEvent` extensions until upstream supports them.
 
 Use when you want:
 
-- a strict core runtime implementation without MCP-B bridge features
+- a core runtime with temporary declarative forms, without MCP-B bridge features
 
 ### 3) `@mcp-b/global` (MCP-B Runtime Entry Point)
 
 - Orchestrates the polyfill, `BrowserMcpServer`, and browser transport.
-- Installs declarative forms and MCP extensions, including `outputSchema`, around the upstream runtime.
+- Adds MCP extensions, including `outputSchema`, around the polyfill runtime.
 - Exports initialization and transport configuration types. The browser adapter and its extension types belong to `@mcp-b/webmcp-ts-sdk`.
 
 Use when you want:
@@ -73,7 +74,7 @@ Core layering:
 
 1. `webmcp-types` -> core browser type contracts; `@mcp-b/webmcp-ts-sdk` -> MCP-B adapter
    and extension contracts
-2. `@mcp-b/webmcp-polyfill` -> canonical core runtime behavior
+2. `@mcp-b/webmcp-polyfill` -> canonical core runtime behavior and temporary declarative forms
 3. `@mcp-b/global` -> MCP-B extensions/runtime built on core
 4. `@mcp-b/react-webmcp` -> React hooks for MCP-B runtime
 5. `usewebmcp` -> React hooks for strict core API
@@ -90,7 +91,7 @@ Core layering:
 
 1. Need core browser contracts only: upstream `webmcp-types`; use `@mcp-b/webmcp-ts-sdk`
    for MCP-B adapter extensions or schema conversion
-2. Need strict core runtime only: `@mcp-b/webmcp-polyfill`
+2. Need the core runtime and temporary declarative forms without MCP-B bridge features: `@mcp-b/webmcp-polyfill`
 3. Need full MCP-B runtime and extension APIs: `@mcp-b/global`
 4. Need React hooks for MCP-B: `@mcp-b/react-webmcp`
 5. Need React hooks for strict core only: `usewebmcp`

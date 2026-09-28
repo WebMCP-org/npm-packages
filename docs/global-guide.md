@@ -8,9 +8,9 @@ the composed official MCP server.
 The core runtime comes from [`@mcp-b/webmcp-polyfill`](../packages/webmcp-polyfill/README.md),
 which bundles the upstream
 [webmachinelearning/webmcp-polyfill](https://github.com/webmachinelearning/webmcp-polyfill)
-at revision `439c6c341f1c632c63498ba206e2bd8471cb8efb`. MCP-B declarative forms,
-the deprecated navigator alias, the testing shim, and MCP `outputSchema` support
-belong to `@mcp-b/global`.
+at revision `439c6c341f1c632c63498ba206e2bd8471cb8efb`. The polyfill
+temporarily retains MCP-B declarative forms and `SubmitEvent` extensions until
+upstream supports them. MCP `outputSchema` belongs to `@mcp-b/global`.
 
 For the public docs site, see:
 
@@ -143,8 +143,9 @@ Initialization does four things:
 4. Replaces `document.modelContext` with that server so strict core calls mirror
    down while MCP-B extensions remain available.
 
-Declarative forms, prompts, resources, transports, and MCP `outputSchema` belong
-to `@mcp-b/global`. All packages use `document.modelContext` for the browser API.
+The polyfill supplies missing declarative form support while preserving existing native hooks. Prompts,
+resources, transports, and MCP `outputSchema` belong to `@mcp-b/global`. All
+packages use `document.modelContext` for the browser API.
 
 ## Output schemas
 

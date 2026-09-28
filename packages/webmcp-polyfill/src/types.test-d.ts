@@ -1,5 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
 import type { WebMCP } from 'webmcp-types';
+import './index.js';
 
 test('ModelContext is the non-constructible Web IDL interface object', () => {
   const context = document.modelContext;
@@ -20,4 +21,12 @@ test('ModelContext is the non-constructible Web IDL interface object', () => {
       })
     | undefined
   >();
+});
+
+test('declarative form extensions remain optional Web IDL members', () => {
+  expectTypeOf<SubmitEvent['agentInvoked']>().toEqualTypeOf<boolean | undefined>();
+  expectTypeOf<NonNullable<SubmitEvent['respondWith']>>()
+    .parameter(0)
+    .toEqualTypeOf<Promise<unknown>>();
+  expectTypeOf<NonNullable<SubmitEvent['respondWith']>>().returns.toBeVoid();
 });

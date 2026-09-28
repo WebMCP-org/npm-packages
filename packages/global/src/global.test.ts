@@ -7,6 +7,9 @@ import { isCallToolResult, type CallToolResult } from '@modelcontextprotocol/ser
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 
+// The core and forms belong to the document, beyond each bridge initialization.
+installWebMCP();
+
 const documentModelContextDescriptorStack: Array<PropertyDescriptor | undefined> = [];
 
 function setDocumentModelContext(value: ModelContext | undefined): void {
@@ -98,26 +101,50 @@ describe('global adapter', () => {
     expect(getModelContext().listTools).toBeTypeOf('function');
   });
 
-  it('adds MCP-B extensions around an upstream context installed beforehand', () => {
+  it('preserves standalone forms across repeated installation and bridge cleanup', async () => {
     installWebMCP();
     const upstreamContext = document.modelContext;
-    const previousRespondWith = Object.getOwnPropertyDescriptor(
-      SubmitEvent.prototype,
-      'respondWith'
-    );
+    if (!upstreamContext) throw new Error('Expected an installed polyfill');
+    const previousRespondWith = SubmitEvent.prototype.respondWith;
+    const form = document.createElement('form');
+    form.setAttribute('toolname', 'standalone_form');
+    form.setAttribute('tooldescription', 'Survives bridge cleanup');
+    form.setAttribute('toolautosubmit', '');
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (!event.respondWith) throw new Error('Expected declarative form support');
+      event.respondWith(Promise.resolve('retained'));
+    });
+    document.body.append(form);
 
-    initializeWebModelContext();
+    try {
+      await expect
+        .poll(async () => (await upstreamContext.getTools()).map(({ name }) => name))
+        .toContain('standalone_form');
+      initializeWebModelContext();
+      const server = getModelContext();
+      installWebMCP();
+      expect(document.modelContext).toBe(server);
+      await expect
+        .poll(async () => (await server.getTools()).map(({ name }) => name))
+        .toContain('standalone_form');
 
-    const server = getModelContext();
-    expect(server).toBeInstanceOf(BrowserMcpServer);
-    expect(document.modelContext).toBe(server);
-    expect(SubmitEvent.prototype.respondWith).toBeTypeOf('function');
-
-    cleanupWebModelContext();
-    expect(document.modelContext).toBe(upstreamContext);
-    expect(Object.getOwnPropertyDescriptor(SubmitEvent.prototype, 'respondWith')).toEqual(
-      previousRespondWith
-    );
+      cleanupWebModelContext();
+      expect(document.modelContext).toBe(upstreamContext);
+      expect(SubmitEvent.prototype.respondWith).toBe(previousRespondWith);
+      form.setAttribute('toolname', 'after_cleanup');
+      await expect
+        .poll(async () => (await upstreamContext.getTools()).map(({ name }) => name))
+        .toContain('after_cleanup');
+      const tool = (await upstreamContext.getTools()).find(({ name }) => name === 'after_cleanup');
+      if (!tool) throw new Error('Expected declarative discovery after cleanup');
+      await expect(upstreamContext.executeTool(tool, {})).resolves.toBe('"retained"');
+    } finally {
+      form.remove();
+      await expect
+        .poll(async () => (await upstreamContext.getTools()).map(({ name }) => name))
+        .not.toContain('after_cleanup');
+    }
   });
 
   it('leaves native declarative form support in place', async () => {

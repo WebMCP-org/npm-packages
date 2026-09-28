@@ -22,7 +22,7 @@ function requireModelContext(): NonNullable<Document['modelContext']> {
 
 /**
  * Declarative forms are not part of the WebMCP draft or WPT IDL, so
- * `SubmitEvent.respondWith()` is optional. Native Chromium and `@mcp-b/global`
+ * `SubmitEvent.respondWith()` is optional. Native Chromium and `@mcp-b/webmcp-polyfill`
  * provide it; absence is a harness failure here.
  *
  * There is deliberately no matching helper for `agentInvoked`: synthetic

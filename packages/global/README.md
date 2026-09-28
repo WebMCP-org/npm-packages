@@ -37,13 +37,13 @@ revision `439c6c341f1c632c63498ba206e2bd8471cb8efb`. It depends on the
 upstream `webmcp-types` declarations. Consumers do not install or build a Git
 dependency.
 
-`@mcp-b/global` layers MCP-B transports, prompts, resources, declarative forms,
-MCP `outputSchema` metadata, and structured MCP responses on the upstream runtime. Existing native
-contexts take precedence and receive the same MCP-B extensions when wrapped,
+`@mcp-b/webmcp-polyfill` retains declarative forms and `SubmitEvent` extensions
+until upstream supports them. `@mcp-b/global` adds MCP-B transports, prompts,
+resources, MCP `outputSchema` metadata, and structured MCP responses. Existing native
+contexts take precedence and receive the MCP-B adapter when wrapped,
 including when the upstream polyfill was installed before `@mcp-b/global`.
-`cleanupWebModelContext()` removes the MCP-B adapter and its form registrations;
-the upstream context remains installed for the document lifetime. The core
-polyfill does not provide these MCP-B extensions.
+`cleanupWebModelContext()` removes the MCP-B adapter; the polyfill context and
+form layer remain installed for the document lifetime. Existing native form hooks are preserved.
 
 `executeTool(tool, inputObject)` follows the current draft and returns JSON.
 
