@@ -4,11 +4,8 @@ import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import type { ModelContext, RegisteredTool, WebMcpToolInput } from '@mcp-b/webmcp-ts-sdk';
 import { Client } from '@modelcontextprotocol/client';
 import { isCallToolResult, type CallToolResult } from '@modelcontextprotocol/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
-
-// The core and forms belong to the document, beyond each bridge initialization.
-installWebMCP();
 
 const documentModelContextDescriptorStack: Array<PropertyDescriptor | undefined> = [];
 
@@ -64,23 +61,61 @@ function parseSerializedResult(serialized: string): CallToolResult {
   return result;
 }
 
-function createNativeModelContextStub(): ModelContext {
-  const nativeContext: ModelContext = {
-    executeTool: async () => {
-      throw new Error('Unexpected native execution');
+function createNativeModelContextStub(overrides: Partial<ModelContext> = {}): ModelContext {
+  return Object.assign(
+    new EventTarget(),
+    {
+      ontoolchange: null,
+      registerTool: async () => {},
+      getTools: async () => [],
+      executeTool: async () => {
+        throw new Error('Unexpected native execution');
+      },
     },
-    ontoolchange: null,
-    getTools: async () => [],
-    registerTool: async () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => true,
-  };
-
-  return nativeContext;
+    overrides
+  );
 }
 
+describe('native declarative form support', () => {
+  it('leaves native declarative form support in place', async () => {
+    // Runs before the polyfill installs its own hooks, so the guard is reachable.
+    expect('agentInvoked' in SubmitEvent.prototype).toBe(false);
+    expect('respondWith' in SubmitEvent.prototype).toBe(false);
+    const nativeContext = createNativeModelContextStub();
+    const registerTool = vi.spyOn(nativeContext, 'registerTool');
+    const agentInvoked = { configurable: true, get: () => false };
+    const respondWith = { configurable: true, writable: true, value: () => {} };
+    Object.defineProperties(SubmitEvent.prototype, { agentInvoked, respondWith });
+    setDocumentModelContext(nativeContext);
+    const form = document.createElement('form');
+    form.setAttribute('toolname', 'native_declarative_tool');
+    form.setAttribute('tooldescription', 'Provided by the browser');
+    document.body.append(form);
+
+    try {
+      initializeWebModelContext();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(registerTool).not.toHaveBeenCalled();
+      expect(Object.getOwnPropertyDescriptor(SubmitEvent.prototype, 'agentInvoked')?.get).toBe(
+        agentInvoked.get
+      );
+      expect(Object.getOwnPropertyDescriptor(SubmitEvent.prototype, 'respondWith')?.value).toBe(
+        respondWith.value
+      );
+    } finally {
+      form.remove();
+      Reflect.deleteProperty(SubmitEvent.prototype, 'agentInvoked');
+      Reflect.deleteProperty(SubmitEvent.prototype, 'respondWith');
+    }
+  });
+});
+
 describe('global adapter', () => {
+  // The core and forms belong to the document, beyond each bridge initialization.
+  beforeAll(() => {
+    installWebMCP();
+  });
+
   it('wraps native document.modelContext with BrowserMcpServer by default', () => {
     const nativeContext = createNativeModelContextStub();
     setDocumentModelContext(nativeContext);
@@ -144,48 +179,6 @@ describe('global adapter', () => {
       await expect
         .poll(async () => (await upstreamContext.getTools()).map(({ name }) => name))
         .not.toContain('after_cleanup');
-    }
-  });
-
-  it('leaves native declarative form support in place', async () => {
-    const nativeContext = createNativeModelContextStub();
-    if (!nativeContext) throw new Error('Native modelContext stub is unavailable');
-    const registerTool = vi.spyOn(nativeContext, 'registerTool');
-    const previousAgentInvoked = Object.getOwnPropertyDescriptor(
-      SubmitEvent.prototype,
-      'agentInvoked'
-    );
-    const previousRespondWith = Object.getOwnPropertyDescriptor(
-      SubmitEvent.prototype,
-      'respondWith'
-    );
-    Object.defineProperties(SubmitEvent.prototype, {
-      agentInvoked: { configurable: true, get: () => false },
-      respondWith: { configurable: true, writable: true, value: () => {} },
-    });
-    setDocumentModelContext(nativeContext);
-    const form = document.createElement('form');
-    form.setAttribute('toolname', 'native_declarative_tool');
-    form.setAttribute('tooldescription', 'Provided by the browser');
-    document.body.append(form);
-
-    try {
-      initializeWebModelContext();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      expect(registerTool).not.toHaveBeenCalled();
-    } finally {
-      form.remove();
-      cleanupWebModelContext();
-      if (previousAgentInvoked) {
-        Object.defineProperty(SubmitEvent.prototype, 'agentInvoked', previousAgentInvoked);
-      } else {
-        Reflect.deleteProperty(SubmitEvent.prototype, 'agentInvoked');
-      }
-      if (previousRespondWith) {
-        Object.defineProperty(SubmitEvent.prototype, 'respondWith', previousRespondWith);
-      } else {
-        Reflect.deleteProperty(SubmitEvent.prototype, 'respondWith');
-      }
     }
   });
 
@@ -260,12 +253,7 @@ describe('global adapter', () => {
     const pendingTools = new Promise<[]>((resolve) => {
       resolveTools = resolve;
     });
-    const nativeContext = Object.assign(new EventTarget(), {
-      ontoolchange: null,
-      registerTool: async () => {},
-      getTools: vi.fn(() => pendingTools),
-      executeTool: vi.fn(async () => 'null'),
-    });
+    const nativeContext = createNativeModelContextStub({ getTools: vi.fn(() => pendingTools) });
     const connectSpy = vi.spyOn(BrowserMcpServer.prototype, 'connect').mockResolvedValue(undefined);
     setDocumentModelContext(nativeContext);
 
@@ -290,11 +278,8 @@ describe('global adapter', () => {
 
   it('connects after an initial native tool synchronization failure', async () => {
     const synchronizationError = new Error('native discovery failed');
-    const nativeContext = Object.assign(new EventTarget(), {
-      ontoolchange: null,
-      registerTool: async () => {},
+    const nativeContext = createNativeModelContextStub({
       getTools: vi.fn().mockRejectedValue(synchronizationError),
-      executeTool: vi.fn(async () => 'null'),
     });
     const connectSpy = vi.spyOn(BrowserMcpServer.prototype, 'connect').mockResolvedValue(undefined);
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -502,9 +487,7 @@ describe('global adapter', () => {
 
   it('reconciles native tools after toolchange events', async () => {
     const nativeTools: RegisteredTool[] = [];
-    const nativeContext = Object.assign(new EventTarget(), {
-      ontoolchange: null,
-      registerTool: async () => {},
+    const nativeContext = createNativeModelContextStub({
       getTools: async () => nativeTools,
       executeTool: async () =>
         JSON.stringify({ content: [{ type: 'text', text: 'native-event-ok' }] }),

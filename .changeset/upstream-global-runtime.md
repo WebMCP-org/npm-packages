@@ -58,15 +58,29 @@ use MCP discovery or `listTools()` when you need MCP output metadata.
 
 ### Cleanup and frames
 
-`cleanupWebModelContext()` removes the MCP-B layer and transports, then restores
-the underlying context. The core polyfill and its form layer stay installed for
-the document lifetime. Use registration AbortControllers to remove your tools and
-invocation signals to cancel work.
+`cleanupWebModelContext()` closes the MCP server and transport, then restores
+the underlying context. Closing the server aborts every registration made
+through `document.modelContext` while the runtime was installed, so those tools
+also disappear from the underlying context, and calling
+`initializeWebModelContext()` again does not bring them back; register them
+again after re-initializing. Tools registered directly on the underlying
+context, including declarative forms, survive cleanup. The core polyfill and its
+form layer stay installed for the document lifetime. Use registration
+AbortControllers to remove your tools and invocation signals to cancel work.
+
+The transport connects, and announces `mcp-server-ready`, only after the first
+discovery of tools already registered on the underlying context, so a client's
+first `tools/list` is complete. Upstream discovery waits up to 500 ms for frames
+that do not answer, so a page embedding an iframe without WebMCP sees its first
+ready message delayed by about that much.
 
 Browser discovery and execution now use upstream frame and origin behavior.
 Install the runtime in participating frames and configure `exposedTo`,
 `getTools({ fromOrigins })`, and iframe `tools` permission for cross-origin use.
 The vendored polyfill rejects opaque and extension-scheme exposure origins.
-Each MCP server mirrors its document and descendants; standard `getTools()` can
-also discover exposed ancestor/sibling tools without importing them recursively
-into the iframe MCP bridge.
+In a top-level document the MCP server mirrors its own tools and those of
+same-origin descendant frames; a cross-origin child never appears over MCP even
+when `getTools({ fromOrigins })` exposes it. In a non-top frame the server
+mirrors only its own window's tools. Standard `getTools()` can still discover
+exposed ancestor and sibling tools without importing them into the iframe MCP
+bridge.

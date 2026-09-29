@@ -73,7 +73,6 @@ Goal: keep one place to track standards decisions, implementation details, and e
 
 - [ ] Cross-document `getTools({ fromOrigins })` exposure and Permissions Policy behavior
 - [ ] Event conformance for standard `toolchange` dispatch timing
-- [ ] Optional Chromium `executeTool` behavior without treating it as standard API
 
 ## Runtime Conformance Matrix (Implemented)
 
@@ -82,7 +81,7 @@ Goal: keep one place to track standards decisions, implementation details, and e
 - Standalone polyfill declarative entry: `packages/webmcp-polyfill/src/declarative-forms.test.ts`
 - Each declarative entry runs in its owning package's default `test` and `test:coverage` scripts.
 - Polyfill runtime smoke test: `packages/webmcp-polyfill/src/index.test.ts`
-- Native Chromium runtime entry: `conformance/native-runtime.e2e.test.ts`
+- Native Chromium runtime entry: `packages/global/conformance/native-runtime.e2e.test.ts`
 - Shared declarative suite: `conformance/declarative-forms-conformance.shared.ts`
 - Pinned upstream page-local imperative WPT:
   - Selection and runner: `scripts/run-webmcp-wpt.mjs`
@@ -111,12 +110,12 @@ Run commands:
   - `pnpm --filter @mcp-b/global run test:conformance:global`
 - WebMCP polyfill smoke test through the global matrix alias:
   - `pnpm --filter @mcp-b/global run test:smoke:polyfill`
-- Native runtime (Chrome 152+ Dev/Canary + flags):
+- Native runtime (Chrome 155+ Beta/Dev/Canary + flags):
   - `CHROME_BIN=\"/path/to/chrome-dev-or-canary\" CHROME_FLAGS=\"--enable-features=WebMCP\" pnpm --filter @mcp-b/global run test:conformance:native`
 - Matrix:
   - `CHROME_BIN=\"/path/to/chrome-dev-or-canary\" CHROME_FLAGS=\"--enable-features=WebMCP\" pnpm --filter @mcp-b/global run test:conformance:matrix`
 
-`vitest.conformance.native.config.ts` auto-detects Chrome Canary/Dev on macOS and common Linux Chrome binaries when `CHROME_BIN` is not set, but it rejects any executable below Chrome 152.
+`vitest.conformance.native.config.ts` auto-detects Chrome Canary/Dev on macOS and common Linux Chrome binaries when `CHROME_BIN` is not set, but it rejects any executable below Chrome 155, the first release with object-input `executeTool()`.
 
 ## Native validation behavior note (updated July 30, 2026)
 
@@ -124,7 +123,7 @@ Run commands:
 - Native conformance discovers tools through `await document.modelContext.getTools()`.
 - Native conformance does not depend on either removed navigator API.
 - Native conformance does not rely on removed preview methods such as `provideContext()` or `clearContext()`.
-- If Chromium exposes `document.modelContext.executeTool(...)`, the suite invokes it with the exact `RegisteredTool` returned by `getTools()`. It does not invoke the extension when absent.
+- Native conformance executes tools through `document.modelContext.executeTool(tool, input)` with the exact `RegisteredTool` returned by `getTools()` and an input object; Chrome 155+ accepts that contract.
 - Current Chromium source notes that tool input schema enforcement during execution is incomplete.
 - The vendored upstream polyfill treats input schemas as metadata during direct execution; it accepts object input and does not validate it against the schema.
 - `@mcp-b/webmcp-polyfill` and `BrowserMcpServer` accept `registerTool(tool, { signal })`; aborting the signal owns removal.

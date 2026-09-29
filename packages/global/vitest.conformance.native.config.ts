@@ -7,7 +7,7 @@ import {
 } from '../../e2e/chrome-executable.js';
 
 const isCI = process.env.CI === 'true';
-const MIN_NATIVE_CHROME_MAJOR = 152;
+const MIN_NATIVE_CHROME_MAJOR = 155;
 const REQUIRED_WEBMCP_FEATURES = ['WebMCP', 'DevToolsWebMCPSupport'];
 
 function resolveChromeFlags(): string[] {

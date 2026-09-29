@@ -93,7 +93,8 @@ form layer remain installed for the document lifetime. Existing native form hook
 </script>
 ```
 
-The ESM entry keeps MCP-B dependencies external and bundles the official polyfill.
+The ESM entry keeps `@mcp-b/transports`, `@mcp-b/webmcp-polyfill`, and
+`@mcp-b/webmcp-ts-sdk` external; only the IIFE bundles them.
 
 ### Via NPM
 
@@ -145,7 +146,9 @@ await document.modelContext.registerTool({
 #### `cleanupWebModelContext()`
 
 Tears down the adapter and restores `document.modelContext` to the captured native or polyfilled
-context. Allows re-initialization.
+context. Closing the adapter aborts every registration made through `document.modelContext` while
+it was installed; re-initializing does not restore them. Tools registered directly on the underlying
+context, including declarative forms, survive.
 
 ```typescript
 import { cleanupWebModelContext, initializeWebModelContext } from '@mcp-b/global';
@@ -204,35 +207,33 @@ Returns WebMCP tool descriptors for all registered tools.
 
 ```typescript
 const tools = await document.modelContext.getTools();
-// [{ name: 'search-products', inputSchema: '{"type":"object",...}', ... }, ...]
+// [{ name: 'search-products', inputSchema: { type: 'object', ... }, ... }, ...]
 ```
 
 #### `executeTool(tool, inputObject)`
 
 Execute a discovered descriptor with an input object. The result is serialized JSON.
-Feature-detect the context before calling it.
 
 ```typescript
 import '@mcp-b/global';
 
 const modelContext = document.modelContext;
-if (!modelContext || typeof modelContext.executeTool !== 'function') {
-  throw new Error('Tool execution is unavailable');
-}
+if (!modelContext) throw new Error('WebMCP is unavailable');
 
 const tools = await modelContext.getTools();
 const searchTool = tools.find((tool) => tool.name === 'search-products');
 if (!searchTool) throw new Error('search-products is not available');
 
-const resultJson = await modelContext.executeTool(searchTool, { query: 'laptop', limit: 5 });
-const result = resultJson === null ? null : JSON.parse(resultJson);
+const result = JSON.parse(
+  await modelContext.executeTool(searchTool, { query: 'laptop', limit: 5 })
+);
 // { content: [{ type: 'text', text: '...' }] }
 ```
 
 #### `listTools()`
 
 This MCP-B helper exposes MCP metadata. In-page WebMCP consumers should use
-`getTools()` and feature-detect `executeTool(tool, inputObject)`.
+`getTools()` and `executeTool(tool, inputObject)`.
 
 Prompt, resource, and lower-level MCP helpers are MCP-B extensions. Narrow
 `document.modelContext` with `isBrowserMcpServer()` from
@@ -514,12 +515,21 @@ await document.modelContext.registerTool({
 
 ## Browser Compatibility
 
-| Browser                 | Native Support | Polyfill |
-| ----------------------- | -------------- | -------- |
-| Chrome/Edge (with flag) | Yes            | N/A      |
-| Chrome/Edge (default)   | No             | Yes      |
-| Firefox                 | No             | Yes      |
-| Safari                  | No             | Yes      |
+Native WebMCP needs Chrome 155 or newer with the WebMCP feature enabled; the
+runtime wraps the native context when it exists. Everywhere else the bundled
+polyfill runs. Its `installWebMCP()` installs only when the engine provides
+every API the vendored core calls. Otherwise it returns without defining
+`document.modelContext`, so `if (!document.modelContext)` remains a valid
+feature check.
+
+| API                             | Chrome | Firefox | Safari |
+| ------------------------------- | ------ | ------- | ------ |
+| `String.prototype.toWellFormed` | 111    | 119     | 16.4   |
+| `AbortSignal.any()`             | 116    | 124     | 17.4   |
+| `Promise.withResolvers()`       | 119    | 121     | 17.4   |
+| `URL.parse()`                   | 126    | 126     | 18     |
+
+The resulting floor is Chrome 126, Firefox 126, and Safari 18.
 
 ## Schema Compatibility
 

@@ -2,13 +2,9 @@ import type { WebMCP } from '@mcp-b/webmcp-ts-sdk';
 import { runDeclarativeFormConformanceSuite } from '../../../conformance/declarative-forms-conformance.shared.js';
 import { afterEach, describe, expect, it } from 'vitest';
 
-type ModelContext = Omit<WebMCP.ModelContext, 'executeTool'> & {
-  executeTool?: WebMCP.ModelContext['executeTool'];
-};
+type ModelContext = WebMCP.ModelContext;
 type ModelContextTool = WebMCP.ModelContextTool;
 type RegisteredTool = WebMCP.RegisteredTool;
-
-type NativeExecuteTool = NonNullable<ModelContext['executeTool']>;
 
 const registeredControllers: AbortController[] = [];
 
@@ -18,11 +14,6 @@ function requireNativeModelContext(): ModelContext {
     throw new Error('Expected native document.modelContext with WebMCP enabled');
   }
   return modelContext;
-}
-
-function getNativeExecuteTool(modelContext: ModelContext): NativeExecuteTool | undefined {
-  const executeTool = modelContext.executeTool;
-  return typeof executeTool === 'function' ? executeTool.bind(modelContext) : undefined;
 }
 
 function uniqueToolName(prefix: string): string {
@@ -144,13 +135,8 @@ describe('Native WebMCP conformance', () => {
     await expect(listNativeToolNames()).resolves.not.toContain(toolName);
   });
 
-  it('executes a registered tool when Chromium executeTool is available', async () => {
+  it('executes a registered tool with object input', async () => {
     const modelContext = requireNativeModelContext();
-    const executeTool = getNativeExecuteTool(modelContext);
-    if (!executeTool) {
-      return;
-    }
-
     const toolName = uniqueToolName('native_execute');
     await registerAbortableTool({
       name: toolName,
@@ -170,7 +156,7 @@ describe('Native WebMCP conformance', () => {
       throw new Error(`Expected getTools() to return ${toolName}`);
     }
 
-    const serialized = await executeTool(registeredTool, { value: 7 });
+    const serialized = await modelContext.executeTool(registeredTool, { value: 7 });
 
     expect(serialized).toEqual(expect.any(String));
     expect(serialized).toContain('value:7');

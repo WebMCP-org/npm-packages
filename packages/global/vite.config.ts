@@ -4,6 +4,10 @@ import { playwright } from 'vite-plus/test/browser-playwright';
 import { defineConfig } from 'vite-plus';
 
 const isCI = process.env.CI === 'true';
+const launchArgs = ['--disable-features=WebMCP'];
+const launchOptions = process.env.CHROME_BIN
+  ? { executablePath: process.env.CHROME_BIN, args: launchArgs }
+  : { args: launchArgs };
 
 // ESM build for npm package
 const esmConfig: Options = {
@@ -57,9 +61,7 @@ export default defineConfig({
     // Use browser mode for real DOM, postMessage, and navigator testing
     browser: {
       enabled: true,
-      provider: playwright({
-        launchOptions: process.env.CHROME_BIN ? { executablePath: process.env.CHROME_BIN } : {},
-      }),
+      provider: playwright({ launchOptions }),
       instances: [{ browser: 'chromium' }],
     },
     include: ['src/**/*.{test,spec}.{ts,tsx}', 'conformance/global-runtime.e2e.test.ts'],

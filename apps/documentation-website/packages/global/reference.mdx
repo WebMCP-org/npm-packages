@@ -111,7 +111,7 @@ installed without changing application usage.
 
 ### `cleanupWebModelContext()`
 
-Restores the native or polyfilled context immediately and starts closing the adapter and transport. It does not uninstall `@mcp-b/webmcp-polyfill` or its temporary declarative form layer; both remain for the document lifetime.
+Restores the native or polyfilled context immediately and starts closing the adapter and transport. Closing the adapter aborts every registration made through `document.modelContext` while it was installed, and re-initializing does not restore them; tools registered directly on the underlying context, including declarative forms, survive. It does not uninstall `@mcp-b/webmcp-polyfill` or its temporary declarative form layer; both remain for the document lifetime.
 
 ```ts title="Cleanup"
 import { cleanupWebModelContext } from '@mcp-b/global';
