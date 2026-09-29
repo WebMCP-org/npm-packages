@@ -233,7 +233,7 @@ function selectorQualitySummary(inter) {
 }
 function renderInteractive(inter, opts) {
   const parts = [];
-  const limit = (arr) => (opts?.maxElements !== void 0 ? arr.slice(0, opts.maxElements) : arr);
+  const limit = (arr) => arr.slice(0, opts?.maxElements ?? arr.length);
   if (inter.buttons.length) {
     parts.push('Buttons:');
     for (const el of limit(inter.buttons)) parts.push(elementLine(el, opts));

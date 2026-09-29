@@ -113,8 +113,7 @@ function renderInteractive(
 ): string {
   const parts: string[] = [];
 
-  const limit = <T>(arr: T[]) =>
-    opts?.maxElements !== undefined ? arr.slice(0, opts.maxElements) : arr;
+  const limit = <T>(arr: T[]) => arr.slice(0, opts?.maxElements ?? arr.length);
 
   if (inter.buttons.length) {
     parts.push('Buttons:');
