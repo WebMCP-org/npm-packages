@@ -4,6 +4,7 @@ import {
   createRequestId,
   isJsonObject,
   isLoopbackHost,
+  normalizeSerializedToolResult,
   RELAY_BROWSER_PROTOCOL,
   RELAY_DISCOVERY_PROTOCOL,
   RELAY_ENDPOINT_CACHE_KEY,
@@ -12,6 +13,7 @@ import {
   type SendableSocket,
   safeSend,
   sanitizeLogText,
+  selectRelayTools,
 } from './shared.js';
 
 describe('isJsonObject', () => {
@@ -34,6 +36,63 @@ describe('isJsonObject', () => {
     expect(isJsonObject(42)).toBe(false);
     expect(isJsonObject('string')).toBe(false);
     expect(isJsonObject(true)).toBe(false);
+  });
+});
+
+describe('normalizeSerializedToolResult', () => {
+  it.each(['Order placed', '10.50', 'true', '[1]'])('keeps %s as the original text', (text) => {
+    expect(normalizeSerializedToolResult(text)).toMatchObject({
+      content: [{ type: 'text', text }],
+      isError: false,
+    });
+  });
+
+  it('unquotes a JSON string result', () => {
+    expect(normalizeSerializedToolResult('"quoted"')).toMatchObject({
+      content: [{ type: 'text', text: 'quoted' }],
+      isError: false,
+    });
+  });
+
+  it('structures a JSON object result', () => {
+    expect(normalizeSerializedToolResult('{"total":10.5}')).toMatchObject({
+      isError: false,
+      structuredContent: { total: 10.5 },
+    });
+  });
+
+  it('rejects input_required results', () => {
+    expect(
+      normalizeSerializedToolResult('{"resultType":"input_required","requestState":"x"}')
+    ).toMatchObject({
+      content: [{ type: 'text', text: expect.stringContaining('input_required') }],
+      isError: true,
+    });
+  });
+});
+
+describe('selectRelayTools', () => {
+  it("keeps this page's tool on a name collision and warns once per name", () => {
+    const pageWindow = { name: 'page' };
+    const frameWindow = { name: 'frame' };
+    vi.stubGlobal('window', pageWindow);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const frameTool = { name: 'dup', description: 'Frame tool', window: frameWindow };
+      const pageTool = { name: 'dup', description: 'Page tool', window: pageWindow };
+      const frameOnly = { name: 'frame_only', description: 'Frame only', window: frameWindow };
+
+      const selected = selectRelayTools([frameTool, frameOnly, pageTool]);
+      expect(selected).toHaveLength(2);
+      expect(selected[0]).toBe(pageTool);
+      expect(selected[1]).toBe(frameOnly);
+      expect(selectRelayTools([pageTool, frameTool])).toEqual([pageTool]);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]?.[0]).toContain('"dup"');
+    } finally {
+      warn.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 });
 

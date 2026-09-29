@@ -148,11 +148,23 @@ The relay omits tools that declare `execution.taskSupport: 'required'`. It expos
 Add a script tag to expose a page's WebMCP tools to the relay:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"></script>
 ```
+
+The CDN URL pins the major version because the embed and the page runtime must share a major
+version. Pages on a 5.x runtime load `@5` for both scripts.
 
 Tools registered on `document.modelContext` are picked up automatically, including tools registered
 after the embed loads. The embed listens for `toolchange` and polls every two seconds as a fallback.
+
+The embed relays the page's own tools plus tools registered by same-origin descendant frames. When
+several frames register the same name, the embed relays and invokes the page's own tool (otherwise
+the first one `getTools()` returns) and logs one console warning per name.
+
+A result that parses to a JSON object becomes structured content, and an MCP result object passes
+through unchanged. A JSON string arrives as its content; any other result keeps its original text,
+so a form response of `10.50` stays `10.50`. Under the polyfill and `@mcp-b/global`, a tool that throws returns an error result with the
+text `Tool execution failed`.
 
 ### Embed attributes
 
@@ -170,7 +182,7 @@ Custom relay port:
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"
+  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"
   data-relay-port="9444"
 ></script>
 ```
@@ -179,14 +191,14 @@ Increase the per-request timeout for tools that chain several slow API calls:
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"
+  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"
   data-request-timeout="120000"
 ></script>
 ```
 
 The relay allows `65000` ms by default. If the page timeout is higher, start the relay with a slightly larger limit. For the `120000` ms page setting above, use `--invoke-timeout 125000`.
 
-The embed script fetches the sibling `widget.html`, injects configuration, and loads it as a hidden blob iframe that inherits the host page origin. The iframe opens a WebSocket to the relay on `localhost`. Self-hosted copies must serve both `embed.js` and `widget.html`; cross-origin hosts must allow the widget fetch with CORS. The relay fails closed if that fetch fails. Page code registers tools on `document.modelContext`. The embed discovers tools through asynchronous `getTools()` and executes the returned descriptor through the feature-detected object-input `executeTool()` API.
+The embed script fetches the sibling `widget.html`, injects configuration, and loads it as a hidden blob iframe that inherits the host page origin. The iframe opens a WebSocket to the relay on `localhost`. Self-hosted copies must serve both `embed.js` and `widget.html`; cross-origin hosts must allow the widget fetch with CORS. The relay fails closed if that fetch fails. Page code registers tools on `document.modelContext`. The embed discovers tools through asynchronous `getTools()` and executes the returned descriptor with `executeTool(tool, inputObject)`. It does not feature-detect `executeTool()`: on a runtime without it, tools are listed but every call fails.
 
 ## Reconnection and client mode
 

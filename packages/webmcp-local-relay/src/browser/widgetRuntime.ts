@@ -1,4 +1,3 @@
-import { z } from 'zod/v4';
 import type { WebMcpToolObjectInput } from '@mcp-b/webmcp-ts-sdk';
 declare global {
   var __WEBMCP_RELAY_CONFIG: Record<string, string> | undefined;
@@ -21,7 +20,6 @@ import {
   RELAY_PORT_RANGE_END,
   RELAY_PORT_RANGE_START,
   safeSend,
-  parseJsonObject,
   sanitizeLogText,
 } from './shared.js';
 
@@ -38,14 +36,13 @@ export interface WidgetConfig {
   tabId: string;
 }
 
-const HostMessageSchema = z.object({
-  requestId: z.string(),
-  type: z.string(),
-  tools: z.unknown().optional(),
-  result: z.unknown().optional(),
-  error: z.string().optional(),
-});
-type HostMessage = z.infer<typeof HostMessageSchema>;
+interface HostMessage {
+  requestId: string;
+  type: string;
+  tools?: unknown;
+  result?: unknown;
+  error?: unknown;
+}
 
 interface PendingRequest {
   resolve: (value: HostMessage) => void;
@@ -55,36 +52,23 @@ interface PendingRequest {
   errorType: string;
 }
 
-const RelayServerMessageSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('server-hello'),
-    service: z.literal('webmcp-local-relay'),
-    version: z.literal(1),
-    host: z.string().min(1),
-    instanceId: z.string().min(1),
-    label: z.string().min(1).optional(),
-    port: z.number().int().min(1).max(65535),
-    relayId: z.string().min(1).optional(),
-    workspace: z.string().min(1).optional(),
-  }),
-  z.object({ type: z.literal('hello/accepted') }),
-  z.object({
-    type: z.literal('hello/rejected'),
-    message: z.string().min(1),
-    reason: z.string().min(1),
-  }),
-  z.object({ type: z.literal('ping') }),
-  z.object({ type: z.literal('reload') }),
-  z.object({
-    type: z.literal('invoke'),
-    callId: z.string().min(1),
-    toolName: z.string().min(1),
-    args: z.unknown().optional(),
-  }),
-]);
-const RelayMessageHeaderSchema = z.object({ type: z.string() });
-type RelayServerMessage = z.infer<typeof RelayServerMessageSchema>;
-type RelayHelloMessage = Extract<RelayServerMessage, { type: 'server-hello' }>;
+interface RelayHelloMessage {
+  type: 'server-hello';
+  service: 'webmcp-local-relay';
+  version: 1;
+  host: string;
+  instanceId: string;
+  label?: string;
+  port: number;
+  relayId?: string;
+  workspace?: string;
+}
+
+interface RelayHelloRejectedMessage {
+  type: 'hello/rejected';
+  message: string;
+  reason: string;
+}
 
 interface RelayEndpoint {
   hello: RelayHelloMessage;
@@ -92,11 +76,10 @@ interface RelayEndpoint {
   port: number;
 }
 
-const CachedRelayEndpointSchema = z.object({
-  host: z.string().min(1),
-  port: z.number().int().min(1).max(65535),
-});
-type CachedRelayEndpoint = z.infer<typeof CachedRelayEndpointSchema>;
+interface CachedRelayEndpoint {
+  host: string;
+  port: number;
+}
 
 type RelayRuntimePhase = 'idle' | 'discovering' | 'dormant';
 
@@ -110,7 +93,7 @@ const REDISCOVERY_DELAYS_MS = [10000, 20000, 30000];
 /** Heartbeat probe interval while dormant (ms). */
 const DORMANT_HEARTBEAT_INTERVAL_MS = 120000;
 type HostRequestPayload = {
-  toolName?: string;
+  toolName?: unknown;
   args?: WebMcpToolObjectInput;
 };
 
@@ -186,8 +169,20 @@ export function parseConfig(search = window.location.search): WidgetConfig | nul
 }
 
 export function parseHostMessage(value: unknown): HostMessage | null {
-  const parsed = HostMessageSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
+  if (
+    !isJsonObject(value) ||
+    typeof value.requestId !== 'string' ||
+    typeof value.type !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    requestId: value.requestId,
+    type: value.type,
+    tools: value.tools,
+    result: value.result,
+    error: value.error,
+  };
 }
 
 export function startWidgetRuntime(): void {
@@ -200,6 +195,52 @@ export function startWidgetRuntime(): void {
   }
 
   runWidget(config);
+}
+
+function parseRelayHello(value: unknown): RelayHelloMessage | null {
+  if (!isJsonObject(value) || value.type !== 'server-hello') {
+    return null;
+  }
+
+  if (
+    value.service !== 'webmcp-local-relay' ||
+    value.version !== 1 ||
+    typeof value.host !== 'string' ||
+    typeof value.instanceId !== 'string' ||
+    typeof value.port !== 'number'
+  ) {
+    return null;
+  }
+
+  const hello: RelayHelloMessage = {
+    type: 'server-hello',
+    service: 'webmcp-local-relay',
+    version: 1,
+    host: value.host,
+    instanceId: value.instanceId,
+    port: value.port,
+  };
+  if (typeof value.label === 'string') hello.label = value.label;
+  if (typeof value.relayId === 'string') hello.relayId = value.relayId;
+  if (typeof value.workspace === 'string') hello.workspace = value.workspace;
+  return hello;
+}
+
+function parseRelayHelloRejected(value: unknown): RelayHelloRejectedMessage | null {
+  if (
+    !isJsonObject(value) ||
+    value.type !== 'hello/rejected' ||
+    typeof value.message !== 'string' ||
+    typeof value.reason !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    type: 'hello/rejected',
+    message: value.message,
+    reason: value.reason,
+  };
 }
 
 function cacheKeyForConfig(config: WidgetConfig): string {
@@ -221,7 +262,23 @@ function readCachedEndpoint(config: WidgetConfig): CachedRelayEndpoint | null {
       return null;
     }
 
-    return CachedRelayEndpointSchema.parse(JSON.parse(raw));
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      !isJsonObject(parsed) ||
+      typeof parsed.host !== 'string' ||
+      parsed.host.length === 0 ||
+      typeof parsed.port !== 'number' ||
+      !Number.isInteger(parsed.port) ||
+      parsed.port < 1 ||
+      parsed.port > 65535
+    ) {
+      return null;
+    }
+
+    return {
+      host: parsed.host,
+      port: parsed.port,
+    };
   } catch {
     return null;
   }
@@ -343,14 +400,14 @@ async function probeRelayEndpoint(candidate: {
         return;
       }
 
-      const hello = RelayServerMessageSchema.safeParse(parsed);
-      if (!hello.success || hello.data.type !== 'server-hello') {
+      const hello = parseRelayHello(parsed);
+      if (!hello) {
         return;
       }
 
       settle({
         endpoint: {
-          hello: hello.data,
+          hello,
           host: candidate.host,
           port: candidate.port,
         },
@@ -448,29 +505,17 @@ function runWidget(cfg: WidgetConfig): void {
         return;
       }
 
-      const parsedMessage = RelayServerMessageSchema.safeParse(parsed);
-      if (!parsedMessage.success) {
-        const header = RelayMessageHeaderSchema.safeParse(parsed);
-        if (header.success) {
-          console.debug(
-            '[webmcp-relay-widget] Ignoring unrecognized message type:',
-            sanitizeLogText(header.data.type)
-          );
-        }
-        return;
-      }
-      const relayMessage: RelayServerMessage = parsedMessage.data;
-
-      if (relayMessage.type === 'server-hello') {
+      const hello = parseRelayHello(parsed);
+      if (hello) {
         activeEndpoint = {
-          hello: relayMessage,
+          hello,
           host: endpoint.host,
           port: endpoint.port,
         };
         return;
       }
 
-      if (relayMessage.type === 'hello/accepted') {
+      if (isJsonObject(parsed) && parsed.type === 'hello/accepted') {
         clearHelloAckTimer();
         helloAccepted = true;
         writeCachedEndpoint(cfg, endpoint);
@@ -478,7 +523,8 @@ function runWidget(cfg: WidgetConfig): void {
         return;
       }
 
-      if (relayMessage.type === 'hello/rejected') {
+      const helloRejected = parseRelayHelloRejected(parsed);
+      if (helloRejected) {
         clearHelloAckTimer();
         helloAccepted = false;
         clearCachedEndpoint(cfg);
@@ -487,23 +533,28 @@ function runWidget(cfg: WidgetConfig): void {
             type: 'webmcp.relay.rejected',
             host: endpoint.host,
             port: endpoint.port,
-            message: relayMessage.message,
-            reason: relayMessage.reason,
+            message: helloRejected.message,
+            reason: helloRejected.reason,
           },
           cfg.hostOrigin
         );
         console.error(
           '[webmcp-relay-widget] Relay rejected browser hello:',
-          relayMessage.reason,
-          relayMessage.message
+          helloRejected.reason,
+          helloRejected.message
         );
         try {
-          socket.close(1008, relayMessage.message);
+          socket.close(1008, helloRejected.message);
         } catch {
           // Ignore close failures after a structured rejection.
         }
         return;
       }
+
+      if (!isJsonObject(parsed) || typeof parsed.type !== 'string') {
+        return;
+      }
+      const relayMessage = parsed;
 
       if (relayMessage.type === 'ping') {
         safeSend(socket, JSON.stringify({ type: 'pong' }));
@@ -515,9 +566,17 @@ function runWidget(cfg: WidgetConfig): void {
         return;
       }
 
+      if (relayMessage.type !== 'invoke') {
+        console.debug(
+          '[webmcp-relay-widget] Ignoring unrecognized message type:',
+          sanitizeLogText(parsed.type)
+        );
+        return;
+      }
+
       requestHost('webmcp.tools.invoke', {
         toolName: relayMessage.toolName,
-        args: parseJsonObject(relayMessage.args) ?? {},
+        args: isJsonObject(relayMessage.args) ? relayMessage.args : {},
       })
         .then((hostResponse) => {
           safeSend(

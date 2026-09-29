@@ -1,6 +1,6 @@
 # Chrome flags for the native WebMCP showcase
 
-The showcase requires Chrome 152 or newer with the experimental WebMCP feature
+The showcase requires Chrome 155 or newer with the experimental WebMCP feature
 enabled. Chrome's preview can change between releases. Check the
 [WebMCP early preview post](https://developer.chrome.com/blog/webmcp-epp) and
 [WebMCP specification](https://webmachinelearning.github.io/webmcp/) when the
@@ -85,7 +85,7 @@ The configuration searches these channels in order:
 5. Chrome Beta
 6. Stable Chrome
 
-It rejects binaries older than Chrome 152.
+It rejects binaries older than Chrome 155.
 
 To choose a binary explicitly:
 
@@ -138,7 +138,7 @@ console.table(
 
 ### `document.modelContext` is missing
 
-1. Check `chrome://version` and confirm Chrome is version 152 or newer.
+1. Check `chrome://version` and confirm Chrome is version 155 or newer.
 2. Confirm both configured flags appear in the command line.
 3. Close every process using the selected test profile, then relaunch Chrome.
 4. Confirm the page does not import `@mcp-b/global` or another polyfill.

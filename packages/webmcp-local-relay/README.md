@@ -56,15 +56,18 @@ Tools that require MCP task execution are omitted, and multi-round `input_requir
 Add one script tag to expose your page's WebMCP tools to the relay:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"></script>
 ```
 
 That's it. If your page already registers tools on `document.modelContext`, they'll be picked up automatically.
 
+Keep the major version in CDN URLs so the embed and the page runtime upgrade
+together. Pages that still load a 5.x runtime pin `@5` for both scripts.
+
 New to WebMCP? Here's the full setup:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@latest/dist/index.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@6/dist/index.iife.js"></script>
 <script>
   void document.modelContext
     .registerTool({
@@ -75,14 +78,14 @@ New to WebMCP? Here's the full setup:
     })
     .catch(console.error);
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"></script>
 ```
 
 Custom relay port:
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"
+  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"
   data-relay-port="9444"
 ></script>
 ```
@@ -92,7 +95,7 @@ several slow API calls and might exceed one minute:
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"
+  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"
   data-request-timeout="120000"
 ></script>
 ```
@@ -240,6 +243,12 @@ Runtime dispatch behavior in the browser embed/widget layer:
   upstream API.
 - Refreshes the descriptor before every invocation so Chrome never receives a
   stale registration object.
+- Relays the page's own tools plus tools registered by same-origin descendant
+  frames. When names collide, the page's own tool wins and the embed logs one
+  warning per name.
+- Converts only results that parse to a JSON object into structured content.
+  A JSON string arrives as its content; any other result, such as `10.50`,
+  keeps its original text.
 
 ### WebMCP Standard Status
 

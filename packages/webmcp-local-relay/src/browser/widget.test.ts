@@ -48,6 +48,7 @@ interface RelayOptions {
   serverPort?: string;
   sendHelloAccepted?: boolean;
   sendHelloRejected?: { message: string; reason: string } | false;
+  serverHello?: { label?: string; relayId?: string; workspace?: string };
 }
 
 const activeRelaySockets = new Set<MockWebSocket>();
@@ -289,6 +290,7 @@ function installEnvironment(options?: RelayOptions): WidgetTestEnv {
         instanceId: `relay-${serverPort}`,
         port: Number(serverPort),
         relayId: `relay-${serverPort}`,
+        ...options?.serverHello,
       })
     );
   };
@@ -702,6 +704,13 @@ describe('widget runtime', () => {
       title: 'Unknown page',
       type: 'hello',
     });
+  });
+
+  it('attaches to a relay started with empty label, relay ID, and workspace', async () => {
+    const env = startRuntime({ serverHello: { label: '', relayId: '', workspace: '' } });
+    const connection = await completeHandshake(env);
+
+    expect(connection.messages[0]).toMatchObject({ origin: APP_ORIGIN, type: 'hello' });
   });
 
   it('handles relay ping, reload, parse failures, and sanitized debug logging', async () => {

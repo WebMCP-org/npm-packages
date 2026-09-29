@@ -5,10 +5,11 @@
   "description": "Native Chromium WebMCP showcase for registration, discovery, and execution",
   "type": "module",
   "scripts": {
-    "build": "tsc && vp build",
+    "build": "pnpm run copy:relay && tsc && vp build",
     "cf-typegen": "wrangler types",
+    "copy:relay": "mkdir -p public/relay && cp ../../packages/webmcp-local-relay/dist/browser/embed.js ../../packages/webmcp-local-relay/dist/browser/widget.html public/relay/",
     "deploy": "pnpm run build && wrangler deploy",
-    "dev": "vp dev",
+    "dev": "pnpm run copy:relay && vp dev",
     "preview": "vp preview",
     "typecheck": "tsc --noEmit"
   },
@@ -32,6 +33,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.54.1",
+    "@mcp-b/webmcp-local-relay": "workspace:*",
     "@modelcontextprotocol/server": "catalog:",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "catalog:",

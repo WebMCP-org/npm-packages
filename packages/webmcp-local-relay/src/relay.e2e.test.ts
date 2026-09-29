@@ -631,6 +631,17 @@ async function setupE2EHarness(options: {
   }
 }
 
+describe('relay browser bundles', () => {
+  it('keep zod out of host-page scripts and the embed under 16 KB', () => {
+    const embed = readRequiredFile(REAL_EMBED_PATH, 'packaged embed.js');
+    const widget = readRequiredFile(REAL_WIDGET_PATH, 'packaged widget.html');
+
+    expect(embed).not.toContain('__zod_globalConfig');
+    expect(widget).not.toContain('__zod_globalConfig');
+    expect(Buffer.byteLength(embed)).toBeLessThan(16 * 1024);
+  });
+});
+
 describe('relay e2e (real browser assets)', () => {
   it('invokes a declarative form with the default origin policy', async () => {
     let widgetServer: StartedHttpServer | null = null;

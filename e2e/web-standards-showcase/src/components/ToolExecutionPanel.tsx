@@ -33,13 +33,6 @@ function parseResult(result: string): JsonValue | string {
   }
 }
 
-function inputSchemaFor(tool: ToolInfo): RJSFSchema {
-  if (!tool.inputSchema) return emptyInputSchema;
-
-  // SAFETY: WebMCP RegisteredTool.inputSchema is the JSON Schema object accepted at registration.
-  return tool.inputSchema as RJSFSchema;
-}
-
 interface ToolExecutionPanelProps {
   /** Array of tools to display and execute */
   tools: ToolInfo[];
@@ -133,7 +126,7 @@ export const ToolExecutionPanel: FC<ToolExecutionPanelProps> = ({
           const hasExecuted = isLoading || isSuccess || isError;
 
           // Missing input schema means the tool takes no arguments.
-          const parsedSchema = inputSchemaFor(tool);
+          const parsedSchema = tool.inputSchema ?? emptyInputSchema;
 
           // Parse MCP result if success
           const formattedResult =

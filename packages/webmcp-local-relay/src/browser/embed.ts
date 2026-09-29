@@ -1,4 +1,3 @@
-import { z } from 'zod/v4';
 /**
  * Injects a hidden relay widget iframe and bridges widget messages to host tools.
  *
@@ -12,33 +11,26 @@ import { z } from 'zod/v4';
  * chain multiple API calls:
  * `<script src=".../embed.js" data-request-timeout="120000"></script>`
  */
-import { normalizeToolResponse } from '@mcp-b/webmcp-ts-sdk/schema';
 import type { RegisteredTool, WebMcpToolObjectInput } from '@mcp-b/webmcp-ts-sdk';
 import type { CallToolResult } from '@modelcontextprotocol/server';
-import { createRequestId, isJsonObject, parseJsonObject } from './shared.js';
+import {
+  createRequestId,
+  isJsonObject,
+  normalizeSerializedToolResult,
+  selectRelayTools,
+} from './shared.js';
 
 type RelayToolDescriptor = Pick<
   RegisteredTool,
   'name' | 'title' | 'description' | 'inputSchema' | 'annotations'
 >;
 
-const WidgetListRequestSchema = z.object({
-  type: z.literal('webmcp.tools.list.request'),
-  requestId: z.string(),
-});
-const WidgetInvokeRequestSchema = z.object({
-  type: z.literal('webmcp.tools.invoke.request'),
-  requestId: z.string(),
-  toolName: z.string(),
-  args: z.unknown().optional(),
-});
-const WidgetRequestSchema = z.discriminatedUnion('type', [
-  WidgetListRequestSchema,
-  WidgetInvokeRequestSchema,
-]);
-type WidgetListRequest = z.infer<typeof WidgetListRequestSchema>;
-type WidgetInvokeRequest = z.infer<typeof WidgetInvokeRequestSchema>;
-type WidgetRequest = z.infer<typeof WidgetRequestSchema>;
+interface WidgetRequestMessage {
+  requestId: string;
+  type: string;
+  toolName?: unknown;
+  args?: unknown;
+}
 
 interface RelayConfig {
   autoConnect: boolean;
@@ -55,8 +47,6 @@ interface RelayConfig {
 const RELAY_IFRAME_SELECTOR = '[data-webmcp-relay]';
 const TAB_ID_STORAGE_KEY = '__webmcp_relay_tab_id';
 const TOOL_SYNC_POLL_INTERVAL_MS = 2000;
-const INPUT_REQUIRED_UNSUPPORTED_MESSAGE =
-  'The WebMCP local relay cannot forward MCP input_required results. Multi-round tool flows require direct McpServer registration.';
 
 let widgetWindow: Window | null = null;
 let config: RelayConfig;
@@ -139,32 +129,13 @@ function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor | null {
   return descriptor;
 }
 
-function normalizeSerializedToolResult(serialized: string): CallToolResult {
-  let rawResult: unknown;
-  try {
-    rawResult = JSON.parse(serialized);
-  } catch {
-    // Native declarative forms return plain text for string responses.
-    return normalizeToolResponse(serialized);
-  }
-
-  if (isJsonObject(rawResult) && rawResult.resultType === 'input_required') {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: INPUT_REQUIRED_UNSUPPORTED_MESSAGE }],
-    };
-  }
-
-  return normalizeToolResponse(rawResult);
-}
-
 async function listRelayTools(): Promise<RelayToolDescriptor[]> {
   const descriptorContext = document.modelContext;
   if (!descriptorContext) {
     return [];
   }
 
-  return (await descriptorContext.getTools())
+  return selectRelayTools(await descriptorContext.getTools())
     .map(mapRegisteredTool)
     .filter((tool): tool is RelayToolDescriptor => tool !== null);
 }
@@ -177,7 +148,9 @@ async function invokeRelayTool(name: string, args: WebMcpToolObjectInput): Promi
 
   // Current Chrome requires a RegisteredTool returned by getTools(), not a
   // name or a stale copy.
-  const tool = (await descriptorContext.getTools()).find((candidate) => candidate.name === name);
+  const tool = selectRelayTools(await descriptorContext.getTools()).find(
+    (candidate) => candidate.name === name
+  );
   if (!tool) {
     throw new Error(`Tool not found: ${name}`);
   }
@@ -187,8 +160,7 @@ async function invokeRelayTool(name: string, args: WebMcpToolObjectInput): Promi
 }
 
 function parseInvokeArgs(value: unknown): WebMcpToolObjectInput {
-  const args = parseJsonObject(value);
-  if (args) return args;
+  if (isJsonObject(value)) return value;
   if (value !== undefined && value !== null) {
     debugWarn('Tool invocation args must be an object; using empty input');
   }
@@ -317,12 +289,24 @@ function respondToSource(
   source?.postMessage(payload, origin);
 }
 
-function parseWidgetRequest(value: unknown): WidgetRequest | null {
-  const parsed = WidgetRequestSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
+function parseWidgetRequest(value: unknown): WidgetRequestMessage | null {
+  if (
+    !isJsonObject(value) ||
+    typeof value.requestId !== 'string' ||
+    typeof value.type !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    requestId: value.requestId,
+    type: value.type,
+    toolName: value.toolName,
+    args: value.args,
+  };
 }
 
-function handleListRequest(request: WidgetListRequest, event: MessageEvent): void {
+function handleListRequest(request: WidgetRequestMessage, event: MessageEvent): void {
   const source = widgetWindow;
   if (!source || event.source !== source) return;
   listRelayTools()
@@ -344,10 +328,10 @@ function handleListRequest(request: WidgetListRequest, event: MessageEvent): voi
     });
 }
 
-function handleInvokeRequest(request: WidgetInvokeRequest, event: MessageEvent): void {
+function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent): void {
   const source = widgetWindow;
   if (!source || event.source !== source) return;
-  invokeRelayTool(request.toolName, parseInvokeArgs(request.args))
+  invokeRelayTool(String(request.toolName ?? ''), parseInvokeArgs(request.args))
     .then((result) => {
       respondToSource(source, event.origin, {
         type: 'webmcp.tools.invoke.response',
