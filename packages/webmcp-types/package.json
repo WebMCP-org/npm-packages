@@ -29,6 +29,6 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
-    "webmcp-types": "^0.1.9"
+    "webmcp-types": "0.1.9"
   }
 }

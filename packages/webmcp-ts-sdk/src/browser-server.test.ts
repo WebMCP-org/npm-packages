@@ -20,14 +20,29 @@ function isCountThree(value: unknown): value is { count: 3 } {
 }
 
 describe('protocol response compatibility', () => {
-  it('preserves JSON-safe future content blocks without interpreting their payload', () => {
+  it('passes a JSON-safe MCP result through unchanged', () => {
     const response = {
-      content: [{ type: 'future-content', payload: { values: [1, true, null] } }],
+      content: [
+        { type: 'text', text: 'done' },
+        { type: 'resource_link', uri: 'https://example.com/report', name: 'report' },
+      ],
       structuredContent: { version: 3 },
       isError: false,
       _meta: { extension: 'future' },
     };
     expect(normalizeToolResponse(response)).toBe(response);
+  });
+
+  it('normalizes objects outside the MCP content types as ordinary tool values', () => {
+    const richText = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello' }] }],
+    };
+    expect(normalizeToolResponse(richText)).toEqual({
+      content: [{ type: 'text', text: JSON.stringify(richText) }],
+      structuredContent: richText,
+      isError: false,
+    });
   });
 
   it('normalizes malformed protocol envelopes as ordinary tool values', () => {
@@ -60,6 +75,24 @@ async function executeRegisteredTool(
     throw new Error(`Tool not found: ${name}`);
   }
   return modelContext.executeTool(tool, args);
+}
+
+/** The browser runner frames this document; `parent` is replaceable, `top` is not. */
+function asTopLevelWindow(): () => void {
+  const descriptor = Object.getOwnPropertyDescriptor(window, 'parent');
+  if (!descriptor) throw new Error('window.parent is not an own property');
+  Object.defineProperty(window, 'parent', { configurable: true, value: window });
+  return () => {
+    Object.defineProperty(window, 'parent', descriptor);
+  };
+}
+
+function createChildFrame() {
+  const iframe = document.createElement('iframe');
+  document.body.appendChild(iframe);
+  const childWindow = iframe.contentWindow;
+  if (!childWindow) throw new Error('The child frame has no window');
+  return { childWindow, remove: () => iframe.remove() };
 }
 
 function createNativeModelContextStub(): ModelContext {
@@ -845,6 +878,16 @@ describe('BrowserMcpServer', () => {
         { exposedTo: ['http://example.com'] }
       )
     ).rejects.toMatchObject({ name: 'SecurityError' });
+    await expect(
+      server.registerTool(
+        {
+          name: 'unparsable_exposure_tool',
+          description: 'Must not register',
+          async execute() {},
+        },
+        { exposedTo: ['not an origin'] }
+      )
+    ).rejects.toMatchObject({ name: 'SecurityError' });
     await expect(server.getTools({ fromOrigins: ['not an origin'] })).rejects.toMatchObject({
       name: 'SecurityError',
     });
@@ -854,11 +897,15 @@ describe('BrowserMcpServer', () => {
   });
 
   it.each([
-    ['submitted:/first', 'submitted:/first'],
-    ['', ''],
-    ['"quoted result"', 'quoted result'],
-    ['{"content":[{"type":"text","text":"MCP result"}]}', 'MCP result'],
-  ])('converts native result %j into MCP content', async (result, text) => {
+    ['submitted:/first', 'submitted:/first', undefined],
+    ['', '', undefined],
+    ['"quoted result"', 'quoted result', undefined],
+    ['10.50', '10.50', undefined],
+    ['true', 'true', undefined],
+    ['[1]', '[1]', undefined],
+    ['{"total":10.5}', '{"total":10.5}', { total: 10.5 }],
+    ['{"content":[{"type":"text","text":"MCP result"}]}', 'MCP result', undefined],
+  ])('converts native result %j into MCP content', async (result, text, structuredContent) => {
     const tool = {
       name: 'native_result',
       title: '',
@@ -882,25 +929,24 @@ describe('BrowserMcpServer', () => {
     await client.connect(clientTransport);
     await server.syncNativeTools();
 
-    await expect(client.callTool({ name: tool.name, arguments: {} })).resolves.toMatchObject({
-      content: [{ type: 'text', text }],
-    });
+    const response = await client.callTool({ name: tool.name, arguments: {} });
+    expect(response).toMatchObject({ content: [{ type: 'text', text }] });
+    expect(response.structuredContent).toEqual(structuredContent);
     await expect(server.executeTool(tool, {})).resolves.toBe(result);
   });
 
-  it('backfills only tools from its frame subtree and preserves descendant execution', async () => {
-    const iframe = document.createElement('iframe');
-    document.body.appendChild(iframe);
-    const childWindow = iframe.contentWindow!;
+  it('mirrors only its own document when framed and its subtree when top-level', async () => {
+    const { childWindow, remove: removeChildFrame } = createChildFrame();
     // The browser runner hosts this test document in a frame. A sibling's
     // parent is that same host, rather than the document served by this server.
-    const siblingFrame = window.parent.document.createElement('iframe');
-    window.parent.document.body.appendChild(siblingFrame);
+    const hostWindow = window.parent;
+    const siblingFrame = hostWindow.document.createElement('iframe');
+    hostWindow.document.body.appendChild(siblingFrame);
     const siblingWindow = siblingFrame.contentWindow!;
     const tools = [
       { name: 'own', window },
       { name: 'descendant', window: childWindow },
-      { name: 'ancestor', window: window.parent },
+      { name: 'ancestor', window: hostWindow },
       { name: 'sibling', window: siblingWindow },
     ].map((tool) => ({
       ...tool,
@@ -919,7 +965,11 @@ describe('BrowserMcpServer', () => {
       { name: 'frame-scope-server', version: '1.0.0' },
       { native: native }
     );
+    let restoreFramedWindow: (() => void) | undefined;
     try {
+      await server.syncNativeTools();
+      expect(server.listTools().map(({ name }) => name)).toEqual(['own']);
+      restoreFramedWindow = asTopLevelWindow();
       await server.syncNativeTools();
       expect(server.listTools().map(({ name }) => name)).toEqual(['own', 'descendant']);
       expect(await server.getTools()).toEqual(tools);
@@ -933,9 +983,222 @@ describe('BrowserMcpServer', () => {
       await client.callTool({ name: 'descendant', arguments: {} });
       expect(executeTool).toHaveBeenCalledWith(tools[1], {}, expect.any(Object));
     } finally {
-      iframe.remove();
+      removeChildFrame();
       siblingFrame.remove();
+      restoreFramedWindow?.();
     }
+  });
+
+  it('lets a local registration take over a name mirrored from a child frame', async () => {
+    const restoreFramedWindow = asTopLevelWindow();
+    const { childWindow, remove: removeChildFrame } = createChildFrame();
+    const nativeTools: RegisteredTool[] = [
+      {
+        name: 'shared',
+        title: '',
+        description: 'child',
+        origin: location.origin,
+        window: childWindow,
+      },
+    ];
+    const executeTool = vi.fn(async () => '{"from":"child"}');
+    const native = Object.assign(new EventTarget(), {
+      ontoolchange: null,
+      async registerTool(tool: Parameters<ModelContext['registerTool']>[0]) {
+        nativeTools.push({
+          name: tool.name,
+          title: tool.title ?? '',
+          description: tool.description,
+          origin: location.origin,
+          window,
+        });
+        native.dispatchEvent(new Event('toolchange'));
+      },
+      getTools: async () => [...nativeTools],
+      executeTool,
+    });
+    server = new BrowserMcpServer({ name: 'child-collision-server', version: '1.0.0' }, { native });
+    try {
+      await server.syncNativeTools();
+      expect(server.listTools()).toMatchObject([{ name: 'shared', description: 'child' }]);
+
+      await server.registerTool({
+        name: 'shared',
+        description: 'parent',
+        execute: () => ({ from: 'parent' }),
+      });
+      expect(server.listTools()).toMatchObject([{ name: 'shared', description: 'parent' }]);
+      await server.syncNativeTools();
+      expect(server.listTools()).toMatchObject([{ name: 'shared', description: 'parent' }]);
+
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverTransport);
+      client = new Client({ name: 'child-collision-client', version: '1.0.0' });
+      await client.connect(clientTransport);
+      await expect(client.callTool({ name: 'shared', arguments: {} })).resolves.toMatchObject({
+        structuredContent: { from: 'parent' },
+      });
+      expect(executeTool).not.toHaveBeenCalled();
+    } finally {
+      removeChildFrame();
+      restoreFramedWindow();
+    }
+  });
+
+  it('mirrors a child frame tool after the parent aborts its own registration of the name', async () => {
+    const restoreFramedWindow = asTopLevelWindow();
+    const { childWindow, remove: removeChildFrame } = createChildFrame();
+    const childTool: RegisteredTool = {
+      name: 'shared',
+      title: '',
+      description: 'child',
+      origin: location.origin,
+      window: childWindow,
+    };
+    let ownTool: RegisteredTool | undefined;
+    const native = Object.assign(new EventTarget(), {
+      ontoolchange: null,
+      async registerTool(
+        tool: Parameters<ModelContext['registerTool']>[0],
+        options?: { signal?: AbortSignal }
+      ) {
+        ownTool = {
+          name: tool.name,
+          title: '',
+          description: tool.description,
+          origin: location.origin,
+          window,
+        };
+        options?.signal?.addEventListener(
+          'abort',
+          () => {
+            ownTool = undefined;
+            native.dispatchEvent(new Event('toolchange'));
+          },
+          { once: true }
+        );
+        native.dispatchEvent(new Event('toolchange'));
+      },
+      getTools: async () => (ownTool ? [ownTool, childTool] : [childTool]),
+      executeTool: async () => '{}',
+    });
+    const server = new BrowserMcpServer(
+      { name: 'child-takeover-server', version: '1.0.0' },
+      { native }
+    );
+    try {
+      const controller = new AbortController();
+      await server.registerTool(
+        { name: 'shared', description: 'parent', execute: () => ({}) },
+        { signal: controller.signal }
+      );
+      expect(server.listTools()).toMatchObject([{ name: 'shared', description: 'parent' }]);
+
+      controller.abort();
+      await vi.waitFor(() =>
+        expect(server.listTools()).toMatchObject([{ name: 'shared', description: 'child' }])
+      );
+    } finally {
+      await server.close();
+      removeChildFrame();
+      restoreFramedWindow();
+    }
+  });
+
+  it('drops a child frame mirror after a call fails because the frame was removed', async () => {
+    const restoreFramedWindow = asTopLevelWindow();
+    const { childWindow, remove: removeChildFrame } = createChildFrame();
+    const childTool: RegisteredTool = {
+      name: 'removed_frame_tool',
+      title: '',
+      description: 'Registered by a frame that goes away',
+      origin: location.origin,
+      window: childWindow,
+    };
+    const native = Object.assign(new EventTarget(), {
+      ontoolchange: null,
+      registerTool: async () => {},
+      getTools: async () => (childWindow.closed ? [] : [childTool]),
+      executeTool: async () => {
+        throw new DOMException('Tool execution failed', 'UnknownError');
+      },
+    });
+    const server = new BrowserMcpServer(
+      { name: 'removed-frame-server', version: '1.0.0' },
+      { native }
+    );
+    const order: string[] = [];
+    server.addEventListener('toolchange', () => order.push('toolchange'));
+    try {
+      await server.syncNativeTools();
+      expect(server.listTools().map(({ name }) => name)).toEqual(['removed_frame_tool']);
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverTransport);
+      client = new Client({ name: 'removed-frame-client', version: '1.0.0' });
+      await client.connect(clientTransport);
+
+      removeChildFrame();
+      expect(childWindow.closed).toBe(true);
+      await expect(
+        client.callTool({ name: 'removed_frame_tool', arguments: {} })
+      ).resolves.toMatchObject({
+        isError: true,
+        content: [{ type: 'text', text: expect.stringContaining('Tool execution failed') }],
+      });
+      await vi.waitFor(() => expect(server.listTools()).toEqual([]));
+      await expect.poll(() => order).toEqual(['toolchange']);
+    } finally {
+      await server.close();
+      restoreFramedWindow();
+    }
+  });
+
+  it('re-dispatches native lifecycle events and exposes their handlers', async () => {
+    const native = Object.assign(new EventTarget(), {
+      ontoolchange: null,
+      registerTool: async () => {},
+      getTools: async () => [],
+      executeTool: async () => '{}',
+    });
+    const server = new BrowserMcpServer({ name: 'lifecycle-server', version: '1.0.0' }, { native });
+    const seen: Array<{ type: string; toolName: unknown; target: boolean; self: boolean }> = [];
+    const lifecycleEvent = (type: string, toolName: string) => {
+      const event = new Event(type);
+      Object.defineProperty(event, 'toolName', { enumerable: true, value: toolName });
+      return event;
+    };
+    const onActivated = function (this: ModelContext, event: Event) {
+      seen.push({
+        type: event.type,
+        toolName: Object.getOwnPropertyDescriptor(event, 'toolName')?.value,
+        target: event.target === server,
+        self: this === server,
+      });
+    };
+    server.ontoolactivated = onActivated;
+    server.addEventListener('toolcancel', (event) => {
+      seen.push({
+        type: event.type,
+        toolName: Object.getOwnPropertyDescriptor(event, 'toolName')?.value,
+        target: event.target === server,
+        self: true,
+      });
+    });
+
+    native.dispatchEvent(lifecycleEvent('toolactivated', 'checkout'));
+    native.dispatchEvent(lifecycleEvent('toolcancel', 'checkout'));
+    expect(seen).toEqual([
+      { type: 'toolactivated', toolName: 'checkout', target: true, self: true },
+      { type: 'toolcancel', toolName: 'checkout', target: true, self: true },
+    ]);
+    expect(server.ontoolactivated).toBe(onActivated);
+    expect(server.ontoolcancel).toBeNull();
+    server.ontoolactivated = null;
+    expect(server.ontoolactivated).toBeNull();
+
+    await server.close();
+    native.dispatchEvent(lifecycleEvent('toolcancel', 'checkout'));
+    expect(seen).toHaveLength(2);
   });
 
   it('does not repopulate tools when close races with native getTools', async () => {

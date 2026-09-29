@@ -38,7 +38,9 @@ new BrowserMcpServer(serverInfo: Implementation, options?: BrowserMcpServerOptio
 | -------- | --------------- | ---------------------------------------------------------------- |
 | `native` | `ModelContext?` | Optional context override; defaults to the page's WebMCP context |
 
-The constructor uses `document.modelContext`, installing the upstream polyfill when needed. It leaves that document property pointing to the underlying context. Use `@mcp-b/global` to install the extended API on the document and connect its default transport. In service workers or Node.js, use the official `McpServer` directly.
+The constructor uses `document.modelContext`, installing the bundled `@mcp-b/webmcp-polyfill` (about 28 KB minified) when needed. It leaves that document property pointing to the underlying context. Use `@mcp-b/global` to install the extended API on the document and connect its default transport.
+
+Without a WebMCP context, which is the case with no `document` (server-side module evaluation) or on an insecure page (the polyfill does not install), the constructor still succeeds and the server serves MCP only: `registerTool()`, `registerPrompt()`, `registerResource()`, `listTools()`, `connect()`, and `close()` work, tools are not mirrored to a browser context, `getTools()` and `executeTool()` reject with `InvalidStateError`, `syncNativeTools()` resolves without effect, and no `toolchange` events fire. In service workers or Node.js, use the official `McpServer` directly.
 
 The constructor passes the remaining options to `McpServer` and enables list-change support for tools, resources, and prompts.
 
@@ -86,7 +88,7 @@ who may connect, and enforcement is the page's own JavaScript rather than the
 user agent. See [Bridge tools across iframes](/how-to/bridge-tools-across-iframes)
 for the end-to-end setup.
 
-Invalid descriptors, duplicate names, blocked Permissions Policy, and pre-aborted signals reject the returned promise.
+Invalid descriptors, duplicate names, blocked Permissions Policy, and pre-aborted signals reject the returned promise. Duplicate names count only this document's registrations: a name held by a mirrored child-frame tool passes to the local registration once the upstream context accepts it.
 
 ### `getTools(options?)`
 
@@ -106,11 +108,11 @@ executeTool(
 ): Promise<string>
 ```
 
-Executes a descriptor returned by `getTools()` with an input object and returns its result as JSON. The optional signal aborts the call.
+Executes a descriptor returned by `getTools()` with an input object and returns the underlying context's result string: JSON for imperative tools, plain text for native declarative tools. The optional signal aborts the call.
 
-### Tool change events
+### Lifecycle events
 
-`BrowserMcpServer` extends `EventTarget` and exposes `ontoolchange`. Local registry changes queue a `toolchange` event. Native `toolchange` events trigger reconciliation before the adapter dispatches its event.
+`BrowserMcpServer` extends `EventTarget` and exposes `ontoolchange`, `ontoolactivated`, and `ontoolcancel`. A native `toolchange` event triggers reconciliation before the adapter dispatches its own `toolchange`; a local registration produces one only after the underlying context reports it. The adapter re-dispatches the underlying context's `toolactivated` and `toolcancel` events on itself as plain `Event` objects that carry the same `toolName`, so listeners on `document.modelContext` see them when `@mcp-b/global` is installed.
 
 ## MCP-B extensions
 
@@ -136,7 +138,7 @@ Returns a clone of the adapter's MCP-B tool metadata, including `outputSchema` w
 syncNativeTools(): Promise<void>
 ```
 
-Reconciles the adapter with tools already visible through `native.getTools()`. Backfill uses the native context’s `executeTool()` with object input. Later native `toolchange` events reconcile additions, metadata changes, and removals.
+Reconciles the adapter with tools already visible through `native.getTools()`. A top-level document mirrors its own tools and those of same-origin descendant frames; a framed document (`window.parent !== window`) mirrors only its own tools. Backfill uses the native context’s `executeTool()` with object input. Over MCP, a native result that parses to a JSON object becomes structured content (an MCP result envelope passes through unchanged); any other result, including numbers, quoted strings, booleans, `null`, and arrays, is returned as text exactly as the context produced it. Later native `toolchange` events reconcile additions, metadata changes, and removals; when a mirrored frame is removed, the first failed call to one of its tools drops the stale mirrors.
 
 Use the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd) recommended by Chrome's WebMCP documentation to inspect native and mirrored tools.
 
@@ -205,6 +207,8 @@ can call a tool, and pass plain JSON metadata so the MCP server does not also ap
 transforms. The [schema guide](/how-to/use-schemas-and-structured-output) demonstrates this pattern;
 [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) applies it for React registrations.
 
+A callback result is passed through as an MCP result only when it is a valid `CallToolResult` whose content items use the MCP content types; any other object, such as a rich-text document with its own `type` and `content` fields, becomes text plus `structuredContent`.
+
 `outputSchema` is enforced by the official MCP server on MCP calls. Direct browser calls do not
 perform that check. `PromptDescriptor.argsSchema` accepts `InputSchema`. Direct upstream server
 registrations support Zod 4.2 or newer and the official `fromJsonSchema` helper; Zod 3 is unsupported.
@@ -214,14 +218,18 @@ MCP requires object-root tool input schemas. An array-root WebMCP tool remains a
 ## Exports
 
 The root exports `BrowserMcpServer`, `isBrowserMcpServer`, `ModelContext`, `RegisteredTool`,
-`ModelContextExtensions`, `ModelContextWithExtensions`, `InputSchema`,
-`ToolDescriptor`, `ToolDescriptorFromSchema`, `ToolAnnotations`, `JsonSchemaForInference`,
-`InferJsonSchema`, `InferArgsFromInputSchema`, and `ToolResultFromOutputSchema`. `WebMCP` is the
-upstream namespace re-exported from `webmcp-types`; use it directly for standard browser contracts.
+`ModelContextExtensions`, `ModelContextWithExtensions`, `ModelContextTool`, `InputSchema`,
+`WebMcpToolInput`, `ToolDescriptor`, `ToolDescriptorFromSchema`, `ToolListItem`, `ToolAnnotations`,
+`RegistrationHandle`, `JsonSchemaForInference`, `InferJsonSchema`, `InferArgsFromInputSchema`, and
+`ToolResultFromOutputSchema`. The MCP result types `CallToolResult`, `ContentBlock`, `TextContent`,
+`JsonObject`, and `JsonValue` are re-exported from `@modelcontextprotocol/server`. `WebMCP` is the
+upstream namespace from `webmcp-types`, re-exported through `@mcp-b/webmcp-polyfill` so that the
+polyfill's `SubmitEvent` and global `ModelContext` declarations reach consumers that import only
+this package.
 
-Import MCP response types such as `CallToolResult`, MCP clients, protocol schemas, transports, and
-validators from their official `@modelcontextprotocol/*` packages. The
-`@mcp-b/webmcp-ts-sdk/schema` subpath exports `normalizeInputSchema()` and `normalizeToolResponse()`
-along with descriptor and serialization helpers.
+Import MCP clients, protocol schemas, transports, and validators from their official
+`@modelcontextprotocol/*` packages. The `@mcp-b/webmcp-ts-sdk/schema` subpath exports
+`normalizeInputSchema()`, `normalizeToolResponse()`, `isMcpStandardSchema()`, and the
+`ToolInputSchema` and `NormalizedInputSchema` types.
 
 The [`@mcp-b/transports` reference](/packages/transports/reference) documents browser transports. [WebMCP and MCP-B extensions](/explanation/strict-core-vs-mcp-b-extensions) defines the boundary between the proposal and this adapter.

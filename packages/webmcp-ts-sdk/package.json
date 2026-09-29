@@ -62,7 +62,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "vp pack",
+    "build": "vp pack && pnpm run typecheck:consumer",
     "check": "vp check --fix",
     "clean": "rm -rf dist",
     "format": "vp fmt --write",
@@ -72,13 +72,14 @@
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
     "test:coverage": "vp test run --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:consumer": "tsc --noEmit --strict --skipLibCheck --module preserve --moduleResolution bundler --lib ES2022,DOM type-tests/consumer.ts"
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",
     "@modelcontextprotocol/server": "catalog:",
     "@standard-schema/spec": "^1.1.0",
-    "webmcp-types": "^0.1.9"
+    "webmcp-types": "0.1.9"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "catalog:",

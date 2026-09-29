@@ -14,8 +14,13 @@ For an application:
 
 ```bash
 pnpm remove @mcp-b/webmcp-types
-pnpm add -D webmcp-types@^0.1.9
+pnpm add -D webmcp-types@0.1.9
 ```
+
+The version is pinned exactly: `webmcp-types` 0.1.10 adds required
+`ontoolactivated` and `ontoolcancel` members and `ToolActivatedEvent` and
+`ToolCancelEvent` globals that the vendored polyfill core does not implement, so
+0.1.9 is the last release whose `ModelContext` the runtime satisfies.
 
 Published libraries whose declarations reference upstream types should add it to
 `dependencies` instead. Update any `compilerOptions.types` entries and triple-slash
@@ -34,25 +39,29 @@ use type-only imports or TypeScript's `types` configuration.
 
 ### Move each type to its owner
 
-| Old export from `@mcp-b/webmcp-types`                                                                                                                        | Replacement                                                                   |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| `ModelContext`, `RegisteredTool`, registration/discovery options                                                                                             | Corresponding `WebMCP.*` types from `webmcp-types`.                           |
-| `ChromeModelContext`, `ChromeModelContextExtensions`                                                                                                         | `WebMCP.ModelContext`; `executeTool()` is now part of the core contract.      |
-| `ChromeModelContextExecuteToolOptions`                                                                                                                       | `WebMCP.ModelContextExecuteToolOptions`.                                      |
-| `ModelContextTesting`, `ModelContextTestingToolInfo`                                                                                                         | Removed. Use `WebMCP.ModelContext` and `WebMCP.RegisteredTool` for test code. |
-| `ModelContextTool`, `WebMcpToolAnnotations`, `MaybePromise`                                                                                                  | `WebMCP.ModelContextTool`, `WebMCP.ToolAnnotations`, `WebMCP.MaybePromise`.   |
-| `ToolDescriptor`, `ToolDescriptorFromSchema`, `ToolListItem`, `ModelContextExtensions`, `ModelContextWithExtensions`, MCP `ToolAnnotations`                  | Same export names from `@mcp-b/webmcp-ts-sdk`.                                |
-| `InputSchema`, `InferArgsFromInputSchema`, `InferJsonSchema`, `JsonSchemaForInference`, `ToolResultFromOutputSchema`, MCP result types, `RegistrationHandle` | Same export names from `@mcp-b/webmcp-ts-sdk`.                                |
+| Old export from `@mcp-b/webmcp-types`                                                                                                                         | Replacement                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `ModelContext`, `RegisteredTool`, registration/discovery options                                                                                              | Corresponding `WebMCP.*` types from `webmcp-types`.                                             |
+| `ChromeModelContext`, `ChromeModelContextExtensions`                                                                                                          | `WebMCP.ModelContext`; `executeTool()` is now part of the core contract.                        |
+| `ChromeModelContextExecuteToolOptions`                                                                                                                        | `WebMCP.ModelContextExecuteToolOptions`.                                                        |
+| `ModelContextTesting`, `ModelContextTestingToolInfo`                                                                                                          | Removed. Use `WebMCP.ModelContext` and `WebMCP.RegisteredTool` for test code.                   |
+| `ModelContextTool`, `WebMcpToolAnnotations`, `MaybePromise`                                                                                                   | `WebMCP.ModelContextTool`, `WebMCP.ToolAnnotations`, `WebMCP.MaybePromise`.                     |
+| `ToolDescriptor`, `ToolDescriptorFromSchema`, `ToolListItem`, `ModelContextExtensions`, `ModelContextWithExtensions`, MCP `ToolAnnotations`                   | Same export names from `@mcp-b/webmcp-ts-sdk`.                                                  |
+| `InputSchema`, `WebMcpToolInput`, `InferArgsFromInputSchema`, `InferJsonSchema`, `JsonSchemaForInference`, `ToolResultFromOutputSchema`, `RegistrationHandle` | Same export names from `@mcp-b/webmcp-ts-sdk`.                                                  |
+| `CallToolResult`, `ContentBlock`, `TextContent`, `JsonObject`, `JsonValue`                                                                                    | Same export names from `@mcp-b/webmcp-ts-sdk`, re-exported from `@modelcontextprotocol/server`. |
 
 For standard schema inference, let `context.registerTool()` infer inline literals
 or use `WebMCP.ModelContextToolFromSchema<typeof inputSchema>`. The upstream type
 takes one schema generic; use the SDK's `ModelContextTool` helpers if you still need
 explicit input/result/name generics. Keep separately declared schemas literal
-with `as const`; widened schemas infer `Record<string, unknown>`.
+with `as const`; a widened schema infers each property as optional `unknown`.
 
 The upstream declaration uses `document.modelContext`, object input to
 `executeTool()`, a JSON-string execution result, and object-valued discovery
 schemas. `RegisteredTool.title` is required (it may be `''`); update test doubles
 that omitted it. Navigator aliases/testing declarations are gone. `SubmitEvent`
 extensions are declared by `@mcp-b/webmcp-polyfill`, and its global `ModelContext`
-interface-object declaration lives in `@mcp-b/webmcp-polyfill`.
+interface-object declaration lives in `@mcp-b/webmcp-polyfill`. Both reach every
+project that imports `@mcp-b/webmcp-ts-sdk`, or a package whose declarations
+import it such as `@mcp-b/react-webmcp`, because the SDK re-exports `WebMCP`
+through the polyfill.

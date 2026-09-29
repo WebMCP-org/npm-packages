@@ -21,7 +21,6 @@ export interface InputSchema extends StandardJsonSchemaObject {
 /** Object or array values accepted at the WebMCP runtime boundary. */
 export type WebMcpToolObjectInput = Parameters<WebMCP.ToolExecuteCallback>[0];
 export type WebMcpToolInput = WebMcpToolObjectInput | unknown[];
-export type WebMcpToolResult = Awaited<ReturnType<WebMCP.ToolExecuteCallback>>;
 
 /** Handle returned by MCP-B registration helpers. */
 export interface RegistrationHandle {

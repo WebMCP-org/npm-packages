@@ -11,7 +11,7 @@ There is no removal date yet.
 
 ```bash
 pnpm remove @mcp-b/webmcp-types
-pnpm add -D webmcp-types
+pnpm add -D webmcp-types@0.1.9
 ```
 
 Change the import to the upstream package:

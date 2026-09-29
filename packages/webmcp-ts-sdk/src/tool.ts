@@ -38,18 +38,6 @@ export interface ModelContextTool<
   execute: (input: TArgs, options: ToolExecuteCallbackOptions) => MaybePromise<TResult>;
 }
 
-/** Standard tool dictionary with input inferred from a JSON Schema literal. */
-export type ModelContextToolFromSchema<
-  TInputSchema extends InputSchema,
-  TResult = unknown,
-  TName extends string = string,
-> = Omit<
-  ModelContextTool<InferArgsFromInputSchema<TInputSchema>, TResult, TName>,
-  'inputSchema'
-> & {
-  inputSchema: TInputSchema;
-};
-
 /** MCP-B tool dictionary with output metadata. */
 export type ToolDescriptor<
   TArgs extends object = WebMcpToolObjectInput,
