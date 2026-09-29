@@ -4,6 +4,7 @@ import { onMounted } from 'vue';
 
 onMounted(async () => {
   installWebMCP();
+  if (!document.modelContext) throw new Error('WebMCP is unavailable');
 
   await document.modelContext.registerTool({
     name: 'current_route',

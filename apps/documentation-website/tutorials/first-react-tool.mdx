@@ -12,7 +12,7 @@ In this tutorial, we will create a minimal React app that registers one WebMCP t
 - Node.js 22.12 or later
 - pnpm
 - A text editor
-- A modern web browser
+- Chrome or Edge 126+, Firefox 126+, or Safari 18+
 
 ## What we will build
 
@@ -155,19 +155,14 @@ const tools = await modelContext.getTools();
 console.log(tools);
 ```
 
-You should see an array containing your `say_hello` tool. Now feature-detect the upstream object-input execution method and call it:
+You should see an array containing your `say_hello` tool. Now call it with an input object:
 
 ```javascript title="Call the tool through the polyfill"
 const tool = tools.find((candidate) => candidate.name === 'say_hello');
 if (!tool) throw new Error('say_hello is not registered');
 
-const executeTool = modelContext.executeTool;
-if (typeof executeTool !== 'function') {
-  throw new Error('This runtime does not expose a compatible executeTool method');
-}
-
-const result = await executeTool.call(modelContext, tool, { name: 'Console' });
-console.log(result === null ? null : JSON.parse(result));
+const result = await modelContext.executeTool(tool, { name: 'Console' });
+console.log(JSON.parse(result));
 ```
 
 The output should be an object containing the tool response:
@@ -190,7 +185,7 @@ Notice that the execution count in the UI also incremented, because the same und
 - `useWebMCP` registers a tool on mount and unregisters on unmount
 - Metadata changes update registration automatically; equivalent inline schemas do not cause re-registration
 - The hook returns `state` (with `executionCount`, `lastResult`, `error`, `isExecuting`) and an `execute` function for local invocation
-- Tools registered via the hook are discoverable with `document.modelContext.getTools()` and callable when the runtime exposes its object-input `executeTool()` method
+- Tools registered via the hook are discoverable with `document.modelContext.getTools()` and callable with `executeTool(tool, inputObject)`
 
 ## Next steps
 

@@ -20,7 +20,7 @@ In this tutorial, we will create a plain HTML page that registers one WebMCP too
 ## Prerequisites
 
 - A text editor
-- A modern web browser (Chrome, Edge, Firefox, or Safari)
+- Chrome or Edge 126+, Firefox 126+, or Safari 18+
 - A local static server, such as Python's built-in HTTP server
 
 No build step or framework is required. Serve the page from `localhost` because
@@ -127,9 +127,12 @@ You should see an array containing your tool:
 ```javascript title="Browser console"
 [
   {
-    name: 'get-page-title',
     description: 'Get the current page title',
     inputSchema: { type: 'object', properties: {} },
+    name: 'get-page-title',
+    origin: 'http://localhost:8000',
+    title: '',
+    window: Window,
   },
 ];
 ```
@@ -140,13 +143,8 @@ Now call the tool:
 const tool = tools.find((candidate) => candidate.name === 'get-page-title');
 if (!tool) throw new Error('get-page-title is not registered');
 
-const executeTool = modelContext.executeTool;
-if (typeof executeTool !== 'function') {
-  throw new Error('This runtime does not expose a compatible executeTool method');
-}
-
-const result = await executeTool.call(modelContext, tool, {});
-console.log(result === null ? null : JSON.parse(result));
+const result = await modelContext.executeTool(tool, {});
+console.log(JSON.parse(result));
 ```
 
 The output should be an object containing your tool's response:

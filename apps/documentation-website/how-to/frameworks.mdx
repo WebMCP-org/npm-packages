@@ -52,8 +52,9 @@ pnpm add usewebmcp react @mcp-b/webmcp-polyfill
 <CounterExample />
 
 `usewebmcp` accepts upstream JSON Schema metadata and passes runtime input to the handler without
-validation. When the schema implements Standard Schema, the MCP-B hook converts its JSON Schema
-metadata and calls its validator before execution. Follow the [schema guide](/how-to/use-schemas-and-structured-output) for transforms and
+validation. It reports a Standard Schema object, such as a Zod schema, as a registration error.
+`@mcp-b/react-webmcp` converts a Standard Schema's JSON Schema metadata, runs its validator once,
+and passes the validated, transformed input to the handler. Follow the [schema guide](/how-to/use-schemas-and-structured-output) for transforms and
 direct browser registrations. Use `usewebmcp` for core tool registration, raw results, and local execution state. Use
 [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference) to initialize the tool-only runtime.
 

@@ -33,7 +33,7 @@ document.modelContext
 └── .executeTool(tool, inputObject)  Execute a discovered tool
 ```
 
-MCP-b **polyfills** that API for all browsers today, and **bridges** it to the full [Model Context Protocol](https://modelcontextprotocol.io/) — turning that tool source into a complete MCP server with prompts, resources, and browser transports.
+MCP-b **polyfills** that API in browsers without native support (Chrome and Firefox 126+, Safari 18+), and **bridges** it to the full [Model Context Protocol](https://modelcontextprotocol.io/) — turning that tool source into a complete MCP server with prompts, resources, and browser transports.
 
 > Built by [MCP-b](https://docs.mcp-b.ai). Not an official W3C or MCP project.
 
@@ -41,13 +41,15 @@ MCP-b **polyfills** that API for all browsers today, and **bridges** it to the f
 
 ### 1. Use the web standard directly
 
-If you're running Chrome with [`--enable-experimental-web-platform-features`](./e2e/web-standards-showcase/CHROMIUM_FLAGS.md), `document.modelContext` is already there. Just use it:
+If you're running Chrome 155 or later with [`--enable-experimental-web-platform-features`](./e2e/web-standards-showcase/CHROMIUM_FLAGS.md), `document.modelContext` is already there. Just use it:
 
 Use upstream [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) for core browser
 contracts and input schema inference. MCP-B adapter extensions and schema helpers live in
 `@mcp-b/webmcp-ts-sdk`.
 
 ```ts
+if (!document.modelContext) throw new Error('WebMCP is unavailable');
+
 await document.modelContext.registerTool({
   name: 'add_todo',
   description: 'Add a new todo item',
@@ -62,12 +64,13 @@ await document.modelContext.registerTool({
 
 ### 2. Polyfill it
 
-Want it to work in **any browser** without the Chrome flag? Add the polyfill — same API, same code:
+Want it to work without the Chrome flag, including in Firefox and Safari? Add the polyfill — same API, same code:
 
 ```ts
 import { installWebMCP } from '@mcp-b/webmcp-polyfill'; // pnpm add @mcp-b/webmcp-polyfill
 
-installWebMCP(); // no-op if native support exists
+installWebMCP(); // keeps native support when present
+if (!document.modelContext) throw new Error('WebMCP is unavailable');
 
 await document.modelContext.registerTool({
   name: 'get_page_title',
@@ -102,6 +105,8 @@ Need the full [Model Context Protocol](https://modelcontextprotocol.io/) — pro
 
 ```ts
 import '@mcp-b/global'; // pnpm add @mcp-b/global
+
+if (!document.modelContext) throw new Error('WebMCP is unavailable');
 
 // Same registerTool API — now backed by a full MCP server
 await document.modelContext.registerTool({
@@ -189,7 +194,7 @@ Three ways for AI agents to discover and call your tools:
 
 **MCP-B Extension** — [Install it from the Chrome Web Store](https://chromewebstore.google.com/detail/mcp-b-extension/daohopfhkdelnpemnhlekblhnikhdhfa). It discovers tools exposed by pages and connects them to extension-side agent experiences.
 
-**Chrome Native** — Enable at `chrome://flags` → _Experimental Web Platform features_, or:
+**Chrome Native** (Chrome 155 or later) — Enable at `chrome://flags` → _Experimental Web Platform features_, or:
 
 ```bash
 google-chrome --enable-experimental-web-platform-features
@@ -236,11 +241,11 @@ Chrome DevTools integration now lives entirely upstream; its WebMCP changes have
 # Full runtime: polyfill + MCP bridge (most users start here)
 pnpm add @mcp-b/global
 
-# WebMCP polyfill with temporary declarative forms (no MCP bridge)
+# WebMCP polyfill with temporary declarative tools (no MCP bridge)
 pnpm add @mcp-b/webmcp-polyfill
 
 # Official WebMCP TypeScript definitions (dev dependency)
-pnpm add -D webmcp-types
+pnpm add -D webmcp-types@0.1.9
 
 # MCP-B adapter and schema helpers
 pnpm add @mcp-b/webmcp-ts-sdk
@@ -248,7 +253,7 @@ pnpm add @mcp-b/webmcp-ts-sdk
 # React hooks for full runtime
 pnpm add @mcp-b/react-webmcp
 
-# React hooks with upstream types and Standard Schema validation
+# React hooks for the WebMCP core (JSON Schema only)
 pnpm add usewebmcp
 
 # Transport layer (custom integrations)
@@ -267,7 +272,7 @@ pnpm add @mcp-b/smart-dom-reader
 
 | Package                                              | Version                                                                                                             | Description                                                          |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| [@mcp-b/webmcp-polyfill](./packages/webmcp-polyfill) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill) | Vendored upstream polyfill plus temporary declarative forms          |
+| [@mcp-b/webmcp-polyfill](./packages/webmcp-polyfill) | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-polyfill)](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill) | Vendored upstream polyfill plus temporary declarative tools          |
 | [@mcp-b/global](./packages/global)                   | [![npm](https://img.shields.io/npm/v/@mcp-b/global)](https://www.npmjs.com/package/@mcp-b/global)                   | Full runtime — polyfill + MCP bridge (prompts, resources, transport) |
 | [@mcp-b/webmcp-ts-sdk](./packages/webmcp-ts-sdk)     | [![npm](https://img.shields.io/npm/v/@mcp-b/webmcp-ts-sdk)](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk)     | Browser adapter, MCP-B extensions, and schema helpers                |
 
@@ -315,7 +320,7 @@ pnpm add @mcp-b/smart-dom-reader
 ├────────────── @mcp-b/webmcp-ts-sdk ──────────────────────┤
 │  BrowserMcpServer — wraps native/polyfill context        │
 ├────────────── @mcp-b/webmcp-polyfill ────────────────────┤
-│  WebMCP core + temporary declarative forms              │
+│  WebMCP core + temporary declarative tools               │
 ├──────────────────────────────────────────────────────────┤
 │  Native browser API (when available)                     │
 └──────────────────────────────────────────────────────────┘
@@ -329,19 +334,21 @@ pnpm add @mcp-b/smart-dom-reader
 ### Dependency Graph
 
 ```
-webmcp-types          (upstream browser contracts)
-├── webmcp-polyfill   (vendored upstream runtime)
-├── usewebmcp         (React hooks for strict core)
-└── webmcp-ts-sdk     (MCP-B adapter, extensions, and schema helpers)
-    ├── global        (full runtime; also uses transports)
-    ├── mcp-iframe    (iframe element; also uses transports)
-    └── react-webmcp  (also uses usewebmcp; pair with global at app level)
+webmcp-types                   (upstream browser contracts)
+├── @mcp-b/webmcp-types        (compatibility alias)
+├── usewebmcp                  (React hooks for strict core)
+└── webmcp-polyfill            (vendored upstream runtime)
+    └── webmcp-ts-sdk          (MCP-B adapter, extensions, and schema helpers)
+        ├── global             (full runtime; also uses transports)
+        ├── mcp-iframe         (iframe element; also uses transports)
+        ├── react-webmcp       (also uses usewebmcp; pair with global at app level)
+        └── webmcp-local-relay (bundles SDK helpers into its browser scripts)
 
-transports            (browser transports shared by integrations)
-└── webmcp-extension  (MV3 template and isolated content-script client)
+transports                     (browser transports shared by integrations)
+└── webmcp-extension           (MV3 template and isolated content-script client)
 ```
 
-Standalone packages: `smart-dom-reader`, `webmcp-local-relay`.
+Standalone package: `smart-dom-reader`.
 
 ## Development
 
@@ -364,7 +371,7 @@ pnpm build
 | `pnpm --filter <pkg> test`  | Test a single package             |
 | `pnpm changeset`            | Create a changeset for versioning |
 
-**Prerequisites:** Node.js >= 22.12 (see `.nvmrc`), pnpm >= 10
+**Prerequisites:** Node.js >= 22.18 (see `.nvmrc`), pnpm >= 10
 
 ## Documentation
 
@@ -375,7 +382,6 @@ pnpm build
 | [Package Philosophy](./docs/MCPB_PACKAGE_PHILOSOPHY.md)          | Package boundaries and layering model               |
 | [Testing Philosophy](./docs/TESTING_PHILOSOPHY.md)               | Test layers, mocking policy, coverage expectations  |
 | [E2E Testing](./docs/TESTING.md)                                 | Playwright setup, test apps, debugging              |
-| [@mcp-b/global guide](./docs/global-guide.md)                    | Advanced usage for the full runtime                 |
 | [AI Contribution Manifesto](./docs/AI_CONTRIBUTION_MANIFESTO.md) | Safety rules and code quality bar                   |
 | [Relevant Links](./docs/RELEVANT_LINKS.md)                       | Curated external best practices for contributors    |
 

@@ -52,6 +52,9 @@ import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 installWebMCP();
 ```
 
+The polyfill installs nothing on insecure pages or in browsers older than Chrome 126, Firefox 126,
+or Safari 18, so `document.modelContext` stays undefined there.
+
 If you load the IIFE build, place its script tag before scripts that register tools. See [Choose a
 runtime](/how-to/choose-runtime) if the application imports more than one MCP-B runtime.
 
@@ -64,6 +67,13 @@ import { isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 
 console.log(isBrowserMcpServer(document.modelContext));
 ```
+
+## Pass tool error details to agents
+
+When a tool throws, the polyfill reports only the generic `Tool execution failed` to the caller,
+including callers that reach the tool through the local relay. To give the agent details, return a
+result with `isError: true` and a text `content` item instead of throwing. See [Use input schemas
+and structured output](/how-to/use-schemas-and-structured-output) for a validation example.
 
 ## Trace missing relay tools
 

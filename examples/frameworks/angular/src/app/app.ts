@@ -8,6 +8,7 @@ import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 export class App implements OnInit {
   async ngOnInit() {
     installWebMCP();
+    if (!document.modelContext) throw new Error('WebMCP is unavailable');
 
     await document.modelContext.registerTool({
       name: 'get_status',

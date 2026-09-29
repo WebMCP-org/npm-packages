@@ -18,8 +18,9 @@ This example uses `workspace:*` dependencies to link against the local monorepo 
 "usewebmcp": "latest"
 ```
 
-## Key File
+## Key Files
 
+- [`src/main.tsx`](src/main.tsx) — installs the polyfill before React mounts
 - [`src/App.tsx`](src/App.tsx) — tool registration via `useWebMCP` hook
 
 ## What It Does

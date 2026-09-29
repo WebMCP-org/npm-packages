@@ -39,7 +39,7 @@ In this tutorial, we will set up a web page with a WebMCP tool, run the local re
 ## Prerequisites
 
 - Node.js 22.12 or later
-- A modern web browser
+- Chrome or Edge 126+, Firefox 126+, or Safari 18+
 - An MCP client (Claude Desktop, Cursor, Claude Code, or Windsurf)
 
 ## What we will build
@@ -60,7 +60,7 @@ Create a file called `relay-demo.html`:
   <head>
     <meta charset="UTF-8" />
     <title>Relay Demo Page</title>
-    <script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@latest/dist/index.iife.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@6/dist/index.iife.js"></script>
   </head>
   <body>
     <h1>Relay Demo</h1>
@@ -85,7 +85,7 @@ Create a file called `relay-demo.html`:
         });
     </script>
 
-    <script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"></script>
   </body>
 </html>
 ```

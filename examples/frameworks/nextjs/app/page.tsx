@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 export default function Home() {
   useEffect(() => {
     installWebMCP();
+    if (!document.modelContext) throw new Error('WebMCP is unavailable');
 
     void document.modelContext.registerTool({
       name: 'get_status',

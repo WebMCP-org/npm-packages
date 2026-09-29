@@ -98,6 +98,8 @@ const registerTool = mc.registerTool;
 Preferred:
 
 ```ts
+if (!document.modelContext) throw new Error('WebMCP is unavailable');
+
 await document.modelContext.registerTool({
   name: 'ping',
   description: 'Ping',
@@ -111,7 +113,8 @@ if (!ping) throw new Error('ping is not registered');
 await document.modelContext.executeTool(ping, {});
 ```
 
-Use the direct path so the code clearly exercises the real public surface.
+Use the direct path so the code clearly exercises the real public surface. `webmcp-types`
+declares `document.modelContext` optional, so check it once, then read it directly.
 
 ### 3. No manual patching of missing inference
 
@@ -165,8 +168,9 @@ const result = await page.evaluate(() => {
 Good direction:
 
 ```ts
-const result = await page.evaluate(() => {
-  return document.modelContext.getTools();
+const toolNames = await page.evaluate(async () => {
+  if (!document.modelContext) throw new Error('WebMCP is unavailable');
+  return (await document.modelContext.getTools()).map((tool) => tool.name);
 });
 ```
 
@@ -250,6 +254,7 @@ Preferred:
 import { initializeWebModelContext } from '@mcp-b/global';
 
 initializeWebModelContext();
+if (!document.modelContext) throw new Error('WebMCP is unavailable');
 const ping = (await document.modelContext.getTools()).find((tool) => tool.name === 'ping');
 if (!ping) throw new Error('ping is not registered');
 await document.modelContext.executeTool(ping, {});

@@ -17,7 +17,7 @@ icon: 'brackets-curly'
 
 import StandardSchemaExample from '/snippets/packages/react-webmcp-standard-schema.mdx';
 
-The core [`usewebmcp`](/packages/usewebmcp/reference) hook accepts upstream JSON Schema metadata and does not validate runtime input. Standard Schema conversion and validation are MCP-B React extensions, described in the [schema boundary explanation](/explanation/strict-core-vs-mcp-b-extensions#why-standard-schema-support-lives-in-the-adapters).
+The core [`usewebmcp`](/packages/usewebmcp/reference) hook accepts upstream JSON Schema metadata and does not validate runtime input; it reports a Standard Schema object, such as a Zod schema, as a registration error. Standard Schema conversion and validation are MCP-B React extensions, described in the [schema boundary explanation](/explanation/strict-core-vs-mcp-b-extensions#why-standard-schema-support-lives-in-the-adapters).
 
 ## Validate React tool input
 
@@ -42,8 +42,8 @@ MCP output metadata or formatting. The core hook does not call a schema validato
 
 If your library supplies only Standard Schema validation, also provide its Standard JSON Schema
 converter. Consult the [Standard JSON Schema implementer guide](https://standardschema.dev/json-schema)
-for your library's conversion API. Passing a converter-only object supplies metadata but does not
-add validation to the core hook; the MCP-B React adapter requires both conversion and validation.
+for your library's conversion API. The core hook rejects any object with a `~standard` property,
+including a converter-only object; the MCP-B React adapter requires both conversion and validation.
 
 ## Infer input from a JSON Schema literal
 
@@ -51,10 +51,11 @@ Pass an inline JSON Schema object to either hook. Both hooks preserve literal ty
 For a reusable schema constant, use `as const` to keep its literal information. Neither hook validates
 plain JSON Schema at runtime; validate in your handler when needed.
 
-For direct browser registration, activate the Community Group's declarations:
+For direct browser registration, activate the Community Group's declarations. Install the version
+the `@mcp-b/*` packages use so the project loads one copy of them:
 
 ```bash title="Install browser declarations"
-pnpm add -D webmcp-types
+pnpm add -D webmcp-types@0.1.9
 ```
 
 The Community Group package supplies the browser contracts. MCP-B adapter extensions and schema
@@ -94,7 +95,8 @@ export async function registerTotalTool() {
       async execute(input) {
         const result = await totalInput['~standard'].validate(input);
         if (result.issues) {
-          throw new TypeError(result.issues.map((issue) => issue.message).join('; '));
+          const text = result.issues.map((issue) => issue.message).join('; ');
+          return { content: [{ type: 'text', text }], isError: true };
         }
         return { total: result.value.count + result.value.limit };
       },
@@ -109,13 +111,15 @@ export async function registerTotalTool() {
 Call `registerTotalTool()` in browser setup, then call its returned cleanup function when the tool
 is no longer needed. Keep the spread when copying the normalized schema: it passes only JSON metadata,
 so MCP calls do not apply the vendor transforms a second time. The callback invokes the schema's own `validate()` method; no second validator
-is needed. The standalone polyfill does not invoke that method for you.
+is needed. The standalone polyfill does not invoke that method for you. Invalid input returns an
+error-flagged result instead of throwing because the polyfill reports every thrown error as the
+generic `Tool execution failed`.
 
 If you use [`BrowserMcpServer`](/packages/webmcp-ts-sdk/reference#schema-boundary), the official MCP
 server runs a preserved Standard Schema validator on MCP client calls. Direct browser calls and
 native mirrors bypass that MCP validation. Use the example above to validate in the browser callback with plain JSON metadata if both routes
 can execute it, or use `@mcp-b/react-webmcp` when registering a Standard Schema from React.
-`usewebmcp` accepts upstream WebMCP JSON Schema and does not perform schema conversion or validation.
+`usewebmcp` accepts only upstream WebMCP JSON Schema and does not perform schema conversion or validation.
 
 ## Add MCP-B output metadata
 

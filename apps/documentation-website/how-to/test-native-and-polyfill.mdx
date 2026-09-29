@@ -19,17 +19,17 @@ then run the broader suite before merging.
 
 ## Choose a repository test lane
 
-| Change                             | Command                                                       |
-| ---------------------------------- | ------------------------------------------------------------- |
-| Package logic and React hooks      | `pnpm test:unit`                                              |
-| Polyfill install smoke             | `pnpm --filter @mcp-b/webmcp-polyfill test:smoke`             |
-| Composed `@mcp-b/global` behavior  | `pnpm --filter @mcp-b/global test:conformance:global`         |
-| Tab and iframe transports          | `pnpm --filter mcp-e2e-tests test:runtime-contract:transport` |
-| `<mcp-iframe>` element             | `pnpm --filter mcp-e2e-tests test:mcp-iframe`                 |
-| Repository native browser contract | `pnpm --filter mcp-e2e-tests test:native-contract:default`    |
-| Local relay                        | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`            |
-| Extension template                 | `pnpm --filter @mcp-b/webmcp-extension test:e2e`              |
-| Full local E2E set                 | `pnpm test:e2e`                                               |
+| Change                             | Command                                                        |
+| ---------------------------------- | -------------------------------------------------------------- |
+| Package logic and React hooks      | `pnpm test:unit`                                               |
+| Polyfill and declarative behavior  | `pnpm --filter @mcp-b/webmcp-polyfill test --browser.headless` |
+| Composed `@mcp-b/global` behavior  | `pnpm --filter @mcp-b/global test:conformance:global`          |
+| Tab and iframe transports          | `pnpm --filter mcp-e2e-tests test:runtime-contract:transport`  |
+| `<mcp-iframe>` element             | `pnpm --filter mcp-e2e-tests test:mcp-iframe`                  |
+| Repository native browser contract | `pnpm --filter mcp-e2e-tests test:native-contract:default`     |
+| Local relay                        | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`             |
+| Extension template                 | `pnpm --filter @mcp-b/webmcp-extension test:e2e`               |
+| Full local E2E set                 | `pnpm test:e2e`                                                |
 
 The runtime contracts cover discovery, invocation, dynamic registration and removal, and handler
 errors through each real transport.
@@ -40,7 +40,7 @@ Run the polyfill and composed global contracts together when you change registra
 discovery, lifecycle, or execution behavior:
 
 ```bash title="Run MCP-B browser conformance"
-pnpm --filter @mcp-b/webmcp-polyfill test:smoke
+pnpm --filter @mcp-b/webmcp-polyfill test --browser.headless
 pnpm --filter @mcp-b/global test:conformance:global
 ```
 
@@ -60,10 +60,12 @@ draft](https://webmachinelearning.github.io/webmcp/).
 
 ## Run the native repository contract
 
-Use the repository command instead of copying browser flags into another script:
+Native lanes need Chrome 155 or later, the first release that accepts object input. Use the
+repository commands instead of copying browser flags into another script:
 
 ```bash title="Run the native contract"
 pnpm --filter mcp-e2e-tests test:native-contract:default
+pnpm --filter @mcp-b/global test:conformance:native
 ```
 
 The checked-in [Playwright

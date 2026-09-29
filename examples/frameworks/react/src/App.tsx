@@ -1,12 +1,6 @@
-import { installWebMCP } from '@mcp-b/webmcp-polyfill';
-import { useEffect } from 'react';
 import { useWebMCP } from 'usewebmcp';
 
 export function App() {
-  useEffect(() => {
-    installWebMCP();
-  }, []);
-
   useWebMCP({
     name: 'say_hello',
     description: 'Returns a hello message',

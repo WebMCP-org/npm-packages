@@ -68,7 +68,7 @@ the Diataxis framework.
 
 ## Quick Reference
 
-- **Node**: >= 22.12
+- **Node**: >= 22.18
 - **Package manager**: pnpm (not npm/yarn)
 - **Toolchain**: Vite+ (`vp` CLI) — unified dev/build/test/lint/format
 - **Linter**: Oxlint (via `vp lint` / `vp check`)
@@ -89,9 +89,16 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 ### WebMCP Proposal APIs
 
 - `document.modelContext` is the canonical current-draft WebMCP surface.
-- `executeTool()` accepts an input object and returns JSON-serialized output, as
-  defined by upstream `webmcp-types` and the polyfill. Legacy string input and
-  navigator aliases have been removed in this major release.
+- `executeTool(tool, inputObject)` takes an input object and resolves to a string.
+  Results are JSON, except that native declarative tools can return plain text, so
+  MCP-B treats a result as structured only when it parses to a plain JSON object.
+  String input, string input schemas, and navigator aliases are gone in this major release.
+- The draft fires `toolactivated` and `toolcancel` at the model context. The polyfill
+  fires both for declarative tools; `BrowserMcpServer` re-dispatches them and adds
+  `ontoolactivated` and `ontoolcancel`.
+- Native Chrome lanes require Chrome 155 or later, the first release with object input.
+- The vendored core needs Chrome 126, Firefox 126, or Safari 18 (`URL.parse()`). On older
+  engines and insecure pages, `installWebMCP()` installs nothing.
 - Check the live draft and package source before documenting browser behavior.
 - New examples and public documentation use `document.modelContext`.
 
@@ -110,9 +117,9 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 │  native/polyfill context.                            │
 ├─────────────────────────────────────────────────────┤
 │  @mcp-b/webmcp-polyfill                             │
-│  Bundles upstream webmachinelearning/webmcp-polyfill │
-│  at the pinned Git revision. Exposes installWebMCP().  │
-│  Core plus temporary MCP-B declarative forms.        │
+│  Bundles upstream webmcp-polyfill (pinned commit).  │
+│  Exposes installWebMCP() plus temporary MCP-B       │
+│  declarative tools.                                 │
 ├─────────────────────────────────────────────────────┤
 │  Native browser API (if available)                   │
 │  document.modelContext provided by the browser.      │
@@ -121,25 +128,27 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 ### Initialization Flow (`@mcp-b/global`)
 
-1. **Polyfill:** Call `installWebMCP()` from `@mcp-b/webmcp-polyfill`. It preserves existing native/preinstalled contexts and adds declarative support when missing. That package bundles the upstream source at the commit recorded in `packages/webmcp-polyfill/package.json` and temporarily retains MCP-B declarative forms. MCP `outputSchema` belongs to `@mcp-b/global`.
+1. **Polyfill:** Call `installWebMCP()` from `@mcp-b/webmcp-polyfill`. It preserves existing native/preinstalled contexts and adds declarative support when missing. That package bundles the upstream source at the commit recorded in `packages/webmcp-polyfill/package.json` and temporarily retains MCP-B declarative tools. MCP `outputSchema` belongs to `@mcp-b/global`.
 2. **Capture native:** A reference to the current document context is saved as `native`.
-3. **BrowserMcpServer:** Uses the page's context by default, installing the upstream polyfill when needed. Global passes its captured `{ native }` explicitly. Browser-facing tool registrations mirror down to that context and native tools are reconciled through `getTools()`.
+3. **BrowserMcpServer:** Uses the page's context by default, installing the upstream polyfill when needed. Global passes its captured `{ native }` explicitly. Browser-facing tool registrations mirror down to that context and native tools are reconciled through `getTools()`. In the top frame that includes tools from same-origin descendant frames; in a child frame it mirrors only the frame's own tools.
 4. **Replace:** `document.modelContext` exposes the `BrowserMcpServer` instance, which adds `registerPrompt`, `registerResource`, `listTools`, and other MCP-B extensions. Browser-shaped execution uses `getTools()` plus `executeTool(tool, inputObject)`.
-5. **Cleanup:** `cleanupWebModelContext()` restores the original native/polyfill context. The polyfill and its form layer remain installed for the document lifetime.
+5. **Cleanup:** `cleanupWebModelContext()` restores the original native/polyfill context. Closing the server unregisters every tool registered through it; tools registered directly on the underlying context remain. The polyfill and its declarative layer remain installed for the document lifetime.
 
 ### What Lives Where
 
-| Method / capability        | Current draft | `@mcp-b/webmcp-polyfill` | `@mcp-b/global` / BrowserMcpServer |
-| -------------------------- | :-----------: | :----------------------: | :--------------------------------: |
-| `registerTool()`           |       Y       |            Y             |        Y (mirrors to core)         |
-| `getTools()`               |       Y       |            Y             |       Y (delegates to core)        |
-| `ontoolchange`             |       Y       |            Y             |                 Y                  |
-| `executeTool(tool, input)` |  Y (object)   |        Y (object)        |             Y (object)             |
-| MCP-B declarative forms    |       -       |            Y             |          Y (via polyfill)          |
-| `outputSchema`             |       -       |            -             |                 Y                  |
-| `registerPrompt()`         |       -       |            -             |                 Y                  |
-| `registerResource()`       |       -       |            -             |                 Y                  |
-| `listTools()`              |       -       |            -             |                 Y                  |
+| Method / capability                | Current draft | `@mcp-b/webmcp-polyfill` | `@mcp-b/global` / BrowserMcpServer |
+| ---------------------------------- | :-----------: | :----------------------: | :--------------------------------: |
+| `registerTool()`                   |       Y       |            Y             |        Y (mirrors to core)         |
+| `getTools()`                       |       Y       |            Y             |       Y (delegates to core)        |
+| `ontoolchange`                     |       Y       |            Y             |                 Y                  |
+| `executeTool(tool, input)`         |  Y (object)   |        Y (object)        |             Y (object)             |
+| `toolactivated` / `toolcancel`     |       Y       |   Y (declarative only)   |         Y (re-dispatched)          |
+| `ontoolactivated` / `ontoolcancel` |       Y       |            -             |                 Y                  |
+| MCP-B declarative tools            |   explainer   |            Y             |          Y (via polyfill)          |
+| `outputSchema`                     |       -       |            -             |                 Y                  |
+| `registerPrompt()`                 |       -       |            -             |                 Y                  |
+| `registerResource()`               |       -       |            -             |                 Y                  |
+| `listTools()`                      |       -       |            -             |                 Y                  |
 
 ### Extension Integration (`@mcp-b/webmcp-extension`)
 
@@ -151,11 +160,13 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 ### Type ownership
 
 - Upstream `webmcp-types` owns the WebMCP browser contracts and `document.modelContext`
-  declaration.
+  declaration. Packages pin it exactly to `0.1.9`; 0.1.10 adds lifecycle members and event
+  classes that the vendored core does not implement.
 - `@mcp-b/webmcp-types` forwards upstream exports for existing package consumers;
   new code imports `webmcp-types` directly. Both legacy core packages are temporary aliases.
 - `@mcp-b/webmcp-ts-sdk` owns MCP-B adapter and extension contracts plus schema helpers.
-- `@mcp-b/global` declares the MCP-B globals that its runtime installs.
+- `@mcp-b/global` declares only `window.__webModelContextOptions`. `document.modelContext`
+  keeps the upstream type, so narrow it with `isBrowserMcpServer()` to reach MCP-B extensions.
 
 ## Reference Repos (`.reference/`)
 
@@ -187,19 +198,17 @@ The pinned WPT revision and CI job live in
 the shared local/CI runner live in
 [`scripts/run-webmcp-wpt.mjs`](./scripts/run-webmcp-wpt.mjs). The WPT lane builds
 the standalone polyfill, disables native WebMCP, injects the bundle, and runs
-an explicit page-local imperative allowlist against the strict upstream core.
-The shared declarative-form suite runs in both the global and standalone polyfill
-packages. Their default test and coverage scripts include their respective
-harnesses. Frame-tree, origin-policy, and navigation WPT are excluded because they require native
-coverage. When changing covered behavior, run the shared conformance suite and
-replay the WPT lane with
+an explicit page-local imperative allowlist plus the declarative files that never
+call `executeTool()`. The shared declarative suite runs in both the global and
+standalone polyfill packages. Their default test and coverage scripts include
+their respective harnesses. The other files, including the frame-tree,
+origin-policy, and navigation cases, target the pinned revision's older API shape
+(JSON-string `executeTool()` input, no `consequentialHint`), which predates
+upstream's own WPT pin; refresh the pin before restoring them. When changing
+covered behavior, run the shared conformance suite and replay the WPT lane with
 `CHROME_BIN=/path/to/chrome-canary pnpm test:wpt`. Update the WPT pin
 deliberately and review the upstream diff first. See
 [`docs/TESTING.md`](./docs/TESTING.md) for the test matrix.
-
-The pinned WPT revision's excluded imperative cases still expect JSON-string
-`executeTool()` input or older annotation shapes than the vendored upstream
-revision. Refresh the WPT pin before adding those cases back.
 
 `pnpm test:wpt:idl` is a second lane checking API _shape_ rather than behavior.
 It needs `interfaces` in the `.reference/wpt` sparse checkout and runs

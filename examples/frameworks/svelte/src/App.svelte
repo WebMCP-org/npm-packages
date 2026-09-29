@@ -4,6 +4,7 @@ import { onMount } from 'svelte';
 
 onMount(async () => {
   installWebMCP();
+  if (!document.modelContext) throw new Error('WebMCP is unavailable');
 
   await document.modelContext.registerTool({
     name: 'get_info',

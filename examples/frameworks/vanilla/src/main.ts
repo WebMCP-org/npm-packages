@@ -1,6 +1,7 @@
 import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 
 installWebMCP();
+if (!document.modelContext) throw new Error('WebMCP is unavailable');
 
 await document.modelContext.registerTool({
   name: 'get_status',

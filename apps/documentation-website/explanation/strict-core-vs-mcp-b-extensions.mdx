@@ -63,7 +63,8 @@ library's validator. The library remains responsible for its refinements, defaul
 async checks.
 
 The core [`usewebmcp` hook](/packages/usewebmcp/reference) accepts upstream JSON Schema metadata and
-does not validate runtime input. [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) converts
+does not validate runtime input. It reports a Standard Schema object, such as a Zod schema, as a
+registration error. [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) converts
 Standard JSON Schema metadata and calls the supplied validator before either local or agent calls.
 It adds MCP result formatting and output metadata as well.
 
@@ -81,7 +82,7 @@ flowchart TD
 The standalone polyfill keeps its browser contract focused on JSON Schema metadata.
 [`@mcp-b/webmcp-ts-sdk/schema`](/packages/webmcp-ts-sdk/reference#schema-boundary) converts schemas
 for direct WebMCP registrations and the MCP adapter; it does not change
-`document.modelContext.registerTool()` or make it call a validator. Declarative forms separately use
+`document.modelContext.registerTool()` or make it call a validator. Declarative tools separately use
 the browser's form constraint validation.
 
 The MCP route has another validation owner: the official server composed by

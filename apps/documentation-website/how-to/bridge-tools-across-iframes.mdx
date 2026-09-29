@@ -124,6 +124,11 @@ the child's `allowedOrigins` independently restricts messages it accepts.
 
 The `allow="tools"` attribute delegates the native WebMCP feature to a
 cross-origin child. It does not create or authorize the MCP-B transport.
+Under the polyfill, the delegation does not reach a child inside `<mcp-iframe>`:
+the polyfill cannot find frames in the element's shadow root, so the
+cross-origin child's `registerTool()` rejects with `NotAllowedError`. A
+cross-origin child needs native WebMCP; a same-origin child works with either
+runtime.
 
 </Step>
 
