@@ -22,9 +22,8 @@ export class ExtensionClientTransport implements Transport {
   private _port: chrome.runtime.Port | undefined;
   private readonly _extensionId: string | undefined;
   private readonly _portName: string;
-  private _messageHandler:
-    | Parameters<chrome.runtime.Port['onMessage']['addListener']>[0]
-    | undefined;
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- port input is untrusted until JSONRPCMessageSchema parses it
+  private _messageHandler: ((message: unknown) => void) | undefined;
   private _disconnectHandler: (() => void) | undefined;
   private _started = false;
   private _closed = false;
