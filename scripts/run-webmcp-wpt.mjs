@@ -24,7 +24,8 @@ if (!existsSync(polyfill)) {
 // ponytail: page-local allowlist; frame/origin tests qualify only if every assertion is page-local.
 // Mixed exposedTo tests stay out because valid nonempty exposure is intentionally native-only.
 // This pinned WPT revision still passes JSON strings to executeTool and predates
-// consequentialHint. Those cases target an older API shape than the vendored upstream runtime.
+// consequentialHint. Those cases target an older API shape than the vendored upstream runtime,
+// which is why the declarative list holds only the files that never call executeTool.
 const imperativeTests = [
   'document-domain-enabled.sub.https.html',
   'duplicate_tool_registration.https.html',
@@ -42,19 +43,29 @@ const imperativeTests = [
   'register_tool_with_empty_annotation.https.html',
   'register_tool_with_schema.https.html',
 ];
+const declarativeTests = [
+  'document-domain-enabled.sub.https.html',
+  'duplicate-tool-name.https.html',
+  'getTools-declarative-schema.https.html',
+  'toolchange-on-attribute-mutation.https.html',
+  'toolchange-on-control-add-remove.https.html',
+  'toolchange-on-name-change.https.html',
+];
+const behavioralTests = [
+  ...imperativeTests.map((test) => `webmcp/imperative/${test}`),
+  ...declarativeTests.map((test) => `webmcp/declarative/${test}`),
+];
 
 // Separate lane so an API-shape regression reports apart from the behavioral gate.
 const idlOnly = process.argv.slice(2).includes('--idl');
 
 const includes = idlOnly
   ? ['/webmcp/idlharness.https.window.html']
-  : imperativeTests.map((test) => `/webmcp/imperative/${test}`);
+  : behavioralTests.map((test) => `/${test}`);
 
 // wptrunner treats an --include that matches nothing as a silent no-op, so a test
 // renamed upstream would drop out of the gate with CI still green.
-const requiredFiles = idlOnly
-  ? ['webmcp/idlharness.https.window.js']
-  : imperativeTests.map((test) => `webmcp/imperative/${test}`);
+const requiredFiles = idlOnly ? ['webmcp/idlharness.https.window.js'] : behavioralTests;
 const missing = requiredFiles.filter((path) => !existsSync(resolve(wptDirectory, path)));
 if (missing.length > 0) {
   throw new Error(

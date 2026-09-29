@@ -1,4 +1,5 @@
 import type { WebMCP } from 'webmcp-types';
+import { executionError } from './upstream/frames.js';
 
 type InputSchema = NonNullable<WebMCP.ModelContextTool['inputSchema']>;
 type WebMcpToolInput = Parameters<WebMCP.ToolExecuteCallback>[0];
@@ -87,36 +88,6 @@ function respondWithAgentSubmitEvent(
   if (event.target instanceof HTMLFormElement) {
     activeSubmissions.get(event.target)?.respond(event);
   }
-}
-
-/** Retains declarative forms until the vendored upstream implements them. */
-export function installWebMCPDeclarativeExtensions(context: WebMCP.ModelContext): void {
-  const prototype = SubmitEvent.prototype;
-  // Native support and earlier bundle installations already own these hooks.
-  if ('agentInvoked' in prototype && 'respondWith' in prototype) return;
-
-  if (!('agentInvoked' in prototype)) {
-    Object.defineProperty(prototype, 'agentInvoked', {
-      configurable: true,
-      enumerable: true,
-      get(this: SubmitEvent) {
-        return isAgentInvokedSubmitEvent(this);
-      },
-    });
-  }
-
-  if (!('respondWith' in prototype)) {
-    Object.defineProperty(prototype, 'respondWith', {
-      configurable: true,
-      enumerable: true,
-      writable: true,
-      value(this: SubmitEvent, agentResponse: Promise<WebMcpToolResult>) {
-        respondWithAgentSubmitEvent(this, agentResponse);
-      },
-    });
-  }
-
-  installDeclarativeForms(document, context);
 }
 
 const TEXT_INPUT_TYPES = new Set(['email', 'password', 'search', 'tel', 'text', 'url']);
@@ -634,24 +605,15 @@ function fillParameter(controls: readonly DeclarativeControl[], value: FormParam
   }
 }
 
-function isAbortError(error: unknown): error is { name: 'AbortError' } {
-  return (
-    error !== null &&
-    (typeof error === 'object' || typeof error === 'function') &&
-    'name' in error &&
-    error.name === 'AbortError'
-  );
-}
-
+// Upstream replaces every callback failure with its own generic error, so no reason
+// thrown or rejected from this layer reaches a caller.
 function fillForm(form: HTMLFormElement, input: WebMcpToolInput): void {
-  if (Array.isArray(input)) throw new TypeError('Declarative tool input must be an object');
+  if (Array.isArray(input)) throw executionError();
   const groups = controlGroups(form);
   const parameters: Array<{ controls: DeclarativeControl[]; value: FormParameterValue }> = [];
   for (const [name, value] of Object.entries(input)) {
     const controls = groups.get(name);
-    if (!controls || !isFormParameterValue(form, controls, value)) {
-      throw new TypeError(`Invalid value for declarative form parameter "${name}"`);
-    }
+    if (!controls || !isFormParameterValue(form, controls, value)) throw executionError();
     parameters.push({ controls, value });
   }
   for (const { controls, value } of parameters) fillParameter(controls, value);
@@ -666,37 +628,28 @@ function findSubmitter(form: HTMLFormElement): Submitter | undefined {
   );
 }
 
-function validationError(form: HTMLFormElement): DOMException {
-  const failures = [...getFormControls(form)]
-    .filter(
-      (element): element is DeclarativeControl =>
-        isControl(element) && element.willValidate && !element.validity.valid
-    )
-    .map((control) => `${control.name.trim() || '{unknown}'}: ${control.validationMessage}`)
-    .join('. ');
-  return new DOMException(`Form validation failed: ${failures}`, 'UnknownError');
-}
-
-function toolActivatedEvent(toolName: string): Event {
-  const event = new Event('toolactivated');
+function lifecycleEvent(type: 'toolactivated' | 'toolcancel', toolName: string): Event {
+  const event = new Event(type);
   Object.defineProperty(event, 'toolName', { enumerable: true, value: toolName });
   return event;
 }
 
 function waitForSubmission(
+  context: WebMCP.ModelContext,
   registration: DeclarativeRegistration,
-  toolName: string,
-  autosubmit: boolean,
-  submitter: Submitter | undefined
+  definition: DeclarativeToolDefinition,
+  submitter: Submitter | undefined,
+  signal: AbortSignal
 ): Promise<WebMcpToolResult> {
   const { form } = registration;
-  registration.cancelPending?.(new DOMException('Tool execution cancelled', 'UnknownError'));
+  registration.cancelPending?.(executionError());
 
   return new Promise((resolve, reject) => {
     let settled = false;
 
     const cleanup = () => {
       EventTarget.prototype.removeEventListener.call(form, 'invalid', onInvalid, true);
+      signal.removeEventListener('abort', onAbort);
       activeSubmissions.delete(form);
       if (registration.cancelPending === cancel) delete registration.cancelPending;
     };
@@ -707,16 +660,24 @@ function waitForSubmission(
       callback();
     };
     const cancel = (reason: ErrorOptions['cause']) => finish(() => reject(reason));
+    // A submission without respondWith() resolves to null, as in Chromium; an undefined
+    // response maps to null as well so that upstream can serialize the result.
     const settleResponse = (response: Promise<WebMcpToolResult>) => {
       response.then(
-        (value) => finish(() => resolve(value)),
+        (value) => finish(() => resolve(value ?? null)),
         (cause: ErrorOptions['cause']) => finish(() => reject(cause))
       );
     };
     const onInvalid = (event: Event) => {
       if (!event.isTrusted) return;
       queueMicrotask(() => {
-        if (!checkFormValidity(form)) cancel(validationError(form));
+        if (!checkFormValidity(form)) cancel(executionError());
+      });
+    };
+    const onAbort = () => {
+      finish(() => {
+        context.dispatchEvent(lifecycleEvent('toolcancel', definition.name));
+        reject(signal.reason);
       });
     };
 
@@ -725,13 +686,12 @@ function waitForSubmission(
         queueMicrotask(() => {
           const response = agentResponses.get(event);
           if (response) settleResponse(response);
-          else if (event.defaultPrevented) {
-            cancel(new DOMException('preventDefault() requires respondWith()', 'UnknownError'));
-          } else finish(() => resolve(undefined));
+          else if (event.defaultPrevented) cancel(executionError());
+          else finish(() => resolve(null));
         });
       },
       direct() {
-        finish(() => resolve(undefined));
+        finish(() => resolve(null));
       },
       respond(event) {
         queueMicrotask(() => {
@@ -742,23 +702,49 @@ function waitForSubmission(
     });
     registration.cancelPending = cancel;
     EventTarget.prototype.addEventListener.call(form, 'invalid', onInvalid, true);
+    signal.addEventListener('abort', onAbort, { once: true });
 
-    if (!autosubmit) {
+    if (!definition.autosubmit) {
       submitter?.focus();
-      window.dispatchEvent(toolActivatedEvent(toolName));
+      context.dispatchEvent(lifecycleEvent('toolactivated', definition.name));
       return;
     }
     try {
       requestFormSubmit(form, submitter);
-      window.dispatchEvent(toolActivatedEvent(toolName));
+      context.dispatchEvent(lifecycleEvent('toolactivated', definition.name));
     } catch (error) {
       cancel(error);
     }
   });
 }
 
-/** Installs the DOM-backed half of the draft Declarative WebMCP API. */
-function installDeclarativeForms(document: Document, context: WebMCP.ModelContext): void {
+/** Retains declarative forms until the vendored upstream implements them. */
+export function installWebMCPDeclarativeExtensions(context: WebMCP.ModelContext): void {
+  const prototype = SubmitEvent.prototype;
+  // Native support and earlier bundle installations already own these hooks.
+  if ('agentInvoked' in prototype && 'respondWith' in prototype) return;
+
+  if (!('agentInvoked' in prototype)) {
+    Object.defineProperty(prototype, 'agentInvoked', {
+      configurable: true,
+      enumerable: true,
+      get(this: SubmitEvent) {
+        return isAgentInvokedSubmitEvent(this);
+      },
+    });
+  }
+
+  if (!('respondWith' in prototype)) {
+    Object.defineProperty(prototype, 'respondWith', {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value(this: SubmitEvent, agentResponse: Promise<WebMcpToolResult>) {
+        respondWithAgentSubmitEvent(this, agentResponse);
+      },
+    });
+  }
+
   const registrations = new Map<HTMLFormElement, DeclarativeRegistration>();
   const blockedDefinitions = new Map<HTMLFormElement, string>();
   const observers = new Map<Document | ShadowRoot, MutationObserver>();
@@ -783,11 +769,7 @@ function installDeclarativeForms(document: Document, context: WebMCP.ModelContex
     const form = event.target;
     queueMicrotask(() => {
       if (event.defaultPrevented) return;
-      registrations
-        .get(form)
-        ?.cancelPending?.(
-          new DOMException('Tool execution cancelled by form reset', 'UnknownError')
-        );
+      registrations.get(form)?.cancelPending?.(executionError());
     });
   };
 
@@ -872,9 +854,7 @@ function installDeclarativeForms(document: Document, context: WebMCP.ModelContex
     for (const [form, registration] of registrations) {
       const fingerprint = selected.get(form)?.fingerprint;
       if (fingerprint !== registration.fingerprint) {
-        registration.cancelPending?.(
-          new DOMException('Tool execution cancelled because its form changed', 'UnknownError')
-        );
+        registration.cancelPending?.(executionError());
         registration.controller.abort();
         registrations.delete(form);
       }
@@ -896,22 +876,17 @@ function installDeclarativeForms(document: Document, context: WebMCP.ModelContex
             title: definition.title,
             description: definition.description,
             inputSchema: definition.inputSchema,
-            execute(input: WebMcpToolInput) {
+            execute(input: WebMcpToolInput, options: WebMCP.ToolExecuteCallbackOptions) {
               const submitter = findSubmitter(form);
-              if (!definition.autosubmit && !submitter) {
-                throw new DOMException(
-                  'A declarative form without toolautosubmit requires a submit button',
-                  'UnknownError'
-                );
-              }
+              if (!definition.autosubmit && !submitter) throw executionError();
               fillForm(form, input);
-              // Preserve the legacy no-response result while making it JSON-serializable upstream.
               return waitForSubmission(
+                context,
                 registration,
-                definition.name,
-                definition.autosubmit,
-                submitter
-              ).then((result) => (result === undefined ? 'undefined' : result));
+                definition,
+                submitter,
+                options.signal
+              );
             },
           },
           { signal: controller.signal }
@@ -921,7 +896,7 @@ function installDeclarativeForms(document: Document, context: WebMCP.ModelContex
           // Invalid toolname/tooldescription attributes reject here. Without this the
           // form silently never becomes a tool, with no diagnostic in any channel.
           // Aborts are ordinary teardown, not a failure worth reporting.
-          if (isAbortError(cause)) return;
+          if (cause instanceof DOMException && cause.name === 'AbortError') return;
           console.error(
             `[webmcp] declarative form tool "${definition.name}" was not registered:`,
             cause

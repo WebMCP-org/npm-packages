@@ -61,7 +61,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "webmcp-types": "^0.1.9"
+    "webmcp-types": "0.1.9"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "catalog:",

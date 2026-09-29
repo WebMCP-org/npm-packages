@@ -39,6 +39,17 @@ function isToolActivatedEvent(event: Event): event is Event & { toolName: string
   );
 }
 
+// Chrome 155 still dispatches toolactivated on window; Chrome 156 and the polyfill use the context.
+function onToolActivated(name: string, handler: () => void): void {
+  const targets = [requireModelContext(), window];
+  const listener = (event: Event) => {
+    if (!isToolActivatedEvent(event) || event.toolName !== name) return;
+    for (const target of targets) target.removeEventListener('toolactivated', listener);
+    handler();
+  };
+  for (const target of targets) target.addEventListener('toolactivated', listener);
+}
+
 async function waitForTool(
   name: string,
   predicate: (tool: WebMCP.RegisteredTool) => boolean = () => true
@@ -75,10 +86,7 @@ async function executeTool(
   tool: WebMCP.RegisteredTool,
   input: Parameters<WebMCP.ModelContext['executeTool']>[1]
 ): Promise<Awaited<ReturnType<WebMCP.ToolExecuteCallback>>> {
-  const modelContext = requireModelContext();
-  if (!modelContext.executeTool)
-    throw new Error('Expected executeTool for declarative conformance');
-  const serialized = await modelContext.executeTool(tool, input);
+  const serialized = await requireModelContext().executeTool(tool, input);
   if (serialized === null) return null;
   try {
     return JSON.parse(serialized);
@@ -427,13 +435,7 @@ export function runDeclarativeFormConformanceSuite(
         event.preventDefault();
         submitRespondWith(event, Promise.resolve());
       });
-      window.addEventListener(
-        'toolactivated',
-        (event) => {
-          if (isToolActivatedEvent(event) && event.toolName === name) events.push('activated');
-        },
-        { once: true }
-      );
+      onToolActivated(name, () => events.push('activated'));
 
       await executeTool(await waitForTool(name), {});
 
@@ -603,12 +605,10 @@ export function runDeclarativeFormConformanceSuite(
 
       let activatedWithValue = '';
       let activatedWithFocusedSubmitter = false;
-      const onActivated = (event: Event) => {
-        if (!isToolActivatedEvent(event) || event.toolName !== name) return;
+      onToolActivated(name, () => {
         activatedWithValue = input.value;
         activatedWithFocusedSubmitter = document.activeElement === button;
-      };
-      window.addEventListener('toolactivated', onActivated, { once: true });
+      });
       let syntheticAgentInvoked: boolean | undefined;
       form.addEventListener('submit', (event) => {
         if (!event.isTrusted) {

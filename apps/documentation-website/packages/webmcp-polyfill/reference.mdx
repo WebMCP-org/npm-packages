@@ -46,8 +46,10 @@ installWebMCP();
 ```
 
 Installation is idempotent and preserves an existing native context. It does
-nothing when the browser document is unavailable. Importing the ESM entry does
-not install the runtime as a side effect.
+nothing when the browser document is unavailable, on an insecure page, or below
+the [browser baseline](#browser-baseline). Importing the ESM entry does not
+install the runtime as a side effect. The script bundle exposes the installer as
+`WebMCPPolyfill.installWebMCP`.
 
 ## Core runtime
 
@@ -73,6 +75,63 @@ MCP-B schema conversion and response helpers are exported by the
 [`@mcp-b/webmcp-ts-sdk/schema` adapter](/packages/webmcp-ts-sdk/reference#schema-boundary).
 The polyfill's `document.modelContext.registerTool()` follows WebMCP and does
 not validate invocation arguments.
+
+## Declarative forms
+
+The retained layer registers a tool for each form with `toolname` and
+`tooldescription` in the document and its open shadow roots. `tooltitle` sets
+the tool title. The input schema comes from the form's named controls;
+`toolparamdescription` on a control or its fieldset describes the parameter.
+
+```html "Declarative form"
+<form toolname="search_catalog" tooldescription="Search the product catalog" toolautosubmit>
+  <input name="query" required toolparamdescription="Words to match" />
+  <button type="submit">Search</button>
+</form>
+
+<script>
+  document.querySelector('form').addEventListener('submit', (event) => {
+    if (!event.agentInvoked) return;
+
+    event.preventDefault();
+    event.respondWith(Promise.resolve({ matches: [] }));
+  });
+</script>
+```
+
+An invocation fills the controls and dispatches `input` and `change` events.
+Without `toolautosubmit`, it focuses the first enabled submit button and waits
+for the user to submit; a form with no submit button rejects. With
+`toolautosubmit`, it runs constraint validation and calls `requestSubmit()`.
+
+| Behavior       | Description                                                                                                                                                                                                                               |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Submit hooks   | The agent-invoked submit event reports `agentInvoked` as `true`. Call `preventDefault()` and `respondWith(promise)` to answer; `respondWith()` throws `InvalidStateError` outside an agent-invoked submit or without `preventDefault()`.  |
+| Results        | JSON strings like every `executeTool()` result. `respondWith(Promise.resolve('sent'))` resolves as `"sent"`; a submission without `respondWith()` resolves as `null`.                                                                     |
+| Events         | `document.modelContext` fires `toolactivated` once the form is filled and `toolcancel` when the `executeTool()` signal aborts. Both are plain `Event` instances with a `toolName` property.                                               |
+| Cancellation   | Aborting the signal rejects with the abort reason and clears the agent attribution, so a later user submission reports `agentInvoked` as `false`. Reset, registration changes, removal, and a new invocation also reject a pending call.  |
+| Failures       | Validation, unknown or invalid parameters, a missing submit button, and a rejected response reject with the generic `UnknownError: Tool execution failed`. Resolve `respondWith()` with an error description when agents need details.    |
+| Native context | When the browser provides `document.modelContext` without `SubmitEvent.agentInvoked` and `respondWith`, the layer installs the hooks and registers forms on that context. A native context that already has them keeps declarative forms. |
+
+The layer does not emulate the `:tool-form-active` and `:tool-submit-active`
+pseudo-classes and skips closed shadow roots, file inputs, and form-associated
+custom elements. The [declarative API page](/reference/webmcp/declarative-api)
+links the proposal and Chrome sources.
+
+## Browser baseline
+
+`installWebMCP()` installs only when the engine provides every API the vendored
+core calls. Otherwise it returns without defining `document.modelContext`, so
+`if (!document.modelContext)` remains a valid feature check.
+
+| API                             | Chrome | Firefox | Safari |
+| ------------------------------- | ------ | ------- | ------ |
+| `String.prototype.toWellFormed` | 111    | 119     | 16.4   |
+| `AbortSignal.any()`             | 116    | 124     | 17.4   |
+| `Promise.withResolvers()`       | 119    | 121     | 17.4   |
+| `URL.parse()`                   | 126    | 126     | 18     |
+
+The resulting floor is Chrome 126, Firefox 126, and Safari 18.
 
 <Card title="WebMCP draft" icon="book" href="https://webmachinelearning.github.io/webmcp/">
   Read the current Community Group report.

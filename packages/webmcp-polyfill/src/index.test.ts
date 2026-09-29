@@ -1,6 +1,17 @@
 import { expect, it } from 'vitest';
 import { installWebMCP } from './index.js';
 
+it('leaves the document untouched when the engine lacks a required API', () => {
+  const { withResolvers } = Promise;
+  Reflect.deleteProperty(Promise, 'withResolvers');
+  try {
+    expect(() => installWebMCP()).not.toThrow();
+    expect('modelContext' in document).toBe(false);
+  } finally {
+    Promise.withResolvers = withResolvers;
+  }
+});
+
 it('installs the upstream object-input API idempotently', async () => {
   installWebMCP();
   const context = document.modelContext;

@@ -5,7 +5,7 @@
 **Breaking: replace the MCP-B core implementation with the upstream WebMCP polyfill.**
 Declarative forms remain available until upstream supports them.
 This package vendors [upstream revision `439c6c3`](https://github.com/webmachinelearning/webmcp-polyfill/tree/439c6c341f1c632c63498ba206e2bd8471cb8efb)
-and uses `webmcp-types@^0.1.9` for the browser contract.
+and uses `webmcp-types@0.1.9` for the browser contract.
 
 The existing package name remains available as a temporary compatibility alias.
 It will eventually be removed; no removal date is set. Sites using declarative
@@ -30,7 +30,10 @@ of the document. To remove tools, pass an `AbortController`'s signal to
 that need a completely fresh runtime should create a new page or document realm.
 
 The `@mcp-b/webmcp-polyfill/iife` export and `dist/index.iife.js` script still install
-automatically. An ESM import alone does not install the polyfill.
+automatically. The script's global is now `WebMCPPolyfill.installWebMCP` (formerly
+`WebMCPPolyfill.initializeWebMCPPolyfill`), and it ignores
+`window.__webMCPPolyfillOptions`; remove that assignment. An ESM import alone does
+not install the polyfill.
 
 ### Use the document API and object input
 
@@ -52,7 +55,12 @@ descriptor from `getTools()` and an input object:
   compatibility paths are gone.
 - Return JSON-serializable values from callbacks. `undefined`, functions, cyclic
   objects, and other non-serializable results now reject instead of falling back
-  to text. Catch execution failures; error names/messages follow upstream.
+  to text.
+- Every failed invocation rejects with `UnknownError: Tool execution failed`.
+  The upstream core does not forward the reason a callback threw or rejected,
+  so the former validation and execution messages are gone. Tools registered
+  through `@mcp-b/global` or `BrowserMcpServer` that need to report details
+  should return an error-flagged MCP result (`isError: true`) instead of throwing.
 - `RegisteredTool.inputSchema` is an object when present. Remove branches that
   parse a serialized schema. Use `tool.title || tool.name` for display labels.
 - Input schemas provide metadata and TypeScript inference, not runtime argument
@@ -76,6 +84,62 @@ the underlying context; it does not uninstall the core polyfill or its form laye
 If you use `withAbortSignal` from the new schema entry, pass an explicit signal
 and remove the former third `getAbortReason` argument. Await the operation directly
 when you have no signal.
+
+### Update declarative form code
+
+- Declarative results are JSON strings like every other `executeTool()` result.
+  A string passed to `respondWith()` arrived as plain text, as in Chrome; parse it now:
+
+  ```diff
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      event.respondWith?.(Promise.resolve('sent'));
+    });
+  - const text = await context.executeTool(tool, {});
+  + const text = JSON.parse(await context.executeTool(tool, {}));
+  ```
+
+- A submission that never calls `respondWith()`, or a `respondWith()` value of
+  `undefined`, resolves as `null`.
+- `toolactivated` fires on `document.modelContext` instead of `window`, and
+  aborting the `executeTool()` signal cancels the pending call and fires
+  `toolcancel` there. Both are plain `Event` instances with a `toolName` property;
+  this package does not define `ToolActivatedEvent` or `ToolCancelEvent`.
+
+  ```diff
+  - window.addEventListener('toolactivated', (event) => {
+  + document.modelContext?.addEventListener('toolactivated', (event) => {
+      console.log(event);
+    });
+  ```
+
+- Validation failures, unknown or invalid parameters, a missing submit button, and
+  rejected responses reject with the generic error described above.
+
+### Pin webmcp-types to 0.1.9
+
+This package depends on `webmcp-types@0.1.9` exactly. `webmcp-types@0.1.10` adds
+required `ontoolactivated` and `ontoolcancel` members plus `ToolActivatedEvent`
+and `ToolCancelEvent` globals that the vendored core does not implement, so a
+project that also depends on `webmcp-types` must pin the same version until the
+runtime catches up:
+
+```bash
+pnpm add webmcp-types@0.1.9
+```
+
+### Check the browser baseline
+
+`installWebMCP()` returns without defining `document.modelContext` on engines that
+lack an API the vendored core calls, so `if (!document.modelContext)` remains the
+feature check. The 5.x polyfill had no such floor.
+
+| API                             | Chrome | Firefox | Safari |
+| ------------------------------- | ------ | ------- | ------ |
+| `String.prototype.toWellFormed` | 111    | 119     | 16.4   |
+| `AbortSignal.any()`             | 116    | 124     | 17.4   |
+| `Promise.withResolvers()`       | 119    | 121     | 17.4   |
+| `URL.parse()`                   | 126    | 126     | 18     |
 
 ### Check browser and frame setup
 

@@ -5,10 +5,23 @@ import { installWebMCP as installUpstream } from './upstream/index.js';
 
 export type { WebMCP } from './upstream/index.js';
 
-/** Installs upstream WebMCP and the retained declarative forms support. */
+/**
+ * Installs upstream WebMCP and the retained declarative forms support.
+ * Engines missing an API the vendored core calls are left untouched: upstream defines
+ * the document getter before it constructs the context, so a failed construction would
+ * leave `document.modelContext` throwing.
+ */
 export function installWebMCP(): void {
-  installUpstream();
   if (typeof document === 'undefined' || !globalThis.isSecureContext) return;
+  if (
+    typeof Promise.withResolvers !== 'function' ||
+    typeof AbortSignal.any !== 'function' ||
+    typeof String.prototype.toWellFormed !== 'function' ||
+    typeof URL.parse !== 'function'
+  ) {
+    return;
+  }
+  installUpstream();
   const context = document.modelContext;
   if (context) installWebMCPDeclarativeExtensions(context);
 }

@@ -2,13 +2,14 @@ import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 
 installWebMCP();
 
-await document.modelContext.registerTool({
+const context = document.modelContext;
+if (!context) throw new Error('WebMCP is unavailable');
+
+await context.registerTool({
   name: 'get_page_title',
   description: 'Get the current page title',
   inputSchema: { type: 'object', properties: {} },
-  async execute() {
-    return {
-      content: [{ type: 'text', text: document.title }],
-    };
+  execute() {
+    return { title: document.title };
   },
 });
