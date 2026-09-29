@@ -103,7 +103,7 @@ pnpm test:e2e:debug
 pnpm test
 pnpm test:runtime-contract
 
-# Native contract (Chrome 152+ WebMCP config)
+# Native contract (Chrome 155+ WebMCP config)
 pnpm test:native-contract:default
 pnpm test:native-contract:beta
 
@@ -177,4 +177,4 @@ pnpm --filter mcp-e2e-tests exec playwright install chromium
 
 ### Native Chromium Details
 
-See [tests/CHROMIUM_TESTING.md](./tests/CHROMIUM_TESTING.md) for the canonical native contract lanes and the Chrome 152 flagged lane.
+See [tests/CHROMIUM_TESTING.md](./tests/CHROMIUM_TESTING.md) for the canonical native contract lanes and the Chrome 155+ flagged lane.

@@ -18,6 +18,19 @@ Both pages must expose `document.modelContext`. The parent needs the MCP-B
 resource and prompt extensions from `@mcp-b/global` when the iframe exposes
 those capabilities.
 
+With the polyfill or `@mcp-b/global` in the child, only a same-origin child can
+register tools. The polyfill's cross-origin permission handshake identifies a
+child by its index in the parent's `window.frames`, and the iframe that
+`<mcp-iframe>` renders inside its shadow root has no index there, so
+`registerTool()` in a cross-origin child rejects with `NotAllowedError` even
+when the element carries `allow="tools"`. Native WebMCP checks the permission
+in the browser and does not have this limitation.
+
+The parent's `@mcp-b/global` server also lists a same-origin child's tools under
+their own names, so each such tool appears twice over MCP: once unprefixed
+through that frame mirroring and once with the element prefix. Resources and
+prompts appear only with the prefix.
+
 ## Use the default element
 
 ```html

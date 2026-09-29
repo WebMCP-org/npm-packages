@@ -313,10 +313,7 @@ test('never registers a child resource it cannot unregister', async ({ page }) =
   await expect.poll(() => parentResourceState(page)).toEqual({ registered: 0, exposed: 0 });
 });
 
-test('validates attributes, reconnects cross-origin, and supports a custom tag entry', async ({
-  context,
-  page,
-}) => {
+test('validates attributes and supports a custom tag entry', async ({ context, page }) => {
   const warnings: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'warning') warnings.push(message.text());
@@ -415,34 +412,6 @@ test('validates attributes, reconnects cross-origin, and supports a custom tag e
   });
   expect(opaqueOriginError).toContain('target-origin="*"');
 
-  const crossOrigin = await page.evaluate(async () => {
-    const element = window.mcpIframeHost.getMcpIframe();
-    const crossOrigin = new URL('/iframe-child.html', location.href);
-    crossOrigin.hostname = location.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
-    crossOrigin.searchParams.set('allow-tools-policy', '1');
-    const crossReady = new Promise<void>((resolve) =>
-      element.addEventListener('mcp-iframe-ready', () => resolve(), { once: true })
-    );
-    element.setAttribute('target-origin', crossOrigin.origin);
-    element.setAttribute('src', crossOrigin.href);
-    await crossReady;
-    const crossResult = await window.mcpIframeHost.callTool('calculate', { a: 2, b: 3 });
-    const crossContent = crossResult.content[0];
-
-    return {
-      tools: element.exposedTools,
-      origin: element.getAttribute('target-origin'),
-      result: crossContent?.type === 'text' ? crossContent.text : crossContent,
-    };
-  });
-  const expectedCrossOrigin = new URL(page.url());
-  expectedCrossOrigin.hostname =
-    expectedCrossOrigin.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
-  expect(crossOrigin).toEqual({
-    tools: ['renamed_frame_calculate'],
-    origin: expectedCrossOrigin.origin,
-    result: '5',
-  });
   expect(warnings).toEqual(
     expect.arrayContaining([
       expect.stringContaining('Invalid call-timeout'),
@@ -459,6 +428,68 @@ test('validates attributes, reconnects cross-origin, and supports a custom tag e
   }));
   expect(custom.tagName).toBe('custom-mcp-iframe');
   expect(custom.result.content[0]).toMatchObject({ type: 'text', text: '7' });
+});
+
+test('bridges a cross-origin child only where the browser grants the tools permission', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const nativeContext = document.modelContext;
+    if (nativeContext) window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = nativeContext;
+  });
+  const crossOrigin = new URL('/iframe-child.html', page.url());
+  crossOrigin.hostname = crossOrigin.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
+  const parent = await page.evaluate(async (source) => {
+    const element = window.mcpIframeHost.getMcpIframe();
+    const ready = new Promise<void>((resolve) =>
+      element.addEventListener('mcp-iframe-ready', () => resolve(), { once: true })
+    );
+    element.setAttribute('allow', 'tools');
+    element.setAttribute('target-origin', new URL(source).origin);
+    element.setAttribute('src', source);
+    await ready;
+    return {
+      allow: element.iframe?.getAttribute('allow'),
+      tools: element.exposedTools,
+      bridged: (await window.mcpIframeHost.getParentTool('calculate')) !== undefined,
+    };
+  }, crossOrigin.href);
+
+  const childFrame = page.frames().find((frame) => frame.url().startsWith(crossOrigin.origin));
+  if (!childFrame) throw new Error('Cross-origin child frame was not found');
+  const child = await childFrame.evaluate(async () => {
+    const native = Boolean(window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__);
+    try {
+      await document.modelContext?.registerTool({
+        name: 'probe',
+        description: 'Probes cross-origin registration',
+        execute: async () => 'probe',
+      });
+      return { native, registration: 'registered' };
+    } catch (error) {
+      return { native, registration: error instanceof Error ? error.name : String(error) };
+    }
+  });
+
+  // The vendored core lets a cross-origin child prove its permission only by its index in the
+  // parent's window.frames, and the iframe inside the element's shadow root has none.
+  expect({ ...parent, ...child }).toEqual(
+    child.native
+      ? {
+          allow: 'tools',
+          tools: ['child-iframe_calculate'],
+          bridged: true,
+          native: true,
+          registration: 'registered',
+        }
+      : {
+          allow: 'tools',
+          tools: [],
+          bridged: false,
+          native: false,
+          registration: 'NotAllowedError',
+        }
+  );
 });
 
 test('surfaces parent registration failures instead of announcing partial readiness', async ({

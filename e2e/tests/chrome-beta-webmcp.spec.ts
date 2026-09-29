@@ -101,17 +101,8 @@ test.describe('Chrome WebMCP native smoke', () => {
         if (!tool.window || tool.window.window !== tool.window) {
           invalidEntries.push({ index, reason: 'window' });
         }
-        if (tool.inputSchema !== undefined) {
-          // An object since webmcp#241; a serialized string from older Chrome.
-          if (isString(tool.inputSchema)) {
-            try {
-              JSON.parse(tool.inputSchema);
-            } catch {
-              invalidEntries.push({ index, reason: 'inputSchema-json' });
-            }
-          } else if (!isJsonObject(tool.inputSchema)) {
-            invalidEntries.push({ index, reason: 'inputSchema-type' });
-          }
+        if (tool.inputSchema !== undefined && !isJsonObject(tool.inputSchema)) {
+          invalidEntries.push({ index, reason: 'inputSchema-type' });
         }
       });
 

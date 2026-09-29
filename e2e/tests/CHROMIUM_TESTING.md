@@ -28,7 +28,7 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="/Applications/Google Chrome Canary.app/Cont
 pnpm test:native-contract:default
 ```
 
-The configuration requires Chrome 152 or newer and launches it with:
+The configuration requires Chrome 155 or newer and launches it with:
 
 ```text
 --enable-experimental-web-platform-features
@@ -46,7 +46,7 @@ The contract lanes verify:
 1. The captured context is native rather than an MCP-B polyfill.
 2. `getTools()` returns registered descriptors with browser-owned metadata.
 3. AbortSignal cleanup removes an owned registration.
-4. Descriptor-based execution works when Chrome exposes `executeTool()`.
+4. Descriptor-based execution works through `executeTool()` with object input.
 5. Tool errors propagate through the native browser surface.
 6. The showcase registers tools and handles parent/iframe lifecycles without
    the testing shim.
@@ -61,10 +61,14 @@ Relevant files:
 
 ## MCP-B runtime coverage
 
-The ordinary Playwright Chromium lane verifies the global runtime through
-`document.modelContext`, MCP transports, and iframe bridges. Run it from `e2e/`:
+The default Playwright configuration runs the global runtime without native
+WebMCP and verifies `document.modelContext`, the MCP transports, and the iframe
+bridge. Run it from `e2e/`:
 
 ```bash
-pnpm test:runtime-contract
-pnpm test:tab-transport
+pnpm test:runtime-contract:transport
+pnpm test:mcp-iframe
 ```
+
+`pnpm test:runtime-contract` runs both and then the native contract, which
+needs Chrome 155 or newer.

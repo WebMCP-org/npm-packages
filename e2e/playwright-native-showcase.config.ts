@@ -4,13 +4,13 @@ import { MACOS_CHROME_EXECUTABLE_PATHS, resolveChromeExecutable } from './chrome
 /**
  * Playwright configuration for Native Web Standards Showcase
  * Launches a browser with --enable-experimental-web-platform-features.
- * Defaults to an installed Chrome 152+ because WebMCP's document.modelContext
+ * Defaults to an installed Chrome 155+ because WebMCP's document.modelContext
  * surface is not available in Playwright's bundled Chromium.
  */
 const tabTransportPort = Number.parseInt(process.env.PLAYWRIGHT_NATIVE_SHOWCASE_PORT ?? '5174', 10);
 const nativeShowcaseBaseUrl = `http://localhost:${tabTransportPort}`;
 const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
-const MIN_NATIVE_CHROME_MAJOR = 152;
+const MIN_NATIVE_CHROME_MAJOR = 155;
 const nativeShowcaseExecutablePath = resolveChromeExecutable({
   candidates: [
     process.env.PLAYWRIGHT_NATIVE_SHOWCASE_EXECUTABLE_PATH,

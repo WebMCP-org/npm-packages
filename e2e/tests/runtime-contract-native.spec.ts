@@ -191,12 +191,6 @@ test.describe('Runtime Contract - Browser API Caller', () => {
 
       const execution = await executeTool.call(modelContext, sumTool, { a: 4, b: 7 });
       const inputSchema = sumTool.inputSchema;
-      const inputSchemaKind =
-        typeof inputSchema === 'string'
-          ? 'string'
-          : inputSchema !== null && typeof inputSchema === 'object' && !Array.isArray(inputSchema)
-            ? 'object'
-            : 'invalid';
 
       return {
         missingRawModelContext: false,
@@ -206,9 +200,8 @@ test.describe('Runtime Contract - Browser API Caller', () => {
           name: sumTool.name,
           title: sumTool.title,
           description: sumTool.description,
-          // An object since webmcp#241; Canary 154 still serves same-document
-          // tools as serialized strings, so both generations are valid here.
-          inputSchemaKind,
+          inputSchemaIsObject:
+            inputSchema !== null && typeof inputSchema === 'object' && !Array.isArray(inputSchema),
           origin: sumTool.origin,
           hasWindow: sumTool.window === window,
         },
@@ -221,10 +214,10 @@ test.describe('Runtime Contract - Browser API Caller', () => {
     expect(result.toolsArePromise).toBe(true);
     expect(result.toolInfo).toMatchObject({
       name: 'sum',
+      inputSchemaIsObject: true,
       origin: expect.any(String),
       hasWindow: true,
     });
-    expect(['string', 'object']).toContain(result.toolInfo?.inputSchemaKind);
     expect(result.execution).toContain('sum:11');
   });
 
@@ -304,18 +297,12 @@ test.describe('Runtime Contract - Browser API Caller', () => {
     }
   });
 
-  test('propagates runtime-thrown errors through the browser API caller', async ({
-    page,
-  }, testInfo) => {
+  test('propagates runtime-thrown errors through the browser API caller', async ({ page }) => {
     await resetInvocations(page);
 
     const errorMessage = await executeNativeToolError(page, 'always_fail', { reason: 'native' });
-    if (testInfo.project.name === 'chrome-m152-webmcp' || testInfo.project.name === 'chromium') {
-      // Current native Chrome builds normalize thrown tool errors into a generic failure string.
-      expect(errorMessage).toMatch(/always_fail:native|invocation failed/i);
-    } else {
-      expect(errorMessage).toContain('always_fail:native');
-    }
+    // Native Chrome normalizes thrown tool errors into a generic failure string.
+    expect(errorMessage).toMatch(/always_fail:native|invocation failed/i);
 
     await expect
       .poll(async () => await readInvocations(page))

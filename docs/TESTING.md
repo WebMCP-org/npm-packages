@@ -32,7 +32,7 @@ pnpm --filter mcp-e2e-tests test:runtime-contract
 pnpm --filter mcp-e2e-tests test:integration:runtime-api
 pnpm --filter mcp-e2e-tests test:integration:frameworks
 
-# Native contract lanes (Chrome 152+ WebMCP config)
+# Native contract lanes (Chrome 155+ WebMCP config)
 pnpm --filter mcp-e2e-tests test:native-contract:default
 pnpm --filter mcp-e2e-tests test:native-showcase
 
@@ -75,7 +75,7 @@ Notes:
 | ------------------- | ------------------------------------------ | -------------------------------------------------------- | ---------------------------------------------------------- |
 | Tab / global        | SDK `Client` + `TabClientTransport`        | Browser page running `@mcp-b/global`                     | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
 | Iframe              | SDK `Client` + `IframeParentTransport`     | Parent/iframe runtime boundary                           | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
-| Native Chromium     | `document.modelContext`                    | Chrome 152+ with WebMCP flags in CI                      | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
+| Native Chromium     | `document.modelContext`                    | Chrome 155+ with WebMCP flags in CI                      | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
 | Local relay         | SDK `Client` over stdio                    | Real relay server + real browser runtime                 | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
 | Extension transport | SDK `Client` + `ExtensionClientTransport`  | Real MV3 extension using `ExtensionServerTransport`      | `pnpm --filter @mcp-b/transports test:e2e`                 |
 | Extension template  | SDK `Client` in an isolated content script | Imperative and declarative tools in a real MV3 extension | `pnpm --filter @mcp-b/webmcp-extension test:e2e`           |
@@ -131,7 +131,7 @@ globals and declarations with `skipLibCheck: false`, with strict null checking e
 The React 18 consumer installs core hooks only; React 19 also checks MCP-B/upstream type coexistence.
 
 Browser tests cover StrictMode, suspended renders, metadata updates, duplicate and delayed
-registrations, late runtime injection, and cancellation. `@mcp-b/react-webmcp` tests additionally
+registrations, and cancellation. `@mcp-b/react-webmcp` tests additionally
 cover Standard Schema validation and transforms. Platform failure tests mock the browser
 registration boundary; successful calls use the real runtime.
 
@@ -184,31 +184,50 @@ Await `rerender` and `unmount`; do not use sleeps to settle React. The
 provide the act environment and cleanup. Client tests profile a memoized consumer, then verify a
 real inventory change reaches it so a disconnected observer cannot pass a zero-commit assertion.
 
-The [hook comparison harness](../benchmarks/react-hooks/README.md) separately measures
-production registration/render counts, scaling to 100 tools, sequential calls, and hook
-bundle sizes. Its hardware-dependent timings are informational, not CI pass/fail thresholds.
-
 ## CI / Default Gate
 
 The canonical runtime gate lives in `.github/workflows/e2e.yml`.
 
-The workflow runs:
+| Lane                   | Workflow     | Required check |
+| ---------------------- | ------------ | -------------- |
+| Lint                   | `ci.yml`     | Yes            |
+| Typecheck              | `ci.yml`     | Yes            |
+| Build                  | `ci.yml`     | Yes            |
+| Unit Tests             | `ci.yml`     | Yes            |
+| Syncpack               | `ci.yml`     | No             |
+| Security Audit         | `ci.yml`     | Yes            |
+| E2E Tests (Playwright) | `e2e.yml`    | Yes            |
+| Extension E2E          | `e2e.yml`    | No             |
+| Native API Parity      | `e2e.yml`    | No             |
+| Analyze                | `codeql.yml` | Yes            |
 
-1. DOM reader, reader-server lifecycle, tab, iframe, local-relay, framework, and `@mcp-b/global` tarball E2E coverage
-2. Extension transport and extension-template E2E coverage
-3. The pinned upstream WebMCP Web Platform Tests against the standalone polyfill
-4. Native contract and showcase integration coverage on Chrome Canary
+Required checks are a repository branch-protection setting; the workflows do not
+declare them.
+
+`E2E Tests (Playwright)` runs on Chrome stable: DOM reader, reader-server
+lifecycle, tab, iframe, local-relay, framework, and `@mcp-b/global` tarball
+coverage. `Extension E2E` runs the extension transport and extension-template
+suites in Playwright's Chromium. `Native API Parity` installs Chrome Beta and
+Chrome Canary and runs the pinned upstream WebMCP Web Platform Tests against the
+standalone polyfill, the IDL shape lane (non-blocking), the native runtime
+contract on both channels, the Chrome WebMCP smoke on Beta, the native React
+hook tests, the `@mcp-b/global` native conformance suite on Canary, the native
+showcase, and the native extension frame integration.
 
 `pnpm test` runs unit tests plus the local zero-mock `pnpm test:e2e` umbrella. CI adds the
-framework, tarball, upstream WPT, and Chrome Canary lanes listed above.
+framework, tarball, upstream WPT, and native lanes listed above.
 
 The upstream suite lives in
 [`webmcp`](https://github.com/web-platform-tests/wpt/tree/master/webmcp). The
 workflow pins its WPT revision and injects
 `packages/webmcp-polyfill/dist/index.iife.js` with native WebMCP disabled. It
-runs an explicit allowlist of imperative tests for the strict core surface.
-Frame-tree, origin-policy, and navigation WPT are excluded because they require
-native browser behavior. The shared declarative-form suite runs against both
+runs an explicit allowlist: fifteen imperative files for the core surface and
+the six declarative files that never call `executeTool()`
+(`document-domain-enabled`, `duplicate-tool-name`, `getTools-declarative-schema`,
+and the three `toolchange-*` files). The other files, including the frame-tree,
+origin-policy, and navigation cases, target the pinned revision's older API
+shape (JSON-string `executeTool()` input, no `consequentialHint`); refresh the
+pin before restoring them. The shared declarative-form suite runs against both
 `@mcp-b/global` and the standalone polyfill. The polyfill harness lives in
 `packages/webmcp-polyfill/src/declarative-forms.test.ts` and runs with that
 package's default `test` and `test:coverage` scripts. Its `test:smoke` script
@@ -216,11 +235,6 @@ runs only the core install, registration, execution, and abort check. The
 global harness runs through `test:conformance:global` and the package's default
 test script. `test:conformance:matrix` runs the polyfill tests, global
 conformance, and native conformance in sequence.
-
-The selected upstream WPT allowlist covers imperative core behavior only.
-The pinned WPT revision's omitted imperative cases still expect JSON-string
-`executeTool()` input or older annotations; refresh the pin before restoring
-them.
 
 ### IDL shape conformance
 
@@ -286,9 +300,9 @@ If the configured port is in use:
 lsof -ti:4173 | xargs kill
 ```
 
-### Chrome 152 Native Contract Lane
+### Chrome 155 Native Contract Lane
 
-The flagged native lane requires Chrome 152+ with:
+The flagged native lane requires Chrome 155+ (Beta or Canary) with:
 
 - `--enable-experimental-web-platform-features`
 - `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`

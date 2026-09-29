@@ -1,12 +1,3 @@
-if (new URLSearchParams(location.search).has('allow-tools-policy')) {
-  Object.defineProperty(document, 'permissionsPolicy', {
-    configurable: true,
-    value: {
-      features: () => ['tools'],
-      allowsFeature: (feature: string) => feature === 'tools',
-    },
-  });
-}
 await import('@mcp-b/global');
 
 import { type JsonObject, type ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
