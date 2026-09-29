@@ -137,8 +137,9 @@ the frame tree.
 ## Navigation results
 
 Chrome resolves `executeTool()` with `null` when a tool triggers navigation.
-The extension client reports that call as interrupted. It does not preserve the
-call across document navigation or read JSON-LD from the destination document.
+The extension client receives a successful call whose text is `null`, not an
+error. It does not preserve the call across document navigation or read JSON-LD
+from the destination document.
 For a declarative tool that must return a result without navigation, cancel the
 submission and use `SubmitEvent.respondWith()`. The upstream
 [declarative explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md#getting-the-form-response-to-the-agent)

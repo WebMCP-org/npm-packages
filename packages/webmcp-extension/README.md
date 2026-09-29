@@ -135,10 +135,10 @@ Load `dist/` as an unpacked extension from `chrome://extensions`.
   explicit `fromOrigins` request. The extension client does not make that
   request. Declarative tools currently have no cross-origin exposure attribute.
 - Native Chrome resolves `executeTool()` with `null` when a tool navigates. The
-  extension client reports that as an interrupted MCP call and does not carry
-  calls across navigation or read JSON-LD from the destination document. Use
-  `SubmitEvent.respondWith()` when a declarative tool must return a result
-  without navigation.
+  extension client receives a successful call whose text is `null`, not an
+  error, and does not carry calls across navigation or read JSON-LD from the
+  destination document. Use `SubmitEvent.respondWith()` when a declarative tool
+  must return a result without navigation.
 
 ## Test
 
