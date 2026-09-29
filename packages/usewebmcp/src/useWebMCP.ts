@@ -29,10 +29,13 @@ function toError(cause: unknown): Error {
   return cause instanceof Error ? cause : new Error(String(cause));
 }
 
-function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, TResult = unknown>(
+export function useWebMCPWithAdapter<
+  const TInputSchema extends ToolInputSchema = object,
+  TResult = unknown,
+>(
   config: WebMCPConfig<TInputSchema, TResult>,
-  deps?: DependencyList,
-  adapter?: WebMCPAdapter<TResult>
+  deps: DependencyList | undefined,
+  adapter: WebMCPAdapter<TResult>
 ): WebMCPReturn<TInputSchema, TResult> {
   const [state, setState] = useState<ToolExecutionState<TResult>>(INITIAL_STATE);
   const [registration, setRegistration] =
@@ -41,6 +44,11 @@ function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, 
   const schema = useMemo(() => {
     try {
       const value = config.inputSchema;
+      if (value !== undefined && '~standard' in value) {
+        throw new TypeError(
+          'inputSchema must be JSON Schema. Use @mcp-b/react-webmcp for Zod and other Standard Schema validators.'
+        );
+      }
       const key = JSON.stringify(value);
       if (value !== undefined && key === undefined) {
         throw new TypeError('inputSchema must serialize to JSON');
@@ -56,13 +64,13 @@ function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, 
     ...(title !== undefined && { title }),
     description,
     ...(annotations !== undefined && { annotations }),
-    ...adapter?.descriptor,
+    ...adapter.descriptor,
   };
   const descriptor = {
     ...metadata,
     ...(schema.value !== undefined && { inputSchema: schema.value }),
   };
-  let preparationError = schema.error ?? adapter?.preparationError;
+  let preparationError = schema.error ?? adapter.preparationError;
   let descriptorKey: string;
   try {
     descriptorKey = JSON.stringify([metadata, schema.key, exposedTo]);
@@ -105,15 +113,27 @@ function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, 
             signal.throwIfAborted();
             if (result instanceof Error) throw result;
             const output =
-              forAgent && executionAdapter?.formatOutput
+              forAgent && executionAdapter.formatOutput
                 ? await executionAdapter.formatOutput(result)
                 : result;
             signal.throwIfAborted();
-            return { result, output };
+            if (forAgent && output !== undefined) {
+              try {
+                if (JSON.stringify(output) === undefined) {
+                  throw new TypeError('JSON.stringify returned undefined');
+                }
+              } catch (cause) {
+                throw new TypeError(
+                  `Tool "${executionConfig.name}" returned a result that is not JSON-serializable`,
+                  { cause }
+                );
+              }
+            }
+            return { result, output: output ?? null };
           } catch (cause) {
             signal.throwIfAborted();
             const error = toError(cause);
-            const formatError = executionAdapter?.formatError;
+            const formatError = executionAdapter.formatError;
             if (!forAgent || !formatError) return { error };
             const output = await formatError(error);
             signal.throwIfAborted();
@@ -172,26 +192,22 @@ function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, 
 
   useEffect(() => {
     const controller = new AbortController();
-    let timer: ReturnType<typeof setInterval> | undefined;
-    const register = () => {
-      const context = document.modelContext;
-      const isSupported = typeof context?.registerTool === 'function';
-      const { config: current, descriptor: tool, preparationError: error } = committed.current;
-      setRegistration((previous) =>
-        previous.isSupported === isSupported && previous.registrationError === (error ?? null)
-          ? previous
-          : { isSupported, registrationError: error ?? null }
-      );
-      if (error || !enabled) return true;
-      if (!isSupported || !context) return false;
-      const failed = (cause: unknown) => {
-        if (controller.signal.aborted) return;
-        controller.abort();
-        setRegistration({
-          isSupported: true,
-          registrationError: toError(cause),
-        });
-      };
+    const context = globalThis.document?.modelContext;
+    const isSupported = typeof context?.registerTool === 'function';
+    const { config: current, descriptor: tool, preparationError: error } = committed.current;
+    setRegistration((previous) =>
+      previous.isSupported === isSupported && previous.registrationError === (error ?? null)
+        ? previous
+        : { isSupported, registrationError: error ?? null }
+    );
+    const failed = (cause: unknown) => {
+      if (controller.signal.aborted) return;
+      controller.abort();
+      const registrationError = toError(cause);
+      console.warn(`[useWebMCP] registerTool("${current.name}") rejected:`, registrationError);
+      setRegistration({ isSupported: true, registrationError });
+    };
+    if (!error && enabled && isSupported && context) {
       try {
         const registered = context.registerTool(
           {
@@ -208,19 +224,8 @@ function useWebMCPInternal<const TInputSchema extends ToolInputSchema = object, 
       } catch (cause) {
         failed(cause);
       }
-      return true;
-    };
-    if (!register()) {
-      // Extensions can inject after mount. Bound discovery to 10 seconds per hook.
-      let attempts = 0;
-      timer = setInterval(() => {
-        if (register() || ++attempts >= 20) clearInterval(timer);
-      }, 500);
     }
-    return () => {
-      clearInterval(timer);
-      controller.abort();
-    };
+    return () => controller.abort();
     // Descriptor contents avoid churn from inline schemas; deps can explicitly refresh registration.
     // oxlint-disable-next-line react-doctor/exhaustive-deps -- Metadata is compared by value and callbacks are read after commit.
   }, [descriptorKey, preparationError?.message, enabled, ...(deps ?? [])]);
@@ -233,16 +238,5 @@ export function useWebMCP<const TInputSchema extends ToolInputSchema = object, T
   config: WebMCPConfig<TInputSchema, TResult>,
   deps?: DependencyList
 ): WebMCPReturn<TInputSchema, TResult> {
-  return useWebMCPInternal(config, deps);
-}
-
-export function useWebMCPWithAdapter<
-  const TInputSchema extends ToolInputSchema = object,
-  TResult = unknown,
->(
-  config: WebMCPConfig<TInputSchema, TResult>,
-  deps: DependencyList | undefined,
-  adapter: WebMCPAdapter<TResult>
-): WebMCPReturn<TInputSchema, TResult> {
-  return useWebMCPInternal(config, deps, adapter);
+  return useWebMCPWithAdapter(config, deps, {});
 }

@@ -97,3 +97,20 @@ it('forwards native cancellation to the handler and clears pending state', async
   expect(hook.result.current.state).toMatchObject({ isExecuting: false, executionCount: 0 });
   await hook.unmount();
 });
+
+it('returns an undefined result to native agents as null', async () => {
+  const hook = await renderHook(() =>
+    useWebMCP({ name: 'native_void', description: 'Returns nothing', execute: () => {} })
+  );
+  const context = requireNativeModelContext();
+  await hook.act(async () => {
+    await expect
+      .poll(async () => (await context.getTools()).some((tool) => tool.name === 'native_void'))
+      .toBe(true);
+    const tool = (await context.getTools()).find((tool) => tool.name === 'native_void');
+    if (!tool) throw new Error('Native tool is missing');
+    await expect(context.executeTool(tool, {})).resolves.toBe('null');
+  });
+  expect(hook.result.current.state).toMatchObject({ error: null, executionCount: 1 });
+  await hook.unmount();
+});

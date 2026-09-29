@@ -21,7 +21,7 @@ The runtime comes from the browser, [`@mcp-b/webmcp-polyfill`](/packages/webmcp-
 pnpm add usewebmcp react
 ```
 
-React 18 and 19 are supported. The published entry point preserves `'use client'`, including production builds. Importing and server rendering do not access browser globals or register tools. Framework integration is covered in the [framework guide](/how-to/frameworks).
+React 18 and 19 are supported. The published entry point preserves `'use client'`, including production builds. Importing and server rendering do not access browser globals or register tools. Renderers without a `document` report `isSupported: false`. Framework integration is covered in the [framework guide](/how-to/frameworks).
 
 ## Hook
 
@@ -35,10 +35,11 @@ React 18 and 19 are supported. The published entry point preserves `'use client'
 | `execute(input, options?)` | `Promise<TResult>`            | Local execution with optional `{ signal }`              |
 | `reset()`                  | `void`                        | Clears observed execution state without cancelling work |
 | `isSupported`              | `boolean`                     | A registration API is available                         |
-| `registrationError`        | `Error \| null`               | Schema serialization or registration failure            |
+| `registrationError`        | `Error \| null`               | Invalid input schema or rejected registration           |
 
 `isRegistered` is no longer returned. Use the runtime’s `getTools()` for confirmed discovery.
 `registrationError` describes setup failures separately from `state.error`; a null error does not confirm registration.
+When the browser rejects a registration, for example because another tool already uses the name, the hook also logs one `console.warn` naming the tool. The tool stays unregistered until its registration refreshes.
 
 ## Config fields
 
@@ -70,6 +71,8 @@ The handler receives the upstream execution `AbortSignal`. Local calls can provi
 
 Inline WebMCP JSON Schema literals infer caller and handler inputs through upstream types. Reusable schemas retain literals with `as const`. `TResult` is inferred from the handler's return value. The schema is registered as metadata; the hook passes runtime input to the handler without validation or transformation.
 
+`ToolInputSchema` excludes Standard Schema values. Passing Zod or another Standard Schema validator is a type error, and at runtime a schema with a `~standard` property sets `registrationError` without registering the tool.
+
 For Standard Schema conversion and runtime validation, use [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference). For direct registration, the [schema guide](/how-to/use-schemas-and-structured-output) covers callback validation and the [SDK schema adapter](/packages/webmcp-ts-sdk/reference#schema-boundary) covers metadata conversion.
 
 ## Re-registration triggers
@@ -80,11 +83,15 @@ Treat input schemas as immutable. Serialization is memoized by `inputSchema` ide
 
 Committed callbacks are published with a layout effect in the browser and a passive effect on the server. Suspended or abandoned renders do not replace the active implementation. Cleanup aborts the component's registration signal.
 
-When the API is absent, the hook checks every 500 ms for up to 10 seconds to detect late extension injection. It stops checking after discovery or unmount. The hook reads `document.modelContext`; it does not fall back to `navigator.modelContext`. A registration that resolves or rejects after cleanup cannot change the replacement registration's state.
+The hook reads `document.modelContext` when it registers and does not wait for a runtime installed later, so install the runtime before mounting tools. It does not fall back to `navigator.modelContext`. A registration that resolves or rejects after cleanup cannot change the replacement registration's state.
+
+When the API is available, the hook commits once after mount to set `isSupported`. Later successful registrations add no commits.
 
 ## Results
 
-Local execution resolves with the handler's raw result, which is also stored in `state.lastResult`. Thrown or returned `Error` objects reject. The hook does not wrap agent results in MCP `CallToolResult` values. For output schemas, MCP annotations, or automatic response formatting, use [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference#usewebmcpconfig-deps).
+Local execution resolves with the handler's raw result, which is also stored in `state.lastResult`. Thrown or returned `Error` objects reject. The hook does not wrap agent results in MCP `CallToolResult` values.
+
+Agent calls receive `null` when the handler returns `undefined`. Any other agent result must be JSON-serializable. A BigInt, function, or circular result fails the agent call, and `state.error` records the reason. For output schemas, MCP annotations, or automatic response formatting, use [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference#usewebmcpconfig-deps).
 
 ## Exported types
 
@@ -95,7 +102,11 @@ Local execution resolves with the handler's raw result, which is also stored in 
 | `WebMCPReturn<TInputSchema, TResult>`        | Execution state, API availability, registration errors, and controls |
 | `ToolExecutionState<TResult>`                | Execution state                                                      |
 | `ToolExecuteFunction<TInputSchema, TResult>` | Handler signature                                                    |
-| `ToolInputSchema`                            | Accepted WebMCP JSON Schema type                                     |
+| `ToolInputSchema`                            | Accepted WebMCP JSON Schema type, excluding Standard Schema values   |
 | `InferToolInput<TInputSchema>`               | Input type inferred from the WebMCP JSON Schema                      |
 
 The second generic parameter of core configuration and return types is the result type. MCP output-schema helpers and schema-validated input types are available from `@mcp-b/react-webmcp`.
+
+## Internal entry point
+
+`usewebmcp/internal` exports `useWebMCPWithAdapter` and `WebMCPAdapter` for [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference). It is not a stable API and can change in any release.

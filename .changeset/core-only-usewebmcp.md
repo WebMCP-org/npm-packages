@@ -19,9 +19,9 @@ If you use Standard Schema/Zod input, `outputSchema`, MCP annotations such as
 ```
 
 Use `@mcp-b/global` in your browser entry to expose MCP metadata, prompts, resources,
-and transports. The extension hook now validates Standard Schema input for both
-local and agent calls, including async validation and transforms. Check handlers
-that previously expected unvalidated input; they now receive the validator's output.
+and transports. `@mcp-b/react-webmcp` validates Standard Schema input before calling
+your handler, and its default error response text is the error message alone, where
+5.x returned `Error: <message>`. The core `usewebmcp` hook validates nothing.
 
 ### Stay on the core hook
 
@@ -52,10 +52,22 @@ export function SearchTool() {
 
 - Core input schemas provide inference and metadata only. Validate input in the
   handler; TypeScript types do not validate agent or JavaScript callers.
+- Zod and other Standard Schema validators, which 5.x accepted, are rejected. Passing
+  one is a type error, and at runtime the hook sets `registrationError` instead of
+  registering the tool. Switch packages as shown above, or use JSON Schema:
+
+  ```diff
+  - inputSchema: z.object({ query: z.string() }),
+  + inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
+  ```
+
 - Local `execute()` and `state.lastResult` contain the raw handler result. Agent
   callbacks now also return that value, without an MCP `content`/`structuredContent`
   envelope. Browser `document.modelContext.executeTool()` still serializes it to
   JSON; consumers of that method must parse the returned string.
+- Agents receive `null` when the handler returns `undefined`. Any other result must
+  be JSON-serializable: a BigInt, function, or circular result fails the agent call,
+  and `state.error` records the reason.
 - Core failures reject instead of returning an MCP `isError` response. Handle
   rejections in callers. A returned `Error` is treated as a failed execution.
 - `formatOutput` and `formatError` are extension-hook options, not core options.
@@ -63,8 +75,8 @@ export function SearchTool() {
 
 Provide `document.modelContext` before mounting tools. With the compatibility
 polyfill, install `@mcp-b/webmcp-polyfill` explicitly and call `installWebMCP()` in
-your browser entry. The hook itself does not install a runtime and no longer reads
-`navigator.modelContext`.
+your browser entry. The hook itself does not install a runtime, does not wait for one
+installed later, and no longer reads `navigator.modelContext`.
 
 ### Update explicit generic arguments
 
@@ -80,7 +92,7 @@ Prefer inference from `inputSchema` and `execute`. If you specify types explicit
 `Result` is the TypeScript value returned by the handler, not its JSON Schema.
 Input inference follows upstream `WebMCP.ModelContextToolFromSchema`. Preserve
 schema literals with `as const` when declaring them separately; a widened schema
-falls back to `Record<string, unknown>`.
+loses its literal types, so each declared property becomes an optional `unknown` field.
 
 ### Registration, cancellation, and fixes
 
@@ -88,14 +100,18 @@ falls back to `Record<string, unknown>`.
   failures separately from `state.error`. Neither confirms registration; use
   `await document.modelContext.getTools()` for discovery. Tool hooks do not expose
   `isRegistered`; prompt/resource hooks in the extension package still do.
+- A missing `document.modelContext` no longer logs a warning; check `isSupported`.
+  A rejected registration, such as a duplicate tool name, still logs one warning
+  naming the tool and now also sets `registrationError`.
 - Handlers receive `(input, { signal })`. Local calls accept
   `execute(input, { signal: controller.signal })`. Forward the signal to work such
   as `fetch`; cancellation rejects and cannot later publish a successful result.
 - Schemas are memoized by object identity: replace a schema object when changing
   it instead of mutating it. Metadata changes refresh registration; equivalent
   serialized descriptors and unrelated renders reuse it. `deps` can force a refresh.
-- Missing APIs are retried for up to ten seconds after mount. Install the runtime
-  before mounting if it may load later than that. Stale registration failures no
-  longer overwrite a replacement registration.
-- Production bundles preserve `'use client'`; React 18/19 SSR and StrictMode are
-  covered by the package checks.
+- Stale registration failures no longer overwrite a replacement registration.
+- Production bundles preserve `'use client'`. The package checks type-check and
+  server-render the packed hooks with React 18 and 19; browser tests, including
+  StrictMode, run on React 19.
+- The new `usewebmcp/internal` entry serves `@mcp-b/react-webmcp`. It is not a
+  stable API and can change in any release.

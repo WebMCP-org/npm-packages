@@ -78,18 +78,16 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
     };
     const toJSON = vi.fn(() => metadata);
     const inputSchema = { ...metadata, toJSON };
-    const register = vi.spyOn(document.modelContext, 'registerTool');
-    const hook = await renderHook(
-      ({ revision }) =>
-        useWebMCP({
-          name: 'cached_schema',
-          description: 'Keeps schema preparation stable',
-          inputSchema,
-          execute: () => revision,
-        }),
-      { initialProps: { revision: 1 } }
+    const register = vi.spyOn(document.modelContext!, 'registerTool');
+    const hook = await renderHook(({ revision }: { revision: number } = { revision: 1 }) =>
+      useWebMCP({
+        name: 'cached_schema',
+        description: 'Keeps schema preparation stable',
+        inputSchema,
+        execute: () => revision,
+      })
     );
-    expect(await document.modelContext.getTools()).toMatchObject([{ inputSchema: metadata }]);
+    expect(await document.modelContext!.getTools()).toMatchObject([{ inputSchema: metadata }]);
     toJSON.mockClear();
     register.mockClear();
 
@@ -104,7 +102,7 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
 
   it('keeps successful asynchronous metadata registration out of UI state', async () => {
     const onRender = vi.fn<ProfilerOnRenderCallback>();
-    const context = document.modelContext;
+    const context = document.modelContext!;
     function Consumer({ revision }: { revision: number }) {
       const { registrationError } = useWebMCP({
         name: 'render_metadata',

@@ -55,5 +55,16 @@ export function useInferenceExamples() {
     annotations: { destructiveHint: true },
     execute: () => 1,
   });
+  const standardSchema = {
+    type: 'object',
+    '~standard': { version: 1, vendor: 'zod', validate: () => ({ value: {} }) },
+  } as const;
+  useWebMCP({
+    name: 'standard_schema',
+    description: 'Standard Schema',
+    // @ts-expect-error - Standard Schema validators belong to @mcp-b/react-webmcp
+    inputSchema: standardSchema,
+    execute: () => 1,
+  });
   return { result, lastResult };
 }

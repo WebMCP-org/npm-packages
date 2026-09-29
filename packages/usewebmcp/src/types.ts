@@ -1,10 +1,15 @@
 import type { WebMCP } from 'webmcp-types';
 
-/** The JSON Schema object accepted by the WebMCP tool contract. */
-export type ToolInputSchema = NonNullable<WebMCP.ModelContextTool['inputSchema']>;
+/**
+ * The JSON Schema object accepted by the WebMCP tool contract. Standard Schema
+ * validators such as Zod belong to `@mcp-b/react-webmcp`.
+ */
+export type ToolInputSchema = NonNullable<WebMCP.ModelContextTool['inputSchema']> & {
+  readonly '~standard'?: never;
+};
 
 /** Input inferred from the WebMCP JSON Schema. */
-export type InferToolInput<T extends ToolInputSchema> = Parameters<
+export type InferToolInput<T extends object> = Parameters<
   WebMCP.ModelContextToolFromSchema<T>['execute']
 >[0];
 

@@ -13,37 +13,14 @@ import CounterExample from '/snippets/packages/usewebmcp-quickstart.mdx';
 
 Each call reads the latest committed counter. Registration and cleanup follow the component lifecycle.
 
-## Performance comparison
-
-In the recorded one-tool run, both hooks registered once per description change and
-never on unrelated updates. `usewebmcp` and `@mcp-b/react-webmcp` each committed
-one render per description change and two per sequential call. The
-[benchmark README](https://github.com/WebMCP-org/npm-packages/tree/main/benchmarks/react-hooks)
-has the comparison, method, and commands to run it.
-
-## Feature comparison
-
-| Feature                         | `usewebmcp` | `@mcp-b/react-webmcp` | MCP Cat | Google    |
-| ------------------------------- | ----------- | --------------------- | ------- | --------- |
-| Hook bundle (gzip)              | 1.7 kB      | 2.1 kB                | 24.2 kB | 0.7 kB    |
-| Schema validation               | Handler     | Standard Schema       | Zod     | Manual    |
-| Registration errors             | Yes         | Yes                   | Yes     | Sync only |
-| Running, result & error state   | Yes         | Yes                   | Yes     | No        |
-| Call tools from React           | Yes         | Yes                   | Yes     | No        |
-| Automatic MCP result formatting | No          | Yes                   | No      | Yes       |
-| Prompt & resource hooks         | No          | Yes                   | No      | No        |
-
-Bundle sizes exclude React and include built-in dependencies. App validators and runtimes are extra.
-
-All four accept JSON Schema. Compared: our PR #329, [MCP Cat 1.1.0](https://www.npmjs.com/package/webmcp-react/v/1.1.0), and [Google 0.2.0](https://www.npmjs.com/package/use-webmcp-tool/v/0.2.0).
-
 ## Package boundary
 
 The hook uses Community Group [types](https://github.com/webmachinelearning/webmcp-types)
 and accepts upstream JSON Schema metadata without runtime validation. Supply native WebMCP, the
 [polyfill](/packages/webmcp-polyfill/overview), or [MCP-B runtime](/packages/global/overview).
-React 18/19 and `'use client'` are supported. For Standard Schema validation, MCP output metadata,
-or formatted agent responses, use [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference).
+React 18/19 and `'use client'` are supported. The hook rejects Standard Schema validators such as
+Zod. For Standard Schema validation, MCP output metadata, prompts, resources, or formatted agent
+responses, use [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference).
 
 [Framework setup](/how-to/frameworks) · [API reference](/packages/usewebmcp/reference) ·
 [Schema guide](/how-to/use-schemas-and-structured-output)

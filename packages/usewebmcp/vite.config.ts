@@ -32,7 +32,7 @@ export default defineConfig({
     tsconfig: './tsconfig.json',
   },
   test: {
-    // Use browser mode for real DOM, React rendering, and navigator testing
+    // Use browser mode for real DOM and React rendering
     browser: {
       enabled: true,
       provider: playwright({

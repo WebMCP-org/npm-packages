@@ -7,9 +7,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const upstreamTypesVersion = JSON.parse(
-  readFileSync(join(root, 'packages/usewebmcp/package.json'), 'utf8')
-).dependencies['webmcp-types'];
+const upstreamTypesVersion =
+  /^ {2}packages\/usewebmcp:\n(?: {4}.*\n)*? {6}webmcp-types:\n {8}specifier: .*\n {8}version: (\S+)$/mu.exec(
+    readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8')
+  )?.[1];
+assert(upstreamTypesVersion, 'pnpm-lock.yaml must resolve webmcp-types for usewebmcp');
 const temporary = mkdtempSync(join(tmpdir(), 'webmcp-react-packages-'));
 const run = (command, args, cwd = root) => {
   try {
@@ -57,9 +59,12 @@ try {
         ),
         'Core hooks must not install MCP-B or MCP SDK packages'
       );
-      const declarations = run('tar', ['-xOf', filename, 'package/dist/index.d.ts']);
+      const declarationFiles = run('tar', ['-tf', filename])
+        .split('\n')
+        .filter((path) => path.endsWith('.d.ts'));
+      const declarations = run('tar', ['-xOf', filename, ...declarationFiles]);
       assert(
-        !/@mcp-b\/|@modelcontextprotocol\//u.test(declarations),
+        !/(?:from|import)\s*\(?\s*["'](?:@mcp-b|@modelcontextprotocol)\//u.test(declarations),
         'Core declarations must be standalone'
       );
     }
@@ -95,7 +100,7 @@ try {
           private: true,
           type: 'module',
           dependencies,
-          pnpm: { overrides: tarballs },
+          pnpm: { overrides: { ...tarballs, 'webmcp-types': upstreamTypesVersion } },
         },
         null,
         2
