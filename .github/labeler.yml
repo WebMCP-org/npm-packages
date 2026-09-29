@@ -39,6 +39,10 @@ packages/webmcp-polyfill:
   - changed-files:
       - any-glob-to-any-file: 'packages/webmcp-polyfill/**'
 
+packages/webmcp-types:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/webmcp-types/**'
+
 # Category labels
 documentation:
   - changed-files:

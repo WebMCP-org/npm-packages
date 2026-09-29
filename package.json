@@ -45,10 +45,11 @@
     "test:unit:coverage": "pnpm test:unit:scripts && pnpm test:unit:packages:coverage && pnpm test:hooks:coverage",
     "test:unit:packages": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/landing-page' --filter '!mcp-e2e-tests' --filter '!mcp-tab-transport-test-app' --filter '!usewebmcp' --filter '!@mcp-b/react-webmcp' run test",
     "test:unit:packages:coverage": "pnpm --filter @mcp-b/documentation-website test && pnpm -r --filter './packages/**' --filter '!usewebmcp' --filter '!@mcp-b/react-webmcp' run test:coverage",
-    "test:unit:scripts": "node --test scripts/*.test.mjs",
+    "test:unit:scripts": "node --test scripts/*.test.mjs tools/oxlint/anti-slop/rules/*.test.ts",
     "test:wpt": "pnpm --filter @mcp-b/webmcp-polyfill build && node ./scripts/run-webmcp-wpt.mjs",
     "test:wpt:idl": "pnpm --filter @mcp-b/webmcp-polyfill build && node ./scripts/run-webmcp-wpt.mjs --idl",
-    "typecheck": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/landing-page' run typecheck",
+    "typecheck": "pnpm -r --filter '!@mcp-b/example-*' --filter '!@mcp-b/landing-page' run typecheck && pnpm typecheck:tools",
+    "typecheck:tools": "tsc -p tools/oxlint",
     "validate:docs": "pnpm --filter @mcp-b/documentation-website validate",
     "validate:publish": "node ./scripts/validate-publish.js"
   },
@@ -60,10 +61,11 @@
     "jiti": "^2.6.1",
     "oxlint": "catalog:",
     "syncpack": "^13.0.0",
+    "typescript": "catalog:",
     "vite-plus": "catalog:"
   },
   "engines": {
-    "node": ">=22.12",
+    "node": ">=22.18",
     "pnpm": "^10"
   },
   "packageManager": "pnpm@10.14.0",

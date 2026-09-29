@@ -17,6 +17,7 @@ function collectInferTypeParameterNames(
 	names: Set<string>,
 ): void {
 	if (node.type === "TSInferType") names.add(node.typeParameter.name.name);
+	// oxlint-disable-next-line anti-slop/no-chained-type-assertions, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion -- visitor keys name AST properties that ESTree types do not index
 	const record = node as unknown as Readonly<Record<string, unknown>>;
 	for (const key of visitorKeys[node.type] ?? []) {
 		const value = record[key];

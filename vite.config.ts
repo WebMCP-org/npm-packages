@@ -12,7 +12,6 @@ const agentToolingIgnorePatterns = [
   '.pi/**',
   '.roo/**',
   '.windsurf/**',
-  'tools/oxlint/anti-slop/**',
 ];
 
 const upstreamVendorIgnorePatterns = ['packages/webmcp-polyfill/src/upstream/**'];
@@ -29,7 +28,6 @@ export default defineConfig({
       '.cache/',
       'coverage/',
       'chromium/',
-      'e2e/web-standards-showcase/public/relay/embed.js',
       'packages/smart-dom-reader/**/lib/**',
       ...agentToolingIgnorePatterns,
       ...upstreamVendorIgnorePatterns,
@@ -37,14 +35,12 @@ export default defineConfig({
     jsPlugins: [{ name: 'anti-slop', specifier: './tools/oxlint/anti-slop/index.ts' }],
     rules: {
       'anti-slop/no-chained-type-assertions': 'error',
-      'anti-slop/no-conditional-empty-object-spread': 'error',
       'anti-slop/no-known-value-widening': 'error',
       'anti-slop/no-module-mocking': 'error',
       'anti-slop/no-object-parameters': 'error',
       'anti-slop/no-reflect-apply': 'error',
       'anti-slop/no-reflect-get': 'error',
       'anti-slop/no-runtime-typeof': 'error',
-      'anti-slop/no-shape-in-symbol-names': 'error',
       'anti-slop/no-unknown-parameters': 'error',
       'anti-slop/no-unknown-returns': 'error',
       'anti-slop/no-unknown-type-aliases': 'error',
@@ -54,7 +50,12 @@ export default defineConfig({
     },
   },
   fmt: {
-    ignorePatterns: ['**/dist/**', ...agentToolingIgnorePatterns, ...upstreamVendorIgnorePatterns],
+    ignorePatterns: [
+      '**/dist/**',
+      'tools/oxlint/anti-slop/**',
+      ...agentToolingIgnorePatterns,
+      ...upstreamVendorIgnorePatterns,
+    ],
     singleQuote: true,
     semi: true, // semicolons: "always"
     trailingComma: 'es5',

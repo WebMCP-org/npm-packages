@@ -37,7 +37,6 @@
     "radix-ui": "^1.6.7",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "svg-dotted-map": "^2.1.0",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.3",
     "three": "^0.185.1",

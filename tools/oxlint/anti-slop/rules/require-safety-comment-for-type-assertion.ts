@@ -5,6 +5,7 @@ import type { ESTree, SourceCode } from "@oxlint/plugins";
 type TypeAssertion = ESTree.TSAsExpression | ESTree.TSTypeAssertion;
 
 const commentOwnerKinds = new Set([
+  "ExportNamedDeclaration",
   "ExpressionStatement",
   "PropertyDefinition",
   "ReturnStatement",
@@ -30,7 +31,12 @@ function hasSafetyComment(sourceCode: SourceCode, node: TypeAssertion): boolean 
     ) {
       return true;
     }
-    if (commentOwnerKinds.has(current.type) || current.parent.type === "Program") return false;
+    if (
+      (commentOwnerKinds.has(current.type) && current.parent.type !== "ExportNamedDeclaration") ||
+      current.parent.type === "Program"
+    ) {
+      return false;
+    }
     current = current.parent;
   }
 }

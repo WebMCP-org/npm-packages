@@ -40,9 +40,6 @@ lerna-debug.log*
 coverage
 .nyc_output
 
-# React hook benchmark output
-benchmarks/react-hooks/production-results.json
-benchmarks/react-hooks/bundle-results.json
 
 # Misc
 .cache
