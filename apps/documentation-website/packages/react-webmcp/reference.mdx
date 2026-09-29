@@ -77,7 +77,7 @@ This hook wraps [`usewebmcp`](/packages/usewebmcp/reference) with Standard Schem
 validation, MCP annotations, output-schema inference, and automatic text/`structuredContent`
 response formatting. Registration lifecycle, cancellation, `enabled`, `exposedTo`, and execution
 state use the core hook.
-The published entry point preserves `'use client'` and supports React 18/19 server rendering.
+The published entry point preserves `'use client'`; server rendering is tested on React 19.
 
 | Field                     | Type                                     | Required | Description                      |
 | ------------------------- | ---------------------------------------- | -------- | -------------------------------- |
@@ -94,7 +94,8 @@ The published entry point preserves `'use client'` and supports React 18/19 serv
 Tool hooks no longer return `isRegistered`; use the runtime’s `getTools()` for confirmed discovery.
 
 Agent failures default to `{ content: [{ type: "text", text: error.message }], isError: true }`.
-`formatError` overrides this response. Both formatters may be async and are awaited. Local failures
+`formatError` overrides this response. A handler that returns `undefined` yields a success response
+whose text is `undefined`; `formatOutput` overrides that. Both formatters may be async and are awaited. Local failures
 and cancellation always reject. `state.error` retains execution failures separately
 from `registrationError`. Core-hook behavior is in the [usewebmcp reference](/packages/usewebmcp/reference).
 
@@ -238,7 +239,7 @@ object to change its contents; equivalent serialized contents do not refresh reg
 The hook checks output JSON serializability; the official MCP server enforces the output schema
 on MCP client calls. Local calls, direct browser execution, and native mirrors bypass that validation.
 
-The tool hook forwards plain JSON metadata and keeps the supplied vendor validator in its callback, so the MCP SDK does not apply those transforms twice. The [SDK schema adapter](/packages/webmcp-ts-sdk/reference#schema-boundary) converts metadata for direct MCP server registrations. The [schema guide](/how-to/use-schemas-and-structured-output) shows validation outside React.
+The tool hook registers plain JSON metadata and keeps the supplied vendor validator in its callback, so the MCP server checks the JSON Schema and the validator runs once, on every path. The [SDK schema adapter](/packages/webmcp-ts-sdk/reference#schema-boundary) converts metadata for direct MCP server registrations. The [schema guide](/how-to/use-schemas-and-structured-output) shows validation outside React.
 
 ## Exported types
 

@@ -2,34 +2,22 @@
 
 import { useMemo, type DependencyList } from 'react';
 import {
+  isMcpStandardSchema,
   normalizeInputSchema,
   normalizeToolResponse,
   type ToolInputSchema,
 } from '@mcp-b/webmcp-ts-sdk/schema';
 import type { InputSchema, JsonSchemaForInference } from '@mcp-b/webmcp-ts-sdk';
-import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { useWebMCPWithAdapter, type WebMCPAdapter } from 'usewebmcp/internal';
 import type { WebMCPConfig as CoreWebMCPConfig } from 'usewebmcp';
 import type { InferOutput, InferValidatedToolInput, WebMCPConfig, WebMCPReturn } from './types.js';
-
-function isStandardSchema(schema: ToolInputSchema): schema is ToolInputSchema & StandardSchemaV1 {
-  const standard = '~standard' in schema ? schema['~standard'] : undefined;
-  return (
-    typeof standard === 'object' &&
-    standard !== null &&
-    'version' in standard &&
-    standard.version === 1 &&
-    'validate' in standard &&
-    typeof standard.validate === 'function'
-  );
-}
 
 async function validateInput<T extends ToolInputSchema>(
   schema: T | undefined,
   input: unknown
 ): Promise<InferValidatedToolInput<T>> {
-  if (!schema || !isStandardSchema(schema)) {
-    // SAFETY: the registered JSON Schema validates agent calls; local callers use InferToolInput.
+  if (!schema || !isMcpStandardSchema(schema)) {
+    // SAFETY: plain JSON Schema carries no validator; MCP checks it on the wire and local callers type their input.
     return input as InferValidatedToolInput<T>;
   }
 
@@ -51,10 +39,12 @@ export function useWebMCP<
   const input = useMemo<{ schema: InputSchema | undefined; error: Error | undefined }>(() => {
     try {
       return {
+        // The copy drops the validator normalizeInputSchema hides on the schema, so the MCP
+        // server registers plain JSON Schema and only this hook runs the validator.
         schema:
           config.inputSchema === undefined
             ? undefined
-            : normalizeInputSchema(config.inputSchema).inputSchema,
+            : { ...normalizeInputSchema(config.inputSchema).inputSchema },
         error: undefined,
       };
     } catch (error) {

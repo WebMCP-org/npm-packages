@@ -1,53 +1,23 @@
-import { initializeWebModelContext } from '@mcp-b/global';
+import '@mcp-b/global';
+import type { CallToolResult, WebMCP } from '@mcp-b/webmcp-ts-sdk';
 import { CallToolResultSchema } from '@modelcontextprotocol/core';
-import type { BrowserMcpServer, CallToolResult, ModelContext } from '@mcp-b/webmcp-ts-sdk';
 import { Suspense, createElement } from 'react';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { useWebMCPContext } from './useWebMCPContext.js';
 
-const TEST_CHANNEL_ID = `useWebMCPContext-browser-${Date.now()}`;
-
-type ExecutableModelContext = Omit<ModelContext, 'executeTool'> &
-  Pick<BrowserMcpServer, 'executeTool'>;
-
-function hasDescriptorExecution(context: ModelContext): context is ExecutableModelContext {
-  return 'executeTool' in context && typeof context.executeTool === 'function';
+function modelContext(): WebMCP.ModelContext {
+  if (!document.modelContext) throw new Error('document.modelContext is unavailable');
+  return document.modelContext;
 }
 
 async function executeRegisteredTool(name: string): Promise<CallToolResult> {
-  const modelContext = document.modelContext;
-  if (!hasDescriptorExecution(modelContext)) {
-    throw new Error('Chrome descriptor execution is unavailable');
-  }
-
-  const tool = (await modelContext.getTools()).find((candidate) => candidate.name === name);
-  if (!tool) {
-    throw new Error(`Tool not found: ${name}`);
-  }
-
-  const serialized = await modelContext.executeTool(tool, {});
-  if (serialized === null) {
-    throw new Error(`Tool execution was interrupted: ${name}`);
-  }
-
-  return CallToolResultSchema.parse(JSON.parse(serialized));
+  const tool = (await modelContext().getTools()).find((candidate) => candidate.name === name);
+  if (!tool) throw new Error(`Tool not found: ${name}`);
+  return CallToolResultSchema.parse(JSON.parse(await modelContext().executeTool(tool, {})));
 }
 
 describe('useWebMCPContext in a browser runtime', () => {
-  beforeAll(() => {
-    if (!document.modelContext) {
-      initializeWebModelContext({
-        transport: {
-          tabServer: {
-            channelId: TEST_CHANNEL_ID,
-            allowedOrigins: [window.location.origin],
-          },
-        },
-      });
-    }
-  });
-
   it('registers, normalizes, and unregisters a context tool', async () => {
     const hook = await renderHook(() =>
       useWebMCPContext('context_user', 'Get the current user', () => ({
@@ -56,7 +26,7 @@ describe('useWebMCPContext in a browser runtime', () => {
       }))
     );
 
-    expect(await document.modelContext.getTools()).toMatchObject([
+    expect(await modelContext().getTools()).toMatchObject([
       {
         name: 'context_user',
         description: 'Get the current user',
@@ -71,12 +41,13 @@ describe('useWebMCPContext in a browser runtime', () => {
     expect(response.structuredContent).toEqual({ id: 'user-1', role: 'admin' });
 
     await hook.unmount();
-    expect(await document.modelContext.getTools()).toEqual([]);
+    expect(await modelContext().getTools()).toEqual([]);
   });
 
   it('uses the latest getter and exposes the canonical execution state', async () => {
     const hook = await renderHook(
-      ({ value }) => useWebMCPContext('context_latest', 'Get latest value', () => value),
+      ({ value }: { value: string } = { value: 'first' }) =>
+        useWebMCPContext('context_latest', 'Get latest value', () => value),
       { initialProps: { value: 'first' } }
     );
 
@@ -112,8 +83,8 @@ describe('useWebMCPContext in a browser runtime', () => {
   it('keeps the committed getter while a newer render is suspended', async () => {
     const pending = new Promise<never>(() => {});
 
-    const hook = await renderHook(
-      ({ value, suspend }: { value: string; suspend?: boolean }) => {
+    const hook = await renderHook<{ value: string; suspend?: boolean }, void>(
+      ({ value, suspend } = { value: 'committed' }) => {
         useWebMCPContext('context_committed', 'Get committed value', () => value);
 
         if (suspend) {

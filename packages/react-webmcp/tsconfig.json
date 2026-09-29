@@ -4,6 +4,7 @@
     "outDir": "./dist",
     "types": ["node"]
   },
+  "files": ["node_modules/vitest/dist/@vitest/browser/matchers.d.ts"],
   "include": ["src/**/*", "vite.config.ts"],
-  "exclude": ["node_modules", "dist", "**/*.test.*", "**/*.spec.*"]
+  "exclude": ["node_modules", "dist"]
 }

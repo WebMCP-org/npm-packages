@@ -1,10 +1,8 @@
-import { initializeWebModelContext } from '@mcp-b/global';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import '@mcp-b/global';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { getBrowserMcpServer } from './model-context.js';
 import { useWebMCPPrompt } from './useWebMCPPrompt.js';
-
-const TEST_CHANNEL_ID = `useWebMCPPrompt-browser-${Date.now()}`;
 
 function modelContext() {
   const context = getBrowserMcpServer();
@@ -15,19 +13,6 @@ function modelContext() {
 }
 
 describe('useWebMCPPrompt in a browser runtime', () => {
-  beforeAll(() => {
-    if (!document.modelContext) {
-      initializeWebModelContext({
-        transport: {
-          tabServer: {
-            channelId: TEST_CHANNEL_ID,
-            allowedOrigins: [window.location.origin],
-          },
-        },
-      });
-    }
-  });
-
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -107,7 +92,12 @@ describe('useWebMCPPrompt in a browser runtime', () => {
       .spyOn(modelContext(), 'registerPrompt')
       .mockReturnValue({ unregister });
     const hook = await renderHook(
-      ({ description, version }) =>
+      (
+        { description, version }: { description: string; version: string } = {
+          description: 'First description',
+          version: 'first',
+        }
+      ) =>
         useWebMCPPrompt({
           name: 'latest_prompt',
           description,
@@ -165,7 +155,7 @@ describe('useWebMCPPrompt in a browser runtime', () => {
       .spyOn(modelContext(), 'registerPrompt')
       .mockReturnValue({ unregister });
     const hook = await renderHook(
-      ({ version }: { version: string }) =>
+      ({ version }: { version: string } = { version: 'first' }) =>
         useWebMCPPrompt({
           name: 'inline_schema_prompt',
           description: 'Review source code',

@@ -263,7 +263,7 @@ it('toggles resource templates through the same enabled option', async () => {
   expect((await client.listResourceTemplates()).resourceTemplates).toEqual([]);
 });
 
-it('forwards context enabled options with bounded commits and stable local controls', async () => {
+it('forwards context enabled options with one commit per update and stable local controls', async () => {
   const register = vi.spyOn(server, 'registerTool');
   const warn = vi.spyOn(console, 'warn');
   const onRender = vi.fn();
@@ -291,7 +291,6 @@ it('forwards context enabled options with bounded commits and stable local contr
     await hook.rerender({ enabled, value: 'latest' });
     expect(hook.result.current.registrationError).toBeNull();
     expect((await client.listTools()).tools).toHaveLength(enabled ? 1 : 0);
-    expect(onRender).toHaveBeenCalled();
     expect(onRender).toHaveBeenCalledTimes(1); // The requested parent update only.
     expect(hook.result.current.state).toBe(state);
     expect(hook.result.current.execute).toBe(execute);

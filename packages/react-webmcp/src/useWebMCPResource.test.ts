@@ -1,10 +1,8 @@
-import { initializeWebModelContext } from '@mcp-b/global';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import '@mcp-b/global';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { getBrowserMcpServer } from './model-context.js';
 import { useWebMCPResource } from './useWebMCPResource.js';
-
-const TEST_CHANNEL_ID = `useWebMCPResource-browser-${Date.now()}`;
 
 function modelContext() {
   const context = getBrowserMcpServer();
@@ -15,19 +13,6 @@ function modelContext() {
 }
 
 describe('useWebMCPResource in a browser runtime', () => {
-  beforeAll(() => {
-    if (!document.modelContext) {
-      initializeWebModelContext({
-        transport: {
-          tabServer: {
-            channelId: TEST_CHANNEL_ID,
-            allowedOrigins: [window.location.origin],
-          },
-        },
-      });
-    }
-  });
-
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -84,7 +69,12 @@ describe('useWebMCPResource in a browser runtime', () => {
       .spyOn(modelContext(), 'registerResource')
       .mockReturnValue({ unregister });
     const hook = await renderHook(
-      ({ name, version }) =>
+      (
+        { name, version }: { name: string; version: string } = {
+          name: 'First name',
+          version: 'first',
+        }
+      ) =>
         useWebMCPResource({
           uri: 'data://latest',
           name,

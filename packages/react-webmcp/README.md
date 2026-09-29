@@ -54,16 +54,13 @@ Native WebMCP and the standalone polyfill do not advertise MCP `outputSchema` me
 Use `usewebmcp` for raw browser tools. This package adds MCP responses, prompts, resources,
 and client hooks. Both share registration, execution state, and cancellation.
 
-[Performance comparison](https://docs.mcp-b.ai/packages/usewebmcp/overview#performance-comparison) ·
-[Feature matrix](https://docs.mcp-b.ai/packages/usewebmcp/overview#feature-comparison)
-
 ## Schemas and results
 
-- The hook calls your schema's converter and supplied validator, including async transforms. It ships no validator.
+- The hook calls your schema's converter once and runs its validator before every handler call (local, `executeTool`, and MCP), including async transforms. It ships no validator.
 - Plain JSON Schema supplies metadata and inference only. Reuse immutable schemas to cache conversion and serialization.
-- `outputSchema` types the result. The MCP server validates it on MCP calls; local and native calls bypass that validation.
+- `outputSchema` types the result. The MCP server validates it on MCP calls; local and native calls bypass that validation. When that check fails, the MCP client receives an error while `state` records the success.
 - Local execution and React state retain your value. Agent calls receive MCP formatting; `formatOutput` can override it.
-- `formatError` defaults to an MCP response with `isError: true`. Async formatters are awaited; local failures and cancellation always reject.
+- `formatError` defaults to an MCP response with `isError: true` whose text is `error.message`. Async formatters are awaited; local failures and cancellation always reject. A handler that returns `undefined` yields the text `undefined`.
 
 [Input example](#mcp-breact-webmcp) ·
 [Schema guide](https://docs.mcp-b.ai/how-to/use-schemas-and-structured-output) ·
@@ -114,7 +111,7 @@ The tool hook returns `state`, `execute`, `reset`, `isSupported`, and `registrat
 Use the runtime’s `getTools()` to confirm registration; `isSupported` only reports API availability.
 Prompt and resource hooks retain `isRegistered`.
 Use `enabled: false` to unregister, and the handler's `{ signal }` for cancellation.
-React 18/19, SSR, StrictMode, and `'use client'` are supported.
+`'use client'` is preserved; server rendering and StrictMode are tested on React 19, and React 18 is in the peer range.
 
 [Lifecycle reference](https://docs.mcp-b.ai/packages/usewebmcp/reference) ·
 [Declarative form attributes](https://docs.mcp-b.ai/packages/react-webmcp/reference#declarative-form-attributes)

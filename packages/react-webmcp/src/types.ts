@@ -27,7 +27,7 @@ export type InferOutput<T extends JsonSchemaForInference | undefined = undefined
 
 export type InferToolInput<T extends ToolInputSchema> = T extends StandardJSONSchemaV1
   ? StandardJSONSchemaV1.InferInput<T>
-  : CoreInferToolInput<T>;
+  : CoreInferToolInput<Exclude<T, StandardJSONSchemaV1>>;
 
 export type InferValidatedToolInput<T extends ToolInputSchema> = T extends StandardSchemaV1
   ? StandardSchemaV1.InferOutput<T>

@@ -2,6 +2,10 @@ import { playwright } from 'vite-plus/test/browser-playwright';
 import { defineConfig } from 'vite-plus';
 
 const isCI = process.env.CI === 'true';
+const launchArgs = ['--disable-features=WebMCP'];
+const launchOptions = process.env.CHROME_BIN
+  ? { executablePath: process.env.CHROME_BIN, args: launchArgs }
+  : { args: launchArgs };
 
 export default defineConfig({
   pack: {
@@ -25,9 +29,7 @@ export default defineConfig({
     // Use browser mode for real DOM, React rendering, and navigator testing
     browser: {
       enabled: true,
-      provider: playwright({
-        launchOptions: process.env.CHROME_BIN ? { executablePath: process.env.CHROME_BIN } : {},
-      }),
+      provider: playwright({ launchOptions }),
       instances: [{ browser: 'chromium' }],
       headless: true,
     },

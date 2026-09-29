@@ -1,69 +1,58 @@
-import { initializeWebModelContext } from '@mcp-b/global';
+import { cleanupWebModelContext, initializeWebModelContext } from '@mcp-b/global';
+import { TabClientTransport } from '@mcp-b/transports';
+import type { CallToolResult, JsonObject, WebMCP } from '@mcp-b/webmcp-ts-sdk';
+import { Client } from '@modelcontextprotocol/client';
 import { CallToolResultSchema } from '@modelcontextprotocol/core';
-import type {
-  CallToolResult,
-  BrowserMcpServer,
-  JsonObject,
-  ModelContext,
-} from '@mcp-b/webmcp-ts-sdk';
 import { StrictMode, createElement } from 'react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { z } from 'zod';
 import { useWebMCP } from './useWebMCP.js';
 
-interface CircularOutput {
-  self?: CircularOutput;
-  ok?: boolean;
-}
+type CircularOutput = { self?: CircularOutput; ok?: boolean };
 
-const TEST_CHANNEL_ID = `usewebmcp-browser-${Date.now()}`;
+let client: Client;
 
-type ExecutableModelContext = Omit<ModelContext, 'executeTool'> &
-  Pick<BrowserMcpServer, 'executeTool'>;
-
-function hasDescriptorExecution(
-  context: ModelContext | undefined
-): context is ExecutableModelContext {
-  return context !== undefined && typeof context.executeTool === 'function';
-}
-
-async function executeRegisteredTool(name: string, args: JsonObject = {}): Promise<CallToolResult> {
-  const modelContext = document.modelContext;
-  if (!hasDescriptorExecution(modelContext)) {
-    throw new Error('Chrome descriptor execution is unavailable');
-  }
-
-  const tool = (await modelContext.getTools()).find((candidate) => candidate.name === name);
-  if (!tool) {
-    throw new Error(`Tool not found: ${name}`);
-  }
-
-  const serialized = await modelContext.executeTool(tool, args);
-  if (serialized === null) {
-    throw new Error(`Tool execution was interrupted: ${name}`);
-  }
-
-  return CallToolResultSchema.parse(JSON.parse(serialized));
+function modelContext(): WebMCP.ModelContext {
+  if (!document.modelContext) throw new Error('document.modelContext is unavailable');
+  return document.modelContext;
 }
 
 async function findTool(name: string) {
-  return (await document.modelContext.getTools()).find((tool) => tool.name === name);
+  return (await modelContext().getTools()).find((tool) => tool.name === name);
+}
+
+async function executeRegisteredTool(
+  name: string,
+  args: JsonObject = {},
+  options?: WebMCP.ModelContextExecuteToolOptions
+): Promise<CallToolResult> {
+  const tool = await findTool(name);
+  if (!tool) throw new Error(`Tool not found: ${name}`);
+  const serialized = await modelContext().executeTool(tool, args, options);
+  return CallToolResultSchema.parse(JSON.parse(serialized));
 }
 
 describe('useWebMCP in a browser runtime', () => {
-  beforeAll(() => {
-    if (!document.modelContext) {
-      initializeWebModelContext({
-        transport: {
-          tabServer: {
-            channelId: TEST_CHANNEL_ID,
-            allowedOrigins: [window.location.origin],
-          },
-        },
-      });
-    }
+  beforeAll(async () => {
+    cleanupWebModelContext();
+    const channelId = `usewebmcp-${crypto.randomUUID()}`;
+    initializeWebModelContext({
+      transport: {
+        iframeServer: false,
+        tabServer: { channelId, allowedOrigins: [window.location.origin] },
+      },
+    });
+    client = new Client(
+      { name: 'usewebmcp-test-client', version: '1.0.0' },
+      { versionNegotiation: { mode: 'auto' } }
+    );
+    await client.connect(
+      new TabClientTransport({ channelId, targetOrigin: window.location.origin })
+    );
   });
+
+  afterAll(() => client.close());
 
   afterEach(() => vi.restoreAllMocks());
 
@@ -156,7 +145,6 @@ describe('useWebMCP in a browser runtime', () => {
   it.each(['default', 'custom'] as const)(
     'formats agent failures as MCP errors while local calls reject (%s)',
     async (formatter) => {
-      const register = vi.spyOn(document.modelContext, 'registerTool');
       const failure = new Error('Handler failed');
       const formatError =
         formatter === 'custom'
@@ -175,11 +163,9 @@ describe('useWebMCP in a browser runtime', () => {
           },
         })
       );
-      const tool = register.mock.calls.find(([tool]) => tool.name === 'mcp_agent_failure')?.[0];
-      if (!tool) throw new Error('Tool was not registered');
 
       await hook.act(async () => {
-        await expect(tool.execute({}, { signal: new AbortController().signal })).resolves.toEqual({
+        expect(await executeRegisteredTool('mcp_agent_failure')).toEqual({
           content: [
             { type: 'text', text: `${formatter === 'custom' ? 'Custom: ' : ''}Handler failed` },
           ],
@@ -198,7 +184,6 @@ describe('useWebMCP in a browser runtime', () => {
   );
 
   it('formats Standard Schema failures before the handler runs', async () => {
-    const register = vi.spyOn(document.modelContext, 'registerTool');
     const execute = vi.fn(() => 'unexpected');
     const hook = await renderHook(() =>
       useWebMCP({
@@ -208,13 +193,9 @@ describe('useWebMCP in a browser runtime', () => {
         execute,
       })
     );
-    const tool = register.mock.calls.find(([tool]) => tool.name === 'mcp_validation_failure')?.[0];
-    if (!tool) throw new Error('Tool was not registered');
 
     await hook.act(async () => {
-      await expect(
-        tool.execute({ count: 'invalid' }, { signal: new AbortController().signal })
-      ).resolves.toEqual({
+      expect(await executeRegisteredTool('mcp_validation_failure', { count: 'invalid' })).toEqual({
         content: [{ type: 'text', text: 'Invalid tool input: Use digits' }],
         isError: true,
       });
@@ -230,34 +211,41 @@ describe('useWebMCP in a browser runtime', () => {
   });
 
   it('keeps cancelled agent calls rejected instead of formatting an MCP error', async () => {
-    const register = vi.spyOn(document.modelContext, 'registerTool');
     const started = Promise.withResolvers<void>();
+    const formatError = vi.fn((error: Error) => error.message);
     const hook = await renderHook(() =>
       useWebMCP({
         name: 'mcp_agent_cancellation',
         description: 'Preserves cancellation through error formatting',
+        formatError,
         execute: () => {
           started.resolve();
           return new Promise<never>(() => {});
         },
       })
     );
-    const tool = register.mock.calls.find(([tool]) => tool.name === 'mcp_agent_cancellation')?.[0];
-    if (!tool) throw new Error('Tool was not registered');
     const controller = new AbortController();
     const reason = new Error('Cancelled');
 
     await hook.act(async () => {
-      const execution = tool.execute({}, { signal: controller.signal });
+      const execution = executeRegisteredTool(
+        'mcp_agent_cancellation',
+        {},
+        {
+          signal: controller.signal,
+        }
+      );
       const rejection = expect(execution).rejects.toBe(reason);
       await started.promise;
       controller.abort(reason);
       await rejection;
     });
-    expect(hook.result.current.state).toEqual({
+    // The runtime rejects the caller first, then aborts the callback with its own AbortError.
+    await vi.waitFor(() => expect(hook.result.current.state.error?.name).toBe('AbortError'));
+    expect(formatError).not.toHaveBeenCalled();
+    expect(hook.result.current.state).toMatchObject({
       isExecuting: false,
       lastResult: null,
-      error: reason,
       executionCount: 0,
     });
   });
@@ -294,10 +282,23 @@ describe('useWebMCP in a browser runtime', () => {
     expect(rawResponse?.structuredContent).toEqual({ ready: true });
   });
 
+  it('sends a void result to agents as text', async () => {
+    const hook = await renderHook(() =>
+      useWebMCP({ name: 'browser_void', description: 'Returns nothing', execute: () => {} })
+    );
+
+    await hook.act(async () => {
+      expect(await executeRegisteredTool('browser_void')).toEqual({
+        content: [{ type: 'text', text: 'undefined' }],
+        isError: false,
+      });
+    });
+  });
+
   it('uses the latest implementation without re-registering the descriptor', async () => {
-    const registerTool = vi.spyOn(document.modelContext, 'registerTool');
+    const registerTool = vi.spyOn(modelContext(), 'registerTool');
     const { act, rerender, unmount } = await renderHook(
-      ({ version }) =>
+      ({ version }: { version: string } = { version: 'first' }) =>
         useWebMCP({
           name: 'browser_latest_execute',
           description: 'Uses the latest closure',
@@ -325,14 +326,15 @@ describe('useWebMCP in a browser runtime', () => {
   it.each(['output', 'error'] as const)(
     'uses the call-start %s formatter across a configuration update',
     async (stage) => {
+      const name = `mcp_snapshot_${stage}`;
       const firstResult = Promise.withResolvers<string>();
       const started = Promise.withResolvers<void>();
       const failure = new Error('Handler failed');
-      const register = vi.spyOn(document.modelContext, 'registerTool');
+      const register = vi.spyOn(modelContext(), 'registerTool');
       const hook = await renderHook(
-        ({ revision }) =>
+        ({ revision }: { revision: string } = { revision: 'A' }) =>
           useWebMCP({
-            name: `mcp_snapshot_${stage}`,
+            name,
             description: 'Keeps each execution and formatter paired',
             execute: () => {
               if (revision === 'A') {
@@ -347,25 +349,26 @@ describe('useWebMCP in a browser runtime', () => {
           }),
         { initialProps: { revision: 'A' } }
       );
-      const tool = register.mock.calls.find(([tool]) => tool.name === `mcp_snapshot_${stage}`)?.[0];
+      const tool = await findTool(name);
       if (!tool) throw new Error('Tool was not registered');
-      const signal = new AbortController().signal;
-      let first!: Promise<unknown>;
+      let first!: Promise<string>;
       await hook.act(async () => {
-        first = Promise.resolve(tool.execute({}, { signal }));
+        first = modelContext().executeTool(tool, {});
         await started.promise;
       });
 
       await hook.rerender({ revision: 'B' });
-      expect(
-        register.mock.calls.filter(([registered]) => registered.name === `mcp_snapshot_${stage}`)
-      ).toHaveLength(1);
+      expect(register.mock.calls.filter(([registered]) => registered.name === name)).toHaveLength(
+        1
+      );
       await hook.act(async () => {
         if (stage === 'output') firstResult.resolve('first');
         else firstResult.reject(failure);
-        await expect(first).resolves.toBe(stage === 'output' ? 'A:first' : 'A:Handler failed');
-        await expect(tool.execute({}, { signal })).resolves.toBe(
-          stage === 'output' ? 'B:next' : 'B:Handler failed'
+        await expect(first).resolves.toBe(
+          JSON.stringify(stage === 'output' ? 'A:first' : 'A:Handler failed')
+        );
+        await expect(modelContext().executeTool(tool, {})).resolves.toBe(
+          JSON.stringify(stage === 'output' ? 'B:next' : 'B:Handler failed')
         );
       });
     }
@@ -397,28 +400,41 @@ describe('useWebMCP in a browser runtime', () => {
       required: ['query'],
     });
   });
-  it('validates and transforms input once while preserving MCP output metadata', async () => {
-    const inputSchema = z.object({ count: z.string().transform(Number) });
+
+  it('validates and transforms Standard Schema input once for MCP clients and executeTool', async () => {
+    const inputSchema = z.object({
+      count: z.string().regex(/^\d+$/, 'Use digits').transform(Number),
+      limit: z.number().default(10),
+    });
     const validate = vi.spyOn(inputSchema['~standard'], 'validate');
+    const received: number[] = [];
     const hook = await renderHook(() =>
       useWebMCP({
-        name: 'mcp_validated',
-        description: 'Validates MCP input',
+        name: 'mcp_transformed',
+        description: 'Adds a numeric count to a limit',
         inputSchema,
         outputSchema: {
           type: 'object',
           properties: { total: { type: 'number' } },
           required: ['total'],
         },
-        execute: ({ count }) => ({ total: count + 1 }),
+        execute: ({ count, limit }) => {
+          received.push(count);
+          return { total: count + limit };
+        },
       })
     );
+
     await hook.act(async () => {
-      expect(await executeRegisteredTool('mcp_validated', { count: '2' })).toMatchObject({
-        structuredContent: { total: 3 },
+      expect(
+        await client.callTool({ name: 'mcp_transformed', arguments: { count: '2' } })
+      ).toMatchObject({ isError: false, structuredContent: { total: 12 } });
+      expect(await executeRegisteredTool('mcp_transformed', { count: '3' })).toMatchObject({
+        structuredContent: { total: 13 },
       });
     });
-    expect(validate).toHaveBeenCalledTimes(1);
-    expect(hook.result.current.state.lastResult).toEqual({ total: 3 });
+    expect(received).toEqual([2, 3]);
+    expect(validate).toHaveBeenCalledTimes(2);
+    expect(hook.result.current.state.lastResult).toEqual({ total: 13 });
   });
 });

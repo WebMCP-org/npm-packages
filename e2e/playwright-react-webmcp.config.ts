@@ -3,6 +3,7 @@ import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/te
 const chromiumChannel = process.env.PLAYWRIGHT_CHROMIUM_CHANNEL;
 const chromiumUse: NonNullable<PlaywrightTestConfig['use']> = {
   ...devices['Desktop Chrome'],
+  launchOptions: { args: ['--disable-features=WebMCP'] },
 };
 if (chromiumChannel) chromiumUse.channel = chromiumChannel;
 
