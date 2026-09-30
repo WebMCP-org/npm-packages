@@ -7,11 +7,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const upstreamTypesVersion =
-  /^ {2}packages\/usewebmcp:\n(?: {4}.*\n)*? {6}webmcp-types:\n {8}specifier: .*\n {8}version: (\S+)$/mu.exec(
-    readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8')
-  )?.[1];
-assert(upstreamTypesVersion, 'pnpm-lock.yaml must resolve webmcp-types for usewebmcp');
 const temporary = mkdtempSync(join(tmpdir(), 'webmcp-react-packages-'));
 const run = (command, args, cwd = root) => {
   try {
@@ -29,6 +24,10 @@ const run = (command, args, cwd = root) => {
 };
 
 try {
+  const [{ dependencies: installed }] = JSON.parse(
+    run('pnpm', ['--filter', 'usewebmcp', 'list', 'webmcp-types', '--json'])
+  );
+  const upstreamTypesVersion = installed['webmcp-types'].version;
   const tarballs = {};
   for (const directory of [
     'webmcp-types',
@@ -38,24 +37,20 @@ try {
     'react-webmcp',
   ]) {
     const cwd = join(root, 'packages', directory);
-    const manifest = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'));
-    const { filename } = JSON.parse(
+    const { name, filename } = JSON.parse(
       run('pnpm', ['pack', '--json', '--pack-destination', temporary], cwd)
     );
-    tarballs[manifest.name] = `file:${filename}`;
+    tarballs[name] = `file:${filename}`;
     if (directory === 'usewebmcp' || directory === 'react-webmcp') {
       const javascript = run('tar', ['-xOf', filename, 'package/dist/index.js']);
-      assert.match(
-        javascript,
-        /^(['"])use client\1;/u,
-        `${manifest.name}: missing client boundary`
-      );
+      assert.match(javascript, /^(['"])use client\1;/u, `${name}: missing client boundary`);
     }
     if (directory === 'usewebmcp') {
       const packed = JSON.parse(run('tar', ['-xOf', filename, 'package/package.json']));
       assert(
         Object.keys(packed.dependencies).every(
-          (name) => !name.startsWith('@mcp-b/') && !name.startsWith('@modelcontextprotocol/')
+          (dependency) =>
+            !dependency.startsWith('@mcp-b/') && !dependency.startsWith('@modelcontextprotocol/')
         ),
         'Core hooks must not install MCP-B or MCP SDK packages'
       );
@@ -95,16 +90,12 @@ try {
     }
     writeFileSync(
       join(consumer, 'package.json'),
-      JSON.stringify(
-        {
-          private: true,
-          type: 'module',
-          dependencies,
-          pnpm: { overrides: { ...tarballs, 'webmcp-types': upstreamTypesVersion } },
-        },
-        null,
-        2
-      )
+      JSON.stringify({
+        private: true,
+        type: 'module',
+        dependencies,
+        pnpm: { overrides: { ...tarballs, 'webmcp-types': upstreamTypesVersion } },
+      })
     );
     console.log(
       `Checking packed hooks with React ${version}${extended ? ' and MCP-B extensions' : ' (core only)'}`
@@ -116,23 +107,19 @@ try {
     );
     writeFileSync(
       join(consumer, 'tsconfig.json'),
-      JSON.stringify(
-        {
-          compilerOptions: {
-            target: 'ES2022',
-            module: 'ESNext',
-            moduleResolution: 'bundler',
-            lib: ['ES2024', 'DOM', 'DOM.Iterable'],
-            strict: true,
-            exactOptionalPropertyTypes: true,
-            skipLibCheck: false,
-            noEmit: true,
-          },
-          include: ['*.ts'],
+      JSON.stringify({
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'ESNext',
+          moduleResolution: 'bundler',
+          lib: ['ES2024', 'DOM', 'DOM.Iterable'],
+          strict: true,
+          exactOptionalPropertyTypes: true,
+          skipLibCheck: false,
+          noEmit: true,
         },
-        null,
-        2
-      )
+        include: ['*.ts'],
+      })
     );
     const coreTypes = readFileSync(
       join(root, 'packages/usewebmcp/type-tests/inference.test.ts'),

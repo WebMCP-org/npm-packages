@@ -110,8 +110,8 @@ loses its literal types, so each declared property becomes an optional `unknown`
   it instead of mutating it. Metadata changes refresh registration; equivalent
   serialized descriptors and unrelated renders reuse it. `deps` can force a refresh.
 - Stale registration failures no longer overwrite a replacement registration.
-- Production bundles preserve `'use client'`. The package checks type-check and
-  server-render the packed hooks with React 18 and 19; browser tests, including
-  StrictMode, run on React 19.
+- Production bundles preserve `'use client'`. The packed hooks are type-checked and
+  server-rendered with React 18 and 19; browser tests, including StrictMode, run on
+  React 19.
 - The new `usewebmcp/internal` entry serves `@mcp-b/react-webmcp`. It is not a
   stable API and can change in any release.

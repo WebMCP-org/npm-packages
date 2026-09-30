@@ -1,5 +1,5 @@
 import { createElement, StrictMode } from 'react';
-import { beforeAll, expect, it } from 'vitest';
+import { beforeAll, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { useWebMCP } from './index.js';
 
@@ -9,6 +9,16 @@ function requireNativeModelContext() {
     throw new Error('Run with Chrome Canary and WEBMCP_NATIVE=1');
   }
   return context;
+}
+
+async function registeredTool(name: string) {
+  const context = requireNativeModelContext();
+  const tool = await vi.waitFor(async () => {
+    const found = (await context.getTools()).find((candidate) => candidate.name === name);
+    if (!found) throw new Error(`${name} is not registered`);
+    return found;
+  });
+  return { context, tool };
 }
 
 beforeAll(() => {
@@ -36,21 +46,12 @@ it('registers, executes, and cleans up through native WebMCP in StrictMode', asy
       }),
     { wrapper: ({ children }) => createElement(StrictMode, null, children) }
   );
-  const context = requireNativeModelContext();
-  await hook.act(async () => {
-    await expect
-      .poll(async () => (await context.getTools()).some((tool) => tool.name === 'native_core'))
-      .toBe(true);
-  });
+  const { context, tool } = await registeredTool('native_core');
   expect(hook.result.current).not.toHaveProperty('isRegistered');
   expect(hook.result.current.registrationError).toBeNull();
-  const tools = (await context.getTools()).filter((tool) => tool.name === 'native_core');
-  expect(tools).toHaveLength(1);
-  const tool = tools[0];
-  if (!tool) throw new Error('Native tool is missing');
+  expect((await context.getTools()).filter((tool) => tool.name === 'native_core')).toHaveLength(1);
   await hook.act(async () => {
-    const response = await context.executeTool(tool, { count: 2 });
-    expect(response && JSON.parse(response)).toEqual({ total: 3 });
+    expect(JSON.parse(await context.executeTool(tool, { count: 2 }))).toEqual({ total: 3 });
   });
   await hook.act(async () => {
     await expect(context.executeTool(tool, { count: -1 })).rejects.toMatchObject({
@@ -76,14 +77,7 @@ it('forwards native cancellation to the handler and clears pending state', async
       },
     })
   );
-  const context = requireNativeModelContext();
-  await hook.act(async () => {
-    await expect
-      .poll(async () => (await context.getTools()).some((tool) => tool.name === 'native_cancelled'))
-      .toBe(true);
-  });
-  const tool = (await context.getTools()).find((tool) => tool.name === 'native_cancelled');
-  if (!tool) throw new Error('Native tool is missing');
+  const { context, tool } = await registeredTool('native_cancelled');
   const controller = new AbortController();
   await hook.act(async () => {
     const execution = context.executeTool(tool, {}, { signal: controller.signal });
@@ -102,13 +96,8 @@ it('returns an undefined result to native agents as null', async () => {
   const hook = await renderHook(() =>
     useWebMCP({ name: 'native_void', description: 'Returns nothing', execute: () => {} })
   );
-  const context = requireNativeModelContext();
+  const { context, tool } = await registeredTool('native_void');
   await hook.act(async () => {
-    await expect
-      .poll(async () => (await context.getTools()).some((tool) => tool.name === 'native_void'))
-      .toBe(true);
-    const tool = (await context.getTools()).find((tool) => tool.name === 'native_void');
-    if (!tool) throw new Error('Native tool is missing');
     await expect(context.executeTool(tool, {})).resolves.toBe('null');
   });
   expect(hook.result.current.state).toMatchObject({ error: null, executionCount: 1 });

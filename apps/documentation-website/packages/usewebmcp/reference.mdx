@@ -37,8 +37,7 @@ React 18 and 19 are supported. The published entry point preserves `'use client'
 | `isSupported`              | `boolean`                     | A registration API is available                         |
 | `registrationError`        | `Error \| null`               | Invalid input schema or rejected registration           |
 
-`isRegistered` is no longer returned. Use the runtime’s `getTools()` for confirmed discovery.
-`registrationError` describes setup failures separately from `state.error`; a null error does not confirm registration.
+`registrationError` describes setup failures separately from `state.error`. A null error does not confirm registration; use the runtime’s `getTools()` for discovery.
 When the browser rejects a registration, for example because another tool already uses the name, the hook also logs one `console.warn` naming the tool. The tool stays unregistered until its registration refreshes.
 
 ## Config fields

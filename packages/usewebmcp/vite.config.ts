@@ -41,10 +41,8 @@ export default defineConfig({
       instances: [{ browser: 'chromium' }],
       headless: true,
     },
-    // Test file patterns
-    include: native ? ['src/useWebMCP.native.ts'] : ['src/**/*.{test,spec}.{ts,tsx}'],
-    // Exclude build output
-    exclude: ['dist', 'node_modules'],
+    include: [native ? 'src/useWebMCP.native.test.ts' : 'src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: native ? [] : ['src/useWebMCP.native.test.ts'],
     // Enable globals for cleaner test syntax
     globals: true,
     // Limit concurrency in CI to prevent resource exhaustion

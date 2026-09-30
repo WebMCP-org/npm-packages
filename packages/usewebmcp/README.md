@@ -76,29 +76,17 @@ output schemas, MCP annotations, MCP result formatting, or prompt and resource h
 - Handlers receive `(input, { signal })` for cancellation, which always rejects.
 - The hook commits once after mount when `isSupported` becomes true. Later successful registrations
   and unrelated renders add no commits.
-- Both packages preserve `'use client'` and support React 18/19, SSR, and StrictMode.
+- The package preserves `'use client'` and supports React 18/19, SSR, and StrictMode.
 
 See the [reference](https://docs.mcp-b.ai/packages/usewebmcp/reference) for metadata updates,
 cancellation, and raw result handling. The `usewebmcp/internal` entry exists for
 `@mcp-b/react-webmcp` and can change in any release.
 
-## Migrating from the previous hook
+## Upgrading from 5.x
 
-The core hook returns raw results and uses upstream WebMCP types. To keep Standard Schema
-validation, `outputSchema`, MCP annotations, `InferOutput`, and automatic MCP responses, change
-your import:
-
-```ts
-import { useWebMCP } from '@mcp-b/react-webmcp';
-```
-
-Tool hooks expose `isSupported` and `registrationError`; use the runtime’s `getTools()` for confirmed discovery.
-Prompt and resource hooks retain their registration status. Core failures reject; the MCP adapter
-returns MCP error responses by default, with the error message as text (5.x prefixed `Error: `).
-
-Core `WebMCPConfig` and `WebMCPReturn` take `TResult` as their second generic.
-`InferToolInput` describes the JSON Schema input accepted by WebMCP.
-[Type reference](https://docs.mcp-b.ai/packages/usewebmcp/reference#exported-types).
+To keep Standard Schema validation, `outputSchema`, MCP annotations, `InferOutput`, or automatic
+MCP responses, import `useWebMCP` from `@mcp-b/react-webmcp` instead. The
+[changelog](./CHANGELOG.md) lists every breaking change.
 
 ## Development
 

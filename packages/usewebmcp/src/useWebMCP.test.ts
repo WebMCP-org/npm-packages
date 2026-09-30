@@ -17,31 +17,14 @@ interface CircularAnnotations {
   self?: CircularAnnotations;
 }
 
-async function executeRegisteredTool(name: string, args: JsonObject = {}): Promise<JsonValue> {
-  const modelContext = document.modelContext;
-  if (!modelContext || typeof modelContext.executeTool !== 'function') {
-    throw new Error('Chrome descriptor execution is unavailable');
-  }
-
-  const tool = (await modelContext.getTools()).find((candidate) => candidate.name === name);
-  if (!tool) {
-    throw new Error(`Tool not found: ${name}`);
-  }
-
-  const serialized = await modelContext.executeTool(tool, args);
-  if (serialized === null) {
-    throw new Error(`Tool execution was interrupted: ${name}`);
-  }
-
-  try {
-    return JSON.parse(serialized);
-  } catch {
-    return serialized;
-  }
-}
-
 async function findTool(name: string) {
   return (await document.modelContext!.getTools()).find((tool) => tool.name === name);
+}
+
+async function executeRegisteredTool(name: string, args: JsonObject = {}): Promise<JsonValue> {
+  const tool = await findTool(name);
+  if (!tool) throw new Error(`Tool not found: ${name}`);
+  return JSON.parse(await document.modelContext!.executeTool(tool, args));
 }
 
 describe('useWebMCP in a browser runtime', () => {
@@ -95,42 +78,6 @@ describe('useWebMCP in a browser runtime', () => {
 
     await unmount();
     expect(await findTool('browser_greet')).toBeUndefined();
-  });
-
-  it('tracks manual execution, errors, and reset state', async () => {
-    const { act, result } = await renderHook(() =>
-      useWebMCP({
-        name: 'browser_state',
-        description: 'Exercises hook state',
-        inputSchema: {
-          type: 'object',
-          properties: { value: { type: 'number' } },
-          required: ['value'],
-        } as const,
-        execute: async ({ value }) => {
-          if (value < 0) throw new Error('value must be positive');
-          return value * 2;
-        },
-      })
-    );
-
-    await act(async () => {
-      await result.current.execute({ value: 5 });
-    });
-    expect(result.current.state.lastResult).toBe(10);
-
-    await act(async () => {
-      await expect(result.current.execute({ value: -1 })).rejects.toThrow('value must be positive');
-    });
-    expect(result.current.state.error?.message).toBe('value must be positive');
-
-    await act(async () => result.current.reset());
-    expect(result.current.state).toEqual({
-      isExecuting: false,
-      lastResult: null,
-      error: null,
-      executionCount: 0,
-    });
   });
 
   it.each([
@@ -274,32 +221,19 @@ describe('useWebMCP in a browser runtime', () => {
     await hook.unmount();
   });
 
-  it('re-registers metadata only when declared dependencies change', async () => {
-    const { rerender } = await renderHook(({ revision }: { revision: number } = { revision: 1 }) =>
+  it('re-registers unchanged metadata when declared dependencies change', async () => {
+    const register = vi.spyOn(document.modelContext!, 'registerTool');
+    const hook = await renderHook(({ revision }: { revision: number } = { revision: 1 }) =>
       useWebMCP(
-        {
-          name: 'browser_dependency',
-          description: 'Uses explicit descriptor dependencies',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              value: { type: 'string', description: `Revision ${revision}` },
-            },
-          } as const,
-          execute: async () => revision,
-        },
+        { name: 'browser_dependency', description: 'Uses explicit deps', execute: () => revision },
         [revision]
       )
     );
-
-    const expectValueDescription = async (description: string) => {
-      expect((await findTool('browser_dependency'))?.inputSchema).toMatchObject({
-        properties: { value: { description } },
-      });
-    };
-    await expectValueDescription('Revision 1');
-    await rerender({ revision: 2 });
-    await expectValueDescription('Revision 2');
+    await hook.rerender({ revision: 1 });
+    expect(register).toHaveBeenCalledOnce();
+    await hook.rerender({ revision: 2 });
+    expect(register).toHaveBeenCalledTimes(2);
+    expect(await findTool('browser_dependency')).toBeDefined();
   });
 
   it('tracks cancellation separately for overlapping executions and ignores late completion', async () => {
@@ -351,6 +285,47 @@ describe('useWebMCP in a browser runtime', () => {
       lastResult: 'success',
       error: null,
       executionCount: 1,
+    });
+  });
+
+  it('preserves completed results and counts when overlapping calls settle in one batch', async () => {
+    const first = Promise.withResolvers<string>();
+    const second = Promise.withResolvers<string>();
+    const failed = Promise.withResolvers<string>();
+    const failure = new Error('Third call failed');
+    const execute = vi
+      .fn<() => Promise<string>>()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+      .mockReturnValueOnce(failed.promise);
+    const hook = await renderHook(() =>
+      useWebMCP({ name: 'same_batch_calls', description: 'Combines completion updates', execute })
+    );
+    let calls!: Promise<string>[];
+    await hook.act(async () => {
+      calls = [
+        hook.result.current.execute({}),
+        hook.result.current.execute({}),
+        hook.result.current.execute({}),
+      ];
+    });
+    expect(hook.result.current.state.isExecuting).toBe(true);
+    await hook.act(async () => {
+      const outcomes = Promise.allSettled(calls);
+      second.resolve('second');
+      first.resolve('first');
+      failed.reject(failure);
+      await expect(outcomes).resolves.toEqual([
+        { status: 'fulfilled', value: 'first' },
+        { status: 'fulfilled', value: 'second' },
+        { status: 'rejected', reason: failure },
+      ]);
+    });
+    expect(hook.result.current.state).toEqual({
+      isExecuting: false,
+      lastResult: 'first',
+      error: failure,
+      executionCount: 2,
     });
   });
 
@@ -418,31 +393,7 @@ describe('useWebMCP in a browser runtime', () => {
     });
   });
 
-  it('can disable and re-enable registration while keeping local execution available', async () => {
-    const hook = await renderHook(({ enabled }: { enabled: boolean } = { enabled: false }) =>
-      useWebMCP({
-        name: 'enabled_tool',
-        description: 'Conditional registration',
-        enabled,
-        execute: () => 'ok',
-      })
-    );
-    expect(hook.result.current).toMatchObject({
-      isSupported: true,
-      registrationError: null,
-    });
-    expect(await findTool('enabled_tool')).toBeUndefined();
-    await hook.act(async () => {
-      await expect(hook.result.current.execute({})).resolves.toBe('ok');
-    });
-    await hook.rerender({ enabled: true });
-    await expect.poll(() => findTool('enabled_tool')).toBeDefined();
-    await hook.rerender({ enabled: false });
-    expect(await findTool('enabled_tool')).toBeUndefined();
-    expect(hook.result.current.registrationError).toBeNull();
-  });
-
-  it('warns about a duplicate registration without unregistering the original owner', async () => {
+  it('keeps the original owner of a duplicate name until it unmounts and the other refreshes', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const first = await renderHook(() =>
       useWebMCP({ name: 'duplicate_owner', description: 'First owner', execute: () => 'first' })
@@ -465,12 +416,17 @@ describe('useWebMCP in a browser runtime', () => {
     });
     expect(warn).toHaveBeenCalledOnce();
     expect(warn.mock.calls[0]?.[0]).toContain('"duplicate_owner"');
-    await second.unmount();
+    await second.rerender({ enabled: false });
     expect(await findTool('duplicate_owner')).toMatchObject({ description: 'First owner' });
     expect(first.result.current.registrationError).toBeNull();
     await first.act(async () => {
       expect(await executeRegisteredTool('duplicate_owner')).toBe('first');
     });
+
+    await first.unmount();
+    await second.rerender({ enabled: true });
+    expect(second.result.current.registrationError).toBeNull();
+    expect(await findTool('duplicate_owner')).toMatchObject({ description: 'Second owner' });
   });
 
   it('reports synchronous platform rejection without breaking rendering', async () => {

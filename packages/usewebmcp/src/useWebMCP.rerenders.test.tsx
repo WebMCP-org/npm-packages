@@ -172,6 +172,7 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
     expect(onRender).toHaveBeenCalled();
     expect(register).not.toHaveBeenCalled();
     expect(await modelContext.getTools()).toEqual([]);
+    expect(hook.result.current).toMatchObject({ isSupported: true, registrationError: null });
 
     // enabled controls exposure, not local execution or the lifetime of its state.
     await hook.act(async () => {
