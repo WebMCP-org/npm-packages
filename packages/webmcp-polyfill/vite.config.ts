@@ -2,7 +2,6 @@ import type { Options } from 'vite-plus/pack';
 import { playwright } from 'vite-plus/test/browser-playwright';
 import { defineConfig } from 'vite-plus';
 
-const isCI = process.env.CI === 'true';
 // Never let a Chrome that ships native WebMCP silently take over the polyfill's tests.
 const launchArgs = ['--disable-features=WebMCP'];
 const launchOptions = process.env.CHROME_BIN
@@ -61,9 +60,6 @@ export default defineConfig({
       instances: [{ browser: 'chromium' }],
     },
     include: ['src/**/*.test.ts'],
-    exclude: ['dist', 'node_modules'],
-    globals: true,
-    maxConcurrency: isCI ? 1 : 2,
     fileParallelism: false,
   },
 });

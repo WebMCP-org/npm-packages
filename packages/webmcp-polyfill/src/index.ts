@@ -6,7 +6,7 @@ import { installWebMCP as installUpstream } from './upstream/index.js';
 export type { WebMCP } from './upstream/index.js';
 
 /**
- * Installs upstream WebMCP and the retained declarative forms support.
+ * Installs upstream WebMCP and the temporary declarative tools layer.
  * Engines missing an API the vendored core calls are left untouched: upstream defines
  * the document getter before it constructs the context, so a failed construction would
  * leave `document.modelContext` throwing.

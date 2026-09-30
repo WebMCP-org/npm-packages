@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-import type { WebMCP } from 'webmcp-types';
+import type { WebMCP } from "webmcp-types";
 import {
   FrameBridge,
   activeWindow,
@@ -11,12 +11,12 @@ import {
   executionError,
   readToolsPolicy,
   type ToolMetadata,
-} from './frames.js';
-export type { WebMCP } from 'webmcp-types';
+} from "./frames.js";
+export type { WebMCP } from "webmcp-types";
 
 // Detached windows may stop exposing these bindings.
 const NativeDOMException = globalThis.DOMException;
-const getWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')?.get;
+const getWindow = Object.getOwnPropertyDescriptor(globalThis, "window")?.get;
 
 interface StoredTool {
   metadata: ToolMetadata;
@@ -45,25 +45,25 @@ const contexts = new WeakMap<Document, ModelContextPolyfill>();
  * @see https://github.com/webmachinelearning/webmcp-polyfill/blob/main/TESTING.md
  */
 export function installWebMCP(): void {
-  if (typeof document === 'undefined' || !globalThis.isSecureContext) {
+  if (typeof document === "undefined" || !globalThis.isSecureContext) {
     return;
   }
-  if ('modelContext' in document) {
+  if ("modelContext" in document) {
     return;
   }
 
   const documentPrototype = Document.prototype;
-  const getDefaultView = Object.getOwnPropertyDescriptor(documentPrototype, 'defaultView')!.get!;
-  const constructorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'ModelContext');
+  const getDefaultView = Object.getOwnPropertyDescriptor(documentPrototype, "defaultView")!.get!;
+  const constructorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "ModelContext");
   if (
     !Object.isExtensible(documentPrototype) ||
     (constructorDescriptor && !constructorDescriptor.configurable) ||
     (!constructorDescriptor && !Object.isExtensible(globalThis))
   ) {
-    throw new TypeError('Cannot install WebMCP on this realm');
+    throw new TypeError("Cannot install WebMCP on this realm");
   }
 
-  Object.defineProperty(globalThis, 'ModelContext', {
+  Object.defineProperty(globalThis, "ModelContext", {
     value: modelContextConstructor,
     configurable: true,
     writable: true,
@@ -81,8 +81,8 @@ export function installWebMCP(): void {
       return context;
     },
   };
-  Object.defineProperty(getModelContext, 'name', { value: 'get modelContext' });
-  Object.defineProperty(documentPrototype, 'modelContext', {
+  Object.defineProperty(getModelContext, "name", { value: "get modelContext" });
+  Object.defineProperty(documentPrototype, "modelContext", {
     configurable: true,
     enumerable: true,
     get: getModelContext,
@@ -96,11 +96,11 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
   readonly #tools = new Map<string, StoredTool>();
   // Only a document that was active when its context was created has a bridge.
   readonly #frames?: FrameBridge;
-  #toolchangeHandler: WebMCP.ModelContext['ontoolchange'] = null;
+  #toolchangeHandler: WebMCP.ModelContext["ontoolchange"] = null;
   readonly #toolchangeListener = (event: Event): void => {
     const handler = this.#toolchangeHandler;
     // An EventHandler keeps a non-callable object but never invokes it.
-    if (typeof handler !== 'function') {
+    if (typeof handler !== "function") {
       return;
     }
     const result = Reflect.apply(handler, this, [event]);
@@ -126,19 +126,19 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
     });
   }
 
-  get ontoolchange(): WebMCP.ModelContext['ontoolchange'] {
+  get ontoolchange(): WebMCP.ModelContext["ontoolchange"] {
     return this.#toolchangeHandler;
   }
 
-  set ontoolchange(handler: WebMCP.ModelContext['ontoolchange']) {
+  set ontoolchange(handler: WebMCP.ModelContext["ontoolchange"]) {
     // [LegacyTreatNonObjectAsNull]: only a non-object becomes null.
     const nextHandler = isObject(handler) ? handler : null;
     // Replacing a handler preserves its listener position; clearing it removes that position.
     if (!this.#toolchangeHandler && nextHandler) {
-      this.addEventListener('toolchange', this.#toolchangeListener);
+      this.addEventListener("toolchange", this.#toolchangeListener);
     }
     if (this.#toolchangeHandler && !nextHandler) {
-      this.removeEventListener('toolchange', this.#toolchangeListener);
+      this.removeEventListener("toolchange", this.#toolchangeListener);
     }
     this.#toolchangeHandler = nextHandler;
   }
@@ -147,7 +147,7 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
   // Each operation reads #document first, so an invalid receiver throws before arguments are read.
   async registerTool(
     tool: object,
-    options: WebMCP.ModelContextRegisterToolOptions = {}
+    options: WebMCP.ModelContextRegisterToolOptions = {},
   ): Promise<void> {
     const ownerDocument = this.#document;
     const { name, title, description, annotations, inputSchema, execute } =
@@ -161,7 +161,7 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
       if (this.#tools.has(name)) {
         throw new NativeDOMException(
           `A tool named ${name} is already registered`,
-          'InvalidStateError'
+          "InvalidStateError",
         );
       }
     };
@@ -171,11 +171,11 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
     if (!/^[A-Za-z0-9_.-]{1,128}$/u.test(name)) {
       throw new NativeDOMException(
         `Tool names are 1 to 128 characters of ASCII alphanumerics, "_", "-" or ".": ${name}`,
-        'InvalidStateError'
+        "InvalidStateError",
       );
     }
     if (!description) {
-      throw new NativeDOMException('A tool description cannot be empty', 'InvalidStateError');
+      throw new NativeDOMException("A tool description cannot be empty", "InvalidStateError");
     }
     const serializedSchema = inputSchema === undefined ? undefined : serializeJSON(inputSchema);
     registrationSignal?.throwIfAborted();
@@ -195,13 +195,13 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
     return new Promise<void>((resolve, reject) => {
       // Abort unregisters the tool and also rejects any pending registration.
       registrationSignal?.addEventListener(
-        'abort',
+        "abort",
         () => {
           this.#tools.delete(name);
           void frames.notify(exposedOrigins);
           reject(registrationSignal.reason);
         },
-        { once: true }
+        { once: true },
       );
 
       this.#tools.set(name, storedTool);
@@ -210,7 +210,7 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
   }
 
   async getTools(
-    options: WebMCP.ModelContextGetToolOptions = {}
+    options: WebMCP.ModelContextGetToolOptions = {},
   ): Promise<WebMCP.RegisteredTool[]> {
     const ownerDocument = this.#document;
     const settings = readDictionary(options);
@@ -239,7 +239,7 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
   async executeTool(
     tool: WebMCP.RegisteredTool,
     inputObject: object = {},
-    options: WebMCP.ModelContextExecuteToolOptions = {}
+    options: WebMCP.ModelContextExecuteToolOptions = {},
   ): Promise<string> {
     const ownerDocument = this.#document;
     const target = readExecutionTarget(tool);
@@ -248,11 +248,11 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
 
     requireActiveWindow(ownerDocument);
     const expectedOrigin = URL.parse(target.origin)?.origin;
-    if (!expectedOrigin || expectedOrigin === 'null') {
-      throw new NativeDOMException('Invalid or opaque origin', 'NotSupportedError');
+    if (!expectedOrigin || expectedOrigin === "null") {
+      throw new NativeDOMException("Invalid or opaque origin", "NotSupportedError");
     }
     if (!isObject(inputObject)) {
-      throw new TypeError('inputObject must be an object');
+      throw new TypeError("inputObject must be an object");
     }
 
     const serializedInput = serializeJSON(inputObject);
@@ -266,7 +266,7 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
         expectedOrigin,
         target.name,
         serializedInput,
-        callerSignal
+        callerSignal,
       );
     }
 
@@ -275,7 +275,7 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
       serializedInput,
       expectedOrigin,
       callerWindow.origin,
-      callerSignal
+      callerSignal,
     );
   }
 
@@ -284,7 +284,7 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
     serializedInput: string,
     expectedOrigin: string,
     callerOrigin: string,
-    callerSignal?: AbortSignal
+    callerSignal?: AbortSignal,
   ): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       callerSignal?.throwIfAborted();
@@ -306,7 +306,7 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
       const rejectExecution = (): void => {
         callbackFinished = true;
         queueTask(() => {
-          callerSignal?.removeEventListener('abort', onCallerAbort);
+          callerSignal?.removeEventListener("abort", onCallerAbort);
           reject(executionError());
         });
       };
@@ -321,7 +321,7 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
         try {
           const serializedResult = serializeJSON(value);
           queueTask(() => {
-            callerSignal?.removeEventListener('abort', onCallerAbort);
+            callerSignal?.removeEventListener("abort", onCallerAbort);
             resolve(serializedResult);
           });
         } catch {
@@ -361,7 +361,7 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
         }
       };
 
-      callerSignal?.addEventListener('abort', onCallerAbort, { once: true });
+      callerSignal?.addEventListener("abort", onCallerAbort, { once: true });
       queueTask(dispatchTool);
     });
   }
@@ -369,7 +369,7 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
   async #requireFrames(): Promise<FrameBridge> {
     const frames = this.#frames;
     if (!frames || !(await frames.allowed())) {
-      throw new NativeDOMException('WebMCP is disabled by Permissions Policy', 'NotAllowedError');
+      throw new NativeDOMException("WebMCP is disabled by Permissions Policy", "NotAllowedError");
     }
     requireActiveWindow(this.#document);
     return frames;
@@ -390,7 +390,7 @@ class ModelContextPolyfill extends EventTarget implements WebMCP.ModelContext {
   #queueToolChange(): Promise<void> {
     return new Promise((resolve) => {
       queueTask(() => {
-        this.dispatchEvent(new Event('toolchange'));
+        this.dispatchEvent(new Event("toolchange"));
         resolve();
       });
     });
@@ -403,18 +403,18 @@ function isExposedTo(tool: StoredTool, ownerOrigin: string, callerOrigin: string
 
 // Web IDL exposes a non-constructible interface with enumerable prototype members.
 const modelContextConstructor = function ModelContext(): never {
-  throw new TypeError('Illegal constructor');
+  throw new TypeError("Illegal constructor");
 };
 // Preserve the public name through minification.
-Object.defineProperty(modelContextConstructor, 'name', { value: 'ModelContext' });
-Object.defineProperty(modelContextConstructor, 'prototype', {
+Object.defineProperty(modelContextConstructor, "name", { value: "ModelContext" });
+Object.defineProperty(modelContextConstructor, "prototype", {
   value: ModelContextPolyfill.prototype,
   writable: false,
 });
 Object.setPrototypeOf(modelContextConstructor, EventTarget);
 Object.defineProperties(ModelContextPolyfill.prototype, {
   constructor: { value: modelContextConstructor, configurable: true, writable: true },
-  [Symbol.toStringTag]: { value: 'ModelContext', configurable: true },
+  [Symbol.toStringTag]: { value: "ModelContext", configurable: true },
   registerTool: { enumerable: true },
   getTools: { enumerable: true },
   executeTool: { enumerable: true },
@@ -425,17 +425,17 @@ Object.defineProperties(ModelContextPolyfill.prototype, {
 function readToolDefinition(value: unknown) {
   const descriptor = readDictionary(value);
   const annotations = readAnnotations(descriptor.annotations);
-  const description = toDOMString(requireMember(descriptor.description, 'description'));
-  const callback = requireMember(descriptor.execute, 'execute');
-  if (typeof callback !== 'function') {
-    throw new TypeError('execute must be a function');
+  const description = toDOMString(requireMember(descriptor.description, "description"));
+  const callback = requireMember(descriptor.execute, "execute");
+  if (typeof callback !== "function") {
+    throw new TypeError("execute must be a function");
   }
   // SAFETY: callability is checked above; inputs and results are converted at invocation.
   const execute = callback as WebMCP.ToolExecuteCallback<object>;
   const inputSchema = readInputSchema(descriptor.inputSchema);
-  const name = toDOMString(requireMember(descriptor.name, 'name'));
+  const name = toDOMString(requireMember(descriptor.name, "name"));
   const rawTitle = descriptor.title;
-  const title = rawTitle === undefined ? '' : toUSVString(rawTitle);
+  const title = rawTitle === undefined ? "" : toUSVString(rawTitle);
 
   return { name, title, description, annotations, inputSchema, execute };
 }
@@ -444,17 +444,17 @@ function readToolDefinition(value: unknown) {
 function readExecutionTarget(value: unknown) {
   const descriptor = readDictionary(value);
   readAnnotations(descriptor.annotations);
-  toDOMString(requireMember(descriptor.description, 'description'));
+  toDOMString(requireMember(descriptor.description, "description"));
   readInputSchema(descriptor.inputSchema);
-  const name = toDOMString(requireMember(descriptor.name, 'name'));
-  const origin = toUSVString(requireMember(descriptor.origin, 'origin'));
+  const name = toDOMString(requireMember(descriptor.name, "name"));
+  const origin = toUSVString(requireMember(descriptor.origin, "origin"));
   const title = descriptor.title;
   if (title !== undefined) {
     toDOMString(title);
   }
-  const targetWindow = requireMember(descriptor.window, 'window');
+  const targetWindow = requireMember(descriptor.window, "window");
   if (!isObject(targetWindow)) {
-    throw new TypeError('window must be a Window');
+    throw new TypeError("window must be a Window");
   }
   getWindow!.call(targetWindow);
 
@@ -464,13 +464,13 @@ function readExecutionTarget(value: unknown) {
 
 function readInputSchema(value: unknown): object | undefined {
   if (value !== undefined && !isObject(value)) {
-    throw new TypeError('inputSchema must be an object');
+    throw new TypeError("inputSchema must be an object");
   }
   return value;
 }
 
 function isObject(value: unknown): value is object {
-  return (typeof value === 'object' && value !== null) || typeof value === 'function';
+  return (typeof value === "object" && value !== null) || typeof value === "function";
 }
 
 // https://webidl.spec.whatwg.org/#es-dictionary
@@ -479,7 +479,7 @@ function readDictionary(value: unknown): Record<PropertyKey, unknown> {
     return {};
   }
   if (!isObject(value)) {
-    throw new TypeError('Expected a dictionary');
+    throw new TypeError("Expected a dictionary");
   }
   // SAFETY: the object check permits property reads; each member still needs conversion.
   return value as Record<PropertyKey, unknown>;
@@ -499,8 +499,8 @@ function readAnnotations(value: unknown): WebMCP.ToolAnnotations | undefined {
 
 // https://webidl.spec.whatwg.org/#es-DOMString
 function toDOMString(value: unknown): string {
-  if (typeof value === 'symbol') {
-    throw new TypeError('Cannot convert a Symbol to a string');
+  if (typeof value === "symbol") {
+    throw new TypeError("Cannot convert a Symbol to a string");
   }
   return String(value);
 }
@@ -520,7 +520,7 @@ function requireMember(value: unknown, name: string): unknown {
 function serializeJSON(value: unknown): string {
   const result = JSON.stringify(value);
   if (result === undefined) {
-    throw new TypeError('Value is not JSON-serializable');
+    throw new TypeError("Value is not JSON-serializable");
   }
   return result;
 }
@@ -540,22 +540,22 @@ function readOriginSequence(value: unknown): string[] {
     return [];
   }
   if (!isObject(value)) {
-    throw new TypeError('Origins must be a sequence');
+    throw new TypeError("Origins must be a sequence");
   }
   const getIterator = readDictionary(value)[Symbol.iterator];
-  if (typeof getIterator !== 'function') {
-    throw new TypeError('Origins must be a sequence');
+  if (typeof getIterator !== "function") {
+    throw new TypeError("Origins must be a sequence");
   }
   // Use the cached method and original receiver without reading the method's own properties.
   const iterable = {
     [Symbol.iterator]() {
       const iterator: unknown = Reflect.apply(getIterator, value, []);
       if (!isObject(iterator)) {
-        throw new TypeError('Iterator must be an object');
+        throw new TypeError("Iterator must be an object");
       }
       const next = readDictionary(iterator).next;
-      if (typeof next !== 'function') {
-        throw new TypeError('Iterator next must be a function');
+      if (typeof next !== "function") {
+        throw new TypeError("Iterator next must be a function");
       }
       // Web IDL does not close the iterator when an item's conversion fails.
       return {
@@ -573,12 +573,12 @@ function parseOrigins(origins: string[]): string[] {
     // A blob: URL carries its creator's origin.
     const origin = URL.parse(value)?.origin;
     if (origin === undefined) {
-      throw new NativeDOMException('Invalid origin', 'SecurityError');
+      throw new NativeDOMException("Invalid origin", "SecurityError");
     }
     // An opaque origin, such as a file: URL's, serializes as "null" and does not parse.
     const url = URL.parse(origin);
     if (!url || !isPotentiallyTrustworthy(url)) {
-      throw new NativeDOMException('Origin is not potentially trustworthy', 'SecurityError');
+      throw new NativeDOMException("Origin is not potentially trustworthy", "SecurityError");
     }
     return origin;
   });
@@ -587,33 +587,33 @@ function parseOrigins(origins: string[]): string[] {
 // https://w3c.github.io/webappsec-secure-contexts/#is-origin-trustworthy
 // Scheme and host checks cannot recognize browser-specific trusted origins.
 function isPotentiallyTrustworthy({ protocol, hostname }: URL): boolean {
-  if (['https:', 'wss:'].includes(protocol)) {
+  if (["https:", "wss:"].includes(protocol)) {
     return true;
   }
   const isLoopback =
-    hostname === '[::1]' ||
+    hostname === "[::1]" ||
     // URL canonicalizes numeric hosts; exclude domains such as 127.example.test.
     /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
   const isLocalhost =
-    hostname === 'localhost' ||
-    hostname === 'localhost.' ||
-    hostname.endsWith('.localhost') ||
-    hostname.endsWith('.localhost.');
-  return ['http:', 'ws:'].includes(protocol) && (isLoopback || isLocalhost);
+    hostname === "localhost" ||
+    hostname === "localhost." ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".localhost.");
+  return ["http:", "ws:"].includes(protocol) && (isLoopback || isLocalhost);
 }
 
 function requireActiveWindow(owner: Document): Window {
   const view = activeWindow(owner);
   if (!view) {
-    throw new NativeDOMException('The document is not fully active', 'InvalidStateError');
+    throw new NativeDOMException("The document is not fully active", "InvalidStateError");
   }
-  if (view.originAgentCluster === false && view.location.protocol !== 'file:') {
-    throw new NativeDOMException('An origin-keyed agent cluster is required', 'SecurityError');
+  if (view.originAgentCluster === false && view.location.protocol !== "file:") {
+    throw new NativeDOMException("An origin-keyed agent cluster is required", "SecurityError");
   }
 
   // Synchronous where the browser exposes the policy; FrameBridge.allowed() covers the rest.
   if (readToolsPolicy(owner) === false) {
-    throw new NativeDOMException('WebMCP is disabled by Permissions Policy', 'NotAllowedError');
+    throw new NativeDOMException("WebMCP is disabled by Permissions Policy", "NotAllowedError");
   }
   return view;
 }

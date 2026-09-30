@@ -121,8 +121,8 @@ function formHasAttribute(form: HTMLFormElement, name: string): boolean {
   return Element.prototype.hasAttribute.call(form, name);
 }
 
-function isFormConnected(form: HTMLFormElement): boolean {
-  return Object.getOwnPropertyDescriptor(Node.prototype, 'isConnected')?.get?.call(form);
+function isConnected(node: Node): boolean {
+  return Object.getOwnPropertyDescriptor(Node.prototype, 'isConnected')?.get?.call(node);
 }
 
 function getOpenShadowRoot(element: Element): ShadowRoot | null {
@@ -229,47 +229,44 @@ function validNumberAttribute(input: HTMLInputElement, name: 'max' | 'min'): num
   return Number.isFinite(value) ? value : undefined;
 }
 
+function validStep(input: HTMLInputElement, fallback: number): number {
+  const step = Number(input.getAttribute('step'));
+  return Number.isFinite(step) && step > 0 ? step : fallback;
+}
+
 function isStepBaseMultiple(stepBase: number, step: number): boolean {
   const quotient = stepBase / step;
   return Math.abs(quotient - Math.round(quotient)) < Number.EPSILON * 16;
 }
 
-function validPattern(input: HTMLInputElement): string | undefined {
+function withPattern(schema: FormParameterSchema, input: HTMLInputElement): FormParameterSchema {
   const pattern = input.getAttribute('pattern');
-  if (pattern === null) return undefined;
+  if (pattern === null) return schema;
   try {
     new RegExp(pattern, 'v');
-    return pattern;
   } catch {
-    return undefined;
+    return schema;
   }
+  return { ...schema, pattern };
 }
 
-function numberSchema(input: HTMLInputElement, includePattern = true): FormParameterSchema {
+function numberSchema(input: HTMLInputElement): FormParameterSchema {
   const schema: FormParameterSchema = { type: 'number' };
   const minimum = validNumberAttribute(input, 'min');
   const maximum = validNumberAttribute(input, 'max');
   if (minimum !== undefined) schema.minimum = minimum;
   if (maximum !== undefined) schema.maximum = maximum;
-
-  const rawStep = input.getAttribute('step');
-  if (rawStep !== 'any') {
-    const parsedStep = rawStep === null || rawStep === '' ? 1 : Number(rawStep);
-    const step = Number.isFinite(parsedStep) && parsedStep > 0 ? parsedStep : 1;
+  if (input.getAttribute('step') !== 'any') {
+    const step = validStep(input, 1);
     const rawValue = Number(input.getAttribute('value'));
     const stepBase = minimum ?? (Number.isFinite(rawValue) ? rawValue : 0);
     if (isStepBaseMultiple(stepBase, step)) schema.multipleOf = step;
   }
-
-  const pattern = includePattern ? validPattern(input) : undefined;
-  if (pattern !== undefined) schema.pattern = pattern;
   return schema;
 }
 
 function temporalFormat(input: HTMLInputElement, datePrefix: string): string {
-  const rawStep = input.getAttribute('step');
-  const parsedStep = rawStep === null || rawStep === '' ? 60 : Number(rawStep);
-  const step = Number.isFinite(parsedStep) && parsedStep > 0 ? parsedStep : 60;
+  const step = validStep(input, 60);
   if (step < 1) return `${datePrefix}(:[0-5][0-9](\\.[0-9]{1,3})?)?$`;
   if (step < 60) return `${datePrefix}(:[0-5][0-9])?$`;
   return `${datePrefix}$`;
@@ -298,122 +295,78 @@ function groupChoiceSchemas(controls: readonly HTMLInputElement[]) {
   };
 }
 
+function isInput(control: DeclarativeControl, type: string): control is HTMLInputElement {
+  return control instanceof HTMLInputElement && control.type === type;
+}
+
+function inputSchema(input: HTMLInputElement): FormParameterSchema | undefined {
+  if (TEXT_INPUT_TYPES.has(input.type)) return withPattern({ type: 'string' }, input);
+  switch (input.type) {
+    case 'hidden':
+      return input.getAttribute('toolparamdescription') ? { type: 'string' } : undefined;
+    case 'number':
+      return withPattern(numberSchema(input), input);
+    case 'range': {
+      const schema = numberSchema(input);
+      schema.minimum ??= 0;
+      schema.maximum ??= 100;
+      return schema;
+    }
+    case 'checkbox':
+      return { type: 'boolean' };
+    case 'date':
+      return { type: 'string', format: 'date' };
+    case 'month':
+      return { type: 'string', format: '^[0-9]{4}-(0[1-9]|1[0-2])$' };
+    case 'week':
+      return { type: 'string', format: '^[0-9]{4}-W(0[1-9]|[1-4][0-9]|5[0-3])$' };
+    case 'time':
+      return { type: 'string', format: temporalFormat(input, '^([01][0-9]|2[0-3]):[0-5][0-9]') };
+    case 'datetime-local':
+      return {
+        type: 'string',
+        format: temporalFormat(
+          input,
+          '^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}T([01][0-9]|2[0-3]):[0-5][0-9]'
+        ),
+      };
+    case 'color':
+      return { type: 'string', format: '^#[0-9a-zA-Z]{6}$' };
+    default:
+      return undefined;
+  }
+}
+
 function parameterSchema(
   form: HTMLFormElement,
   controls: readonly DeclarativeControl[]
 ): FormParameterSchema | undefined {
-  const first = controls[0];
+  const [first] = controls;
   if (!first) return undefined;
-
-  if (controls.length > 1) {
-    if (!controls.every((control) => control instanceof HTMLInputElement)) return undefined;
-    if (controls.every((control) => control.type === 'checkbox')) {
-      return withDescription(
-        {
-          type: 'array',
-          items: { type: 'string', ...groupChoiceSchemas(controls) },
-          uniqueItems: true,
-        },
-        form,
-        controls
-      );
+  let schema: FormParameterSchema | undefined;
+  if (controls.every((control) => isInput(control, 'radio'))) {
+    schema = { type: 'string', ...groupChoiceSchemas(controls) };
+  } else if (controls.length > 1) {
+    if (controls.every((control) => isInput(control, 'checkbox'))) {
+      schema = {
+        type: 'array',
+        items: { type: 'string', ...groupChoiceSchemas(controls) },
+        uniqueItems: true,
+      };
     }
-    if (controls.every((control) => control.type === 'radio')) {
-      return withDescription({ type: 'string', ...groupChoiceSchemas(controls) }, form, controls);
-    }
-    return undefined;
-  }
-
-  if (first instanceof HTMLTextAreaElement) {
-    return withDescription({ type: 'string' }, form, controls);
-  }
-
-  if (first instanceof HTMLSelectElement) {
+  } else if (first instanceof HTMLTextAreaElement) {
+    schema = { type: 'string' };
+  } else if (first instanceof HTMLSelectElement) {
     const choices = optionSchemas([...first.options]);
-    return withDescription(
-      first.multiple
-        ? { type: 'array', items: { type: 'string', ...choices }, uniqueItems: true }
-        : { type: 'string', ...choices },
-      form,
-      controls
-    );
+    schema = first.multiple
+      ? { type: 'array', items: { type: 'string', ...choices }, uniqueItems: true }
+      : { type: 'string', ...choices };
+  } else {
+    schema = inputSchema(first);
   }
-
-  if (TEXT_INPUT_TYPES.has(first.type)) {
-    const schema: FormParameterSchema = { type: 'string' };
-    const pattern = validPattern(first);
-    if (pattern !== undefined) schema.pattern = pattern;
-    return withDescription(schema, form, controls);
-  }
-  if (first.type === 'hidden') {
-    return first.getAttribute('toolparamdescription')
-      ? withDescription({ type: 'string' }, form, controls)
-      : undefined;
-  }
-  if (first.type === 'number') {
-    return withDescription(numberSchema(first), form, controls);
-  }
-  if (first.type === 'range') {
-    const schema = numberSchema(first, false);
-    schema.minimum ??= 0;
-    schema.maximum ??= 100;
-    return withDescription(schema, form, controls);
-  }
-  if (first.type === 'checkbox') {
-    return withDescription({ type: 'boolean' }, form, controls);
-  }
-  if (first.type === 'radio') {
-    return withDescription({ type: 'string', ...groupChoiceSchemas([first]) }, form, controls);
-  }
-  if (first.type === 'date') {
-    return withDescription(
-      { type: 'string', format: 'date' },
-      form,
-      controls,
-      "Dates MUST be provided in 'YYYY-MM-DD' format."
-    );
-  }
-  if (first.type === 'month') {
-    return withDescription(
-      { type: 'string', format: '^[0-9]{4}-(0[1-9]|1[0-2])$' },
-      form,
-      controls
-    );
-  }
-  if (first.type === 'week') {
-    return withDescription(
-      { type: 'string', format: '^[0-9]{4}-W(0[1-9]|[1-4][0-9]|5[0-3])$' },
-      form,
-      controls
-    );
-  }
-  if (first.type === 'time') {
-    return withDescription(
-      {
-        type: 'string',
-        format: temporalFormat(first, '^([01][0-9]|2[0-3]):[0-5][0-9]'),
-      },
-      form,
-      controls
-    );
-  }
-  if (first.type === 'datetime-local') {
-    return withDescription(
-      {
-        type: 'string',
-        format: temporalFormat(
-          first,
-          '^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}T([01][0-9]|2[0-3]):[0-5][0-9]'
-        ),
-      },
-      form,
-      controls
-    );
-  }
-  if (first.type === 'color') {
-    return withDescription({ type: 'string', format: '^#[0-9a-zA-Z]{6}$' }, form, controls);
-  }
-  return undefined;
+  const dateHint =
+    first.type === 'date' ? "Dates MUST be provided in 'YYYY-MM-DD' format." : undefined;
+  return schema && withDescription(schema, form, controls, dateHint);
 }
 
 function synthesizeSchema(form: HTMLFormElement): InputSchema {
@@ -484,34 +437,23 @@ function isFormParameterValue(
   controls: readonly DeclarativeControl[],
   value: unknown
 ): value is FormParameterValue {
-  const first = controls[0];
+  const [first] = controls;
   if (!first || !parameterSchema(form, controls)) return false;
-
-  if (controls.length > 1) {
-    if (!controls.every((control) => control instanceof HTMLInputElement)) return false;
-    if (controls.every((control) => control.type === 'checkbox')) {
-      return hasUniqueAllowedValues(value, new Set(controls.map((control) => control.value)));
-    }
-    if (controls.every((control) => control.type === 'radio')) {
-      const string = toFormString(value);
-      return string !== undefined && controls.some((control) => control.value === string);
-    }
-    return false;
+  const string = toFormString(value);
+  if (controls.every((control) => isInput(control, 'radio'))) {
+    return controls.some((control) => control.value === string);
   }
-
+  // Any other group with a schema is a checkbox group.
+  if (controls.length > 1) {
+    return hasUniqueAllowedValues(value, new Set(controls.map((control) => control.value)));
+  }
   if (first instanceof HTMLSelectElement) {
     const allowed = new Set([...first.options].map((option) => option.value));
     if (first.multiple) return hasUniqueAllowedValues(value, allowed);
-    const string = toFormString(value);
     return string !== undefined && allowed.has(string);
   }
-  if (first instanceof HTMLTextAreaElement) return toFormString(value) !== undefined;
+  if (first instanceof HTMLTextAreaElement) return string !== undefined;
   if (first.type === 'checkbox') return toFormBoolean(value) !== undefined;
-  if (first.type === 'radio') {
-    const string = toFormString(value);
-    return string !== undefined && first.value === string;
-  }
-  const string = toFormString(value);
   return string !== undefined && inputAcceptsValue(first, string);
 }
 
@@ -520,88 +462,58 @@ function dispatchInputAndChange(control: DeclarativeControl): void {
   control.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-function setNativeValue(control: HTMLInputElement | HTMLTextAreaElement, value: string): void {
+// Prototype setters skip instance overrides such as React's value tracker, so frameworks
+// treat the dispatched events as real changes.
+function setValue(control: HTMLInputElement | HTMLTextAreaElement, value: string): void {
+  if (control.value === value) return;
   const prototype =
     control instanceof HTMLInputElement
       ? HTMLInputElement.prototype
       : HTMLTextAreaElement.prototype;
   Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(control, value);
+  dispatchInputAndChange(control);
 }
 
-function setNativeChecked(control: HTMLInputElement, checked: boolean): void {
+function setChecked(control: HTMLInputElement, checked: boolean): void {
+  if (control.checked === checked) return;
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'checked')?.set?.call(
     control,
     checked
   );
+  dispatchInputAndChange(control);
 }
 
+// Expects a value that isFormParameterValue() accepted.
 function fillParameter(controls: readonly DeclarativeControl[], value: FormParameterValue): void {
-  const first = controls[0];
-  if (!first) return;
-
-  if (controls.length > 1 && controls.every((control) => control instanceof HTMLInputElement)) {
-    if (controls.every((control) => control.type === 'checkbox') && Array.isArray(value)) {
-      const checked = new Set(value.map(toFormString));
-      for (const control of controls) {
-        const next = checked.has(control.value);
-        if (control.checked === next) continue;
-        setNativeChecked(control, next);
-        dispatchInputAndChange(control);
-      }
-      return;
+  const [first] = controls;
+  const string = toFormString(value);
+  const values = new Set(Array.isArray(value) ? value.map(toFormString) : []);
+  if (controls.every((control) => isInput(control, 'radio'))) {
+    const control = controls.find((candidate) => candidate.value === string);
+    if (control) setChecked(control, true);
+  } else if (controls.length > 1) {
+    for (const control of controls) {
+      if (control instanceof HTMLInputElement) setChecked(control, values.has(control.value));
     }
-    const selected = toFormString(value);
-    const control = controls.find((candidate) => candidate.value === selected);
-    if (control && !control.checked) {
-      setNativeChecked(control, true);
-      dispatchInputAndChange(control);
-    }
-    return;
-  }
-
-  if (first instanceof HTMLSelectElement) {
-    if (first.multiple && Array.isArray(value)) {
-      const selected = new Set(value.map(toFormString));
+  } else if (first instanceof HTMLSelectElement) {
+    if (first.multiple) {
       let changed = false;
       for (const option of first.options) {
-        const next = selected.has(option.value);
+        const next = values.has(option.value);
         if (option.selected === next) continue;
         option.selected = next;
         changed = true;
       }
       if (changed) dispatchInputAndChange(first);
-      return;
-    }
-    const next = toFormString(value);
-    if (next !== undefined && first.value !== next) {
-      first.value = next;
+    } else if (string !== undefined && first.value !== string) {
+      first.value = string;
       dispatchInputAndChange(first);
     }
-    return;
-  }
-
-  if (first instanceof HTMLInputElement && first.type === 'checkbox') {
-    const next = toFormBoolean(value);
-    if (next !== undefined && first.checked !== next) {
-      setNativeChecked(first, next);
-      dispatchInputAndChange(first);
-    }
-    return;
-  }
-
-  if (first instanceof HTMLInputElement && first.type === 'radio') {
-    const next = toFormString(value);
-    if (next === first.value && !first.checked) {
-      setNativeChecked(first, true);
-      dispatchInputAndChange(first);
-    }
-    return;
-  }
-
-  const next = toFormString(value);
-  if (next !== undefined && first.value !== next) {
-    setNativeValue(first, next);
-    dispatchInputAndChange(first);
+  } else if (first && isInput(first, 'checkbox')) {
+    const checked = toFormBoolean(value);
+    if (checked !== undefined) setChecked(first, checked);
+  } else if (first && string !== undefined) {
+    setValue(first, string);
   }
 }
 
@@ -718,7 +630,7 @@ function waitForSubmission(
   });
 }
 
-/** Retains declarative forms until the vendored upstream implements them. */
+/** Adds declarative tools until the vendored upstream implements them. */
 export function installWebMCPDeclarativeExtensions(context: WebMCP.ModelContext): void {
   const prototype = SubmitEvent.prototype;
   // Native support and earlier bundle installations already own these hooks.
@@ -819,7 +731,7 @@ export function installWebMCPDeclarativeExtensions(context: WebMCP.ModelContext)
           !(element instanceof HTMLFormElement) ||
           !formHasAttribute(element, 'toolname') ||
           !formHasAttribute(element, 'tooldescription') ||
-          !isFormConnected(element)
+          !isConnected(element)
         ) {
           continue;
         }
@@ -829,19 +741,18 @@ export function installWebMCPDeclarativeExtensions(context: WebMCP.ModelContext)
         const fingerprint = JSON.stringify(definition);
         const blockedFingerprint = blockedDefinitions.get(form);
         if (blockedFingerprint === fingerprint) continue;
-        const retryingChangedDefinition = blockedFingerprint !== undefined;
         blockedDefinitions.delete(form);
         const existingForm = selectedByName.get(definition.name);
-        if (existingForm && !retryingChangedDefinition) {
-          blockedDefinitions.set(form, fingerprint);
-          continue;
-        }
         if (existingForm) {
-          const existingSelection = selected.get(existingForm);
-          if (existingSelection) {
-            blockedDefinitions.set(existingForm, existingSelection.fingerprint);
-            selected.delete(existingForm);
+          // A duplicate name stays blocked until its definition changes, then takes over.
+          if (blockedFingerprint === undefined) {
+            blockedDefinitions.set(form, fingerprint);
+            continue;
           }
+          const existingSelection = selected.get(existingForm);
+          if (existingSelection)
+            blockedDefinitions.set(existingForm, existingSelection.fingerprint);
+          selected.delete(existingForm);
         }
         selectedByName.set(definition.name, form);
         selected.set(form, { definition, fingerprint });
@@ -905,41 +816,38 @@ export function installWebMCPDeclarativeExtensions(context: WebMCP.ModelContext)
     }
   }
 
-  const elementPrototype = document.defaultView?.Element.prototype;
-  const attachShadowDescriptor = elementPrototype
-    ? Object.getOwnPropertyDescriptor(elementPrototype, 'attachShadow')
-    : undefined;
-  if (elementPrototype && attachShadowDescriptor?.configurable) {
-    const nativeAttachShadow = elementPrototype.attachShadow;
+  const attachShadowDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'attachShadow');
+  if (attachShadowDescriptor?.configurable) {
+    const nativeAttachShadow = Element.prototype.attachShadow;
     const attachShadow = function (this: Element, init: ShadowRootInit): ShadowRoot {
       const root = nativeAttachShadow.call(this, init);
       if (
         root.mode === 'open' &&
         Object.getOwnPropertyDescriptor(Node.prototype, 'ownerDocument')?.get?.call(this) ===
           document &&
-        Object.getOwnPropertyDescriptor(Node.prototype, 'isConnected')?.get?.call(this)
+        isConnected(this)
       ) {
         observeRoot(root);
       }
       return root;
     };
-    Object.defineProperty(elementPrototype, 'attachShadow', {
+    Object.defineProperty(Element.prototype, 'attachShadow', {
       ...attachShadowDescriptor,
       value: attachShadow,
     });
   }
 
-  const formPrototype = document.defaultView?.HTMLFormElement.prototype;
-  const submitDescriptor = formPrototype
-    ? Object.getOwnPropertyDescriptor(formPrototype, 'submit')
-    : undefined;
-  if (formPrototype && submitDescriptor?.configurable) {
-    const nativeSubmit = formPrototype.submit;
+  const submitDescriptor = Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, 'submit');
+  if (submitDescriptor?.configurable) {
+    const nativeSubmit = HTMLFormElement.prototype.submit;
     const submit = function (this: HTMLFormElement): void {
       nativeSubmit.call(this);
       activeSubmissions.get(this)?.direct();
     };
-    Object.defineProperty(formPrototype, 'submit', { ...submitDescriptor, value: submit });
+    Object.defineProperty(HTMLFormElement.prototype, 'submit', {
+      ...submitDescriptor,
+      value: submit,
+    });
   }
 
   // ponytail: a whole-tree rescan keeps DOM ownership obvious; index forms if this

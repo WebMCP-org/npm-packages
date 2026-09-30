@@ -22,7 +22,6 @@ if (!existsSync(polyfill)) {
 }
 
 // ponytail: page-local allowlist; frame/origin tests qualify only if every assertion is page-local.
-// Mixed exposedTo tests stay out because valid nonempty exposure is intentionally native-only.
 // This pinned WPT revision still passes JSON strings to executeTool and predates
 // consequentialHint. Those cases target an older API shape than the vendored upstream runtime,
 // which is why the declarative list holds only the files that never call executeTool.

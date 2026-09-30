@@ -3,7 +3,7 @@ import { expect, it } from 'vitest';
 import { installWebMCP } from './index.js';
 
 runDeclarativeFormConformanceSuite({
-  suiteName: 'Standalone polyfill declarative forms',
+  suiteName: 'Standalone polyfill declarative tools',
   install: installWebMCP,
 });
 

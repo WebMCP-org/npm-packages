@@ -21,7 +21,7 @@ function requireModelContext(): NonNullable<Document['modelContext']> {
 }
 
 /**
- * Declarative forms are not part of the WebMCP draft or WPT IDL, so
+ * The WebMCP IDL does not define the declarative `SubmitEvent` hooks, so
  * `SubmitEvent.respondWith()` is optional. Native Chromium and `@mcp-b/webmcp-polyfill`
  * provide it; absence is a harness failure here.
  *
@@ -82,12 +82,12 @@ async function waitForCondition(
   throw new Error(message);
 }
 
+// Chrome returns a string passed to respondWith() as plain text rather than JSON.
 async function executeTool(
   tool: WebMCP.RegisteredTool,
   input: Parameters<WebMCP.ModelContext['executeTool']>[1]
 ): Promise<Awaited<ReturnType<WebMCP.ToolExecuteCallback>>> {
   const serialized = await requireModelContext().executeTool(tool, input);
-  if (serialized === null) return null;
   try {
     return JSON.parse(serialized);
   } catch {
@@ -95,11 +95,27 @@ async function executeTool(
   }
 }
 
+function rejectAfter(milliseconds: number, message: string): Promise<never> {
+  return new Promise((_, reject) => setTimeout(() => reject(new Error(message)), milliseconds));
+}
+
 export function runDeclarativeFormConformanceSuite(
   options: DeclarativeFormConformanceOptions
 ): void {
   describe(options.suiteName, () => {
     const toolNames = new Set<string>();
+
+    /** Inserts `markup` in one step and returns the form that declares the generated tool name. */
+    function declareForm(prefix: string, markup: (toolName: string) => string) {
+      const name = `${prefix}_${String(Date.now())}`;
+      toolNames.add(name);
+      document.body.insertAdjacentHTML('beforeend', markup(name));
+      const form = document.querySelector<HTMLFormElement>(
+        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
+      );
+      if (!form) throw new Error(`Expected the ${name} declarative form fixture`);
+      return { name, form };
+    }
 
     beforeAll(async () => {
       await options.cleanup?.();
@@ -117,11 +133,10 @@ export function runDeclarativeFormConformanceSuite(
     });
 
     it('registers annotated forms with schemas derived from native controls', async () => {
-      const name = `declarative_schema_${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooltitle="Search" tooldescription="Search the catalog">
+      const { name } = declareForm(
+        'declarative_schema',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooltitle="Search" tooldescription="Search the catalog">
           <input name="query" required toolparamdescription="The search query">
           <input name="limit" type="number" toolparamdescription="Maximum result count">
           <input name="safe_search" type="checkbox" toolparamdescription="Enable safe search">
@@ -172,12 +187,11 @@ export function runDeclarativeFormConformanceSuite(
     });
 
     it('matches Chromium schema rules for associated, constrained, and omitted controls', async () => {
-      const name = `declarative_schema_edges_${String(Date.now())}`;
       const formId = `declarative-form-${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} id="${formId}" toolname="${name}" tooldescription="Schema edges">
+      const { name } = declareForm(
+        'declarative_schema_edges',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} id="${formId}" toolname="${toolName}" tooldescription="Schema edges">
           <input name="invalid_pattern" pattern="[">
           <input name="distance" type="range">
           <input name="at" type="time" step="1">
@@ -216,8 +230,83 @@ export function runDeclarativeFormConformanceSuite(
       });
     });
 
+    it('matches Chromium schema rules for choice, date, and labelled controls', async () => {
+      const { name } = declareForm(
+        'declarative_schema_choices',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Choice controls">
+          <label>Gift wrap <input name="wrap" type="radio" value="yes"></label>
+          <fieldset toolparamdescription="Delivery speed">
+            <input name="speed" type="radio" value="standard">
+            <input name="speed" type="radio" value="express">
+          </fieldset>
+          <label><input name="extras" type="checkbox" value="card"> Card</label>
+          <input name="extras" type="checkbox" value="bag">
+          <select name="size"><option value="s">Small</option><option>Large</option></select>
+          <label>Notes <textarea name="notes"></textarea></label>
+          <input name="day" type="date" toolparamdescription="Delivery day">
+          <input name="month" type="month">
+          <input name="week" type="week">
+          <input name="color" type="color" aria-description="Ribbon color">
+          <input name="count" type="number" pattern="[0-9]+">
+        </form>`
+      );
+
+      const tool = await waitForTool(name);
+      expect(tool.inputSchema).toEqual({
+        type: 'object',
+        properties: {
+          wrap: {
+            type: 'string',
+            anyOf: [{ type: 'string', const: 'yes', title: 'Gift wrap' }],
+            enum: ['yes'],
+            description: 'Gift wrap',
+          },
+          speed: {
+            type: 'string',
+            anyOf: [
+              { type: 'string', const: 'standard' },
+              { type: 'string', const: 'express' },
+            ],
+            enum: ['standard', 'express'],
+            description: 'Delivery speed',
+          },
+          extras: {
+            type: 'array',
+            items: {
+              type: 'string',
+              anyOf: [
+                { type: 'string', const: 'card', title: 'Card' },
+                { type: 'string', const: 'bag' },
+              ],
+              enum: ['card', 'bag'],
+            },
+            uniqueItems: true,
+          },
+          size: {
+            type: 'string',
+            anyOf: [
+              { type: 'string', const: 's', title: 'Small' },
+              { type: 'string', const: 'Large', title: 'Large' },
+            ],
+            enum: ['s', 'Large'],
+          },
+          notes: { type: 'string', description: 'Notes' },
+          day: {
+            type: 'string',
+            format: 'date',
+            description: "Delivery day (Dates MUST be provided in 'YYYY-MM-DD' format.)",
+          },
+          month: { type: 'string', format: '^[0-9]{4}-(0[1-9]|1[0-2])$' },
+          week: { type: 'string', format: '^[0-9]{4}-W(0[1-9]|[1-4][0-9]|5[0-3])$' },
+          color: { type: 'string', format: '^#[0-9a-zA-Z]{6}$', description: 'Ribbon color' },
+          count: { type: 'number', multipleOf: 1, pattern: '[0-9]+' },
+        },
+        required: [],
+      });
+    });
+
     it('normalizes parameter names without trusting clobberable form properties', async () => {
-      const name = `declarative_clobber_${String(Date.now())}`;
       const parameterNames = [
         'spaced',
         '__proto__',
@@ -233,10 +322,10 @@ export function runDeclarativeFormConformanceSuite(
         'shadowRoot',
         'submit',
       ];
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Clobbering-safe form" toolautosubmit>
+      const { name, form } = declareForm(
+        'declarative_clobber',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Clobbering-safe form" toolautosubmit>
           <input name="  spaced  ">
           ${parameterNames
             .slice(1)
@@ -245,10 +334,6 @@ export function runDeclarativeFormConformanceSuite(
           <button type="submit">Submit</button>
         </form>`
       );
-      const form = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
-      if (!form) throw new Error('Expected clobbering declarative form fixture');
       EventTarget.prototype.addEventListener.call(
         form,
         'submit',
@@ -283,16 +368,18 @@ export function runDeclarativeFormConformanceSuite(
     });
 
     it('fills controls, dispatches native events, and returns the submit response', async () => {
-      const name = `declarative_execute_${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Update search" toolautosubmit>
+      const { name, form } = declareForm(
+        'declarative_execute',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Update search" toolautosubmit>
           <input id="declarative-query" name="query">
           <input id="declarative-limit" name="limit" type="number">
           <input id="declarative-safe" name="safe" type="checkbox">
           <input id="declarative-sort-new" name="sort" type="radio" value="new">
           <input id="declarative-sort-top" name="sort" type="radio" value="top">
+          <input id="declarative-alert" name="alert" type="radio" value="on">
+          <input id="declarative-source-docs" name="sources" type="checkbox" value="docs" checked>
+          <input id="declarative-source-code" name="sources" type="checkbox" value="code">
           <textarea id="declarative-notes" name="notes"></textarea>
           <select id="declarative-tags" name="tags" multiple>
             <option value="typescript">TypeScript</option>
@@ -302,10 +389,6 @@ export function runDeclarativeFormConformanceSuite(
           <button type="submit">Apply</button>
         </form>`
       );
-      const form = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
-      if (!form) throw new Error('Expected declarative form fixture');
 
       const changed = new Set<string>();
       form.querySelectorAll<HTMLElement>('input, textarea, select').forEach((control) => {
@@ -331,6 +414,8 @@ export function runDeclarativeFormConformanceSuite(
         limit: 25,
         safe: true,
         sort: 'top',
+        alert: 'on',
+        sources: ['code'],
         notes: 'browser parity',
         tags: ['typescript', 'testing'],
       });
@@ -341,6 +426,9 @@ export function runDeclarativeFormConformanceSuite(
       expect(form.elements.namedItem('limit')).toHaveProperty('value', '25');
       expect(form.elements.namedItem('safe')).toHaveProperty('checked', true);
       expect(document.querySelector('#declarative-sort-top')).toHaveProperty('checked', true);
+      expect(form.elements.namedItem('alert')).toHaveProperty('checked', true);
+      expect(document.querySelector('#declarative-source-docs')).toHaveProperty('checked', false);
+      expect(document.querySelector('#declarative-source-code')).toHaveProperty('checked', true);
       expect(form.elements.namedItem('notes')).toHaveProperty('value', 'browser parity');
       expect(
         [...form.querySelectorAll<HTMLOptionElement>('#declarative-tags option')]
@@ -357,6 +445,12 @@ export function runDeclarativeFormConformanceSuite(
           'declarative-safe:change',
           'declarative-sort-top:input',
           'declarative-sort-top:change',
+          'declarative-alert:input',
+          'declarative-alert:change',
+          'declarative-source-docs:input',
+          'declarative-source-docs:change',
+          'declarative-source-code:input',
+          'declarative-source-code:change',
           'declarative-notes:input',
           'declarative-notes:change',
           'declarative-tags:input',
@@ -366,12 +460,11 @@ export function runDeclarativeFormConformanceSuite(
     });
 
     it('reports agentInvoked for the running tool call but not for ordinary submissions', async () => {
-      const name = `declarative_attribution_${String(Date.now())}`;
       const userFormId = `declarative-user-form-${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Agent attribution" toolautosubmit>
+      const { name, form: toolForm } = declareForm(
+        'declarative_attribution',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Agent attribution" toolautosubmit>
           <input name="query">
           <button type="submit">Search</button>
         </form>
@@ -380,14 +473,9 @@ export function runDeclarativeFormConformanceSuite(
           <button type="submit">Search</button>
         </form>`
       );
-      const toolForm = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
       const userForm = document.querySelector<HTMLFormElement>(`#${userFormId}`);
       const userButton = userForm?.querySelector<HTMLButtonElement>('button');
-      if (!toolForm || !userForm || !userButton) {
-        throw new Error('Expected agent-attribution declarative form fixtures');
-      }
+      if (!userForm || !userButton) throw new Error('Expected the user form fixture');
 
       let agentSubmitInvoked: boolean | undefined;
       toolForm.addEventListener('submit', (event) => {
@@ -419,16 +507,11 @@ export function runDeclarativeFormConformanceSuite(
     });
 
     it('dispatches autosubmit before announcing tool activation', async () => {
-      const name = `declarative_autosubmit_order_${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Autosubmit order" toolautosubmit></form>`
+      const { name, form } = declareForm(
+        'declarative_autosubmit_order',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Autosubmit order" toolautosubmit></form>`
       );
-      const form = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
-      if (!form) throw new Error('Expected autosubmit-order declarative form fixture');
       const events: string[] = [];
       form.addEventListener('submit', (event) => {
         events.push('submit');
@@ -444,23 +527,18 @@ export function runDeclarativeFormConformanceSuite(
 
     it('honors native validation, novalidate, and formnovalidate during autosubmit', async () => {
       for (const validationBypass of ['novalidate', 'formnovalidate'] as const) {
-        const name = `declarative_${validationBypass}_${String(Date.now())}`;
-        toolNames.add(name);
-        document.body.insertAdjacentHTML(
-          'beforeend',
-          `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Skip validation" toolautosubmit ${
-            validationBypass === 'novalidate' ? 'novalidate' : ''
-          }>
+        const { name, form } = declareForm(
+          `declarative_${validationBypass}`,
+          (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Skip validation" toolautosubmit ${
+          validationBypass === 'novalidate' ? 'novalidate' : ''
+        }>
             <input name="required_value" required>
             <button type="submit" ${
               validationBypass === 'formnovalidate' ? 'formnovalidate' : ''
             }>Submit</button>
           </form>`
         );
-        const form = document.querySelector<HTMLFormElement>(
-          `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-        );
-        if (!form) throw new Error('Expected validation-bypass declarative form fixture');
         form.addEventListener('submit', (event) => {
           event.preventDefault();
           submitRespondWith(event, Promise.resolve(validationBypass));
@@ -469,19 +547,14 @@ export function runDeclarativeFormConformanceSuite(
         await expect(executeTool(await waitForTool(name), {})).resolves.toBe(validationBypass);
       }
 
-      const name = `declarative_validation_${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Run validation" toolautosubmit>
+      const { name, form } = declareForm(
+        'declarative_validation',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Run validation" toolautosubmit>
           <input name="required_value" required>
           <button type="submit">Submit</button>
         </form>`
       );
-      const form = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
-      if (!form) throw new Error('Expected validated declarative form fixture');
       let submitted = false;
       form.addEventListener('submit', () => {
         submitted = true;
@@ -492,20 +565,15 @@ export function runDeclarativeFormConformanceSuite(
     });
 
     it('resolves an autosubmit call from the submit event when no response is provided', async () => {
-      const name = `declarative_submit_settle_${String(Date.now())}`;
       const frameName = `declarative-settle-frame-${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Submit without responding" toolautosubmit target="${frameName}" action="about:blank">
+      const { name, form } = declareForm(
+        'declarative_submit_settle',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Submit without responding" toolautosubmit target="${frameName}" action="about:blank">
           <input name="query">
         </form>
         <iframe ${FIXTURE_ATTRIBUTE} name="${frameName}"></iframe>`
       );
-      const form = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
-      if (!form) throw new Error('Expected settle-on-submit declarative form fixture');
 
       let submitted = false;
       form.addEventListener('submit', () => {
@@ -518,19 +586,14 @@ export function runDeclarativeFormConformanceSuite(
     });
 
     it('resolves when a submit handler performs a direct form submission', async () => {
-      const name = `declarative_direct_submit_${String(Date.now())}`;
       const frameName = `declarative-frame-${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Submit directly" toolautosubmit target="${frameName}" action="about:blank">
+      const { name, form } = declareForm(
+        'declarative_direct_submit',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Submit directly" toolautosubmit target="${frameName}" action="about:blank">
         </form>
         <iframe ${FIXTURE_ATTRIBUTE} name="${frameName}"></iframe>`
       );
-      const form = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
-      if (!form) throw new Error('Expected direct-submit declarative form fixture');
 
       let submitted = false;
       form.addEventListener('submit', (event) => {
@@ -545,21 +608,17 @@ export function runDeclarativeFormConformanceSuite(
     });
 
     it('resolves a manual invocation when script submits the active form directly', async () => {
-      const name = `declarative_external_submit_${String(Date.now())}`;
       const frameName = `declarative-external-frame-${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Submit outside a handler" target="${frameName}" action="about:blank">
+      const { name, form } = declareForm(
+        'declarative_external_submit',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Submit outside a handler" target="${frameName}" action="about:blank">
           <button type="submit">Submit</button>
         </form>
         <iframe ${FIXTURE_ATTRIBUTE} name="${frameName}"></iframe>`
       );
-      const form = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
-      const button = form?.querySelector<HTMLButtonElement>('button');
-      if (!form || !button) throw new Error('Expected external-submit declarative form fixture');
+      const button = form.querySelector('button');
+      if (!button) throw new Error('Expected the external-submit button');
 
       let settled = false;
       const execution = executeTool(await waitForTool(name), {}).finally(() => {
@@ -575,32 +634,23 @@ export function runDeclarativeFormConformanceSuite(
       form.submit();
 
       await expect(
-        Promise.race([
-          execution,
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('timed out waiting for direct submission')), 200)
-          ),
-        ])
+        Promise.race([execution, rejectAfter(200, 'timed out waiting for direct submission')])
       ).resolves.toBeDefined();
     });
 
     it('keeps manual-review calls pending until the focused submit button is used', async () => {
-      const name = `declarative_manual_${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Prepare a message">
+      const { name, form } = declareForm(
+        'declarative_manual',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Prepare a message">
           <input name="message">
           <button type="submit">Send</button>
         </form>`
       );
-      const form = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
-      const input = form?.elements.namedItem('message');
-      const button = form?.querySelector<HTMLButtonElement>('button');
-      if (!form || !(input instanceof HTMLInputElement) || !button) {
-        throw new Error('Expected manual declarative form fixture');
+      const input = form.elements.namedItem('message');
+      const button = form.querySelector('button');
+      if (!(input instanceof HTMLInputElement) || !button) {
+        throw new Error('Expected the manual form controls');
       }
 
       let activatedWithValue = '';
@@ -646,21 +696,15 @@ export function runDeclarativeFormConformanceSuite(
     });
 
     it('rejects a manual form without mutating it when no submit button exists', async () => {
-      const name = `declarative_missing_submit_${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Missing submit button">
+      const { name, form } = declareForm(
+        'declarative_missing_submit',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Missing submit button">
           <input name="value" value="initial">
         </form>`
       );
-      const form = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
-      const input = form?.elements.namedItem('value');
-      if (!(input instanceof HTMLInputElement)) {
-        throw new Error('Expected missing-submit declarative form fixture');
-      }
+      const input = form.elements.namedItem('value');
+      if (!(input instanceof HTMLInputElement)) throw new Error('Expected the value input');
 
       await expect(
         executeTool(await waitForTool(name), { value: 'should not be applied' })
@@ -669,22 +713,16 @@ export function runDeclarativeFormConformanceSuite(
     });
 
     it('cancels a pending manual-review call when the form is reset', async () => {
-      const name = `declarative_reset_${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Prepare resettable input">
+      const { name, form } = declareForm(
+        'declarative_reset',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Prepare resettable input">
           <input name="value" value="initial">
           <button type="submit">Save</button>
         </form>`
       );
-      const form = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
-      const input = form?.elements.namedItem('value');
-      if (!form || !(input instanceof HTMLInputElement)) {
-        throw new Error('Expected reset declarative form fixture');
-      }
+      const input = form.elements.namedItem('value');
+      if (!(input instanceof HTMLInputElement)) throw new Error('Expected the value input');
 
       const execution = executeTool(await waitForTool(name), { value: 'pending' });
       await waitForCondition(
@@ -695,33 +733,24 @@ export function runDeclarativeFormConformanceSuite(
       form.reset();
 
       await expect(
-        Promise.race([
-          execution,
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('timed out waiting for reset cancellation')), 200)
-          ),
-        ])
+        Promise.race([execution, rejectAfter(200, 'timed out waiting for reset cancellation')])
       ).rejects.toMatchObject({ name: 'UnknownError' });
       expect(input.value).toBe('initial');
     });
 
     it('keeps a manual invocation active when reset is prevented', async () => {
-      const name = `declarative_prevented_reset_${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Prevent reset">
+      const { name, form } = declareForm(
+        'declarative_prevented_reset',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Prevent reset">
           <input name="value" value="initial">
           <button type="submit">Save</button>
         </form>`
       );
-      const form = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
-      const input = form?.elements.namedItem('value');
-      const button = form?.querySelector<HTMLButtonElement>('button');
-      if (!form || !(input instanceof HTMLInputElement) || !button) {
-        throw new Error('Expected prevented-reset declarative form fixture');
+      const input = form.elements.namedItem('value');
+      const button = form.querySelector('button');
+      if (!(input instanceof HTMLInputElement) || !button) {
+        throw new Error('Expected the prevented-reset form controls');
       }
       form.addEventListener('reset', (event) => event.preventDefault());
       form.addEventListener('submit', (event) => {
@@ -747,21 +776,19 @@ export function runDeclarativeFormConformanceSuite(
     });
 
     it('reconciles form mutations and duplicate registration retries', async () => {
-      const name = `declarative_dynamic_${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} id="declarative-first" toolname="${name}" tooldescription="First form">
+      const { name, form: first } = declareForm(
+        'declarative_dynamic',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} id="declarative-first" toolname="${toolName}" tooldescription="First form">
           <input name="query">
         </form>
-        <form ${FIXTURE_ATTRIBUTE} id="declarative-second" toolname="${name}" tooldescription="Second form">
+        <form ${FIXTURE_ATTRIBUTE} id="declarative-second" toolname="${toolName}" tooldescription="Second form">
           <input name="fallback">
         </form>`
       );
-      const first = document.querySelector<HTMLFormElement>('#declarative-first');
       const second = document.querySelector<HTMLFormElement>('#declarative-second');
-      const input = first?.elements.namedItem('query');
-      if (!first || !second || !(input instanceof HTMLInputElement)) {
+      const input = first.elements.namedItem('query');
+      if (!second || !(input instanceof HTMLInputElement)) {
         throw new Error('Expected dynamic declarative form fixtures');
       }
 
@@ -810,16 +837,11 @@ export function runDeclarativeFormConformanceSuite(
     });
 
     it('emits a tool change when toolautosubmit is added', async () => {
-      const name = `declarative_autosubmit_change_${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Autosubmit change"></form>`
+      const { name, form } = declareForm(
+        'declarative_autosubmit_change',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Autosubmit change"></form>`
       );
-      const form = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
-      if (!form) throw new Error('Expected autosubmit-change declarative form fixture');
       await waitForTool(name);
       const changed = new Promise((resolve) => {
         requireModelContext().addEventListener('toolchange', resolve, { once: true });
@@ -831,11 +853,10 @@ export function runDeclarativeFormConformanceSuite(
     });
 
     it('rejects invalid input transactionally before changing any control', async () => {
-      const name = `declarative_transaction_${String(Date.now())}`;
-      toolNames.add(name);
-      document.body.insertAdjacentHTML(
-        'beforeend',
-        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Transactional form" toolautosubmit>
+      const { name, form } = declareForm(
+        'declarative_transaction',
+        (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Transactional form" toolautosubmit>
           <input name="query" value="original">
           <select name="scope">
             <option value="local">Local</option>
@@ -843,13 +864,10 @@ export function runDeclarativeFormConformanceSuite(
           </select>
         </form>`
       );
-      const form = document.querySelector<HTMLFormElement>(
-        `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-      );
-      const query = form?.elements.namedItem('query');
-      const scope = form?.elements.namedItem('scope');
-      if (!form || !(query instanceof HTMLInputElement) || !(scope instanceof HTMLSelectElement)) {
-        throw new Error('Expected transactional declarative form fixture');
+      const query = form.elements.namedItem('query');
+      const scope = form.elements.namedItem('scope');
+      if (!(query instanceof HTMLInputElement) || !(scope instanceof HTMLSelectElement)) {
+        throw new Error('Expected the transactional form controls');
       }
       form.addEventListener('submit', (event) => {
         event.preventDefault();
@@ -879,18 +897,13 @@ export function runDeclarativeFormConformanceSuite(
     it.skipIf(options.supportsFormRemovalCancellation === false)(
       'rejects a pending response when its declarative form is removed',
       async () => {
-        const name = `declarative_removed_${String(Date.now())}`;
-        toolNames.add(name);
-        document.body.insertAdjacentHTML(
-          'beforeend',
-          `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Pending form" toolautosubmit>
+        const { name, form } = declareForm(
+          'declarative_removed',
+          (toolName) => `
+        <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Pending form" toolautosubmit>
           <input name="value">
         </form>`
         );
-        const form = document.querySelector<HTMLFormElement>(
-          `form[${FIXTURE_ATTRIBUTE}][toolname="${name}"]`
-        );
-        if (!form) throw new Error('Expected pending declarative form fixture');
         let submitted: (() => void) | undefined;
         const submission = new Promise<void>((resolve) => {
           submitted = resolve;

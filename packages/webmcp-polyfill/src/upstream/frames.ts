@@ -1,10 +1,8 @@
-import type { WebMCP } from 'webmcp-types';
+import type { WebMCP } from "webmcp-types";
 
 /** Tool metadata as its owner stores it and as frames exchange it. */
-export interface ToolMetadata extends Pick<
-  WebMCP.RegisteredTool,
-  'name' | 'title' | 'description'
-> {
+export interface ToolMetadata
+  extends Pick<WebMCP.RegisteredTool, "name" | "title" | "description"> {
   annotations: WebMCP.ToolAnnotations | undefined;
   // Snapshot at registration; each discovery result parses a fresh copy.
   serializedSchema: string | undefined;
@@ -12,10 +10,10 @@ export interface ToolMetadata extends Pick<
 
 // Lexicographical, the order in which Web IDL reads dictionary members.
 export const annotationNames = [
-  'consequentialHint',
-  'debugging',
-  'readOnlyHint',
-  'untrustedContentHint',
+  "consequentialHint",
+  "debugging",
+  "readOnlyHint",
+  "untrustedContentHint",
 ] as const satisfies readonly (keyof WebMCP.ToolAnnotations)[];
 
 interface Handlers {
@@ -24,16 +22,16 @@ interface Handlers {
     callerOrigin: string,
     name: string,
     serializedInput: string,
-    signal: AbortSignal
+    signal: AbortSignal,
   ): Promise<string>;
   changed(): Promise<void>;
 }
 
 type Request =
-  | { kind: 'permission'; childIndex: number; childOrigin: string }
-  | { kind: 'getTools' }
-  | { kind: 'execute'; name: string; input: string }
-  | { kind: 'changed' };
+  | { kind: "permission"; childIndex: number; childOrigin: string }
+  | { kind: "getTools" }
+  | { kind: "execute"; name: string; input: string }
+  | { kind: "changed" };
 
 type ReplyValue = boolean | ToolMetadata[] | string | undefined;
 
@@ -42,7 +40,7 @@ interface Session {
   end(): void;
 }
 
-const protocol = 'webmcp-polyfill';
+const protocol = "webmcp-polyfill";
 // Bounds handshakes, discovery, and permission replies; author code has no deadline.
 const deadline = 500;
 const NativeDOMException = globalThis.DOMException;
@@ -66,14 +64,14 @@ export class FrameBridge {
     this.#window = view;
     this.#document = view.document;
     this.#handlers = handlers;
-    this.#window.addEventListener('message', (event) => this.#receive(event), true);
-    this.#window.addEventListener('pagehide', () => {
+    this.#window.addEventListener("message", (event) => this.#receive(event), true);
+    this.#window.addEventListener("pagehide", () => {
       this.#hidden = true;
       for (const session of this.#sessions) {
         session.end();
       }
     });
-    this.#window.addEventListener('pageshow', (event) => {
+    this.#window.addEventListener("pageshow", (event) => {
       // Only a restore from the back/forward cache follows pagehide.
       if (event.persisted) {
         this.#hidden = false;
@@ -113,20 +111,20 @@ export class FrameBridge {
             .map((metadata) => toRegisteredTool(metadata, this.#window, ownOrigin));
         }
         try {
-          const reply = await this.#request(peer, origins, { kind: 'getTools' });
+          const reply = await this.#request(peer, origins, { kind: "getTools" });
           if (!Array.isArray(reply.value)) {
-            throw new TypeError('Expected a tool list from the frame');
+            throw new TypeError("Expected a tool list from the frame");
           }
           return reply.value.map((value: unknown) =>
-            toRegisteredTool(readToolMetadata(value), peer, reply.origin)
+            toRegisteredTool(readToolMetadata(value), peer, reply.origin),
           );
         } catch (error) {
-          if (!(error instanceof NativeDOMException && error.name === 'UnknownError')) {
-            console.warn('WebMCP: could not read tools from a frame.', error);
+          if (!(error instanceof NativeDOMException && error.name === "UnknownError")) {
+            console.warn("WebMCP: could not read tools from a frame.", error);
           }
           return [];
         }
-      })
+      }),
     );
     return results.flat();
   }
@@ -136,15 +134,15 @@ export class FrameBridge {
     expectedOrigin: string,
     name: string,
     serializedInput: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<string> {
     const reply = await this.#request(
       target,
       [expectedOrigin],
-      { kind: 'execute', name, input: serializedInput },
-      signal
+      { kind: "execute", name, input: serializedInput },
+      signal,
     );
-    if (typeof reply.value !== 'string') {
+    if (typeof reply.value !== "string") {
       throw executionError();
     }
     return reply.value;
@@ -160,7 +158,7 @@ export class FrameBridge {
         continue;
       }
       try {
-        await this.#request(peer, origins, { kind: 'changed' });
+        await this.#request(peer, origins, { kind: "changed" });
       } catch {
         // Frames may navigate or disappear while registration changes are delivered.
       }
@@ -171,7 +169,7 @@ export class FrameBridge {
     target: Window,
     origins: string[] | undefined,
     request: Request,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<{ value: unknown; origin: string }> {
     return new Promise((resolve, reject) => {
       signal?.throwIfAborted();
@@ -187,12 +185,12 @@ export class FrameBridge {
       const close = (): void => {
         clearTimeout(timer);
         stopWatching();
-        signal?.removeEventListener('abort', abort);
+        signal?.removeEventListener("abort", abort);
         this.#handshakes.delete(id);
         port1.close();
       };
       const fail = (error: unknown = executionError()): void => {
-        port1.postMessage({ kind: 'cancel' });
+        port1.postMessage({ kind: "cancel" });
         close();
         reject(error);
       };
@@ -214,7 +212,7 @@ export class FrameBridge {
         }
         peerOrigin = event.origin;
         clearTimeout(timer);
-        if (request.kind !== 'execute' && request.kind !== 'changed') {
+        if (request.kind !== "execute" && request.kind !== "changed") {
           timer = setTimeout(expire, deadline);
         }
         // The port reaches the document that answered, even if its window navigates afterwards.
@@ -226,22 +224,22 @@ export class FrameBridge {
       port1.onmessage = (event: MessageEvent<unknown>) => {
         const reply = record(event.data);
         // A peer that gave up may say so before its ready message is handled here.
-        if (reply?.kind === 'error') {
+        if (reply?.kind === "error") {
           fail();
           return;
         }
-        if (reply?.kind !== 'result' || peerOrigin === undefined) {
+        if (reply?.kind !== "result" || peerOrigin === undefined) {
           return;
         }
         close();
         resolve({ value: reply.value, origin: peerOrigin });
       };
       port1.onmessageerror = () => fail();
-      signal?.addEventListener('abort', abort, { once: true });
+      signal?.addEventListener("abort", abort, { once: true });
       this.#handshakes.set(id, connected);
       // The peer's origin is unknown until it answers, and this message carries only the id.
       try {
-        target.postMessage(`${protocol}:connect:${id}`, '*', [port2]);
+        target.postMessage(`${protocol}:connect:${id}`, "*", [port2]);
       } catch {
         port2.close();
         fail();
@@ -263,13 +261,13 @@ export class FrameBridge {
       !isWindow(source) ||
       !this.#related(source) ||
       // An opaque origin cannot be named by exposedTo, fromOrigins, or an allow attribute.
-      event.origin === 'null' ||
+      event.origin === "null" ||
       this.#hidden
     ) {
       return;
     }
 
-    if (message.kind === 'announce') {
+    if (message.kind === "announce") {
       const isNew = !this.#knownPeers.has(source);
       this.#learn(source);
       source.postMessage(`${protocol}:present`, event.origin);
@@ -282,26 +280,26 @@ export class FrameBridge {
         if (peer === source) {
           continue;
         }
-        peer.postMessage(`${protocol}:refresh`, '*');
+        peer.postMessage(`${protocol}:refresh`, "*");
       }
       return;
     }
-    if (message.kind === 'present') {
+    if (message.kind === "present") {
       this.#learn(source);
       return;
     }
-    if (message.kind === 'refresh') {
+    if (message.kind === "refresh") {
       if (source === this.#window.top) {
         this.#announce();
       }
       return;
     }
-    if (message.kind === 'ready') {
+    if (message.kind === "ready") {
       this.#handshakes.get(message.id)?.(event);
       return;
     }
     const [port] = event.ports;
-    if (message.kind !== 'connect' || !message.id || !port || event.ports.length !== 1) {
+    if (message.kind !== "connect" || !message.id || !port || event.ports.length !== 1) {
       return;
     }
     this.#learn(source);
@@ -322,7 +320,7 @@ export class FrameBridge {
       close();
     };
     const fail = (): void => {
-      port.postMessage({ kind: 'error' });
+      port.postMessage({ kind: "error" });
       cancel();
     };
     // Tell a requester that was too slow to send its request; it may have no deadline left.
@@ -332,7 +330,7 @@ export class FrameBridge {
     port.onmessageerror = fail;
     port.onmessage = async (event: MessageEvent<unknown>) => {
       const request = record(event.data);
-      if (request?.kind === 'cancel') {
+      if (request?.kind === "cancel") {
         cancel();
         return;
       }
@@ -343,7 +341,7 @@ export class FrameBridge {
       clearTimeout(timer);
       try {
         const value = await this.#respond(source, origin, request, controller.signal);
-        port.postMessage({ kind: 'result', value });
+        port.postMessage({ kind: "result", value });
         close();
       } catch {
         fail();
@@ -356,18 +354,18 @@ export class FrameBridge {
     source: Window,
     origin: string,
     request: Record<string, unknown> | undefined,
-    signal: AbortSignal
+    signal: AbortSignal,
   ): Promise<ReplyValue> {
     if (!request || !this.#related(source)) {
       throw executionError();
     }
-    if (request.kind === 'permission') {
+    if (request.kind === "permission") {
       const { childIndex, childOrigin } = request;
       if (
-        typeof childIndex !== 'number' ||
+        typeof childIndex !== "number" ||
         !Number.isInteger(childIndex) ||
         childIndex < 0 ||
-        typeof childOrigin !== 'string'
+        typeof childOrigin !== "string"
       ) {
         throw executionError();
       }
@@ -381,17 +379,17 @@ export class FrameBridge {
       throw executionError();
     }
     signal.throwIfAborted();
-    if (request.kind === 'getTools') {
+    if (request.kind === "getTools") {
       return this.#handlers.getTools(origin);
     }
     if (
-      request.kind === 'execute' &&
-      typeof request.name === 'string' &&
-      typeof request.input === 'string'
+      request.kind === "execute" &&
+      typeof request.name === "string" &&
+      typeof request.input === "string"
     ) {
       return this.#handlers.execute(origin, request.name, request.input, signal);
     }
-    if (request.kind === 'changed') {
+    if (request.kind === "changed") {
       await this.#handlers.changed();
       return undefined;
     }
@@ -424,7 +422,7 @@ export class FrameBridge {
     const parentOrigin = view.location.ancestorOrigins?.[0];
     const parentDocument = readDocument(
       view.parent,
-      parentOrigin === undefined || parentOrigin === view.origin
+      parentOrigin === undefined || parentOrigin === view.origin,
     );
     if (!parentDocument) {
       return this.#parentPermission(view, view.origin);
@@ -467,7 +465,7 @@ export class FrameBridge {
     }
     try {
       const reply = await this.#request(parent, undefined, {
-        kind: 'permission',
+        kind: "permission",
         childIndex,
         childOrigin: origin,
       });
@@ -540,7 +538,7 @@ export class FrameBridge {
   #announce(): Window[] {
     const others = this.#tree().filter((frame) => frame !== this.#window);
     for (const frame of others) {
-      frame.postMessage(`${protocol}:announce`, '*');
+      frame.postMessage(`${protocol}:announce`, "*");
     }
     return others;
   }
@@ -558,7 +556,7 @@ export class FrameBridge {
   #forget(peer: Window): void {
     this.#knownPeers.delete(peer);
     if (this.#related(peer)) {
-      peer.postMessage(`${protocol}:announce`, '*');
+      peer.postMessage(`${protocol}:announce`, "*");
     }
   }
 
@@ -591,10 +589,10 @@ function childAllowed(owner: Document, child: Window, origin: string): boolean {
   if (!frame) {
     return false;
   }
-  const directive = (frame.getAttribute('allow') ?? '')
-    .split(';')
+  const directive = (frame.getAttribute("allow") ?? "")
+    .split(";")
     .map((part) => part.trim().split(/\s+/u))
-    .find(([name]) => name === 'tools');
+    .find(([name]) => name === "tools");
   if (!directive) {
     return origin === ownerOrigin;
   }
@@ -604,15 +602,15 @@ function childAllowed(owner: Document, child: Window, origin: string): boolean {
     return false;
   }
   // A frame with srcdoc, no src, or an about: URL takes its owner's origin.
-  const src = frame.hasAttribute('srcdoc') ? null : frame.getAttribute('src');
+  const src = frame.hasAttribute("srcdoc") ? null : frame.getAttribute("src");
   const srcURL = src ? URL.parse(src, owner.baseURI) : null;
-  const sourceOrigin = !src || srcURL?.protocol === 'about:' ? ownerOrigin : srcURL?.origin;
+  const sourceOrigin = !src || srcURL?.protocol === "about:" ? ownerOrigin : srcURL?.origin;
   return sources.some(
     (source) =>
-      source === '*' ||
+      source === "*" ||
       (source === "'self'" && origin === ownerOrigin) ||
       (source === "'src'" && origin === sourceOrigin) ||
-      source === origin
+      source === origin,
   );
 }
 
@@ -646,13 +644,13 @@ function findFrame(owner: Document, child: Window, sameOrigin: boolean): Element
 
 // Unlike frameElement, a DOM search cannot enter closed shadow roots.
 function searchFrames(root: Document | ShadowRoot, child: Window): Element | undefined {
-  const frames = root.querySelectorAll<HTMLIFrameElement | HTMLFrameElement>('iframe, frame');
+  const frames = root.querySelectorAll<HTMLIFrameElement | HTMLFrameElement>("iframe, frame");
   for (const frame of frames) {
     if (frame.contentWindow === child) {
       return frame;
     }
   }
-  for (const element of root.querySelectorAll('*')) {
+  for (const element of root.querySelectorAll("*")) {
     if (!element.shadowRoot) {
       continue;
     }
@@ -673,19 +671,19 @@ export function readToolsPolicy(owner: Document): boolean | undefined {
   // Neither policy interface is in TypeScript's DOM library.
   const source: Document & { permissionsPolicy?: unknown; featurePolicy?: unknown } = owner;
   const policy = record(source.permissionsPolicy ?? source.featurePolicy);
-  if (typeof policy?.features !== 'function' || typeof policy.allowsFeature !== 'function') {
+  if (typeof policy?.features !== "function" || typeof policy.allowsFeature !== "function") {
     return undefined;
   }
   const features: unknown = policy.features();
-  return Array.isArray(features) && features.includes('tools')
-    ? Boolean(policy.allowsFeature('tools'))
+  return Array.isArray(features) && features.includes("tools")
+    ? Boolean(policy.allowsFeature("tools"))
     : undefined;
 }
 
 function toRegisteredTool(
   metadata: ToolMetadata,
   owner: Window,
-  origin: string
+  origin: string,
 ): WebMCP.RegisteredTool {
   // SAFETY: the draft keeps whatever JSON toJSON produced; the cast matches RegisteredTool's type.
   const inputSchema =
@@ -710,12 +708,12 @@ function readToolMetadata(value: unknown): ToolMetadata {
   const tool = record(value);
   if (
     !tool ||
-    typeof tool.name !== 'string' ||
-    typeof tool.title !== 'string' ||
-    typeof tool.description !== 'string' ||
-    (tool.serializedSchema !== undefined && typeof tool.serializedSchema !== 'string')
+    typeof tool.name !== "string" ||
+    typeof tool.title !== "string" ||
+    typeof tool.description !== "string" ||
+    (tool.serializedSchema !== undefined && typeof tool.serializedSchema !== "string")
   ) {
-    throw new TypeError('Invalid tool metadata from the frame');
+    throw new TypeError("Invalid tool metadata from the frame");
   }
   const metadata: ToolMetadata = {
     name: tool.name,
@@ -729,7 +727,7 @@ function readToolMetadata(value: unknown): ToolMetadata {
   }
   const hints = record(tool.annotations);
   if (!hints) {
-    throw new TypeError('Invalid tool annotations from the frame');
+    throw new TypeError("Invalid tool annotations from the frame");
   }
   const annotations: WebMCP.ToolAnnotations = {};
   for (const name of annotationNames) {
@@ -737,7 +735,7 @@ function readToolMetadata(value: unknown): ToolMetadata {
     if (hint === undefined) {
       continue;
     }
-    if (typeof hint !== 'boolean') {
+    if (typeof hint !== "boolean") {
       throw new TypeError(`Invalid ${name} annotation from the frame`);
     }
     annotations[name] = hint;
@@ -747,15 +745,15 @@ function readToolMetadata(value: unknown): ToolMetadata {
 }
 
 function readWindowMessage(value: unknown): { kind: string; id: string } | undefined {
-  if (typeof value !== 'string') {
+  if (typeof value !== "string") {
     return undefined;
   }
-  const [namespace, kind = '', id = '', extra] = value.split(':');
+  const [namespace, kind = "", id = "", extra] = value.split(":");
   return namespace === protocol && extra === undefined ? { kind, id } : undefined;
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return undefined;
   }
   // SAFETY: the object check permits property reads; each reader validates its members.
@@ -764,12 +762,12 @@ function record(value: unknown): Record<string, unknown> | undefined {
 
 function isWindow(value: MessageEventSource): value is Window {
   try {
-    return 'postMessage' in value && 'window' in value;
+    return "postMessage" in value && "window" in value;
   } catch {
     return false;
   }
 }
 
 export function executionError(): DOMException {
-  return new NativeDOMException('Tool execution failed', 'UnknownError');
+  return new NativeDOMException("Tool execution failed", "UnknownError");
 }
