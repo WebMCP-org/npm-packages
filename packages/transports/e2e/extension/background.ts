@@ -12,7 +12,6 @@ import {
 } from '../../../../e2e/runtime-contract/core.js';
 
 let dynamicToolEnabled = false;
-let runtimeMutationQueue: Promise<void> = Promise.resolve();
 
 interface RuntimeSession {
   registrations: Map<string, RegisteredTool>;
@@ -20,15 +19,6 @@ interface RuntimeSession {
 }
 
 const sessions = new Set<RuntimeSession>();
-
-function enqueueRuntimeMutation<T>(operation: () => Promise<T>): Promise<T> {
-  const result = runtimeMutationQueue.then(operation, operation);
-  runtimeMutationQueue = result.then(
-    () => undefined,
-    () => undefined
-  );
-  return result;
-}
 
 function registerSessionTool(session: RuntimeSession, tool: RuntimeContractTool): void {
   const registration = session.server.registerTool(
@@ -48,37 +38,23 @@ const runtimeTools = createRuntimeContractTools(state, {
 });
 const runtimeContract = createRuntimeContractController(
   state,
-  () =>
-    enqueueRuntimeMutation(async () => {
-      if (dynamicToolEnabled) return false;
-
-      const registeredSessions: RuntimeSession[] = [];
-      try {
-        for (const session of sessions) {
-          registerSessionTool(session, runtimeTools.createDynamicTool());
-          registeredSessions.push(session);
-        }
-      } catch (error) {
-        for (const session of registeredSessions) {
-          session.registrations.get(DYNAMIC_TOOL_NAME)?.remove();
-          session.registrations.delete(DYNAMIC_TOOL_NAME);
-        }
-        throw error;
-      }
-
-      dynamicToolEnabled = true;
-      return true;
-    }),
-  (name = DYNAMIC_TOOL_NAME) =>
-    enqueueRuntimeMutation(async () => {
-      if (name !== DYNAMIC_TOOL_NAME || !dynamicToolEnabled) return false;
-      dynamicToolEnabled = false;
-      for (const session of sessions) {
-        session.registrations.get(DYNAMIC_TOOL_NAME)?.remove();
-        session.registrations.delete(DYNAMIC_TOOL_NAME);
-      }
-      return true;
-    })
+  async () => {
+    if (dynamicToolEnabled) return false;
+    for (const session of sessions) {
+      registerSessionTool(session, runtimeTools.createDynamicTool());
+    }
+    dynamicToolEnabled = true;
+    return true;
+  },
+  async (name = DYNAMIC_TOOL_NAME) => {
+    if (name !== DYNAMIC_TOOL_NAME || !dynamicToolEnabled) return false;
+    dynamicToolEnabled = false;
+    for (const session of sessions) {
+      session.registrations.get(DYNAMIC_TOOL_NAME)?.remove();
+      session.registrations.delete(DYNAMIC_TOOL_NAME);
+    }
+    return true;
+  }
 );
 state.ready = true;
 

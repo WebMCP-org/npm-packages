@@ -25,12 +25,8 @@ function isControlResponse(value: unknown): value is ControlResponse {
   return value.ok ? 'value' in value : typeof value.error === 'string';
 }
 
-function isBoolean(value: unknown): value is boolean {
-  return typeof value === 'boolean';
-}
-
 function parseBoolean(value: unknown, action: string): boolean {
-  if (!isBoolean(value)) {
+  if (typeof value !== 'boolean') {
     throw new TypeError(`Control action '${action}' returned a non-boolean value`);
   }
   return value;
