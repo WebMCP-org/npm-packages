@@ -64,9 +64,7 @@ Prompt and resource discovery also belongs to MCP. Use a connected MCP client in
 
 ## Native integration
 
-The constructor uses `document.modelContext` automatically and installs the bundled `@mcp-b/webmcp-polyfill` (about 28 KB minified) when needed. It delegates browser discovery, execution, and access checks to that context. The document property continues to expose the underlying context; `@mcp-b/global` installs the extended API and connects its default transport.
-
-Without a WebMCP context, which is the case with no `document` (server-side module evaluation) or on an insecure page (the polyfill does not install), the constructor still succeeds and the server serves MCP only: `registerTool()`, `registerPrompt()`, `registerResource()`, `listTools()`, `connect()`, and `close()` work, tools are not mirrored to a browser context, `getTools()` and `executeTool()` reject with `InvalidStateError`, `syncNativeTools()` resolves without effect, and no `toolchange` events fire. For service workers or Node.js, use the official `McpServer` directly.
+The constructor uses `document.modelContext`, installing the bundled `@mcp-b/webmcp-polyfill` (about 28 KB minified) when needed, and delegates browser discovery, execution, and access checks to that context. Without a WebMCP context (no `document`, or an insecure page), the server serves MCP only. The document property keeps exposing the underlying context; `@mcp-b/global` installs the extended API and connects its default transport.
 
 To select a context explicitly, pass it as `native`, then reconcile its current tools:
 
@@ -78,19 +76,13 @@ const server = new BrowserMcpServer({ name: 'catalog-app', version: '1.0.0' }, {
 await server.syncNativeTools();
 ```
 
-`syncNativeTools()` resolves after reconciliation. Later native `toolchange` events trigger another reconciliation. A top-level document mirrors its own tools and those of same-origin descendant frames; a framed document mirrors only its own tools. The native context must implement the upstream object-input `executeTool()` contract. Over MCP, a native result that parses to a JSON object becomes structured content; any other result (text, numbers, quoted strings, booleans, `null`, arrays) is returned as text unchanged. Direct `executeTool()` calls preserve the underlying context's result.
-
-The adapter re-dispatches the context's `toolactivated` and `toolcancel` events on itself with the same `toolName`, next to its own `toolchange`.
+`syncNativeTools()` resolves after reconciliation, and later native `toolchange` events reconcile again. The [package reference](https://docs.mcp-b.ai/packages/webmcp-ts-sdk/reference) covers frame scope, native result conversion, lifecycle events, and the MCP-only mode.
 
 ## Schema boundary
 
-`BrowserMcpServer` converts JSON Schema or Standard JSON Schema input metadata with the SDK schema adapter. When the supplied schema also has `~standard.validate()`, the adapter preserves that method for the official MCP server. For plain JSON Schema, the server uses the MCP SDK's `fromJsonSchema` adapter.
+`BrowserMcpServer` accepts JSON Schema and Standard JSON Schema input metadata. The official MCP server validates input and `outputSchema` on **MCP client calls** only; direct `executeTool()` calls and native mirrors invoke the browser callback without that validation, so validate in the callback when both paths can call a tool. The [`@mcp-b/react-webmcp`](../react-webmcp/README.md) hook already does this.
 
-This validation runs on **MCP client calls**. Direct `executeTool()` calls and native WebMCP mirrors invoke the browser callback without passing through MCP validation. Validate in that callback when exposing tools through both paths, and pass plain JSON metadata so the MCP SDK does not also apply the vendor transforms. The [`@mcp-b/react-webmcp`](../react-webmcp/README.md) hook already does this for local and agent calls using the validator supplied in your schema.
-
-`outputSchema` is likewise enforced by the MCP server on MCP calls, not on direct browser calls. See [schemas and structured output](https://docs.mcp-b.ai/how-to/use-schemas-and-structured-output) for examples and [the package reference](https://docs.mcp-b.ai/packages/webmcp-ts-sdk/reference#schema-boundary) for the contracts.
-
-MCP requires an object-root tool input schema. An array-root WebMCP tool remains available through WebMCP but is omitted from MCP discovery. Direct registrations on `server.mcpServer` use the official SDK's schema APIs; Zod 4.2 or newer is supported, and Zod 3 is unsupported.
+MCP requires an object-root tool input schema. An array-root WebMCP tool remains available through WebMCP but is omitted from MCP discovery. Direct registrations on `server.mcpServer` use the official SDK's schema APIs; Zod 4.2 or newer is supported, and Zod 3 is unsupported. See [the package reference](https://docs.mcp-b.ai/packages/webmcp-ts-sdk/reference#schema-boundary) for the contracts and [schemas and structured output](https://docs.mcp-b.ai/how-to/use-schemas-and-structured-output) for examples.
 
 ## Exports
 

@@ -59,9 +59,8 @@ with `as const`; a widened schema infers each property as optional `unknown`.
 The upstream declaration uses `document.modelContext`, object input to
 `executeTool()`, a JSON-string execution result, and object-valued discovery
 schemas. `RegisteredTool.title` is required (it may be `''`); update test doubles
-that omitted it. Navigator aliases/testing declarations are gone. `SubmitEvent`
-extensions are declared by `@mcp-b/webmcp-polyfill`, and its global `ModelContext`
-interface-object declaration lives in `@mcp-b/webmcp-polyfill`. Both reach every
-project that imports `@mcp-b/webmcp-ts-sdk`, or a package whose declarations
-import it such as `@mcp-b/react-webmcp`, because the SDK re-exports `WebMCP`
-through the polyfill.
+that omitted it. Navigator aliases/testing declarations are gone.
+`@mcp-b/webmcp-polyfill` declares the `SubmitEvent` extensions and the global
+`ModelContext` interface object. Both reach every project that imports
+`@mcp-b/webmcp-ts-sdk`, or a package whose declarations import it such as
+`@mcp-b/react-webmcp`, because the SDK re-exports `WebMCP` through the polyfill.

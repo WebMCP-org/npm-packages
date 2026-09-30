@@ -24,6 +24,43 @@ pnpm add @mcp-b/webmcp-ts-sdk @mcp-b/transports
   installs the adapter on `document.modelContext`.
 </Note>
 
+## Minimal example
+
+```ts "Register a tool that an AbortSignal removes"
+import { TabServerTransport } from '@mcp-b/transports';
+import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
+
+const server = new BrowserMcpServer({ name: 'my-web-app', version: '1.0.0' });
+const transport = new TabServerTransport({ allowedOrigins: [window.location.origin] });
+
+await server.connect(transport);
+
+const controller = new AbortController();
+
+await server.registerTool(
+  {
+    name: 'echo',
+    description: 'Echo a message',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+      },
+      required: ['message'],
+      additionalProperties: false,
+    },
+    async execute({ message }) {
+      return {
+        content: [{ type: 'text', text: `Echo: ${String(message)}` }],
+      };
+    },
+  },
+  { signal: controller.signal }
+);
+
+controller.abort();
+```
+
 ## `BrowserMcpServer`
 
 ### Constructor
@@ -217,15 +254,17 @@ MCP requires object-root tool input schemas. An array-root WebMCP tool remains a
 
 ## Exports
 
-The root exports `BrowserMcpServer`, `isBrowserMcpServer`, `ModelContext`, `RegisteredTool`,
-`ModelContextExtensions`, `ModelContextWithExtensions`, `ModelContextTool`, `InputSchema`,
-`WebMcpToolInput`, `ToolDescriptor`, `ToolDescriptorFromSchema`, `ToolListItem`, `ToolAnnotations`,
-`RegistrationHandle`, `JsonSchemaForInference`, `InferJsonSchema`, `InferArgsFromInputSchema`, and
-`ToolResultFromOutputSchema`. The MCP result types `CallToolResult`, `ContentBlock`, `TextContent`,
-`JsonObject`, and `JsonValue` are re-exported from `@modelcontextprotocol/server`. `WebMCP` is the
-upstream namespace from `webmcp-types`, re-exported through `@mcp-b/webmcp-polyfill` so that the
-polyfill's `SubmitEvent` and global `ModelContext` declarations reach consumers that import only
-this package.
+The root exports `BrowserMcpServer`, `BrowserMcpServerOptions`, `isBrowserMcpServer`,
+`PromptDescriptor`, `ResourceDescriptor`, `ModelContext`, `ModelContextGetToolOptions`,
+`ModelContextRegisterToolOptions`, `RegisteredTool`, `ModelContextExtensions`,
+`ModelContextWithExtensions`, `ModelContextTool`, `InputSchema`, `WebMcpToolInput`,
+`WebMcpToolObjectInput`, `ToolDescriptor`, `ToolDescriptorFromSchema`, `ToolListItem`,
+`ToolAnnotations`, `MaybePromise`, `RegistrationHandle`, `JsonSchemaForInference`,
+`InferJsonSchema`, `InferArgsFromInputSchema`, and `ToolResultFromOutputSchema`. The MCP result
+types `CallToolResult`, `ContentBlock`, `TextContent`, `JsonObject`, and `JsonValue` are
+re-exported from `@modelcontextprotocol/server`. `WebMCP` is the upstream namespace from
+`webmcp-types`, re-exported through `@mcp-b/webmcp-polyfill` so that the polyfill's `SubmitEvent`
+and global `ModelContext` declarations reach consumers that import only this package.
 
 Import MCP clients, protocol schemas, transports, and validators from their official
 `@modelcontextprotocol/*` packages. The `@mcp-b/webmcp-ts-sdk/schema` subpath exports

@@ -7,22 +7,10 @@ import type {
 import type { ToolAnnotations as McpToolAnnotations } from '@modelcontextprotocol/server';
 import type { WebMCP } from 'webmcp-types';
 
-/**
- * Annotations in the WebMCP tool dictionary.
- * @see https://webmachinelearning.github.io/webmcp/#dictdef-toolannotations
- */
-export type WebMcpToolAnnotations = WebMCP.ToolAnnotations;
-
-/** MCP annotations plus WebMCP's untrusted-content hint. */
-export type ToolAnnotations = McpToolAnnotations & WebMcpToolAnnotations;
+/** MCP annotations plus the WebMCP tool annotations. */
+export type ToolAnnotations = McpToolAnnotations & WebMCP.ToolAnnotations;
 
 export type MaybePromise<T> = WebMCP.MaybePromise<T>;
-
-/**
- * Options the platform passes to a tool's `execute` callback.
- * @see https://webmachinelearning.github.io/webmcp/#dictdef-toolexecutecallbackoptions
- */
-export type ToolExecuteCallbackOptions = WebMCP.ToolExecuteCallbackOptions;
 
 /**
  * Tool dictionary accepted by the standard browser API.
@@ -35,7 +23,7 @@ export interface ModelContextTool<
 > extends Omit<WebMCP.ModelContextTool, 'name' | 'inputSchema' | 'execute'> {
   name: TName;
   inputSchema?: InputSchema | undefined;
-  execute: (input: TArgs, options: ToolExecuteCallbackOptions) => MaybePromise<TResult>;
+  execute: (input: TArgs, options: WebMCP.ToolExecuteCallbackOptions) => MaybePromise<TResult>;
 }
 
 /** MCP-B tool dictionary with output metadata. */

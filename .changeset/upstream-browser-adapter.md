@@ -30,14 +30,21 @@ tools can return plain text. Over MCP, a native result that parses to a JSON obj
 becomes structured content (an MCP result envelope passes through unchanged); a
 JSON string is returned as its content; any other native result, including
 numbers, booleans, `null`, and arrays, is returned as text exactly as the context
-produced it, so a native `null` is a success result whose text is `null`. A callback result is passed through as an
-MCP result only when it is a valid `CallToolResult` whose content items use the MCP
-content types; any other object, such as a rich-text document with its own `type`
-and `content` fields, becomes text plus `structuredContent`. Callbacks must return
-JSON-serializable values. The adapter no longer parses string discovery schemas or
-falls back to stringifying unsupported callback results. Execution errors and
-browser access checks now follow the supplied context. Older native previews are
-preserved, not upgraded by polyfill installation.
+produced it, so a native `null` is a success result whose text is `null`. A callback
+result is passed through as an MCP result only when it is a valid `CallToolResult`
+whose content items use the MCP content types; any other object, such as a rich-text
+document with its own `type` and `content` fields, becomes text plus
+`structuredContent`. Callbacks must return JSON-serializable values: direct execution
+rejects any other result with `UnknownError` instead of stringifying it. The adapter
+no longer parses string discovery schemas. Execution errors and browser access checks
+now follow the supplied context. Older native previews are preserved, not upgraded
+by polyfill installation.
+
+Tool handlers now receive `(input, { signal })`; pass the signal to cancellable
+operations. Use an invocation signal to cancel running work rather than relying on
+unregistering a tool to cancel it. MCP schema validation still runs on MCP calls;
+direct browser execution invokes the callback without that validation, so validate
+there when serving untrusted browser input.
 
 The adapter no longer implements a standalone WebMCP runtime. The constructor still
 succeeds without a WebMCP context, that is with no `document` (server-side module
@@ -59,12 +66,6 @@ the constructor's install call.
 `ontoolchange`, and re-dispatches the underlying context's `toolactivated` and
 `toolcancel` events on itself as plain `Event` objects that carry the same
 `toolName`, so listeners on `document.modelContext` see them under `@mcp-b/global`.
-
-Tool handlers now receive `(input, { signal })`; pass the signal to cancellable
-operations. Use an invocation signal to cancel running work rather than relying on
-unregistering a tool to cancel it. MCP schema validation still runs on MCP calls;
-direct browser execution invokes the callback without that validation, so validate
-there when serving untrusted browser input.
 
 ### Move types and helpers
 
@@ -88,9 +89,10 @@ when declaring schemas separately. `RegisteredTool.title` is required, and
 
 The `/schema` entry exports `normalizeInputSchema()`, `normalizeToolResponse()`,
 `isMcpStandardSchema()`, and the `ToolInputSchema` and `NormalizedInputSchema` types.
-Legacy `parseChromeToolInput`, `serializeChromeToolResult`, `createUnknownError`,
-`createToolInvocationFailedError`, `withAbortSignal`, and the browser-origin/access
-validation helpers are no longer exported; use the context's execution API and your
+The other `@mcp-b/webmcp-polyfill/schema` helpers are removed, including
+`parseChromeToolInput()`, `serializeChromeToolResult()`, the error factories,
+descriptor coercion and validation, `serializeInputSchema()`, `withAbortSignal()`,
+and the browser-origin and access checks. Use the context's execution API and your
 own abort handling.
 
 ### Discovery and exposure

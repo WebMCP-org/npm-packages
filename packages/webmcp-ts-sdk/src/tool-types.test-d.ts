@@ -9,11 +9,10 @@ import type {
   ModelContextTool,
   ToolAnnotations,
   ToolDescriptor,
-  ToolExecuteCallbackOptions,
   ToolListItem,
   ToolResultFromOutputSchema,
+  WebMCP,
   WebMcpToolInput,
-  WebMcpToolAnnotations,
 } from './index.js';
 import type { Tool as McpTool } from '@modelcontextprotocol/server';
 
@@ -43,15 +42,15 @@ test('the execute options bag carries the cancellation signal', () => {
     execute: ({ value }, options) => (options.signal.aborted ? -1 : value),
   };
 
-  expectTypeOf(cancellable.execute).parameter(1).toEqualTypeOf<ToolExecuteCallbackOptions>();
-  expectTypeOf<ToolExecuteCallbackOptions['signal']>().toEqualTypeOf<AbortSignal>();
+  expectTypeOf(cancellable.execute).parameter(1).toEqualTypeOf<WebMCP.ToolExecuteCallbackOptions>();
+  expectTypeOf<WebMCP.ToolExecuteCallbackOptions['signal']>().toEqualTypeOf<AbortSignal>();
 });
 
 test('the MCP-B descriptor keeps the standard callback shape', () => {
   expectTypeOf<ToolDescriptor['execute']>().parameter(0).toEqualTypeOf<WebMcpToolObjectInput>();
   expectTypeOf<ToolDescriptor['execute']>()
     .parameter(1)
-    .toEqualTypeOf<ToolExecuteCallbackOptions>();
+    .toEqualTypeOf<WebMCP.ToolExecuteCallbackOptions>();
   expectTypeOf<Parameters<ToolDescriptor['execute']>['length']>().toEqualTypeOf<2>();
   expectTypeOf<ToolDescriptor['execute']>().returns.toEqualTypeOf<unknown>();
 });
@@ -106,7 +105,7 @@ test('InputSchema accepts MCP wire schemas and readonly JSON Schema literals', (
 });
 
 test('standard and extended annotations stay distinct', () => {
-  expectTypeOf<WebMcpToolAnnotations>().toEqualTypeOf<{
+  expectTypeOf<WebMCP.ToolAnnotations>().toEqualTypeOf<{
     readOnlyHint?: boolean;
     untrustedContentHint?: boolean;
     consequentialHint?: boolean;
