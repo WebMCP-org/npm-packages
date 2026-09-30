@@ -31,17 +31,13 @@ catalog:
   zod: 4.4.3
 
 onlyBuiltDependencies:
-  - '@axodotdev/oranda'
   - '@parcel/watcher'
   - '@tailwindcss/oxide'
-  - dtrace-provider
   - esbuild
   - lmdb
   - msgpackr-extract
   - puppeteer
   - sharp
-  - spawn-sync
-  - unrs-resolver
   - workerd
 
 peerDependencyRules:

@@ -1,18 +1,12 @@
 import { Icons } from '@/components/icons';
 
-export const BLUR_FADE_DELAY = 0.15;
-
 const BOOKING_HREF = '/contact';
 const ROOK_HREF = 'https://chromewebstore.google.com/detail/opojeelojlkcinlhkbahpcekdolfjmhi';
 
 export const siteConfig = {
   name: 'MCP-B',
-  description:
-    'The WebMCP packages and browser extension. Open-source tools that let AI agents call functions your website already exposes.',
   cta: 'Read the docs',
   ctaHref: 'https://docs.mcp-b.ai',
-  url: import.meta.env.PUBLIC_APP_URL || 'http://localhost:4321',
-  keywords: ['WebMCP', 'MCP-B', 'browser tools', 'Model Context Protocol'],
   links: {
     email: 'alex@mcp-b.ai',
     twitter: 'https://x.com/alexnahasdev',
@@ -243,87 +237,9 @@ export const siteConfig = {
     title: 'Packages',
     description: 'Core runtime, React, agent, and browser tooling.',
   },
-  workflowConnectSection: {
-    title: 'Publish browser tools. Connect agent clients.',
-    description:
-      'Use the package layer that matches your application, then connect through the extension, a relay, or an MCP-B transport.',
-    ctaButton: { text: 'Choose a runtime', href: 'https://docs.mcp-b.ai/how-to/choose-runtime' },
-    blocks: [
-      {
-        id: 1,
-        icon: 'magic-click' as const,
-        title: 'Publish a focused tool surface',
-        description:
-          'Register typed tools through document.modelContext with clear schemas and product-level permission checks.',
-      },
-      {
-        id: 2,
-        icon: 'magic-star' as const,
-        title: 'Choose the right connection',
-        description:
-          'Use the extension for browser experiences, local relay for desktop clients, or transports for embedded integrations.',
-      },
-    ],
-  },
-  connectSection: {
-    badge: { icon: <Icons.terminal className="size-4 text-muted-foreground" />, text: 'Build' },
-    title: { before: 'Install. Publish. ', highlight: 'Connect.' },
-    description: 'A practical path from a web application to an agent-callable tool surface.',
-    step1: {
-      title: 'Choose a runtime',
-      description:
-        'Start with native WebMCP or the strict polyfill. Add @mcp-b/global only when you need MCP-B extensions and transport.',
-    },
-    step2: {
-      title: 'Register tools',
-      description:
-        'Publish small, typed actions through document.modelContext and keep human confirmation in the product UI.',
-    },
-    step3: {
-      title: 'Connect an agent',
-      description:
-        'Install the MCP-B extension or configure the relay and transport that fits your client.',
-    },
-  },
-  testimonialSection: {
-    badge: { icon: 'quote' as const, text: 'Open source' },
-    title: { before: 'Built in the ', highlight: 'open', after: '' },
-    description: 'Follow implementation, releases, and package history in the public repositories.',
-    testimonials: [],
-  },
-  faqSection: {
-    title: 'MCP-B questions',
-    description: 'Short answers with links to the task-focused documentation.',
-    faQitems: [
-      {
-        id: 1,
-        question: 'Is MCP-B the official W3C implementation?',
-        answer:
-          'No. MCP-B is an open-source WebMCP implementation and tooling suite. The W3C specification remains the authority for the standard surface.',
-      },
-      {
-        id: 2,
-        question: 'Which API should new code use?',
-        answer:
-          'Use document.modelContext with the upstream WebMCP types and polyfill. MCP-B adds prompts, resources, output schemas, and transports.',
-      },
-      {
-        id: 3,
-        question: 'Where do I install the extension?',
-        answer: 'Install Rook from its canonical Chrome Web Store listing linked from this page.',
-      },
-      {
-        id: 4,
-        question: 'Which package should I start with?',
-        answer:
-          'Use the runtime chooser in Docs. The strict polyfill is the smallest portable runtime; @mcp-b/global adds MCP-B extensions and transport.',
-      },
-    ],
-  },
   ctaSection: {
     id: 'cta',
     title: 'Ready to make your site agent-ready?',
-    backgroundImage: '/agent-cta-background.png',
     button: {
       text: 'Read the docs',
       href: 'https://docs.mcp-b.ai',
@@ -332,5 +248,3 @@ export const siteConfig = {
       'Install the packages, publish tools through document.modelContext, and connect an agent. Everything is open source.',
   },
 };
-
-export type SiteConfig = typeof siteConfig;

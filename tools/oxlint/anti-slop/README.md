@@ -7,6 +7,7 @@ Not vendored: `effect/` and the `no-conditional-empty-object-spread` and `no-sha
 ## Local changes
 
 - `index.ts`: drops the `no-conditional-empty-object-spread` and `no-shape-in-symbol-names` registrations.
+- `rules/no-chained-type-assertions.test.ts` and `rules/no-unknown-parameters.test.ts`: added; upstream has no tests for these rules.
 - `rules/no-runtime-typeof.ts`: reports `typeof` only when its result is used as a value; comparisons with a type-name string and `switch` discriminants pass. The `allowInTypeGuards` option is gone.
 - `rules/no-runtime-typeof.test.ts`: rewritten for the local behavior.
 - `rules/no-unknown-parameters.ts`: also exempts type guards and functions named `parse*`, `decode*`, `normalize*`, `validate*`, `read*`, `coerce*`, `serialize*`, or `to*` that declare a concrete return type.
