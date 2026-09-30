@@ -32,7 +32,7 @@ const e2eContentScriptConfig: PackUserConfig = {
   clean: false,
   treeshake: true,
   minify: false,
-  target: 'chrome111',
+  target: 'chrome126',
   platform: 'browser',
   deps: { alwaysBundle: [/.*/] },
   tsconfig: './tsconfig.check.json',

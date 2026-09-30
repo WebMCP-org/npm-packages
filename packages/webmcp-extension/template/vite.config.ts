@@ -9,7 +9,7 @@ const common: PackUserConfig = {
   sourcemap: true,
   treeshake: true,
   minify: true,
-  target: 'chrome111',
+  target: 'chrome126',
   platform: 'browser',
   deps: { alwaysBundle: [/.*/] },
   tsconfig: './tsconfig.json',
