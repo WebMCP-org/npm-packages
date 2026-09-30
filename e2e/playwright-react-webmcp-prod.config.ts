@@ -8,9 +8,7 @@ const chromiumUse: NonNullable<PlaywrightTestConfig['use']> = {
 if (chromiumChannel) chromiumUse.channel = chromiumChannel;
 
 /**
- * Playwright config for React WebMCP production build tests.
- * This tests against a minified production build to verify polyfill detection
- * works correctly even when class names are minified.
+ * Playwright config for React WebMCP tests against a minified production build.
  */
 const config: PlaywrightTestConfig = {
   testDir: './tests',

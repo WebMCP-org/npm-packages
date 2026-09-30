@@ -36,22 +36,15 @@ export function useWebMCP<
   const TInput extends ToolInputSchema = InputSchema,
   const TOutput extends JsonSchemaForInference | undefined = undefined,
 >(config: WebMCPConfig<TInput, TOutput>, deps?: DependencyList): WebMCPReturn<TOutput, TInput> {
-  const input = useMemo<{ schema: InputSchema | undefined; error: Error | undefined }>(() => {
+  const input = useMemo(() => {
     try {
+      // The copy drops the validator normalizeInputSchema hides on the schema, so the MCP
+      // server registers plain JSON Schema and only this hook runs the validator.
       return {
-        // The copy drops the validator normalizeInputSchema hides on the schema, so the MCP
-        // server registers plain JSON Schema and only this hook runs the validator.
-        schema:
-          config.inputSchema === undefined
-            ? undefined
-            : { ...normalizeInputSchema(config.inputSchema).inputSchema },
-        error: undefined,
+        schema: config.inputSchema && { ...normalizeInputSchema(config.inputSchema).inputSchema },
       };
     } catch (error) {
-      return {
-        schema: undefined,
-        error: error instanceof Error ? error : new Error(String(error)),
-      };
+      return { error: error instanceof Error ? error : new Error(String(error)) };
     }
   }, [config.inputSchema]);
   const coreConfig: CoreWebMCPConfig<InputSchema, InferOutput<TOutput>> = {

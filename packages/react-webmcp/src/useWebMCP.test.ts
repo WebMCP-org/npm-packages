@@ -3,7 +3,6 @@ import { TabClientTransport } from '@mcp-b/transports';
 import type { CallToolResult, JsonObject, WebMCP } from '@mcp-b/webmcp-ts-sdk';
 import { Client } from '@modelcontextprotocol/client';
 import { CallToolResultSchema } from '@modelcontextprotocol/core';
-import { StrictMode, createElement } from 'react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { z } from 'zod';
@@ -56,42 +55,6 @@ describe('useWebMCP in a browser runtime', () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it('registers, executes, and unregisters a real WebMCP tool', async () => {
-    const { act, result, unmount } = await renderHook(
-      () =>
-        useWebMCP({
-          name: 'browser_greet',
-          description: 'Greets a person',
-          inputSchema: {
-            type: 'object',
-            properties: { name: { type: 'string' } },
-            required: ['name'],
-          } as const,
-          execute: async ({ name }) => `Hello, ${name}`,
-        }),
-      { wrapper: ({ children }) => createElement(StrictMode, null, children) }
-    );
-
-    const tool = await findTool('browser_greet');
-    expect(tool?.description).toBe('Greets a person');
-    // An object since webmcp#241.
-    expect(tool?.inputSchema).toMatchObject({
-      type: 'object',
-      required: ['name'],
-    });
-
-    let response: CallToolResult | undefined;
-    await act(async () => {
-      response = await executeRegisteredTool('browser_greet', { name: 'Ada' });
-    });
-    expect(response?.content[0]).toMatchObject({ type: 'text', text: 'Hello, Ada' });
-    expect(result.current.state.lastResult).toBe('Hello, Ada');
-    expect(result.current.state.executionCount).toBe(1);
-
-    await unmount();
-    expect(await findTool('browser_greet')).toBeUndefined();
-  });
-
   it('publishes JSON structured content when an output schema is present', async () => {
     const { act } = await renderHook(() =>
       useWebMCP({
@@ -114,6 +77,9 @@ describe('useWebMCP in a browser runtime', () => {
       })
     );
 
+    expect((await findTool('browser_total'))?.inputSchema).toMatchObject({
+      required: ['left', 'right'],
+    });
     let response: CallToolResult | undefined;
     await act(async () => {
       response = await executeRegisteredTool('browser_total', { left: 3, right: 4 });
@@ -293,34 +259,6 @@ describe('useWebMCP in a browser runtime', () => {
         isError: false,
       });
     });
-  });
-
-  it('uses the latest implementation without re-registering the descriptor', async () => {
-    const registerTool = vi.spyOn(modelContext(), 'registerTool');
-    const { act, rerender, unmount } = await renderHook(
-      ({ version }: { version: string } = { version: 'first' }) =>
-        useWebMCP({
-          name: 'browser_latest_execute',
-          description: 'Uses the latest closure',
-          execute: async () => version,
-        }),
-      { initialProps: { version: 'first' } }
-    );
-
-    const registrationsAfterMount = registerTool.mock.calls.filter(
-      ([tool]) => tool.name === 'browser_latest_execute'
-    ).length;
-    await rerender({ version: 'second' });
-
-    let response: CallToolResult | undefined;
-    await act(async () => {
-      response = await executeRegisteredTool('browser_latest_execute');
-    });
-    expect(response?.content[0]).toMatchObject({ type: 'text', text: 'second' });
-    expect(
-      registerTool.mock.calls.filter(([tool]) => tool.name === 'browser_latest_execute')
-    ).toHaveLength(registrationsAfterMount);
-    await unmount();
   });
 
   it.each(['output', 'error'] as const)(

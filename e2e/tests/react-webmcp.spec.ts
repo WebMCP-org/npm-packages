@@ -650,9 +650,11 @@ test.describe('React WebMCP structuredContent Tests', () => {
       const response = await client.callTool({ name: 'counter_get', arguments: {} });
       return response.structuredContent;
     });
-    const parsed = parseCounterOutput(structuredContent);
 
-    expect(parsed).toEqual({ counter: expect.any(Number), timestamp: expect.any(String) });
+    expect(parseCounterOutput(structuredContent)).toEqual({
+      counter: expect.any(Number),
+      timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    });
   });
 
   test('should normalize JSON results without outputSchema', async ({ page }) => {
@@ -662,44 +664,17 @@ test.describe('React WebMCP structuredContent Tests', () => {
         throw new Error('mcpClient not available');
       }
 
-      try {
-        const response = await client.callTool({
-          name: 'counter_increment',
-          arguments: { amount: 1 },
-        });
-        return {
-          success: true,
-          hasStructuredContent: response.structuredContent !== undefined,
-          hasContent: Array.isArray(response.content) && response.content.length > 0,
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
+      const response = await client.callTool({
+        name: 'counter_increment',
+        arguments: { amount: 1 },
+      });
+      return {
+        hasStructuredContent: response.structuredContent !== undefined,
+        hasContent: Array.isArray(response.content) && response.content.length > 0,
+      };
     });
 
-    // Verify the tool call was successful
-    expect(result.success).toBe(true);
-    expect(result.hasStructuredContent).toBe(true);
-    expect(result.hasContent).toBe(true);
-  });
-
-  test('should return correct counter value from structuredContent', async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const client = window.mcpClient;
-      if (!client) {
-        throw new Error('mcpClient not available');
-      }
-
-      const response = await client.callTool({ name: 'counter_get', arguments: {} });
-      return response.structuredContent;
-    });
-    const structured = parseCounterOutput(result);
-
-    expect(structured.counter).toEqual(expect.any(Number));
-    expect(structured.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(result).toEqual({ hasStructuredContent: true, hasContent: true });
   });
 
   test('should validate structuredContent reflects updated state', async ({ page }) => {
@@ -723,8 +698,6 @@ test.describe('React WebMCP structuredContent Tests', () => {
     const first = parseCounterOutput(results.first);
     const second = parseCounterOutput(results.second);
 
-    // Verify the counter was incremented correctly
-    expect(first.timestamp).toEqual(expect.any(String));
     expect(second.counter).toBe(first.counter + 5);
   });
 });

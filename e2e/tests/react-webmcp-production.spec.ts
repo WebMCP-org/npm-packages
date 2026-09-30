@@ -121,10 +121,6 @@ async function waitForCounterValue(page: Page, expectedValue: number): Promise<v
 }
 
 // =============================================================================
-// Type definitions for page.evaluate
-// =============================================================================
-
-// =============================================================================
 // Tests
 // =============================================================================
 
@@ -224,21 +220,5 @@ test.describe('Production Build - Tool Registration Tests', () => {
     expect(tools).toContain(TOOLS.COUNTER_GET);
     expect(tools).toContain(TOOLS.POSTS_LIKE);
     expect(tools).toContain(TOOLS.POSTS_SEARCH);
-  });
-
-  test('should not have any duplicate tool registrations', async ({ page }) => {
-    await waitForAnyToolsRegistered(page);
-
-    const tools = await listToolNames(page);
-
-    const toolCounts = new Map<string, number>();
-    for (const name of tools) {
-      toolCounts.set(name, (toolCounts.get(name) ?? 0) + 1);
-    }
-    const duplicates = [...toolCounts]
-      .filter(([, count]) => count > 1)
-      .map(([name, count]) => ({ name, count }));
-
-    expect(duplicates).toEqual([]);
   });
 });

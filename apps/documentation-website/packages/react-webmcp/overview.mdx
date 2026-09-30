@@ -23,7 +23,7 @@ For `{ left: 3, right: 4 }`, React state holds `{ total: 7 }`; the agent receive
 
 ## Package boundary
 
-Both hooks preserve `'use client'` and accept React 18 or 19; their tests run on React 19. This package adds Standard Schema
+Both hooks preserve `'use client'` and accept React 18 or 19; browser tests run on React 19. This package adds Standard Schema
 conversion and validation, MCP responses, prompts, resources, and client hooks on top of the core
 registration lifecycle.
 Agent failures become MCP error responses; local failures and cancellation reject.

@@ -1,6 +1,7 @@
 # @mcp-b/react-webmcp
 
-React hooks for WebMCP tools with MCP output schemas, prompts, resources, and client connections.
+React hooks for WebMCP tools with MCP output schemas, prompts, resources, and client connections,
+built on the core [`usewebmcp`](../usewebmcp/README.md) tool hook.
 
 ```tsx
 'use client';
@@ -48,11 +49,6 @@ Import `@mcp-b/global` once in your client entry. Zod is optional; compatible sc
 | `McpClientProvider` and `useMcpClient`   | Your MCP client and transport; no `document.modelContext` required |
 
 Native WebMCP and the standalone polyfill do not advertise MCP `outputSchema` metadata. Use the MCP-B runtime to expose that metadata to MCP clients.
-
-## Compare hooks
-
-Use `usewebmcp` for raw browser tools. This package adds MCP responses, prompts, resources,
-and client hooks. Both share registration, execution state, and cancellation.
 
 ## Schemas and results
 
@@ -107,13 +103,11 @@ Wrap your UI in `McpClientProvider`, supplying stable client and transport insta
 
 ## State and lifecycle
 
-The tool hook returns `state`, `execute`, `reset`, `isSupported`, and `registrationError`.
-Use the runtime’s `getTools()` to confirm registration; `isSupported` only reports API availability.
-Prompt and resource hooks retain `isRegistered`.
-Use `enabled: false` to unregister, and the handler's `{ signal }` for cancellation.
+The tool hook returns the core hook's state and controls and shares its `enabled`, cancellation,
+and registration behavior ([lifecycle reference](https://docs.mcp-b.ai/packages/usewebmcp/reference)).
+Prompt and resource hooks return `isRegistered`.
 `'use client'` is preserved; server rendering and StrictMode are tested on React 19, and React 18 is in the peer range.
 
-[Lifecycle reference](https://docs.mcp-b.ai/packages/usewebmcp/reference) ·
 [Declarative form attributes](https://docs.mcp-b.ai/packages/react-webmcp/reference#declarative-form-attributes)
 
 ## Development
