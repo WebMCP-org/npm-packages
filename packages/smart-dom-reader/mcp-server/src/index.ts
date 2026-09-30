@@ -181,11 +181,7 @@ type LibraryCache = {
   mtimeMs: number;
 };
 
-async function pathExists(candidate: string | undefined): Promise<boolean> {
-  if (!candidate) {
-    return false;
-  }
-
+async function pathExists(candidate: string): Promise<boolean> {
   try {
     await access(candidate, F_OK);
     return true;
@@ -667,7 +663,7 @@ class SmartDomReaderServer {
     const page = this.getActivePage();
     const code = await this.readLibraryFile(resolve(__dirname, EMBEDDED_LIBRARY_RELATIVE_PATH));
 
-    return page.evaluate<string, { code: string; request: LibraryRequest }>(
+    const markdown = await page.evaluate<unknown, { code: string; request: LibraryRequest }>(
       async ({ code, request: [operation, args] }) => {
         const blob = new Blob([code], { type: 'text/javascript' });
         const url = URL.createObjectURL(blob);
@@ -691,11 +687,7 @@ class SmartDomReaderServer {
               if (!target) throw new Error(`No matching element for selector ${selector}`);
               const overview = ProgressiveExtractor.extractStructure(target);
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              const markdown = MarkdownFormatter.structure(overview, fmt, meta);
-              if (typeof markdown !== 'string') {
-                throw new TypeError('MarkdownFormatter.structure() returned a non-string result.');
-              }
-              return markdown;
+              return MarkdownFormatter.structure(overview, fmt, meta);
             }
 
             case 'region': {
@@ -707,11 +699,7 @@ class SmartDomReaderServer {
               const result = ProgressiveExtractor.extractRegion(selector, document, options ?? {});
               if (!result) return `No matching region for selector ${selector}`;
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              const markdown = MarkdownFormatter.region(result, fmt, meta);
-              if (typeof markdown !== 'string') {
-                throw new TypeError('MarkdownFormatter.region() returned a non-string result.');
-              }
-              return markdown;
+              return MarkdownFormatter.region(result, fmt, meta);
             }
 
             case 'content': {
@@ -727,11 +715,7 @@ class SmartDomReaderServer {
               );
               if (!content) return `No content for selector ${selector}`;
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              const markdown = MarkdownFormatter.content(content, fmt, meta);
-              if (typeof markdown !== 'string') {
-                throw new TypeError('MarkdownFormatter.content() returned a non-string result.');
-              }
-              return markdown;
+              return MarkdownFormatter.content(content, fmt, meta);
             }
 
             case 'interactive': {
@@ -746,21 +730,13 @@ class SmartDomReaderServer {
               if (typeof SmartDOMReader.extractInteractive === 'function') {
                 const result = SmartDOMReader.extractInteractive(target, options ?? {});
                 if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-                const markdown = MarkdownFormatter.region(result, fmt, meta);
-                if (typeof markdown !== 'string') {
-                  throw new TypeError('MarkdownFormatter.region() returned a non-string result.');
-                }
-                return markdown;
+                return MarkdownFormatter.region(result, fmt, meta);
               }
 
               const reader = new SmartDOMReader({ ...options, mode: 'interactive' });
               const result = reader.extract(target, options ?? {});
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              const markdown = MarkdownFormatter.region(result, fmt, meta);
-              if (typeof markdown !== 'string') {
-                throw new TypeError('MarkdownFormatter.region() returned a non-string result.');
-              }
-              return markdown;
+              return MarkdownFormatter.region(result, fmt, meta);
             }
 
             default: {
@@ -773,6 +749,10 @@ class SmartDomReaderServer {
       },
       { code, request }
     );
+    if (typeof markdown !== 'string') {
+      throw new TypeError('The embedded library returned a non-string result.');
+    }
+    return markdown;
   }
 
   private getActivePage(): Page {

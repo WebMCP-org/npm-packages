@@ -327,7 +327,6 @@ async function runFrameSelectorTest(page) {
   });
 
   // A cross-realm failure surfaces as { error }; a wrong-realm success omits "Widget".
-  // Extraction returns markdown text or a structured failure with an error field.
   /** @param {string | { error: string }} out */
   const readFrame = (out) => typeof out === 'string' && out.includes('Widget');
   /** @param {string | { error: string }} out */
