@@ -37,13 +37,14 @@ revision `439c6c341f1c632c63498ba206e2bd8471cb8efb`. It depends on the
 upstream `webmcp-types` declarations. Consumers do not install or build a Git
 dependency.
 
-`@mcp-b/webmcp-polyfill` retains declarative forms and `SubmitEvent` extensions
+`@mcp-b/webmcp-polyfill` retains the declarative API and its `SubmitEvent` extensions
 until upstream supports them. `@mcp-b/global` adds MCP-B transports, prompts,
 resources, MCP `outputSchema` metadata, and structured MCP responses. Existing native
 contexts take precedence and receive the MCP-B adapter when wrapped,
 including when the upstream polyfill was installed before `@mcp-b/global`.
 `cleanupWebModelContext()` removes the MCP-B adapter; the polyfill context and
-form layer remain installed for the document lifetime. Existing native form hooks are preserved.
+declarative layer remain installed for the document lifetime. Existing native
+`SubmitEvent` hooks are preserved.
 
 `executeTool(tool, inputObject)` follows the current draft and returns JSON.
 
@@ -55,7 +56,7 @@ form layer remain installed for the document lifetime. Existing native form hook
 <!DOCTYPE html>
 <html>
   <head>
-    <script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+    <script src="https://unpkg.com/@mcp-b/global@6/dist/index.iife.js"></script>
   </head>
   <body>
     <h1>My AI-Powered App</h1>
@@ -148,7 +149,7 @@ await document.modelContext.registerTool({
 Tears down the adapter and restores `document.modelContext` to the captured native or polyfilled
 context. Closing the adapter aborts every registration made through `document.modelContext` while
 it was installed; re-initializing does not restore them. Tools registered directly on the underlying
-context, including declarative forms, survive.
+context, including declarative tools, survive.
 
 ```typescript
 import { cleanupWebModelContext, initializeWebModelContext } from '@mcp-b/global';
@@ -329,7 +330,7 @@ The package auto-initializes on import in browser environments. To customize bef
     },
   };
 </script>
-<script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+<script src="https://unpkg.com/@mcp-b/global@6/dist/index.iife.js"></script>
 ```
 
 To prevent auto-initialization:
@@ -338,23 +339,11 @@ To prevent auto-initialization:
 <script>
   window.__webModelContextOptions = { autoInitialize: false };
 </script>
-<script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+<script src="https://unpkg.com/@mcp-b/global@6/dist/index.iife.js"></script>
 <script>
   // Initialize manually later
   WebMCP.initializeWebModelContext();
 </script>
-```
-
-## Testing
-
-Use the same document API as application code:
-
-```typescript
-const context = document.modelContext;
-if (!context) throw new Error('WebMCP is unavailable');
-const tool = (await context.getTools()).find(({ name }) => name === 'search-products');
-if (!tool) throw new Error('Search tool is unavailable');
-const result = JSON.parse(await context.executeTool(tool, { query: 'laptop' }));
 ```
 
 ## Feature Detection

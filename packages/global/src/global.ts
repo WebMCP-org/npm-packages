@@ -7,7 +7,7 @@ import type { WebModelContextInitOptions } from './types.js';
 interface RuntimeState {
   server: BrowserMcpServer;
   transport: Transport;
-  previousDocumentModelContextDescriptor: PropertyDescriptor | undefined;
+  previousDescriptor: PropertyDescriptor | undefined;
 }
 
 let runtime: RuntimeState | null = null;
@@ -36,10 +36,8 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     return;
   }
 
-  // Cross-bundle guard: if modelContext is already a BrowserMcpServer
-  // (set by another bundle in this window), skip initialization.
-  const existingContext = document.modelContext;
-  if (existingContext && isBrowserMcpServer(existingContext)) {
+  // Cross-bundle guard: another bundle in this window already installed the bridge.
+  if (isBrowserMcpServer(document.modelContext)) {
     return;
   }
 
@@ -53,16 +51,10 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
 
   // Some browser hosts expose a frozen native context through non-configurable
   // own properties. It is already usable and cannot legally be wrapped.
-  const previousDocumentModelContextDescriptor = Object.getOwnPropertyDescriptor(
-    document,
-    'modelContext'
-  );
-  if (
-    previousDocumentModelContextDescriptor
-      ? !previousDocumentModelContextDescriptor.configurable
-      : !Object.isExtensible(document)
-  )
+  const previousDescriptor = Object.getOwnPropertyDescriptor(document, 'modelContext');
+  if (previousDescriptor ? !previousDescriptor.configurable : !Object.isExtensible(document)) {
     return;
+  }
 
   // Resolve transport before replacing the document context.
   const transport = createTransport(options?.transport);
@@ -78,11 +70,7 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
       writable: false,
       value: server,
     });
-    runtime = {
-      server,
-      transport,
-      previousDocumentModelContextDescriptor,
-    };
+    runtime = { server, transport, previousDescriptor };
   } catch (error) {
     void server.close();
     void transport.close();
@@ -116,16 +104,15 @@ export function cleanupWebModelContext(): void {
     return;
   }
 
-  const { server, transport, previousDocumentModelContextDescriptor } = runtime;
+  const { server, transport, previousDescriptor } = runtime;
   runtime = null;
 
   void server.close();
   void transport.close();
 
-  // Restore the descriptors that existed before we wrapped with BrowserMcpServer.
-  // The polyfill and declarative forms remain installed for the lifetime of the document.
-  if (previousDocumentModelContextDescriptor) {
-    Object.defineProperty(document, 'modelContext', previousDocumentModelContextDescriptor);
+  // The polyfill and its declarative layer remain installed for the lifetime of the document.
+  if (previousDescriptor) {
+    Object.defineProperty(document, 'modelContext', previousDescriptor);
   } else {
     Reflect.deleteProperty(document, 'modelContext');
   }

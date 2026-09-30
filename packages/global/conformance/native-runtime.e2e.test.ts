@@ -2,13 +2,9 @@ import type { WebMCP } from '@mcp-b/webmcp-ts-sdk';
 import { runDeclarativeFormConformanceSuite } from '../../../conformance/declarative-forms-conformance.shared.js';
 import { afterEach, describe, expect, it } from 'vitest';
 
-type ModelContext = WebMCP.ModelContext;
-type ModelContextTool = WebMCP.ModelContextTool;
-type RegisteredTool = WebMCP.RegisteredTool;
-
 const registeredControllers: AbortController[] = [];
 
-function requireNativeModelContext(): ModelContext {
+function requireNativeModelContext(): WebMCP.ModelContext {
   const modelContext = document.modelContext;
   if (!modelContext) {
     throw new Error('Expected native document.modelContext with WebMCP enabled');
@@ -20,7 +16,7 @@ function uniqueToolName(prefix: string): string {
   return `${prefix}_${String(Date.now())}_${String(Math.random()).slice(2)}`;
 }
 
-async function listNativeTools(): Promise<RegisteredTool[]> {
+async function listNativeTools(): Promise<WebMCP.RegisteredTool[]> {
   return requireNativeModelContext().getTools();
 }
 
@@ -28,13 +24,11 @@ async function listNativeToolNames(): Promise<string[]> {
   return (await listNativeTools()).map((tool) => tool.name);
 }
 
-function registerNativeTool(tool: ModelContextTool, signal?: AbortSignal): Promise<void> {
-  const modelContext = requireNativeModelContext();
-  const registerTool = modelContext.registerTool;
-  return registerTool.call(modelContext, tool, signal ? { signal } : undefined);
+function registerNativeTool(tool: WebMCP.ModelContextTool, signal?: AbortSignal): Promise<void> {
+  return requireNativeModelContext().registerTool(tool, signal ? { signal } : undefined);
 }
 
-async function registerAbortableTool(tool: ModelContextTool): Promise<AbortController> {
+async function registerAbortableTool(tool: WebMCP.ModelContextTool): Promise<AbortController> {
   const controller = new AbortController();
   registeredControllers.push(controller);
   await expect(registerNativeTool(tool, controller.signal)).resolves.toBeUndefined();
@@ -65,35 +59,13 @@ describe('Native WebMCP conformance', () => {
     expect('clearContext' in modelContext).toBe(false);
   });
 
-  it('registerTool resolves undefined and exposes tools through getTools()', async () => {
-    const toolName = uniqueToolName('native_register');
-    const controller = new AbortController();
-    registeredControllers.push(controller);
-
-    await expect(
-      registerNativeTool(
-        {
-          name: toolName,
-          description: 'Native register conformance tool',
-          inputSchema: { type: 'object', properties: {} },
-          async execute() {
-            return { content: [{ type: 'text', text: 'ok' }] };
-          },
-        },
-        controller.signal
-      )
-    ).resolves.toBeUndefined();
-
-    await expect(listNativeToolNames()).resolves.toContain(toolName);
-  });
-
   it('getTools accepts the standard fromOrigins option', async () => {
     await expect(requireNativeModelContext().getTools({ fromOrigins: [] })).resolves.toEqual(
       expect.any(Array)
     );
   });
 
-  it('registerTool(tool, { signal }) unregisters when the signal aborts', async () => {
+  it('registerTool resolves undefined, exposes the tool, and unregisters on abort', async () => {
     const toolName = uniqueToolName('native_signal');
     const controller = await registerAbortableTool({
       name: toolName,
@@ -164,7 +136,7 @@ describe('Native WebMCP conformance', () => {
 });
 
 runDeclarativeFormConformanceSuite({
-  suiteName: 'Native declarative form conformance (Chrome)',
+  suiteName: 'Native declarative conformance (Chrome)',
   // Native Chromium keeps a pending declarative execution alive after its form is removed.
   supportsFormRemovalCancellation: false,
 });

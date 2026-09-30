@@ -103,28 +103,24 @@ Run commands:
   - `CHROME_BIN="/path/to/chrome-canary" pnpm test:wpt`
 - WebMCP polyfill smoke test (non-native Chromium):
   - `pnpm --filter @mcp-b/webmcp-polyfill run test:smoke`
-- Standalone polyfill core and declarative forms (non-native Chromium):
+- Standalone polyfill core and declarative tools (non-native Chromium):
   - `pnpm --filter @mcp-b/webmcp-polyfill test --browser.headless`
   - `pnpm --filter @mcp-b/webmcp-polyfill test:coverage`
-- Global runtime and declarative forms (non-native Chromium):
+- Global runtime and declarative tools (non-native Chromium):
   - `pnpm --filter @mcp-b/global run test:conformance:global`
-- WebMCP polyfill smoke test through the global matrix alias:
-  - `pnpm --filter @mcp-b/global run test:smoke:polyfill`
-- Native runtime (Chrome 155+ Beta/Dev/Canary + flags):
-  - `CHROME_BIN=\"/path/to/chrome-dev-or-canary\" CHROME_FLAGS=\"--enable-features=WebMCP\" pnpm --filter @mcp-b/global run test:conformance:native`
+- Native runtime (Chrome 155+ Beta, Dev, or Canary):
+  - `CHROME_BIN="/path/to/chrome-canary" pnpm --filter @mcp-b/global run test:conformance:native`
 - Matrix:
-  - `CHROME_BIN=\"/path/to/chrome-dev-or-canary\" CHROME_FLAGS=\"--enable-features=WebMCP\" pnpm --filter @mcp-b/global run test:conformance:matrix`
+  - `CHROME_BIN="/path/to/chrome-canary" pnpm --filter @mcp-b/global run test:conformance:matrix`
 
-`vitest.conformance.native.config.ts` auto-detects Chrome Canary/Dev on macOS and common Linux Chrome binaries when `CHROME_BIN` is not set, but it rejects any executable below Chrome 155, the first release with object-input `executeTool()`.
+`vitest.conformance.native.config.ts` enables the `WebMCP` and `DevToolsWebMCPSupport` features and merges any extra `CHROME_FLAGS`. It auto-detects Chrome Canary/Dev on macOS and common Linux Chrome binaries when `CHROME_BIN` is not set, but it rejects any executable below Chrome 155, the first release with object-input `executeTool()`.
 
-## Native validation behavior note (updated July 30, 2026)
+## Native validation behavior note (updated September 2026)
 
 - WebMCP remains experimental and is in an origin trial rather than generally shipped stable.
 - Native conformance discovers tools through `await document.modelContext.getTools()`.
-- Native conformance does not depend on either removed navigator API.
 - Native conformance does not rely on removed preview methods such as `provideContext()` or `clearContext()`.
 - Native conformance executes tools through `document.modelContext.executeTool(tool, input)` with the exact `RegisteredTool` returned by `getTools()` and an input object; Chrome 155+ accepts that contract.
 - Current Chromium source notes that tool input schema enforcement during execution is incomplete.
 - The vendored upstream polyfill treats input schemas as metadata during direct execution; it accepts object input and does not validate it against the schema.
-- `@mcp-b/webmcp-polyfill` and `BrowserMcpServer` accept `registerTool(tool, { signal })`; aborting the signal owns removal.
 - Conformance implication: do not assert execution-time schema validation in native or polyfill conformance; MCP transport validation belongs to the official MCP server.

@@ -5,15 +5,11 @@ export type { WebMCP } from '@mcp-b/webmcp-polyfill';
 
 export type { TransportConfiguration, WebModelContextInitOptions } from './types.js';
 
-if (globalThis.window !== undefined && globalThis.document !== undefined) {
-  const options = window.__webModelContextOptions;
-  const shouldAutoInitialize = options?.autoInitialize !== false;
-
-  if (shouldAutoInitialize) {
-    try {
-      initializeWebModelContext(options);
-    } catch (error) {
-      console.error('[WebModelContext] Auto-initialization failed:', error);
-    }
+const options = globalThis.window?.__webModelContextOptions;
+if (options?.autoInitialize !== false) {
+  try {
+    initializeWebModelContext(options);
+  } catch (error) {
+    console.error('[WebModelContext] Auto-initialization failed:', error);
   }
 }

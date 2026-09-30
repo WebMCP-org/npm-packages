@@ -23,7 +23,7 @@ runRuntimeCoreConformanceSuite({
 });
 
 runDeclarativeFormConformanceSuite({
-  suiteName: 'Declarative form conformance (@mcp-b/global)',
+  suiteName: 'Declarative conformance (@mcp-b/global)',
   install() {
     initializeWebModelContext(TEST_INIT_OPTIONS);
   },

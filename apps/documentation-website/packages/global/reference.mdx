@@ -31,7 +31,7 @@ pnpm add @mcp-b/global
 ```
 
 ```html title="Script tag (IIFE)"
-<script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+<script src="https://unpkg.com/@mcp-b/global@6/dist/index.iife.js"></script>
 ```
 
 ```html title="ES module"
@@ -44,7 +44,22 @@ pnpm add @mcp-b/global
 
 ## Minimal example
 
-<Snippet file="snippets/packages/global-quickstart.ts" />
+```ts title="Register a tool"
+import '@mcp-b/global';
+
+if (!document.modelContext) throw new Error('WebMCP is unavailable');
+
+await document.modelContext.registerTool({
+  name: 'get_page_title',
+  description: 'Get the current page title',
+  inputSchema: { type: 'object', properties: {} },
+  async execute() {
+    return {
+      content: [{ type: 'text', text: document.title }],
+    };
+  },
+});
+```
 
 ---
 
@@ -61,7 +76,7 @@ Importing `@mcp-b/global` in a browser environment auto-initializes `document.mo
     },
   };
 </script>
-<script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+<script src="https://unpkg.com/@mcp-b/global@6/dist/index.iife.js"></script>
 ```
 
 To prevent auto-initialization:
@@ -70,7 +85,7 @@ To prevent auto-initialization:
 <script>
   window.__webModelContextOptions = { autoInitialize: false };
 </script>
-<script src="https://unpkg.com/@mcp-b/global@latest/dist/index.iife.js"></script>
+<script src="https://unpkg.com/@mcp-b/global@6/dist/index.iife.js"></script>
 <script>
   WebMCP.initializeWebModelContext();
 </script>
@@ -111,7 +126,7 @@ installed without changing application usage.
 
 ### `cleanupWebModelContext()`
 
-Restores the native or polyfilled context immediately and starts closing the adapter and transport. Closing the adapter aborts every registration made through `document.modelContext` while it was installed, and re-initializing does not restore them; tools registered directly on the underlying context, including declarative forms, survive. It does not uninstall `@mcp-b/webmcp-polyfill` or its temporary declarative form layer; both remain for the document lifetime.
+Restores the native or polyfilled context immediately and starts closing the adapter and transport. Closing the adapter aborts every registration made through `document.modelContext` while it was installed, and re-initializing does not restore them; tools registered directly on the underlying context, including declarative tools, survive. It does not uninstall `@mcp-b/webmcp-polyfill` or its temporary declarative layer; both remain for the document lifetime.
 
 ```ts title="Cleanup"
 import { cleanupWebModelContext } from '@mcp-b/global';

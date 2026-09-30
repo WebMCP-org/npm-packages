@@ -19,7 +19,7 @@ packages together for this major release.
 
 Feature-detect the context as before. `tool` must be a descriptor returned by
 `await context.getTools()`. Imperative tools return JSON strings; native declarative
-forms can return plain text. Direct calls preserve that result, while MCP calls
+tools can return plain text. Direct calls preserve that result, while MCP calls
 normalize both formats into MCP content. Bare `null` results and serialized
 discovery schemas from older Chrome implementations are no longer adapted. Return
 JSON-serializable callback results and catch execution rejections.
@@ -32,7 +32,7 @@ must be upgraded to the current object-input contract.
 
 ### Extensions and TypeScript
 
-Declarative forms (`toolname`, `tooldescription`, and related attributes) and
+The declarative API (`toolname`, `tooldescription`, and related attributes) and
 `SubmitEvent.agentInvoked`/`respondWith()` remain available from the standalone
 polyfill while upstream support is pending. MCP output schemas, prompts, and
 resources belong to this package's runtime.
@@ -64,8 +64,8 @@ through `document.modelContext` while the runtime was installed, so those tools
 also disappear from the underlying context, and calling
 `initializeWebModelContext()` again does not bring them back; register them
 again after re-initializing. Tools registered directly on the underlying
-context, including declarative forms, survive cleanup. The core polyfill and its
-form layer stay installed for the document lifetime. Use registration
+context, including declarative tools, survive cleanup. The core polyfill and its
+declarative layer stay installed for the document lifetime. Use registration
 AbortControllers to remove your tools and invocation signals to cancel work.
 
 The transport connects, and announces `mcp-server-ready`, only after the first

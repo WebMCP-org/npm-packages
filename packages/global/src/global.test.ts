@@ -76,8 +76,8 @@ function createNativeModelContextStub(overrides: Partial<ModelContext> = {}): Mo
   );
 }
 
-describe('native declarative form support', () => {
-  it('leaves native declarative form support in place', async () => {
+describe('native declarative support', () => {
+  it('leaves native declarative support in place', async () => {
     // Runs before the polyfill installs its own hooks, so the guard is reachable.
     expect('agentInvoked' in SubmitEvent.prototype).toBe(false);
     expect('respondWith' in SubmitEvent.prototype).toBe(false);
@@ -111,7 +111,7 @@ describe('native declarative form support', () => {
 });
 
 describe('global adapter', () => {
-  // The core and forms belong to the document, beyond each bridge initialization.
+  // The core and its declarative layer belong to the document, beyond each bridge initialization.
   beforeAll(() => {
     installWebMCP();
   });
@@ -136,7 +136,7 @@ describe('global adapter', () => {
     expect(getModelContext().listTools).toBeTypeOf('function');
   });
 
-  it('preserves standalone forms across repeated installation and bridge cleanup', async () => {
+  it('preserves declarative tools across repeated installation and bridge cleanup', async () => {
     installWebMCP();
     const upstreamContext = document.modelContext;
     if (!upstreamContext) throw new Error('Expected an installed polyfill');
@@ -147,7 +147,7 @@ describe('global adapter', () => {
     form.setAttribute('toolautosubmit', '');
     form.addEventListener('submit', (event) => {
       event.preventDefault();
-      if (!event.respondWith) throw new Error('Expected declarative form support');
+      if (!event.respondWith) throw new Error('Expected declarative support');
       event.respondWith(Promise.resolve('retained'));
     });
     document.body.append(form);
@@ -213,6 +213,19 @@ describe('global adapter', () => {
       })
     ).toThrow('tabServer transport is disabled');
     expect(document.modelContext).toBe(nativeContext);
+  });
+
+  it('skips auto-initialization on import when autoInitialize is false', async () => {
+    const nativeContext = createNativeModelContextStub();
+    setDocumentModelContext(nativeContext);
+    window.__webModelContextOptions = { autoInitialize: false };
+
+    try {
+      await import('./index.js');
+      expect(document.modelContext).toBe(nativeContext);
+    } finally {
+      Reflect.deleteProperty(window, '__webModelContextOptions');
+    }
   });
 
   it('restores the native surface and permits retry when transport connection fails', async () => {

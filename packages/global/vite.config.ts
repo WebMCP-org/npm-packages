@@ -58,7 +58,7 @@ const iifeConfig: Options = {
 export default defineConfig({
   pack: [esmConfig, iifeConfig],
   test: {
-    // Use browser mode for real DOM, postMessage, and navigator testing
+    // Use browser mode for real DOM and postMessage testing
     browser: {
       enabled: true,
       provider: playwright({ launchOptions }),
