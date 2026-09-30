@@ -62,7 +62,18 @@ production. A manually created MCP server can instead connect to
 
 ## Minimal example
 
-<Snippet file="snippets/packages/mcp-iframe-quickstart.html" />
+```html title="Bridge an iframe"
+<mcp-iframe src="./child-app.html" id="my-app"></mcp-iframe>
+
+<script type="module">
+  import '@mcp-b/mcp-iframe';
+
+  const el = document.querySelector('mcp-iframe');
+  el.addEventListener('mcp-iframe-ready', (event) => {
+    console.log('Exposed tools:', event.detail.tools);
+  });
+</script>
+```
 
 ## Entry points
 

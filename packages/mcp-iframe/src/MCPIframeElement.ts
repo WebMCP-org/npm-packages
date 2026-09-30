@@ -32,17 +32,15 @@
  */
 
 import { DEFAULT_IFRAME_CHANNEL_ID, IframeParentTransport } from '@mcp-b/transports';
-import {
-  type BrowserMcpServer,
-  type PromptDescriptor,
-  type ResourceDescriptor,
-} from '@mcp-b/webmcp-ts-sdk';
 import type {
+  BrowserMcpServer,
   CallToolResult,
   InputSchema,
   ModelContext,
   ModelContextTool,
+  PromptDescriptor,
   RegistrationHandle,
+  ResourceDescriptor,
 } from '@mcp-b/webmcp-ts-sdk';
 import {
   Client,
@@ -260,49 +258,45 @@ export class MCPIframeElement extends HTMLElement {
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
     if (oldValue === newValue) return;
 
-    if (name === 'target-origin' || name === 'channel') {
-      if (this.#iframe && this.isConnected) void this.#reconnect();
-      return;
+    if (
+      name === 'call-timeout' &&
+      newValue !== null &&
+      this.#getCallTimeout() !== Number(newValue)
+    ) {
+      console.warn(
+        `[MCPIframe] Invalid call-timeout "${newValue}". Using ${DEFAULT_CALL_TIMEOUT}.`
+      );
     }
-
-    if (name === 'call-timeout') {
-      const timeout = Number(newValue);
-      if (newValue !== null && (!Number.isSafeInteger(timeout) || timeout <= 0)) {
-        console.warn(
-          `[MCPIframe] Invalid call-timeout "${newValue}". Using ${DEFAULT_CALL_TIMEOUT}.`
-        );
+    if (name === 'prefix-separator' && newValue !== null) {
+      const sanitized = sanitizeMCPNamePart(newValue);
+      if (sanitized !== newValue) {
+        console.warn(`[MCPIframe] Invalid prefix-separator "${newValue}". Using "${sanitized}".`);
       }
-      return;
     }
 
-    if (name === 'id' || name === 'prefix-separator') {
-      if (name === 'prefix-separator' && newValue !== null) {
-        const sanitized = sanitizeMCPNamePart(newValue);
-        if (sanitized !== newValue) {
-          console.warn(`[MCPIframe] Invalid prefix-separator "${newValue}". Using "${sanitized}".`);
+    const iframe = this.#iframe;
+    if (iframe && IFRAME_ATTRIBUTES.includes(name)) {
+      if (newValue === null) iframe.removeAttribute(name);
+      else iframe.setAttribute(name, newValue);
+    }
+
+    switch (name) {
+      case 'target-origin':
+      case 'channel':
+        if (iframe && this.isConnected) void this.#reconnect();
+        break;
+      case 'src':
+      case 'srcdoc':
+        if (!iframe) break;
+        ++this.#connectionRequestGeneration;
+        void this.#disconnect();
+        break;
+      case 'id':
+      case 'name':
+      case 'prefix-separator':
+        if (this.#connection) {
+          this.#requestRefresh(this.#connection, 'Failed to update parent registrations');
         }
-      }
-      const connection = this.#connection;
-      if (connection) {
-        this.#requestRefresh(connection, 'Failed to update parent registrations');
-      }
-      return;
-    }
-
-    if (!this.#iframe || !IFRAME_ATTRIBUTES.includes(name)) return;
-    if (newValue === null) {
-      this.#iframe.removeAttribute(name);
-    } else {
-      this.#iframe.setAttribute(name, newValue);
-    }
-    if (name === 'src' || name === 'srcdoc') {
-      ++this.#connectionRequestGeneration;
-      void this.#disconnect();
-    } else if (name === 'name') {
-      const connection = this.#connection;
-      if (connection) {
-        this.#requestRefresh(connection, 'Failed to update parent registrations');
-      }
     }
   }
 
