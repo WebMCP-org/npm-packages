@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildRelayEndpointCacheKey,
-  createRequestId,
   isJsonObject,
   isLoopbackHost,
+  isMessageEnvelope,
   normalizeSerializedToolResult,
   RELAY_BROWSER_PROTOCOL,
   RELAY_DISCOVERY_PROTOCOL,
@@ -36,6 +36,21 @@ describe('isJsonObject', () => {
     expect(isJsonObject(42)).toBe(false);
     expect(isJsonObject('string')).toBe(false);
     expect(isJsonObject(true)).toBe(false);
+  });
+});
+
+describe('isMessageEnvelope', () => {
+  it('accepts objects with a string requestId and type', () => {
+    expect(
+      isMessageEnvelope({ requestId: 'req-1', type: 'webmcp.tools.list.response', tools: [] })
+    ).toBe(true);
+  });
+
+  it('rejects values without a string requestId and type', () => {
+    expect(isMessageEnvelope(null)).toBe(false);
+    expect(isMessageEnvelope(42)).toBe(false);
+    expect(isMessageEnvelope({ requestId: 'req-1' })).toBe(false);
+    expect(isMessageEnvelope({ requestId: 1, type: 'x' })).toBe(false);
   });
 });
 
@@ -112,33 +127,9 @@ describe('isLoopbackHost', () => {
   });
 });
 
-describe('createRequestId', () => {
-  it('returns a string', () => {
-    expect(createRequestId()).toBeTypeOf('string');
-  });
-
-  it('returns crypto.randomUUID', () => {
-    const randomUuid = vi.spyOn(crypto, 'randomUUID').mockReturnValue('uuid-123');
-    try {
-      expect(createRequestId()).toBe('uuid-123');
-    } finally {
-      randomUuid.mockRestore();
-    }
-  });
-
-  it('returns unique values', () => {
-    const ids = new Set(Array.from({ length: 20 }, () => createRequestId()));
-    expect(ids.size).toBe(20);
-  });
-});
-
 describe('sanitizeLogText', () => {
   it('strips newline characters from log values', () => {
     expect(sanitizeLogText('invoke\r\nspoofed-entry')).toBe('invokespoofed-entry');
-  });
-
-  it('coerces non-string values before sanitizing', () => {
-    expect(sanitizeLogText(42)).toBe('42');
   });
 });
 

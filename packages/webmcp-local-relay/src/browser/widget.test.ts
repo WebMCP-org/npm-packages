@@ -1,6 +1,6 @@
 import { z } from 'zod/v4';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { parseConfig, parseHostMessage, startWidgetRuntime } from './widgetRuntime.js';
+import { parseConfig, startWidgetRuntime } from './widgetRuntime.js';
 
 const APP_ORIGIN = 'https://app.example.com';
 let nextRelayPort = 9333;
@@ -479,33 +479,6 @@ describe('parseConfig', () => {
   });
 });
 
-describe('parseHostMessage', () => {
-  it('rejects invalid host messages', () => {
-    expect(parseHostMessage(null)).toBeNull();
-    expect(parseHostMessage(42)).toBeNull();
-    expect(parseHostMessage({ requestId: 'req-1' })).toBeNull();
-    expect(parseHostMessage({ requestId: 1, type: 'x' })).toBeNull();
-  });
-
-  it('returns valid host messages with optional payloads', () => {
-    expect(
-      parseHostMessage({
-        error: 'boom',
-        requestId: 'req-1',
-        result: { ok: true },
-        tools: [{ name: 'sum' }],
-        type: 'webmcp.tools.invoke.response',
-      })
-    ).toEqual({
-      error: 'boom',
-      requestId: 'req-1',
-      result: { ok: true },
-      tools: [{ name: 'sum' }],
-      type: 'webmcp.tools.invoke.response',
-    });
-  });
-});
-
 describe('widget runtime', () => {
   beforeEach(() => {
     vi.useRealTimers();
@@ -694,6 +667,21 @@ describe('widget runtime', () => {
       tools: latestTools,
       type: 'tools/list',
     });
+  });
+
+  it('connects when the browser denies sessionStorage access', async () => {
+    const env = installEnvironment();
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      configurable: true,
+      get() {
+        throw new DOMException('Access is denied for this document.', 'SecurityError');
+      },
+    });
+    startWidgetRuntime();
+
+    const connection = await completeHandshake(env, [{ name: 'sum' }]);
+
+    expect(connection.messages[1]).toEqual({ tools: [{ name: 'sum' }], type: 'tools/list' });
   });
 
   it('falls back to Unknown page when no title or referrer is available', async () => {

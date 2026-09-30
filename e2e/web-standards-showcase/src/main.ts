@@ -210,7 +210,7 @@ function setupEventListeners(): void {
   document.getElementById('register-timer-tool')?.addEventListener('click', registerTimerTool);
   document.getElementById('unregister-timer')?.addEventListener('click', unregisterTimerTool);
 
-  // Native discovery and Chromium execution extension
+  // Native discovery and execution
   document.getElementById('list-tools')?.addEventListener('click', listToolsDemo);
   document.getElementById('execute-tool')?.addEventListener('click', executeToolDemo);
   document.getElementById('unregister-tool')?.addEventListener('click', unregisterToolDemo);
@@ -327,7 +327,7 @@ function updateReactToolExecutor(tools: ToolInfo[]): void {
 
 async function executeRegisteredTool(toolName: string, argsJson: string): Promise<string> {
   if (typeof modelContext.executeTool !== 'function') {
-    throw new Error("This Chromium build doesn't expose the optional executeTool() extension");
+    throw new Error("This Chromium build doesn't expose executeTool()");
   }
 
   const tool = (await modelContext.getTools()).find((candidate) => candidate.name === toolName);

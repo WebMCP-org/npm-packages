@@ -27,6 +27,21 @@ export function isJsonObject(value: unknown): value is WebMcpToolObjectInput {
 }
 
 /**
+ * A request or response exchanged between the embed and the widget over
+ * `postMessage`. Payload fields (`tools`, `args`, `result`, ...) vary by type.
+ */
+export interface MessageEnvelope extends WebMcpToolObjectInput {
+  requestId: string;
+  type: string;
+}
+
+export function isMessageEnvelope(value: unknown): value is MessageEnvelope {
+  return (
+    isJsonObject(value) && typeof value.requestId === 'string' && typeof value.type === 'string'
+  );
+}
+
+/**
  * Converts an `executeTool()` result to an MCP result. Only a JSON object is
  * structured; any other result, including numbers, keeps its original text.
  */
@@ -35,7 +50,7 @@ export function normalizeSerializedToolResult(serialized: string): CallToolResul
   try {
     rawResult = JSON.parse(serialized);
   } catch {
-    // Native declarative forms return plain text for string responses.
+    // Native declarative tools return plain text for string responses.
   }
 
   if (!isJsonObject(rawResult)) {
@@ -82,17 +97,10 @@ export function isLoopbackHost(host: string): boolean {
 }
 
 /**
- * Creates a random request/tab ID.
- */
-export function createRequestId(): string {
-  return crypto.randomUUID();
-}
-
-/**
  * Normalizes user-controlled values before writing them to plain-text logs.
  */
-export function sanitizeLogText(value: string | number): string {
-  return String(value).replace(/[\r\n]/g, '');
+export function sanitizeLogText(value: string): string {
+  return value.replace(/[\r\n]/g, '');
 }
 
 export interface SendableSocket {

@@ -35,7 +35,7 @@ Tool results reach the agent as follows:
 - A result that parses to a JSON object becomes structured content, and an MCP
   result object passes through unchanged.
 - A JSON string arrives as its content, so a tool that returns `done` sends the
-  text `done`. Any other result keeps its original text: a declarative form
+  text `done`. Any other result keeps its original text: a declarative tool
   that responds `10.50` stays `10.50` instead of `10.5`.
 - Under the upstream polyfill core, standalone or through `@mcp-b/global`, a
   tool that throws arrives as an error result with the text
@@ -47,7 +47,7 @@ If you supply a custom runtime or test double:
 - Return discovery schemas as objects, not JSON strings. Malformed schemas are
   omitted from relay discovery.
 - Accept an input object in `executeTool()`, and return JSON-serialized output.
-  Native declarative forms may also return plain text. Execution failures must
+  Native declarative tools may also return plain text. Execution failures must
   reject; a `null` result now reaches the agent as the text `null` instead of an
   interrupted-navigation error.
 - Use `document.modelContext`; update older browser previews that implement a
@@ -56,7 +56,11 @@ If you supply a custom runtime or test double:
 Tool updates received during discovery or reconnection are now retained. A stale
 initial tool list no longer overwrites newer registrations, so tools added while
 the relay is reconnecting remain available after the connection is restored.
-The existing page-to-widget bridge remains in use.
+
+The embed now passes the page title to the widget verbatim, so a title that
+contains `</script>` or a `$'` sequence no longer breaks the widget or runs as a
+script inside it. The widget also connects when the browser blocks
+`sessionStorage`.
 
 Programmatic `LocalRelayMcpServer` construction also accepts `launchBrowser` to
 override the platform browser launcher in embedded applications and tests; the

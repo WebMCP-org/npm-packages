@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 
 import {
+  type CallToolResult,
   fromJsonSchema,
   McpServer,
   type RegisteredTool,
@@ -14,6 +15,14 @@ import type { AggregatedTool, SourceInfo } from './registry.js';
 import type { RelayInvokeArgs } from './protocol.js';
 
 const JsonSchemaObjectSchema = z.record(z.string(), z.unknown());
+
+function textResult(text: string): CallToolResult {
+  return { content: [{ type: 'text', text }] };
+}
+
+function errorResult(text: string): CallToolResult {
+  return { content: [{ type: 'text', text }], isError: true };
+}
 
 interface RelaySourcesResult {
   mode?: 'client';
@@ -229,26 +238,12 @@ export class LocalRelayMcpServer {
         annotations: { readOnlyHint: false },
       },
       async ({ url, refresh }) => {
-        let parsed: URL;
-        try {
-          parsed = new URL(url);
-        } catch {
-          return {
-            content: [{ type: 'text' as const, text: `Invalid URL: ${url}` }],
-            isError: true,
-          };
+        const parsed = URL.parse(url);
+        if (!parsed) {
+          return errorResult(`Invalid URL: ${url}`);
         }
-
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: `Only http: and https: URLs are allowed. Got: ${parsed.protocol}`,
-              },
-            ],
-            isError: true,
-          };
+          return errorResult(`Only http: and https: URLs are allowed. Got: ${parsed.protocol}`);
         }
 
         const existing =
@@ -260,80 +255,40 @@ export class LocalRelayMcpServer {
 
         if (refresh) {
           if (this.bridge.mode === 'client') {
-            return {
-              content: [
-                {
-                  type: 'text' as const,
-                  text: 'Refresh is not supported in client mode. Only the server relay can reload sources.',
-                },
-              ],
-              isError: true,
-            };
+            return errorResult(
+              'Refresh is not supported in client mode. Only the server relay can reload sources.'
+            );
           }
-
           if (!existing) {
-            return {
-              content: [
-                {
-                  type: 'text' as const,
-                  text: `No connected source matches origin ${parsed.origin}. The page may not be open or connected.`,
-                },
-              ],
-              isError: true,
-            };
+            return errorResult(
+              `No connected source matches origin ${parsed.origin}. The page may not be open or connected.`
+            );
           }
-
           try {
             this.bridge.reloadSource(existing.sourceId);
-            return {
-              content: [
-                {
-                  type: 'text' as const,
-                  text: `Reload sent to source ${existing.sourceId} (${existing.url ?? existing.origin}).`,
-                },
-              ],
-            };
           } catch (err) {
-            return {
-              content: [
-                {
-                  type: 'text' as const,
-                  text: `Failed to reload source: ${err instanceof Error ? err.message : String(err)}`,
-                },
-              ],
-              isError: true,
-            };
+            return errorResult(
+              `Failed to reload source: ${err instanceof Error ? err.message : String(err)}`
+            );
           }
+          return textResult(
+            `Reload sent to source ${existing.sourceId} (${existing.url ?? existing.origin}).`
+          );
         }
 
         try {
           await this.openInBrowser(url);
         } catch (err) {
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: `Failed to open browser: ${err instanceof Error ? err.message : String(err)}`,
-              },
-            ],
-            isError: true,
-          };
+          return errorResult(
+            `Failed to open browser: ${err instanceof Error ? err.message : String(err)}`
+          );
         }
 
-        if (existing) {
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: `Opened ${url} in the default browser. Note: a source from ${existing.url ?? existing.origin} is already connected.`,
-              },
-            ],
-          };
-        }
-
-        return {
-          content: [{ type: 'text' as const, text: `Opened ${url} in the default browser.` }],
-        };
+        return textResult(
+          existing
+            ? `Opened ${url} in the default browser. Note: a source from ${existing.url ?? existing.origin} is already connected.`
+            : `Opened ${url} in the default browser.`
+        );
       }
     );
   }
@@ -504,15 +459,7 @@ export class LocalRelayMcpServer {
         process.stderr.write(
           `[webmcp-local-relay] error: dynamic tool "${tool.name}" invocation failed: ${details}\n`
         );
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: `Failed to invoke relayed tool "${tool.name}": ${message}`,
-            },
-          ],
-          isError: true,
-        };
+        return errorResult(`Failed to invoke relayed tool "${tool.name}": ${message}`);
       }
     });
   }

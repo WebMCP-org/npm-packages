@@ -723,10 +723,14 @@ export class RelayBridgeServer extends EventEmitter {
     }
 
     this.registry.touchConnection(connectionId);
-    this.onBrowserClientMessage(connectionId, parsedMessage.data);
+    this.onBrowserClientMessage(connectionId, socket, parsedMessage.data);
   }
 
-  private onBrowserClientMessage(connectionId: string, message: BrowserToRelayMessage): void {
+  private onBrowserClientMessage(
+    connectionId: string,
+    socket: WebSocket,
+    message: BrowserToRelayMessage
+  ): void {
     if (message.type !== 'hello' && !this.browserClientConnectionIds.has(connectionId)) {
       process.stderr.write(
         `[webmcp-local-relay] warn: connection ${connectionId} sent ${message.type} before hello, ignoring\n`
@@ -737,31 +741,26 @@ export class RelayBridgeServer extends EventEmitter {
     switch (message.type) {
       case 'hello':
         try {
-          const socket = this.socketByConnectionId.get(connectionId);
           const origin = this.requestOriginByConnectionId.get(connectionId) ?? message.origin;
           if (!this.isHostOriginAllowed(origin)) {
             process.stderr.write(
               `[webmcp-local-relay] warn: rejecting source ${connectionId} with disallowed host origin: ${origin ?? 'missing'}\n`
             );
-            if (socket) {
-              this.sendHelloRejected(
-                socket,
-                {
-                  type: 'hello/rejected',
-                  reason: 'host-origin-not-allowed',
-                  message: 'Host page origin is not allowed by this relay.',
-                },
-                1008,
-                'Host origin not allowed'
-              );
-            }
+            this.sendHelloRejected(
+              socket,
+              {
+                type: 'hello/rejected',
+                reason: 'host-origin-not-allowed',
+                message: 'Host page origin is not allowed by this relay.',
+              },
+              1008,
+              'Host origin not allowed'
+            );
             break;
           }
           this.registry.upsertSource(connectionId, { ...message, origin });
           this.browserClientConnectionIds.add(connectionId);
-          if (socket) {
-            this.sendHelloAccepted(socket, { type: 'hello/accepted' });
-          }
+          this.sendHelloAccepted(socket, { type: 'hello/accepted' });
           this.emit('stateChanged');
         } catch (err) {
           process.stderr.write(
@@ -779,7 +778,7 @@ export class RelayBridgeServer extends EventEmitter {
           process.stderr.write(
             `[webmcp-local-relay] error: failed to register tools for connection ${connectionId}: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`
           );
-          this.socketByConnectionId.get(connectionId)?.close(1008, 'Invalid tool list');
+          socket.close(1008, 'Invalid tool list');
         }
         break;
 

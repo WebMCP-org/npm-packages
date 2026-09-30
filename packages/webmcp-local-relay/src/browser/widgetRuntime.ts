@@ -12,9 +12,10 @@ declare global {
  */
 import {
   buildRelayEndpointCacheKey,
-  createRequestId,
   isJsonObject,
   isLoopbackHost,
+  isMessageEnvelope,
+  type MessageEnvelope,
   RELAY_BROWSER_PROTOCOL,
   RELAY_DISCOVERY_PROTOCOL,
   RELAY_PORT_RANGE_END,
@@ -29,23 +30,15 @@ export interface WidgetConfig {
   hostTitle: string;
   hostUrl: string;
   relayHostHint: string;
-  relayId?: string;
-  relayPortHint?: number;
-  relayWorkspace?: string;
+  relayId: string | undefined;
+  relayPortHint: number;
+  relayWorkspace: string | undefined;
   requestTimeoutMs: number;
   tabId: string;
 }
 
-interface HostMessage {
-  requestId: string;
-  type: string;
-  tools?: unknown;
-  result?: unknown;
-  error?: unknown;
-}
-
 interface PendingRequest {
-  resolve: (value: HostMessage) => void;
+  resolve: (value: MessageEnvelope) => void;
   reject: (reason: Error) => void;
   timeoutId: ReturnType<typeof setTimeout>;
   responseType: string;
@@ -111,24 +104,7 @@ export function parseConfig(search = window.location.search): WidgetConfig | nul
     return null;
   }
 
-  const hostUrl = getParam('hostUrl') || hostOrigin;
-  const hostTitle = getParam('hostTitle') || '';
-  const tabId = getParam('tabId') || createRequestId();
   const relayHostHint = getParam('relayHost') || '127.0.0.1';
-  const relayPortHintRaw = getParam('relayPort');
-  const relayPortHint =
-    relayPortHintRaw && relayPortHintRaw.length > 0
-      ? Number(relayPortHintRaw)
-      : RELAY_PORT_RANGE_START;
-  const autoConnect = getParam('autoConnect') !== 'false';
-  const relayId = getParam('relayId') || undefined;
-  const relayWorkspace = getParam('relayWorkspace') || undefined;
-  const requestTimeoutRaw = getParam('requestTimeout');
-  const requestTimeoutMs =
-    requestTimeoutRaw && requestTimeoutRaw.length > 0
-      ? Number(requestTimeoutRaw)
-      : DEFAULT_REQUEST_TIMEOUT_MS;
-
   if (!isLoopbackHost(relayHostHint)) {
     console.error(
       '[webmcp-relay-widget] relayHost must be a loopback address, got:',
@@ -137,6 +113,8 @@ export function parseConfig(search = window.location.search): WidgetConfig | nul
     return null;
   }
 
+  const relayPortHintRaw = getParam('relayPort');
+  const relayPortHint = relayPortHintRaw ? Number(relayPortHintRaw) : RELAY_PORT_RANGE_START;
   if (!Number.isInteger(relayPortHint) || relayPortHint < 1 || relayPortHint > 65535) {
     console.error(
       '[webmcp-relay-widget] relayPort must be an integer between 1 and 65535, got:',
@@ -145,6 +123,10 @@ export function parseConfig(search = window.location.search): WidgetConfig | nul
     return null;
   }
 
+  const requestTimeoutRaw = getParam('requestTimeout');
+  const requestTimeoutMs = requestTimeoutRaw
+    ? Number(requestTimeoutRaw)
+    : DEFAULT_REQUEST_TIMEOUT_MS;
   if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs < 1) {
     console.error(
       '[webmcp-relay-widget] requestTimeout must be a positive integer (ms), got:',
@@ -153,35 +135,17 @@ export function parseConfig(search = window.location.search): WidgetConfig | nul
     return null;
   }
 
-  const config: WidgetConfig = {
-    autoConnect,
-    hostOrigin,
-    hostTitle,
-    hostUrl,
-    relayHostHint,
-    relayPortHint,
-    requestTimeoutMs,
-    tabId,
-  };
-  if (relayId) config.relayId = relayId;
-  if (relayWorkspace) config.relayWorkspace = relayWorkspace;
-  return config;
-}
-
-export function parseHostMessage(value: unknown): HostMessage | null {
-  if (
-    !isJsonObject(value) ||
-    typeof value.requestId !== 'string' ||
-    typeof value.type !== 'string'
-  ) {
-    return null;
-  }
   return {
-    requestId: value.requestId,
-    type: value.type,
-    tools: value.tools,
-    result: value.result,
-    error: value.error,
+    autoConnect: getParam('autoConnect') !== 'false',
+    hostOrigin,
+    hostTitle: getParam('hostTitle') || '',
+    hostUrl: getParam('hostUrl') || hostOrigin,
+    relayHostHint,
+    relayId: getParam('relayId') || undefined,
+    relayPortHint,
+    relayWorkspace: getParam('relayWorkspace') || undefined,
+    requestTimeoutMs,
+    tabId: getParam('tabId') || crypto.randomUUID(),
   };
 }
 
@@ -252,10 +216,6 @@ function cacheKeyForConfig(config: WidgetConfig): string {
 }
 
 function readCachedEndpoint(config: WidgetConfig): CachedRelayEndpoint | null {
-  if (!globalThis.sessionStorage) {
-    return null;
-  }
-
   try {
     const raw = sessionStorage.getItem(cacheKeyForConfig(config));
     if (!raw) {
@@ -285,10 +245,6 @@ function readCachedEndpoint(config: WidgetConfig): CachedRelayEndpoint | null {
 }
 
 function writeCachedEndpoint(config: WidgetConfig, endpoint: RelayEndpoint): void {
-  if (!globalThis.sessionStorage) {
-    return;
-  }
-
   try {
     sessionStorage.setItem(
       cacheKeyForConfig(config),
@@ -303,10 +259,6 @@ function writeCachedEndpoint(config: WidgetConfig, endpoint: RelayEndpoint): voi
 }
 
 function clearCachedEndpoint(config: WidgetConfig): void {
-  if (!globalThis.sessionStorage) {
-    return;
-  }
-
   try {
     sessionStorage.removeItem(cacheKeyForConfig(config));
   } catch {
@@ -320,9 +272,6 @@ function buildDiscoveryCandidates(config: WidgetConfig): Array<{ host: string; p
   const candidates: Array<{ host: string; port: number }> = [];
 
   const pushCandidate = (host: string, port: number): void => {
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      return;
-    }
     const key = `${host}:${String(port)}`;
     if (seen.has(key)) {
       return;
@@ -331,9 +280,7 @@ function buildDiscoveryCandidates(config: WidgetConfig): Array<{ host: string; p
     candidates.push({ host, port });
   };
 
-  if (config.relayPortHint !== undefined) {
-    pushCandidate(config.relayHostHint, config.relayPortHint);
-  }
+  pushCandidate(config.relayHostHint, config.relayPortHint);
 
   if (cached) {
     pushCandidate(cached.host, cached.port);
@@ -446,8 +393,8 @@ function runWidget(cfg: WidgetConfig): void {
     }
   };
 
-  function requestHost(baseType: string, payload: HostRequestPayload): Promise<HostMessage> {
-    const requestId = createRequestId();
+  function requestHost(baseType: string, payload: HostRequestPayload): Promise<MessageEnvelope> {
+    const requestId = crypto.randomUUID();
 
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
@@ -806,27 +753,10 @@ function runWidget(cfg: WidgetConfig): void {
       return;
     }
 
-    const seen = new Set<string>();
-    const candidates: Array<{ host: string; port: number }> = [];
-
-    const pushCandidate = (host: string, port: number): void => {
-      const key = `${host}:${String(port)}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      candidates.push({ host, port });
-    };
-
-    if (cfg.relayPortHint !== undefined) {
-      pushCandidate(cfg.relayHostHint, cfg.relayPortHint);
-    }
-
+    const candidates = [{ host: cfg.relayHostHint, port: cfg.relayPortHint }];
     const cached = readCachedEndpoint(cfg);
-    if (cached) {
-      pushCandidate(cached.host, cached.port);
-    }
-
-    if (candidates.length === 0) {
-      return;
+    if (cached && (cached.host !== cfg.relayHostHint || cached.port !== cfg.relayPortHint)) {
+      candidates.push(cached);
     }
 
     // Transition state and remove listeners to prevent concurrent event-driven wakes.
@@ -891,27 +821,20 @@ function runWidget(cfg: WidgetConfig): void {
       return;
     }
 
-    const message = parseHostMessage(data);
-    if (!message) {
+    if (!isMessageEnvelope(data)) {
+      return;
+    }
+    const pending = pendingRequests.get(data.requestId);
+    if (!pending || (data.type !== pending.responseType && data.type !== pending.errorType)) {
       return;
     }
 
-    const pending = pendingRequests.get(message.requestId);
-    if (!pending) {
-      return;
-    }
-
-    if (message.type === pending.responseType) {
-      clearTimeout(pending.timeoutId);
-      pendingRequests.delete(message.requestId);
-      pending.resolve(message);
-      return;
-    }
-
-    if (message.type === pending.errorType) {
-      clearTimeout(pending.timeoutId);
-      pendingRequests.delete(message.requestId);
-      pending.reject(new Error(String(message.error || 'Unknown host error')));
+    clearTimeout(pending.timeoutId);
+    pendingRequests.delete(data.requestId);
+    if (data.type === pending.responseType) {
+      pending.resolve(data);
+    } else {
+      pending.reject(new Error(String(data.error || 'Unknown host error')));
     }
   });
 

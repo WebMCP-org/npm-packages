@@ -65,7 +65,6 @@
   },
   "devDependencies": {
     "@anthropic-ai/mcpb": "2.1.2",
-    "@mcp-b/webmcp-polyfill": "workspace:*",
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@modelcontextprotocol/client": "catalog:",
     "@types/node": "catalog:",

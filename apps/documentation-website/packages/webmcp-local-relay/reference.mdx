@@ -78,10 +78,6 @@ npx @mcp-b/webmcp-local-relay
 
 A `.mcpb` bundle file is available from [GitHub Releases](https://github.com/WebMCP-org/npm-packages/releases) for Claude Desktop (double-click to install). It starts with the zero-configuration defaults: loopback, automatic port discovery, and all page origins allowed.
 
-## Minimal example
-
-<Snippet file="snippets/packages/webmcp-local-relay-quickstart.json" />
-
 ## CLI options
 
 ```text
@@ -163,7 +159,7 @@ the first one `getTools()` returns) and logs one console warning per name.
 
 A result that parses to a JSON object becomes structured content, and an MCP result object passes
 through unchanged. A JSON string arrives as its content; any other result keeps its original text,
-so a form response of `10.50` stays `10.50`. Under the polyfill and `@mcp-b/global`, a tool that throws returns an error result with the
+so a declarative tool response of `10.50` stays `10.50`. Under the polyfill and `@mcp-b/global`, a tool that throws returns an error result with the
 text `Tool execution failed`.
 
 ### Embed attributes
@@ -222,10 +218,6 @@ The relay supports pages using:
 2. Native Chrome with `document.modelContext.getTools()` and object-input `executeTool()`
 3. `@mcp-b/webmcp-polyfill`
 
-The browser embed always uses document-first discovery and executes the current
-descriptor returned by `getTools()`. It does not depend on the removed
-name-based compatibility APIs.
-
 `file:` pages report an opaque `null` origin, which the polyfill's descriptor execution path rejects.
 Local integrations therefore need a non-opaque origin such as `http://localhost`.
 
@@ -259,7 +251,7 @@ The package exports the following for programmatic use:
 | `printHelp`                  | Function | Prints CLI usage to stderr                            |
 | `CliOptions`                 | Type     | Parsed CLI option shape                               |
 
-`LocalRelayMcpServerOptions` accepts `serverName` (default `webmcp-local-relay`), `serverVersion` (default `0.0.0`), and at most one of:
+`LocalRelayMcpServerOptions` accepts `serverName` (default `webmcp-local-relay`), `serverVersion` (default `0.0.0`), `launchBrowser` (replaces the `execFile` launcher that `webmcp_open_page` uses), and at most one of:
 
 | Field           | Type                       | Description                         |
 | --------------- | -------------------------- | ----------------------------------- |
@@ -359,13 +351,7 @@ The package exports the following for programmatic use:
 
 ## Troubleshooting
 
-| Problem                  | Fix                                                                                                                                                 |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected`   | Ensure the page loaded `embed.js` and the relay process is running                                                                                  |
-| `No tools listed`        | Ensure tools are registered on the page. The embed listens for changes and polls every two seconds, so load order does not matter.                  |
-| `Tool not found`         | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                            |
-| Connection blocked       | Verify `--widget-origin` matches the WebSocket origin (for example, `https://myapp.com`) and the relay port matches `data-relay-port`               |
-| `Host response timeout:` | The host page took longer than the per-request timeout (default 60s) to respond. Increase via `data-request-timeout="<ms>"` on the embed script tag |
+For common problems and their fixes, see [Troubleshoot common issues](/how-to/connect-desktop-agents-with-local-relay#troubleshoot-common-issues).
 
 ## Related
 

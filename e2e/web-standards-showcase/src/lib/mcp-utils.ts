@@ -14,10 +14,6 @@ export type FormattedMcpResult = {
   rawResult: CallToolResult | JsonValue | undefined;
 };
 
-function isString(value: JsonValue): value is string {
-  return typeof value === 'string';
-}
-
 /**
  * Parse an MCP tool response and extract displayable text content
  *
@@ -49,7 +45,7 @@ export function formatMcpResult(
 
   if (!isCallToolResult(result)) {
     return {
-      displayText: isString(result) ? result : (JSON.stringify(result, null, 2) ?? String(result)),
+      displayText: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
       isError: false,
       rawResult: result,
     };

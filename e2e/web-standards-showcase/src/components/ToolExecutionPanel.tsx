@@ -79,7 +79,7 @@ export const ToolExecutionPanel: FC<ToolExecutionPanelProps> = ({
           [toolName]: { status: 'success', params: args, result },
         }));
 
-        // Clear success state after 3 seconds
+        // Clear success state after 5 seconds
         setTimeout(() => {
           setToolStates((prev) => {
             const newState = { ...prev };

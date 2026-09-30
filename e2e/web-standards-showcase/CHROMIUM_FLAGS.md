@@ -22,8 +22,7 @@ The Playwright native configurations launch Chrome with:
 `WebMCPTesting` is the current Chromium feature-flag name used by this test
 environment. It does not make `navigator.modelContextTesting` part of the
 current WebMCP contract. Native assertions use `document.modelContext`,
-`getTools()`, and the feature-detectable descriptor-based `executeTool()`
-extension.
+`getTools()`, and descriptor-based `executeTool()` when the browser exposes it.
 
 ## Launch Chrome manually
 
@@ -106,7 +105,7 @@ console.log({
   registerTool: typeof context?.registerTool,
   getTools: typeof context?.getTools,
   toolchange: typeof context?.addEventListener,
-  chromeExecuteToolExtension: typeof context?.executeTool,
+  executeTool: typeof context?.executeTool,
   deprecatedNavigatorAlias: 'modelContext' in navigator,
   deprecatedTestingShim: 'modelContextTesting' in navigator,
 });

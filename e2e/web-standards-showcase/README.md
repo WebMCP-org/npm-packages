@@ -23,10 +23,8 @@ can inspect tools exposed by a page.
 - Same-origin parent and iframe contexts
 - A live editor and generated forms for tool inputs
 
-The app does not load `@mcp-b/global`, and it rejects contexts carrying the
-MCP-B polyfill marker. It does not depend on the deprecated
-`navigator.modelContext` alias or the removed `navigator.modelContextTesting`
-API.
+The app does not depend on the deprecated `navigator.modelContext` alias or the
+removed `navigator.modelContextTesting` API.
 
 ## Requirements
 

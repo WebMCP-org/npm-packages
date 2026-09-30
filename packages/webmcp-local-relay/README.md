@@ -252,7 +252,7 @@ Runtime dispatch behavior in the browser embed/widget layer:
 
 ### WebMCP Standard Status
 
-WebMCP is an emerging web platform proposal. This relay works with the current native Chrome preview and MCP-B runtimes, but native extension details can still change as implementations mature.
+WebMCP is an emerging web platform proposal. This relay works with the current native Chrome preview and MCP-B runtimes, but the browser API can still change as implementations mature.
 
 - [W3C WebML CG draft](https://webmachinelearning.github.io/webmcp/)
 - [Proposal repository](https://github.com/webmachinelearning/webmcp)
@@ -266,13 +266,13 @@ For Chromium/Chrome Canary native preview testing:
 
 ### Troubleshooting
 
-| Problem                  | Fix                                                                                                                                       |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected`   | Ensure the page loaded `embed.js` and the relay process is running                                                                        |
-| `No tools listed`        | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits the `toolchange` event |
-| `Tool not found`         | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                  |
-| Connection blocked       | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`            |
-| `Host response timeout:` | The host page exceeded its timeout (default 60s). Raise `data-request-timeout` and keep CLI `--invoke-timeout` slightly higher            |
+| Problem                  | Fix                                                                                                                                |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `No sources connected`   | Ensure the page loaded `embed.js` and the relay process is running                                                                 |
+| `No tools listed`        | Ensure tools are registered on the page. The embed listens for changes and polls every two seconds, so load order does not matter. |
+| `Tool not found`         | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                           |
+| Connection blocked       | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`     |
+| `Host response timeout:` | The host page exceeded its timeout (default 60s). Raise `data-request-timeout` and keep CLI `--invoke-timeout` slightly higher     |
 
 ---
 
