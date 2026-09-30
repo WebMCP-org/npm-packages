@@ -67,6 +67,7 @@ Create a file called `relay-demo.html`:
     <p id="status">Registering tool...</p>
 
     <script>
+      if (!document.modelContext) throw new Error('WebMCP is unavailable');
       void document.modelContext
         .registerTool({
           name: 'get_page_title',

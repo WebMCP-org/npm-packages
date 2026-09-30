@@ -38,10 +38,7 @@ and cleanup does not uninstall the separately owned polyfill or its declarative 
 
 This separation allows a library to depend only on types, a site to use only
 the tool-only polyfill, or an application to install the complete MCP-B runtime.
-Core tool registrations remain visible to native browser tooling, while
-cleanup can restore the context that existed before initialization.
-
-All integrations use `document.modelContext`.
+Core tool registrations remain visible to native browser tooling.
 
 See the [`@mcp-b/global` reference](/packages/global/reference) and [Choose a
 runtime](/how-to/choose-runtime).

@@ -43,7 +43,8 @@ prompt and resource hooks, and MCP client-provider hooks.
 ## Register a tool with `usewebmcp`
 
 Install the focused hook and provide `document.modelContext` through native support,
-`@mcp-b/webmcp-polyfill`, or `@mcp-b/global` before the component mounts:
+[`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference), or `@mcp-b/global` before the
+component mounts:
 
 ```bash title="Install the focused hook"
 pnpm add usewebmcp react @mcp-b/webmcp-polyfill
@@ -51,12 +52,9 @@ pnpm add usewebmcp react @mcp-b/webmcp-polyfill
 
 <CounterExample />
 
-`usewebmcp` accepts upstream JSON Schema metadata and passes runtime input to the handler without
-validation. It reports a Standard Schema object, such as a Zod schema, as a registration error.
-`@mcp-b/react-webmcp` converts a Standard Schema's JSON Schema metadata, runs its validator once,
-and passes the validated, transformed input to the handler. Follow the [schema guide](/how-to/use-schemas-and-structured-output) for transforms and
-direct browser registrations. Use `usewebmcp` for core tool registration, raw results, and local execution state. Use
-[`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference) to initialize the tool-only runtime.
+`usewebmcp` passes input to the handler without validation and reports a Standard Schema object,
+such as a Zod schema, as a registration error. To validate or transform input, follow the [schema
+guide](/how-to/use-schemas-and-structured-output).
 
 ## Handle server rendering
 
@@ -85,7 +83,7 @@ so `document.modelContext` exists before the hook commits.
 After the component commits, inspect the page registry:
 
 ```js title="Browser console"
-await document.modelContext.getTools();
+await document.modelContext?.getTools();
 ```
 
 If a tool disappears too early or remains after unmount, check the hook dependencies and component

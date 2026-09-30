@@ -63,8 +63,7 @@ library's validator. The library remains responsible for its refinements, defaul
 async checks.
 
 The core [`usewebmcp` hook](/packages/usewebmcp/reference) accepts upstream JSON Schema metadata and
-does not validate runtime input. It reports a Standard Schema object, such as a Zod schema, as a
-registration error. [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) converts
+does not validate runtime input. [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) converts
 Standard JSON Schema metadata and calls the supplied validator before either local or agent calls.
 It adds MCP result formatting and output metadata as well.
 
@@ -93,6 +92,4 @@ string-to-number transform in both places would feed the first transform's numbe
 validator expecting a string.
 
 The [schema guide](/how-to/use-schemas-and-structured-output) shows how to keep one owner for vendor
-validation when registering directly, and how to add MCP output schemas independently. Upstream
-[`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) owns the core browser declarations.
-The SDK schema adapter handles MCP-B conversion; neither package performs runtime validation by itself.
+validation when registering directly, and how to add MCP output schemas independently.

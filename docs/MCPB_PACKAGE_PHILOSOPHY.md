@@ -31,11 +31,11 @@ Use when you want:
 
 - Bundles the upstream WebMCP polyfill source at the revision recorded in its package manifest.
 - Installs the standard `document.modelContext` runtime plus temporary MCP-B
-  declarative forms and `SubmitEvent` extensions until upstream supports them.
+  declarative tools and `SubmitEvent` extensions until upstream supports them.
 
 Use when you want:
 
-- a core runtime with temporary declarative forms, without MCP-B bridge features
+- a core runtime with temporary declarative tools, without MCP-B bridge features
 
 ### 3) `@mcp-b/global` (MCP-B Runtime Entry Point)
 
@@ -74,7 +74,7 @@ Core layering:
 
 1. `webmcp-types` -> core browser type contracts; `@mcp-b/webmcp-ts-sdk` -> MCP-B adapter
    and extension contracts
-2. `@mcp-b/webmcp-polyfill` -> canonical core runtime behavior and temporary declarative forms
+2. `@mcp-b/webmcp-polyfill` -> canonical core runtime behavior and temporary declarative tools
 3. `@mcp-b/global` -> MCP-B extensions/runtime built on core
 4. `@mcp-b/react-webmcp` -> React hooks for MCP-B runtime
 5. `usewebmcp` -> React hooks for strict core API
@@ -91,7 +91,7 @@ Core layering:
 
 1. Need core browser contracts only: upstream `webmcp-types`; use `@mcp-b/webmcp-ts-sdk`
    for MCP-B adapter extensions or schema conversion
-2. Need the core runtime and temporary declarative forms without MCP-B bridge features: `@mcp-b/webmcp-polyfill`
+2. Need the core runtime and temporary declarative tools without MCP-B bridge features: `@mcp-b/webmcp-polyfill`
 3. Need full MCP-B runtime and extension APIs: `@mcp-b/global`
 4. Need React hooks for MCP-B: `@mcp-b/react-webmcp`
 5. Need React hooks for strict core only: `usewebmcp`

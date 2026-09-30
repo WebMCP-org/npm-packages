@@ -41,7 +41,7 @@ Treat all boundary input as untrusted:
 - `postMessage` payloads
 - extension/runtime messages
 - JSON-RPC envelopes
-- tool arguments and serialized testing inputs
+- tool arguments
 - external SDK or client payloads
 
 Validate at boundary entry, then narrow types for internal logic.
@@ -94,7 +94,7 @@ Performance is a design concern, not a late patch.
 - Runtime contracts: upstream `webmcp-types` owns browser declarations;
   `@mcp-b/webmcp-ts-sdk` owns MCP-B adapter extensions;
   `@mcp-b/webmcp-polyfill` distributes the upstream core runtime.
-- The polyfill temporarily retains declarative forms; `@mcp-b/global` adds transports, resources, and prompts without changing the core contract.
+- The polyfill temporarily retains declarative tools; `@mcp-b/global` adds transports, resources, and prompts without changing the core contract.
 - Transport behavior remains explicit and testable in `@mcp-b/transports`.
 
 ## 5) Duplication Policy

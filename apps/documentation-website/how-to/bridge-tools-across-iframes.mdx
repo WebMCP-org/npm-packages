@@ -62,6 +62,7 @@ Configure the parent origin before importing `@mcp-b/global` in the child page:
   };
 
   await import('@mcp-b/global');
+  if (!document.modelContext) throw new Error('WebMCP is unavailable');
 
   await document.modelContext.registerTool({
     name: 'calculate',
@@ -137,8 +138,8 @@ runtime.
 After `mcp-iframe-ready` fires, inspect the parent context:
 
 ```javascript title="List parent tools"
-const tools = await document.modelContext.getTools();
-console.log(tools.find((tool) => tool.name === 'calculator_calculate'));
+const tools = await document.modelContext?.getTools();
+console.log(tools?.find((tool) => tool.name === 'calculator_calculate'));
 ```
 
 Use a different `id` for every `<mcp-iframe>` so bridged names remain unique.

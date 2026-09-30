@@ -290,7 +290,7 @@ If the only way to register a schema is to cast it, fix the registration typing.
 
 Reject a change if it does any of the following:
 
-1. Casts `window`, `navigator`, or `globalThis` to reach a repo-owned property.
+1. Casts `window`, `document`, or `globalThis` to reach a repo-owned property.
 2. Casts `registerTool`, `listTools`, `executeTool`, or similar public functions to broader signatures.
 3. Assigns repo-owned globals or public boundary methods to intermediate variables without a real need.
 4. Adds manual handler arg annotations because schema inference failed.

@@ -46,7 +46,7 @@ Create a new file called `index.html` and paste in this starting point:
   <head>
     <meta charset="UTF-8" />
     <title>My First WebMCP Tool</title>
-    <script src="https://unpkg.com/@mcp-b/webmcp-polyfill@latest/dist/index.iife.js"></script>
+    <script src="https://unpkg.com/@mcp-b/webmcp-polyfill@6/dist/index.iife.js"></script>
   </head>
   <body>
     <h1>My First WebMCP Tool</h1>
@@ -69,6 +69,7 @@ Replace the empty `<script>` block at the bottom of the page with:
 
 ```html title="index.html"
 <script>
+  if (!document.modelContext) throw new Error('WebMCP is unavailable');
   void document.modelContext
     .registerTool({
       name: 'get-page-title',
@@ -118,6 +119,7 @@ Open the browser console (F12, then click the Console tab). Type the following:
 
 ```javascript title="Browser console"
 const modelContext = document.modelContext;
+if (!modelContext) throw new Error('WebMCP is unavailable');
 const tools = await modelContext.getTools();
 console.log(tools);
 ```
@@ -187,13 +189,14 @@ Here is the full `index.html` for reference:
   <head>
     <meta charset="UTF-8" />
     <title>My First WebMCP Tool</title>
-    <script src="https://unpkg.com/@mcp-b/webmcp-polyfill@latest/dist/index.iife.js"></script>
+    <script src="https://unpkg.com/@mcp-b/webmcp-polyfill@6/dist/index.iife.js"></script>
   </head>
   <body>
     <h1>My First WebMCP Tool</h1>
     <p id="status">Loading...</p>
 
     <script>
+      if (!document.modelContext) throw new Error('WebMCP is unavailable');
       void document.modelContext
         .registerTool({
           name: 'get-page-title',

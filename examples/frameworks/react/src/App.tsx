@@ -11,7 +11,7 @@ export function App() {
       },
     },
     execute: async (args) => ({
-      content: [{ type: 'text', text: `Hello ${args?.name ?? 'world'}!` }],
+      content: [{ type: 'text', text: `Hello ${args.name ?? 'world'}!` }],
     }),
   });
 

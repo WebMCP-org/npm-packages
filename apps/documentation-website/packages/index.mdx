@@ -8,8 +8,7 @@ icon: 'boxes-stacked'
 Packages are the primary entry point for this documentation. Start with a package overview when you need to choose the right building block, then move into that package's reference page for API details.
 
 Core browser declarations come from the Community Group package
-[`webmcp-types`](https://github.com/webmachinelearning/webmcp-types). MCP-B adapter extensions and
-schema helpers are part of [`@mcp-b/webmcp-ts-sdk`](/packages/webmcp-ts-sdk/reference).
+[`webmcp-types`](https://github.com/webmachinelearning/webmcp-types).
 Cross-package concepts stay in [Explanation](/explanation/index); task-oriented setup stays in
 [Tutorials](/tutorials/index) and [How-To Guides](/how-to/index).
 
@@ -29,8 +28,7 @@ Cross-package concepts stay in [Explanation](/explanation/index); task-oriented 
     surface.
   </Card>
   <Card title="@mcp-b/webmcp-ts-sdk" icon="boxes-stacked" href="/packages/webmcp-ts-sdk/overview">
-    Browser-adapted MCP TypeScript SDK that provides BrowserMcpServer and supports dynamic tool
-    registration.
+    Browser adapter that provides `BrowserMcpServer`, MCP-B extensions, and schema helpers.
   </Card>
   <Card title="@mcp-b/transports" icon="boxes-stacked" href="/packages/transports/overview">
     Tab, iframe, and extension transport classes for moving MCP messages through browser boundaries.
@@ -61,7 +59,7 @@ Cross-package concepts stay in [Explanation](/explanation/index); task-oriented 
     href="/packages/webmcp-extension/overview"
   >
     Chromium MV3 template and isolated-world client helper for installing WebMCP and calling page
-    tools, including declarative forms, from an extension.
+    tools, including declarative tools, from an extension.
   </Card>
   <Card
     title="@mcp-b/webmcp-local-relay"

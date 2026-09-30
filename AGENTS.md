@@ -92,7 +92,7 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 - `executeTool(tool, inputObject)` takes an input object and resolves to a string.
   Results are JSON, except that native declarative tools can return plain text, so
   MCP-B treats a result as structured only when it parses to a plain JSON object.
-  String input, string input schemas, and navigator aliases are gone in this major release.
+  String input, string input schemas, and navigator aliases are not supported.
 - The draft fires `toolactivated` and `toolcancel` at the model context. The polyfill
   fires both for declarative tools; `BrowserMcpServer` re-dispatches them and adds
   `ontoolactivated` and `ontoolcancel`.
@@ -197,18 +197,13 @@ The pinned WPT revision and CI job live in
 [`.github/workflows/e2e.yml`](./.github/workflows/e2e.yml). Test selection and
 the shared local/CI runner live in
 [`scripts/run-webmcp-wpt.mjs`](./scripts/run-webmcp-wpt.mjs). The WPT lane builds
-the standalone polyfill, disables native WebMCP, injects the bundle, and runs
-an explicit page-local imperative allowlist plus the declarative files that never
-call `executeTool()`. The shared declarative suite runs in both the global and
-standalone polyfill packages. Their default test and coverage scripts include
-their respective harnesses. The other files, including the frame-tree,
-origin-policy, and navigation cases, target the pinned revision's older API shape
-(JSON-string `executeTool()` input, no `consequentialHint`), which predates
-upstream's own WPT pin; refresh the pin before restoring them. When changing
-covered behavior, run the shared conformance suite and replay the WPT lane with
+the standalone polyfill, disables native WebMCP, injects the bundle, and runs an
+explicit allowlist. When changing covered behavior, run the shared conformance
+suite and replay the WPT lane with
 `CHROME_BIN=/path/to/chrome-canary pnpm test:wpt`. Update the WPT pin
 deliberately and review the upstream diff first. See
-[`docs/TESTING.md`](./docs/TESTING.md) for the test matrix.
+[`docs/TESTING.md`](./docs/TESTING.md) for the test matrix and why the allowlist
+omits the other upstream files.
 
 `pnpm test:wpt:idl` is a second lane checking API _shape_ rather than behavior.
 It needs `interfaces` in the `.reference/wpt` sparse checkout and runs

@@ -250,9 +250,9 @@ When contributing to a specific package:
 
 ### @mcp-b/webmcp-ts-sdk
 
-- Minimal modifications to official SDK
+- Compose the official MCP SDK instead of forking or patching it
 - Maintain compatibility with upstream SDK updates
-- Focus on dynamic tool registration support
+- Delegate browser tool operations to the underlying WebMCP context
 
 ### @mcp-b/transports
 

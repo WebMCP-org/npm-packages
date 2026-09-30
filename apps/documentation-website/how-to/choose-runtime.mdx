@@ -36,27 +36,26 @@ compatibility, type inference, or extension behavior your application needs.
 5. **Do you need MCP bridge transport, `listTools`, prompts, resources, or direct MCP server
    access?** Use [`@mcp-b/global`](/packages/global/overview).
 
-6. **Do you only need React tool registration?** Use
+6. **Do you only need React tool registration with JSON Schema input?** Use
    [`usewebmcp`](/packages/usewebmcp/overview).
 
-7. **Do you need React prompt, resource, or MCP client/provider hooks?** Use
+7. **Do you need Standard Schema input such as Zod, output schemas, or React prompt, resource, or
+   MCP client/provider hooks?** Use
    [`@mcp-b/react-webmcp`](/packages/react-webmcp/overview). Prompt and resource hooks require
    `@mcp-b/global`; tool hooks work with native or polyfilled `document.modelContext`, and
    client/provider hooks use their configured MCP connection.
 
 ## Package comparison
 
-| Choice                   | Adds a browser runtime | Choose it for                                                 |
-| ------------------------ | ---------------------- | ------------------------------------------------------------- |
-| Native browser support   | No                     | Browser behavior documented by the implementation             |
-| `webmcp-types`           | No                     | Core browser declarations that track the live proposal        |
-| `@mcp-b/webmcp-ts-sdk`   | No                     | MCP-B adapter extensions and schema conversion                |
-| `@mcp-b/webmcp-polyfill` | Yes                    | Tool registration, discovery, and temporary declarative tools |
-| `@mcp-b/global`          | Yes                    | MCP-B extensions, server access, and browser transports       |
-| `usewebmcp`              | No                     | React tool hooks over an initialized `document.modelContext`  |
-| `@mcp-b/react-webmcp`    | No                     | React tool, prompt, resource, and MCP client/provider hooks   |
-
-Both the standalone polyfill and `@mcp-b/global` use upstream object-input `executeTool()` and return JSON-serialized results.
+| Choice                   | Adds a browser runtime                | Choose it for                                                 |
+| ------------------------ | ------------------------------------- | ------------------------------------------------------------- |
+| Native browser support   | No                                    | Browser behavior documented by the implementation             |
+| `webmcp-types`           | No                                    | Core browser declarations that track the live proposal        |
+| `@mcp-b/webmcp-ts-sdk`   | When you construct `BrowserMcpServer` | MCP-B adapter extensions and schema conversion                |
+| `@mcp-b/webmcp-polyfill` | Yes                                   | Tool registration, discovery, and temporary declarative tools |
+| `@mcp-b/global`          | Yes                                   | MCP-B extensions, server access, and browser transports       |
+| `usewebmcp`              | No                                    | React tool hooks over an initialized `document.modelContext`  |
+| `@mcp-b/react-webmcp`    | No                                    | React tool, prompt, resource, and MCP client/provider hooks   |
 
 ## Continue with the selected path
 

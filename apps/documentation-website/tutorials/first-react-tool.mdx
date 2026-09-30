@@ -151,6 +151,7 @@ Open the browser console (F12) and verify the tool is registered:
 
 ```javascript title="Find the registered tool"
 const modelContext = document.modelContext;
+if (!modelContext) throw new Error('WebMCP is unavailable');
 const tools = await modelContext.getTools();
 console.log(tools);
 ```

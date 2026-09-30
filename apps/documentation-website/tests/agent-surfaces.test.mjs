@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const appRoot = new URL('../', import.meta.url);
@@ -15,4 +15,20 @@ test('agent-facing docs use the current proposal and omit component source', asy
   assert.match(llms, /document\.modelContext/);
   assert.match(llms, /not a W3C Standard/);
   assert.doesNotMatch(llms, /navigator\.modelContext|WebMCP is a W3C standard/i);
+});
+
+test('pages render snippets through .mdx imports, not <Snippet file>', async () => {
+  const pages = (await readdir(appRoot, { recursive: true })).filter(
+    (path) => path.endsWith('.mdx') && !path.includes('node_modules')
+  );
+  const offenders = [];
+  for (const page of pages) {
+    if ((await readFile(new URL(page, appRoot), 'utf8')).includes('<Snippet file='))
+      offenders.push(page);
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `<Snippet file> renders nothing; import an .mdx snippet in: ${offenders.join(', ')}`
+  );
 });

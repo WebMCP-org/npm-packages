@@ -34,7 +34,7 @@ mode: 'custom'
           </div>
 
           <p className="docs-landing-note docs-landing-note-tight docs-landing-hero-note">
-            Read <a href="/explanation/what-is-webmcp">What is WebMCP?</a>, <a href="/explanation/webmcp-vs-mcp">WebMCP vs MCP</a>, and <a href="/how-to/choose-runtime">Choose a runtime</a>.
+            Read <a href="/explanation/what-is-webmcp">What is WebMCP?</a>, <a href="https://developer.chrome.com/docs/ai/webmcp/compare-mcp">WebMCP vs MCP</a>, and <a href="/how-to/choose-runtime">Choose a runtime</a>.
           </p>
         </div>
 
@@ -86,6 +86,7 @@ mode: 'custom'
           <div className="docs-landing-code-card">
             <p className="docs-landing-code-label">Tool registration (live)</p>
             ```javascript
+            if (!document.modelContext) throw new Error("WebMCP is unavailable");
             await document.modelContext.registerTool({
               name: "get_docs_info",
               description: "Returns info about the current docs page",

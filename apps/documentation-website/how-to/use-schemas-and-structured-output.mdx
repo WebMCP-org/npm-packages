@@ -21,7 +21,8 @@ The core [`usewebmcp`](/packages/usewebmcp/reference) hook accepts upstream JSON
 
 ## Validate React tool input
 
-Install the MCP-B React hook and the schema library used in this example:
+Install [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) and the schema library used in
+this example:
 
 ```bash title="Install the hook and Zod"
 pnpm add @mcp-b/react-webmcp zod@^4.2
@@ -36,9 +37,6 @@ validator before the handler:
 Call `useTotalTool()` in your component. An agent call with `{ count: "2" }`, or a local
 `tool.execute({ count: "2" })`, returns `{ total: 12 }`. The handler receives the number `2` and
 the default limit `10`. Invalid input fails before execution; async validation is awaited.
-
-Use [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) for this validation behavior and for
-MCP output metadata or formatting. The core hook does not call a schema validator.
 
 If your library supplies only Standard Schema validation, also provide its Standard JSON Schema
 converter. Consult the [Standard JSON Schema implementer guide](https://standardschema.dev/json-schema)
@@ -57,9 +55,6 @@ the `@mcp-b/*` packages use so the project loads one copy of them:
 ```bash title="Install browser declarations"
 pnpm add -D webmcp-types@0.1.9
 ```
-
-The Community Group package supplies the browser contracts. MCP-B adapter extensions and schema
-conversion are documented in the [`@mcp-b/webmcp-ts-sdk` reference](/packages/webmcp-ts-sdk/reference).
 
 ## Convert a Standard JSON Schema implementation outside React
 
@@ -119,7 +114,6 @@ If you use [`BrowserMcpServer`](/packages/webmcp-ts-sdk/reference#schema-boundar
 server runs a preserved Standard Schema validator on MCP client calls. Direct browser calls and
 native mirrors bypass that MCP validation. Use the example above to validate in the browser callback with plain JSON metadata if both routes
 can execute it, or use `@mcp-b/react-webmcp` when registering a Standard Schema from React.
-`usewebmcp` accepts only upstream WebMCP JSON Schema and does not perform schema conversion or validation.
 
 ## Add MCP-B output metadata
 
