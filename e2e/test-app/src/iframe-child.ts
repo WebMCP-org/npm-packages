@@ -1,7 +1,6 @@
 await import('@mcp-b/global');
 
-import { type JsonObject, type ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
-import type { RegistrationHandle } from '@mcp-b/webmcp-ts-sdk';
+import type { JsonObject, RegistrationHandle, ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
 import { requireBrowserMcpServer } from './browser-mcp-server.js';
 
 const modelContext = requireBrowserMcpServer();

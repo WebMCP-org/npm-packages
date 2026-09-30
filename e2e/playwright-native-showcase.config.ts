@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
-import { MACOS_CHROME_EXECUTABLE_PATHS, resolveChromeExecutable } from './chrome-executable.js';
+import {
+  MACOS_CHROME_EXECUTABLE_PATHS,
+  MIN_NATIVE_CHROME_MAJOR,
+  resolveChromeExecutable,
+  WEBMCP_CHROME_ARGS,
+} from './chrome-executable.js';
 
 /**
  * Playwright configuration for Native Web Standards Showcase
@@ -7,10 +12,9 @@ import { MACOS_CHROME_EXECUTABLE_PATHS, resolveChromeExecutable } from './chrome
  * Defaults to an installed Chrome 155+ because WebMCP's document.modelContext
  * surface is not available in Playwright's bundled Chromium.
  */
-const tabTransportPort = Number.parseInt(process.env.PLAYWRIGHT_NATIVE_SHOWCASE_PORT ?? '5174', 10);
-const nativeShowcaseBaseUrl = `http://localhost:${tabTransportPort}`;
+const showcasePort = Number.parseInt(process.env.PLAYWRIGHT_NATIVE_SHOWCASE_PORT ?? '5174', 10);
+const nativeShowcaseBaseUrl = `http://localhost:${showcasePort}`;
 const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
-const MIN_NATIVE_CHROME_MAJOR = 155;
 const nativeShowcaseExecutablePath = resolveChromeExecutable({
   candidates: [
     process.env.PLAYWRIGHT_NATIVE_SHOWCASE_EXECUTABLE_PATH,
@@ -37,14 +41,9 @@ export default defineConfig({
     baseURL: nativeShowcaseBaseUrl,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-
-    // CRITICAL: Launch with experimental web platform features enabled
     launchOptions: {
       executablePath: nativeShowcaseExecutablePath,
-      args: [
-        '--enable-experimental-web-platform-features',
-        '--enable-features=WebMCPTesting,DevToolsWebMCPSupport',
-      ],
+      args: WEBMCP_CHROME_ARGS,
     },
   },
 
@@ -58,7 +57,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: `cd web-standards-showcase && pnpm dev --host 127.0.0.1 --port ${tabTransportPort}`,
+    command: `cd web-standards-showcase && pnpm dev --host 127.0.0.1 --port ${showcasePort}`,
     url: nativeShowcaseBaseUrl,
     reuseExistingServer,
     timeout: 120 * 1000,

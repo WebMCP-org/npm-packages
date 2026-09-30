@@ -24,9 +24,11 @@ From `e2e/`:
 
 ```bash
 CHROME_BIN="/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary" \
-PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary" \
-pnpm test:native-contract:default
+pnpm test:native-contract
 ```
+
+`pnpm test:native-parity` runs the contract plus the Chrome WebMCP smoke in
+`tests/chrome-beta-webmcp.spec.ts`.
 
 The configuration requires Chrome 155 or newer and launches it with:
 
@@ -58,6 +60,7 @@ Relevant files:
 - `tests/native-showcase.spec.ts`
 - `playwright-chrome-beta-webmcp.config.ts`
 - `playwright-native-showcase.config.ts`
+- `chrome-executable.ts` (Chrome floor, WebMCP flags, browser discovery)
 
 ## MCP-B runtime coverage
 

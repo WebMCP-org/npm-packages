@@ -42,22 +42,16 @@ async function bootstrap() {
   setStatus('ready', 'MCP client connected to iframe runtime');
 }
 
-if (iframeEl.contentDocument?.readyState === 'complete') {
+function start() {
   void bootstrap().catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
     setStatus('error', message);
     console.error('[runtime-contract][iframe-client]', error);
   });
+}
+
+if (iframeEl.contentDocument?.readyState === 'complete') {
+  start();
 } else {
-  iframeEl.addEventListener(
-    'load',
-    () => {
-      void bootstrap().catch((error) => {
-        const message = error instanceof Error ? error.message : String(error);
-        setStatus('error', message);
-        console.error('[runtime-contract][iframe-client]', error);
-      });
-    },
-    { once: true }
-  );
+  iframeEl.addEventListener('load', start, { once: true });
 }

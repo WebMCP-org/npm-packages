@@ -48,9 +48,7 @@ async function callTool(name: string, args: JsonObject) {
     (candidate) => candidate.name === `${mcpIframe.itemPrefix}${name}`
   );
   if (!tool) throw new Error(`Tool not found: ${name}`);
-  const result = await modelContext.executeTool(tool, args);
-  if (result === null) throw new Error('Tool execution was interrupted');
-  return normalizeToolResponse(JSON.parse(result));
+  return normalizeToolResponse(JSON.parse(await modelContext.executeTool(tool, args)));
 }
 
 async function readResource(uri: string) {

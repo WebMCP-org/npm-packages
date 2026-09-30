@@ -1,4 +1,5 @@
 import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test';
+import { WEBMCP_CHROME_ARGS } from './chrome-executable.js';
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -10,10 +11,6 @@ const chromiumChannel = process.env.PLAYWRIGHT_CHROMIUM_CHANNEL;
 const chromiumExecutablePath =
   process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ?? process.env.CHROME_BIN;
 const enableWebMCPFlags = process.env.PLAYWRIGHT_ENABLE_WEBMCP_FLAGS === '1';
-const webMCPFlags = [
-  '--enable-experimental-web-platform-features',
-  '--enable-features=WebMCPTesting,DevToolsWebMCPSupport',
-];
 const chromiumUse: NonNullable<PlaywrightTestConfig['use']> = {
   ...devices['Desktop Chrome'],
 };
@@ -24,7 +21,7 @@ if (chromiumChannel && !chromiumExecutablePath) {
 type ChromiumLaunchOptions = NonNullable<NonNullable<PlaywrightTestConfig['use']>['launchOptions']>;
 const launchOptions: ChromiumLaunchOptions = {};
 if (chromiumExecutablePath) launchOptions.executablePath = chromiumExecutablePath;
-if (enableWebMCPFlags) launchOptions.args = webMCPFlags;
+if (enableWebMCPFlags) launchOptions.args = WEBMCP_CHROME_ARGS;
 if (chromiumExecutablePath || enableWebMCPFlags) {
   chromiumUse.launchOptions = launchOptions;
 }
@@ -37,7 +34,6 @@ const config: PlaywrightTestConfig = {
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [['html'], ['list'], ...(process.env.CI ? [['github'] as const] : [])],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */

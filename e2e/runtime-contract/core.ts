@@ -7,7 +7,7 @@ export type RuntimeToolArguments =
   | { value: string }
   | { reason: string };
 
-const BASE_TOOL_NAMES = ['echo', 'sum', 'always_fail'] as const;
+export const BASE_TOOL_NAMES = ['echo', 'sum', 'always_fail'] as const;
 export const DYNAMIC_TOOL_NAME = 'dynamic_tool';
 
 export interface RuntimeInvocationRecord {
@@ -25,7 +25,6 @@ export interface RuntimeContractController {
 
 export interface RuntimeContractOptions {
   runtimeLabel?: string;
-  dynamicToolName?: string;
 }
 
 export interface RuntimeContractTool extends Omit<
@@ -95,10 +94,6 @@ function recordInvocation(
   });
 }
 
-export function getCanonicalToolNames(includeDynamic = false): string[] {
-  return includeDynamic ? [...BASE_TOOL_NAMES, DYNAMIC_TOOL_NAME] : [...BASE_TOOL_NAMES];
-}
-
 export function firstTextContent(
   result: Pick<CallToolResult, 'content'> | null | undefined
 ): string {
@@ -118,7 +113,6 @@ export function createRuntimeContractTools(
   options: RuntimeContractOptions = {}
 ): RuntimeContractTools {
   const runtimeLabel = options.runtimeLabel ?? 'browser';
-  const dynamicToolName = options.dynamicToolName ?? DYNAMIC_TOOL_NAME;
 
   return {
     baseTools: [
@@ -186,7 +180,7 @@ export function createRuntimeContractTools(
     ],
     createDynamicTool() {
       return {
-        name: dynamicToolName,
+        name: DYNAMIC_TOOL_NAME,
         description: 'A dynamically registered contract tool.',
         inputSchema: {
           type: 'object',
@@ -197,7 +191,7 @@ export function createRuntimeContractTools(
         },
         async execute(args) {
           const value = typeof args.value === 'string' ? args.value : '';
-          recordInvocation(state, dynamicToolName, args);
+          recordInvocation(state, DYNAMIC_TOOL_NAME, args);
           return textResult(`dynamic:${value}`, {
             value,
             runtime: runtimeLabel,

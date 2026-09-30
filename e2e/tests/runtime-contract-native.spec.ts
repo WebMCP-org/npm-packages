@@ -1,7 +1,8 @@
 import { expect, type Page, test } from '@playwright/test';
 import {
   DYNAMIC_TOOL_NAME,
-  getCanonicalToolNames,
+  expectBaseTools,
+  firstTextContent,
   readInvocations,
   registerDynamicTool,
   resetInvocations,
@@ -9,45 +10,6 @@ import {
   waitForRuntimePage,
 } from './runtime-contract.helpers.js';
 import type { RuntimeToolArguments } from '../runtime-contract/core.js';
-
-type TextContentResult = { type: 'text'; text: string };
-type TextToolResult = { content: TextContentResult[] };
-
-function isTextContent(value: unknown): value is TextContentResult {
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    'type' in value &&
-    value.type === 'text' &&
-    'text' in value &&
-    typeof value.text === 'string'
-  );
-}
-
-function isTextToolResult(value: unknown): value is TextToolResult {
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    'content' in value &&
-    Array.isArray(value.content) &&
-    value.content.every(isTextContent)
-  );
-}
-
-function extractToolText(result: string | null): string {
-  if (result === null) return '';
-
-  try {
-    const parsed: unknown = JSON.parse(result);
-    if (isTextToolResult(parsed)) return parsed.content[0]?.text ?? result;
-  } catch {
-    return result;
-  }
-
-  return result;
-}
 
 async function listNativeToolNames(page: Page): Promise<string[]> {
   return page.evaluate(async () => {
@@ -71,21 +33,17 @@ async function executeNativeToolText(
       if (!modelContext) {
         throw new Error('Native document.modelContext is unavailable');
       }
-      const executeTool = modelContext.executeTool;
-      if (typeof executeTool !== 'function') {
-        throw new Error('Native executeTool is unavailable');
-      }
 
       const tool = (await modelContext.getTools()).find((candidate) => candidate.name === toolName);
       if (!tool) {
         throw new Error(`Native tool is unavailable: ${toolName}`);
       }
 
-      return executeTool.call(modelContext, tool, toolArgs);
+      return modelContext.executeTool(tool, toolArgs);
     },
     { toolName: name, toolArgs: args }
   );
-  return extractToolText(result);
+  return firstTextContent(JSON.parse(result));
 }
 
 async function executeNativeToolError(
@@ -108,9 +66,7 @@ async function executeNativeToolError(
           throw new Error(`Native tool is unavailable: ${toolName}`);
         }
 
-        const executeTool = modelContext.executeTool;
-        if (typeof executeTool !== 'function') throw new Error('Native executeTool is unavailable');
-        await executeTool.call(modelContext, tool, toolArgs);
+        await modelContext.executeTool(tool, toolArgs);
         return '';
       } catch (error) {
         return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
@@ -165,9 +121,7 @@ test.describe('Runtime Contract - Browser API Caller', () => {
   });
 
   test('discovers the canonical base tool set through browser APIs', async ({ page }) => {
-    const toolNames = await listNativeToolNames(page);
-    expect(toolNames).toEqual(expect.arrayContaining(getCanonicalToolNames(false)));
-    expect(toolNames).toHaveLength(getCanonicalToolNames(false).length);
+    expectBaseTools(await listNativeToolNames(page));
   });
 
   test('supports producer getTools and executeTool shape on document.modelContext', async ({
@@ -176,25 +130,19 @@ test.describe('Runtime Contract - Browser API Caller', () => {
     const result = await page.evaluate(async () => {
       const modelContext = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
       if (!modelContext) {
-        return { missingRawModelContext: true, missingSumTool: false, toolsArePromise: false };
-      }
-      const executeTool = modelContext.executeTool;
-      if (typeof executeTool !== 'function') {
-        return { missingRawModelContext: false, missingSumTool: false, toolsArePromise: false };
+        throw new Error('Native document.modelContext is unavailable');
       }
       const toolsPromise = modelContext.getTools();
       const tools = await toolsPromise;
       const sumTool = tools.find((tool) => tool.name === 'sum');
       if (!sumTool) {
-        return { missingRawModelContext: false, missingSumTool: true, toolsArePromise: false };
+        throw new Error('Native tool is unavailable: sum');
       }
 
-      const execution = await executeTool.call(modelContext, sumTool, { a: 4, b: 7 });
+      const execution = await modelContext.executeTool(sumTool, { a: 4, b: 7 });
       const inputSchema = sumTool.inputSchema;
 
       return {
-        missingRawModelContext: false,
-        missingSumTool: false,
         toolsArePromise: typeof toolsPromise.then === 'function',
         toolInfo: {
           name: sumTool.name,
@@ -209,8 +157,6 @@ test.describe('Runtime Contract - Browser API Caller', () => {
       };
     });
 
-    expect(result.missingRawModelContext).toBe(false);
-    expect(result.missingSumTool).toBe(false);
     expect(result.toolsArePromise).toBe(true);
     expect(result.toolInfo).toMatchObject({
       name: 'sum',
@@ -279,11 +225,7 @@ test.describe('Runtime Contract - Browser API Caller', () => {
             if (!modelContext) {
               throw new Error('Native document.modelContext is unavailable');
             }
-            const executeTool = modelContext.executeTool;
-            if (typeof executeTool !== 'function') {
-              throw new Error('Native executeTool is unavailable');
-            }
-            await executeTool.call(modelContext, tool, toolArgs);
+            await modelContext.executeTool(tool, toolArgs);
             return '';
           } catch (error) {
             return error instanceof Error ? `${error.name}: ${error.message}` : String(error);

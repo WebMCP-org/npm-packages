@@ -1,34 +1,6 @@
 import type { JsonObject } from '@mcp-b/webmcp-ts-sdk';
 import { expect, test } from '@playwright/test';
 
-function isString(value: unknown): value is string {
-  return typeof value === 'string';
-}
-
-function isJsonObject(value: unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function parseTextResult(serialized: string): string | undefined {
-  try {
-    const parsed: unknown = JSON.parse(serialized);
-    if (!isJsonObject(parsed) || !Array.isArray(parsed.content)) return undefined;
-    const [first] = parsed.content;
-    if (!isJsonObject(first) || first.type !== 'text' || !isString(first.text)) return undefined;
-    return first.text;
-  } catch {
-    return undefined;
-  }
-}
-
-function isDirectOrWrappedText(value: string | null | undefined, expectedText: string): boolean {
-  if (value === null || value === undefined) return false;
-  if (value === expectedText) {
-    return true;
-  }
-  return parseTextResult(value) === expectedText;
-}
-
 test.describe('Chrome WebMCP native smoke', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
@@ -56,8 +28,7 @@ test.describe('Chrome WebMCP native smoke', () => {
         hasRegisterTool: typeof context?.registerTool === 'function',
         hasGetTools: typeof context?.getTools === 'function',
         hasAddEventListener: typeof context?.addEventListener === 'function',
-        executeToolHasValidShape:
-          context?.executeTool === undefined || typeof context.executeTool === 'function',
+        hasExecuteTool: typeof context?.executeTool === 'function',
         hasDeprecatedNavigatorAlias: 'modelContext' in navigator,
         hasMcpBExtensions:
           activeContext !== undefined &&
@@ -70,17 +41,15 @@ test.describe('Chrome WebMCP native smoke', () => {
     expect(surface.hasRegisterTool).toBe(true);
     expect(surface.hasGetTools).toBe(true);
     expect(surface.hasAddEventListener).toBe(true);
-    expect(surface.executeToolHasValidShape).toBe(true);
+    expect(surface.hasExecuteTool).toBe(true);
     expect(surface.hasDeprecatedNavigatorAlias).toBe(false);
     expect(surface.hasMcpBExtensions).toBe(true);
   });
 
   test('getTools returns valid RegisteredTool entries for every tool', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
 
       const isString = (value: unknown): value is string => typeof value === 'string';
       const isJsonObject = (value: unknown): value is JsonObject =>
@@ -106,20 +75,17 @@ test.describe('Chrome WebMCP native smoke', () => {
         }
       });
 
-      return { missingApi: false, count: tools.length, invalidEntries };
+      return { count: tools.length, invalidEntries };
     });
 
-    expect(result.missingApi).toBe(false);
     expect(result.count).toBeGreaterThan(0);
     expect(result.invalidEntries).toEqual([]);
   });
 
   test('getTools tracks registerTool signal lifecycle operations', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
 
       const toolName = `beta_list_tracking_${Date.now()}`;
       const controller = new AbortController();
@@ -151,38 +117,29 @@ test.describe('Chrome WebMCP native smoke', () => {
       }
 
       return {
-        missingApi: false,
         before,
         afterRegister,
-        afterUnregister: toolsAfterUnregister.length,
         hasToolAfterRegister,
         hasToolAfterUnregister: toolsAfterUnregister.some((tool) => tool.name === toolName),
       };
     });
 
-    expect(result.missingApi).toBe(false);
-    if (result.missingApi) {
-      throw new Error('document.modelContext not available');
-    }
-    expect(result.afterRegister).toBeGreaterThanOrEqual((result.before ?? 0) + 1);
+    expect(result.afterRegister).toBeGreaterThanOrEqual(result.before + 1);
     expect(result.hasToolAfterRegister).toBe(true);
     expect(result.hasToolAfterUnregister).toBe(false);
   });
 
   test('getTools omits inputSchema when registration omits it', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
 
-      const nativeContext = context;
       const noSchemaName = `beta_no_schema_${Date.now()}`;
       const undefinedSchemaName = `beta_undefined_schema_${Date.now()}`;
       const noSchemaController = new AbortController();
       const undefinedSchemaController = new AbortController();
 
-      await nativeContext.registerTool(
+      await context.registerTool(
         {
           name: noSchemaName,
           description: 'No explicit schema',
@@ -204,18 +161,20 @@ test.describe('Chrome WebMCP native smoke', () => {
         enumerable: true,
         value: undefined,
       });
-      await nativeContext.registerTool(undefinedSchemaTool, {
+      await context.registerTool(undefinedSchemaTool, {
         signal: undefinedSchemaController.signal,
       });
 
       try {
-        const tools = await nativeContext.getTools();
-        const noSchemaTool = tools.find((tool) => tool.name === noSchemaName);
-        const undefinedSchemaTool = tools.find((tool) => tool.name === undefinedSchemaName);
+        const tools = await context.getTools();
+        const listedNoSchema = tools.find((tool) => tool.name === noSchemaName);
+        const listedUndefinedSchema = tools.find((tool) => tool.name === undefinedSchemaName);
+        if (!listedNoSchema || !listedUndefinedSchema) {
+          throw new Error('Registered tools are missing from getTools()');
+        }
         return {
-          missingApi: false,
-          noSchemaIsUndefined: noSchemaTool?.inputSchema === undefined,
-          undefinedSchemaIsUndefined: undefinedSchemaTool?.inputSchema === undefined,
+          noSchemaIsUndefined: listedNoSchema.inputSchema === undefined,
+          undefinedSchemaIsUndefined: listedUndefinedSchema.inputSchema === undefined,
         };
       } finally {
         noSchemaController.abort();
@@ -223,20 +182,14 @@ test.describe('Chrome WebMCP native smoke', () => {
       }
     });
 
-    expect(result.missingApi).toBe(false);
     expect(result.noSchemaIsUndefined).toBe(true);
     expect(result.undefinedSchemaIsUndefined).toBe(true);
   });
 
   test('executeTool accepts a discovered tool descriptor and object inputs', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
-      if (typeof context.executeTool !== 'function') {
-        return { missingApi: false, missingExecuteTool: true };
-      }
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
 
       const toolName = `beta_exec_ok_${Date.now()}`;
       const controller = new AbortController();
@@ -258,43 +211,28 @@ test.describe('Chrome WebMCP native smoke', () => {
 
       try {
         const tool = (await context.getTools()).find((candidate) => candidate.name === toolName);
-        if (!tool) {
-          return { missingApi: false, missingExecuteTool: false, missingTool: true };
-        }
-        const executeTool = context.executeTool.bind(context);
-        const withoutOptions = await executeTool(tool, { value: 7 });
-        const withEmptyOptions = await executeTool(tool, { value: 8 }, {});
+        if (!tool) throw new Error(`Tool not found: ${toolName}`);
         return {
-          missingApi: false,
-          missingExecuteTool: false,
-          missingTool: false,
-          withoutOptions,
-          withEmptyOptions,
+          withoutOptions: await context.executeTool(tool, { value: 7 }),
+          withEmptyOptions: await context.executeTool(tool, { value: 8 }, {}),
         };
       } finally {
         controller.abort();
       }
     });
 
-    expect(result.missingApi).toBe(false);
-    test.skip(
-      'missingExecuteTool' in result && result.missingExecuteTool === true,
-      'Chrome does not expose its optional executeTool extension'
-    );
-    expect(result.missingTool).toBe(false);
-    expect(isDirectOrWrappedText(result.withoutOptions, 'beta:7')).toBe(true);
-    expect(isDirectOrWrappedText(result.withEmptyOptions, 'beta:8')).toBe(true);
+    expect(JSON.parse(result.withoutOptions)).toEqual({
+      content: [{ type: 'text', text: 'beta:7' }],
+    });
+    expect(JSON.parse(result.withEmptyOptions)).toEqual({
+      content: [{ type: 'text', text: 'beta:8' }],
+    });
   });
 
   test('executeTool accepts array inputs', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
-      if (typeof context.executeTool !== 'function') {
-        return { missingApi: false, missingExecuteTool: true };
-      }
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
 
       const toolName = `beta_exec_array_${Date.now()}`;
       const controller = new AbortController();
@@ -312,57 +250,29 @@ test.describe('Chrome WebMCP native smoke', () => {
 
       try {
         const tool = (await context.getTools()).find((candidate) => candidate.name === toolName);
-        if (!tool) {
-          return { missingApi: false, missingExecuteTool: false, missingTool: true };
-        }
-        return {
-          missingApi: false,
-          missingExecuteTool: false,
-          missingTool: false,
-          value: await context.executeTool(tool, [1, 2, 3]),
-        };
+        if (!tool) throw new Error(`Tool not found: ${toolName}`);
+        return await context.executeTool(tool, [1, 2, 3]);
       } finally {
         controller.abort();
       }
     });
 
-    expect(result.missingApi).toBe(false);
-    test.skip(
-      'missingExecuteTool' in result && result.missingExecuteTool === true,
-      'Chrome does not expose its optional executeTool extension'
-    );
-    expect(result.missingTool).toBe(false);
-    expect(isDirectOrWrappedText(result.value, 'beta-array:1,2,3')).toBe(true);
+    expect(JSON.parse(result)).toEqual({ content: [{ type: 'text', text: 'beta-array:1,2,3' }] });
   });
 
   test('executeTool rejects serialized JSON strings with TypeError', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
-      if (typeof context.executeTool !== 'function') {
-        return { missingApi: false, missingExecuteTool: true };
-      }
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
       const firstTool = (await context.getTools())[0];
-      if (!firstTool) {
-        return { missingApi: false, missingExecuteTool: false, noTool: true };
-      }
+      if (!firstTool) throw new Error('No registered tools');
 
       try {
         // @ts-expect-error Deliberately exercise the rejected legacy JSON-string input.
         await context.executeTool(firstTool, '{}');
-        return {
-          missingApi: false,
-          missingExecuteTool: false,
-          noTool: false,
-          didThrow: false,
-        };
+        return { didThrow: false };
       } catch (error) {
         return {
-          missingApi: false,
-          missingExecuteTool: false,
-          noTool: false,
           didThrow: true,
           name: error instanceof Error ? error.name : String(error),
           message: error instanceof Error ? error.message : String(error),
@@ -370,12 +280,6 @@ test.describe('Chrome WebMCP native smoke', () => {
       }
     });
 
-    expect(result.missingApi).toBe(false);
-    test.skip(
-      'missingExecuteTool' in result && result.missingExecuteTool === true,
-      'Chrome does not expose its optional executeTool extension'
-    );
-    expect(result.noTool).toBe(false);
     expect(result.didThrow).toBe(true);
     expect(result.name).toBe('TypeError');
     expect(result.message).toMatch(/input object|not an object/i);
@@ -383,32 +287,17 @@ test.describe('Chrome WebMCP native smoke', () => {
 
   test('executeTool rejects primitive inputs with TypeError', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
-      if (typeof context.executeTool !== 'function') {
-        return { missingApi: false, missingExecuteTool: true };
-      }
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
       const firstTool = (await context.getTools())[0];
-      if (!firstTool) {
-        return { missingApi: false, missingExecuteTool: false, noTool: true };
-      }
+      if (!firstTool) throw new Error('No registered tools');
 
       try {
         // @ts-expect-error Deliberately exercise the object-input boundary.
         await context.executeTool(firstTool, 7);
-        return {
-          missingApi: false,
-          missingExecuteTool: false,
-          noTool: false,
-          didThrow: false,
-        };
+        return { didThrow: false };
       } catch (error) {
         return {
-          missingApi: false,
-          missingExecuteTool: false,
-          noTool: false,
           didThrow: true,
           name: error instanceof Error ? error.name : String(error),
           message: error instanceof Error ? error.message : String(error),
@@ -416,12 +305,6 @@ test.describe('Chrome WebMCP native smoke', () => {
       }
     });
 
-    expect(result.missingApi).toBe(false);
-    test.skip(
-      'missingExecuteTool' in result && result.missingExecuteTool === true,
-      'Chrome does not expose its optional executeTool extension'
-    );
-    expect(result.noTool).toBe(false);
     expect(result.didThrow).toBe(true);
     expect(result.name).toBe('TypeError');
     expect(result.message).toMatch(/input object|not an object/i);
@@ -429,13 +312,8 @@ test.describe('Chrome WebMCP native smoke', () => {
 
   test('executeTool rejects a stale registered descriptor with UnknownError', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
-      if (typeof context.executeTool !== 'function') {
-        return { missingApi: false, missingExecuteTool: true };
-      }
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
 
       const toolName = `beta_missing_${Date.now()}`;
       const controller = new AbortController();
@@ -451,25 +329,14 @@ test.describe('Chrome WebMCP native smoke', () => {
         { signal: controller.signal }
       );
       const tool = (await context.getTools()).find((candidate) => candidate.name === toolName);
-      if (!tool) {
-        controller.abort();
-        return { missingApi: false, missingExecuteTool: false, missingTool: true };
-      }
       controller.abort();
+      if (!tool) throw new Error(`Tool not found: ${toolName}`);
 
       try {
         await context.executeTool(tool, {});
-        return {
-          missingApi: false,
-          missingExecuteTool: false,
-          missingTool: false,
-          didThrow: false,
-        };
+        return { didThrow: false };
       } catch (error) {
         return {
-          missingApi: false,
-          missingExecuteTool: false,
-          missingTool: false,
           didThrow: true,
           name: error instanceof Error ? error.name : String(error),
           message: error instanceof Error ? error.message : String(error),
@@ -477,12 +344,6 @@ test.describe('Chrome WebMCP native smoke', () => {
       }
     });
 
-    expect(result.missingApi).toBe(false);
-    test.skip(
-      'missingExecuteTool' in result && result.missingExecuteTool === true,
-      'Chrome does not expose its optional executeTool extension'
-    );
-    expect(result.missingTool).toBe(false);
     expect(result.didThrow).toBe(true);
     expect(result.name).toBe('UnknownError');
     expect((result.message ?? '').length).toBeGreaterThan(0);
@@ -490,13 +351,8 @@ test.describe('Chrome WebMCP native smoke', () => {
 
   test('executeTool maps thrown tool invocation failures to UnknownError', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
-      if (typeof context.executeTool !== 'function') {
-        return { missingApi: false, missingExecuteTool: true };
-      }
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
 
       const toolName = `beta_exec_throw_${Date.now()}`;
       const controller = new AbortController();
@@ -511,24 +367,14 @@ test.describe('Chrome WebMCP native smoke', () => {
         },
         { signal: controller.signal }
       );
+      const tool = (await context.getTools()).find((candidate) => candidate.name === toolName);
+      if (!tool) throw new Error(`Tool not found: ${toolName}`);
 
       try {
-        const tool = (await context.getTools()).find((candidate) => candidate.name === toolName);
-        if (!tool) {
-          return { missingApi: false, missingExecuteTool: false, missingTool: true };
-        }
         await context.executeTool(tool, {});
-        return {
-          missingApi: false,
-          missingExecuteTool: false,
-          missingTool: false,
-          didThrow: false,
-        };
+        return { didThrow: false };
       } catch (error) {
         return {
-          missingApi: false,
-          missingExecuteTool: false,
-          missingTool: false,
           didThrow: true,
           name: error instanceof Error ? error.name : String(error),
           message: error instanceof Error ? error.message : String(error),
@@ -538,12 +384,6 @@ test.describe('Chrome WebMCP native smoke', () => {
       }
     });
 
-    expect(result.missingApi).toBe(false);
-    test.skip(
-      'missingExecuteTool' in result && result.missingExecuteTool === true,
-      'Chrome does not expose its optional executeTool extension'
-    );
-    expect(result.missingTool).toBe(false);
     expect(result.didThrow).toBe(true);
     expect(result.name).toBe('UnknownError');
     expect((result.message ?? '').length).toBeGreaterThan(0);
@@ -551,60 +391,33 @@ test.describe('Chrome WebMCP native smoke', () => {
 
   test('executeTool with aborted signal before call rejects', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
-      if (typeof context.executeTool !== 'function') {
-        return { missingApi: false, missingExecuteTool: true };
-      }
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
       const firstTool = (await context.getTools())[0];
-      if (!firstTool) {
-        return { missingApi: false, missingExecuteTool: false, noTool: true };
-      }
+      if (!firstTool) throw new Error('No registered tools');
 
       const controller = new AbortController();
       controller.abort();
 
       try {
         await context.executeTool(firstTool, {}, { signal: controller.signal });
-        return {
-          missingApi: false,
-          missingExecuteTool: false,
-          noTool: false,
-          didThrow: false,
-        };
+        return { didThrow: false };
       } catch (error) {
         return {
-          missingApi: false,
-          missingExecuteTool: false,
-          noTool: false,
           didThrow: true,
           name: error instanceof Error ? error.name : String(error),
-          message: error instanceof Error ? error.message : String(error),
         };
       }
     });
 
-    expect(result.missingApi).toBe(false);
-    test.skip(
-      'missingExecuteTool' in result && result.missingExecuteTool === true,
-      'Chrome does not expose its optional executeTool extension'
-    );
-    expect(result.noTool).toBe(false);
     expect(result.didThrow).toBe(true);
     expect(result.name).toBe('AbortError');
   });
 
   test('executeTool with aborted signal during pending tool rejects', async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
-      if (typeof context.executeTool !== 'function') {
-        return { missingApi: false, missingExecuteTool: true };
-      }
+    const errorName = await page.evaluate(async () => {
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
 
       const toolName = `beta_exec_abort_${Date.now()}`;
       const registrationController = new AbortController();
@@ -623,55 +436,29 @@ test.describe('Chrome WebMCP native smoke', () => {
 
       try {
         const tool = (await context.getTools()).find((candidate) => candidate.name === toolName);
-        if (!tool) {
-          return { missingApi: false, missingExecuteTool: false, missingTool: true };
-        }
+        if (!tool) throw new Error(`Tool not found: ${toolName}`);
         const controller = new AbortController();
-        const parseError = (error: unknown): { name: string; message: string } =>
-          error instanceof Error
-            ? { name: error.name, message: error.message }
-            : { name: 'Error', message: String(error) };
-        const pending = context
-          .executeTool(tool, {}, { signal: controller.signal })
-          .then((value) => ({ didThrow: false, value }))
-          .catch((error) => ({ didThrow: true, ...parseError(error) }));
+        const pending = context.executeTool(tool, {}, { signal: controller.signal }).then(
+          () => 'resolved',
+          (error) => (error instanceof Error ? error.name : String(error))
+        );
 
         setTimeout(() => controller.abort(), 10);
-        return {
-          missingApi: false,
-          missingExecuteTool: false,
-          missingTool: false,
-          ...(await pending),
-        };
+        return await pending;
       } finally {
         registrationController.abort();
       }
     });
 
-    expect(result.missingApi).toBe(false);
-    test.skip(
-      'missingExecuteTool' in result && result.missingExecuteTool === true,
-      'Chrome does not expose its optional executeTool extension'
-    );
-    if (!('didThrow' in result)) {
-      throw new Error('Unexpected executeTool result shape');
-    }
-    if (!('name' in result) || !('message' in result)) {
-      throw new Error('Expected executeTool to throw an error');
-    }
-    expect(result.missingTool).toBe(false);
-    expect(result.didThrow).toBe(true);
-    expect(result.name).toBe('AbortError');
+    expect(errorName).toBe('AbortError');
   });
 
   test('multiple toolchange listeners receive events and survive listener errors', async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
 
       let firstCount = 0;
       let secondCount = 0;
@@ -739,7 +526,6 @@ test.describe('Chrome WebMCP native smoke', () => {
       }
 
       return {
-        missingApi: false,
         firstCount,
         secondCount,
         sawRegisterNotification,
@@ -748,7 +534,6 @@ test.describe('Chrome WebMCP native smoke', () => {
       };
     });
 
-    expect(result.missingApi).toBe(false);
     expect(result.sawRegisterNotification).toBe(true);
     expect(result.sawAbortNotification).toBe(true);
     expect(result.firstCount).toBe(result.secondCount);

@@ -10,13 +10,6 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-async function waitForNativeReady(page: Page): Promise<void> {
-  await page.waitForSelector('#detection-status', { timeout: 10000 });
-  await expect(page.locator('#detection-status')).toContainText(
-    'Native Chromium Web Model Context API detected'
-  );
-}
-
 async function waitForIframeReady(page: Page): Promise<void> {
   const iframe = page.frameLocator('#test-iframe');
   await expect(iframe.locator('#iframe-status')).toContainText('Native API Ready', {
@@ -26,8 +19,8 @@ async function waitForIframeReady(page: Page): Promise<void> {
 
 async function getToolNames(page: Page): Promise<string[]> {
   return page.evaluate(async () => {
-    const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-    if (!context) throw new Error('document.modelContext is unavailable');
+    const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+    if (!context) throw new Error('Native document.modelContext is unavailable');
     return (await context.getTools()).map((tool) => tool.name);
   });
 }
@@ -48,7 +41,11 @@ async function waitForToolSet(page: Page, toolNames: string[]): Promise<void> {
 
 async function openShowcase(page: Page): Promise<void> {
   await page.goto('/');
-  await waitForNativeReady(page);
+  await waitForTextContains(
+    page,
+    '#detection-status',
+    'Native Chromium Web Model Context API detected'
+  );
 }
 
 async function waitForTextContains(page: Page, selector: string, text: string): Promise<void> {
@@ -60,11 +57,6 @@ test.describe('Native API Detection', () => {
     await openShowcase(page);
 
     await expect(page.locator('#detection-banner')).toBeVisible();
-    await waitForTextContains(
-      page,
-      '#detection-status',
-      'Native Chromium Web Model Context API detected'
-    );
   });
 
   test('exposes the native document.modelContext surface', async ({ page }) => {
@@ -77,8 +69,7 @@ test.describe('Native API Detection', () => {
         hasRegisterTool: typeof context?.registerTool === 'function',
         hasGetTools: typeof context?.getTools === 'function',
         hasAddEventListener: typeof context?.addEventListener === 'function',
-        executeToolHasValidShape:
-          context?.executeTool === undefined || typeof context.executeTool === 'function',
+        hasExecuteTool: typeof context?.executeTool === 'function',
         hasDeprecatedNavigatorAlias: 'modelContext' in navigator,
         rawSurface: window.__WEBMCP_SHOWCASE_RAW_SURFACE__,
       };
@@ -88,7 +79,7 @@ test.describe('Native API Detection', () => {
     expect(surface.hasRegisterTool).toBe(true);
     expect(surface.hasGetTools).toBe(true);
     expect(surface.hasAddEventListener).toBe(true);
-    expect(surface.executeToolHasValidShape).toBe(true);
+    expect(surface.hasExecuteTool).toBe(true);
     expect(surface.hasDeprecatedNavigatorAlias).toBe(false);
     expect(surface.rawSurface).toMatchObject({
       hasModelContext: true,
@@ -182,10 +173,8 @@ test.describe('Native API Semantics', () => {
 
   test('registerTool exposes registered tools and abort cleanup removes them', async ({ page }) => {
     const state = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
 
       const firstToolName = `native_reg_first_${Date.now()}`;
       const secondToolName = `native_reg_second_${Date.now()}`;
@@ -223,18 +212,12 @@ test.describe('Native API Semantics', () => {
       secondController.abort();
 
       return {
-        missingApi: false,
         firstToolName,
         secondToolName,
         beforeAbort,
         afterAbort,
       };
     });
-
-    expect(state.missingApi).toBe(false);
-    if (state.missingApi || !state.firstToolName || !state.secondToolName) {
-      return;
-    }
 
     expect(state.beforeAbort).toContain(state.firstToolName);
     expect(state.afterAbort).toContain(state.secondToolName);
@@ -244,10 +227,8 @@ test.describe('Native API Semantics', () => {
 
   test('multiple registered tools clean up through AbortSignal', async ({ page }) => {
     const state = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
 
       const firstToolName = `clear_a_${Date.now()}`;
       const secondToolName = `clear_b_${Date.now()}`;
@@ -283,17 +264,11 @@ test.describe('Native API Semantics', () => {
       secondController.abort();
 
       return {
-        missingApi: false,
         firstToolName,
         secondToolName,
         before,
       };
     });
-
-    expect(state.missingApi).toBe(false);
-    if (state.missingApi || !state.firstToolName || !state.secondToolName) {
-      return;
-    }
 
     expect(state.before).toEqual(
       expect.arrayContaining([state.firstToolName, state.secondToolName])
@@ -302,17 +277,10 @@ test.describe('Native API Semantics', () => {
     await waitForToolAbsent(page, state.secondToolName);
   });
 
-  test('executes a descriptor discovered through getTools when Chrome exposes executeTool', async ({
-    page,
-  }) => {
-    const result = await page.evaluate(async () => {
-      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ ?? document.modelContext;
-      if (!context) {
-        return { missingApi: true };
-      }
-      if (typeof context.executeTool !== 'function') {
-        return { missingApi: false, missingExecuteTool: true };
-      }
+  test('executes a descriptor discovered through getTools', async ({ page }) => {
+    const response = await page.evaluate(async () => {
+      const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      if (!context) throw new Error('Native document.modelContext is unavailable');
 
       const toolName = `native_execute_${Date.now()}`;
       const controller = new AbortController();
@@ -335,28 +303,14 @@ test.describe('Native API Semantics', () => {
 
       try {
         const tool = (await context.getTools()).find((candidate) => candidate.name === toolName);
-        if (!tool) {
-          return { missingApi: false, missingExecuteTool: false, missingTool: true };
-        }
-        const response = await context.executeTool(tool, { value: 42 });
-        return {
-          missingApi: false,
-          missingExecuteTool: false,
-          missingTool: false,
-          response,
-        };
+        if (!tool) throw new Error(`Tool not found: ${toolName}`);
+        return await context.executeTool(tool, { value: 42 });
       } finally {
         controller.abort();
       }
     });
 
-    expect(result.missingApi).toBe(false);
-    test.skip(
-      'missingExecuteTool' in result && result.missingExecuteTool === true,
-      'Chrome does not expose its optional executeTool extension'
-    );
-    expect(result.missingTool).toBe(false);
-    expect(String(result.response)).toContain('42');
+    expect(JSON.parse(response)).toEqual({ content: [{ type: 'text', text: 'value:42' }] });
   });
 });
 

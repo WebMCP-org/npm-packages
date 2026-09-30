@@ -224,15 +224,12 @@ jobs:
       - name: Run Native Runtime Contract (Chrome Canary)
         env:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
-          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: ${{ steps.chrome_canary.outputs.chrome-path }}
-          PLAYWRIGHT_ENABLE_WEBMCP_FLAGS: '1'
-        run: pnpm --filter mcp-e2e-tests run test:native-contract:default
+        run: pnpm --filter mcp-e2e-tests run test:native-contract
 
       - name: Run Native Runtime Contract and WebMCP smoke (Chrome Beta)
         env:
           CHROME_BIN: ${{ steps.chrome_beta.outputs.chrome-path }}
-          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: ${{ steps.chrome_beta.outputs.chrome-path }}
-        run: pnpm --filter mcp-e2e-tests run test:native-parity:beta
+        run: pnpm --filter mcp-e2e-tests run test:native-parity
 
       - name: Run native React hook tests
         env:
@@ -247,7 +244,6 @@ jobs:
       - name: Run Native Runtime API Integration (Chrome Canary)
         env:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
-          PLAYWRIGHT_NATIVE_SHOWCASE_EXECUTABLE_PATH: ${{ steps.chrome_canary.outputs.chrome-path }}
         run: pnpm --filter mcp-e2e-tests run test:native-showcase
 
       - name: Run Native Extension Frame Integration (Chromium Snapshot)
@@ -260,7 +256,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: playwright-report-native-parity-chrome-canary
+          name: playwright-report-native-parity
           path: e2e/playwright-report/
           retention-days: 14
 
@@ -268,6 +264,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: test-results-native-parity-chrome-canary
+          name: test-results-native-parity
           path: e2e/test-results/
           retention-days: 7

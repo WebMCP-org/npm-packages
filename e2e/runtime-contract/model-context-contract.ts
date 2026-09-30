@@ -1,4 +1,4 @@
-import type { WebMCP } from 'webmcp-types';
+import type { WebMCP } from '@mcp-b/webmcp-ts-sdk';
 import {
   createRuntimeContractController,
   createRuntimeContractState,
@@ -24,7 +24,6 @@ export async function installModelContextRuntimeContract(
   const state = createRuntimeContractState();
   const tools = createRuntimeContractTools(state, options);
   const registrations = new Map<string, AbortController>();
-  const dynamicToolName = options.dynamicToolName ?? DYNAMIC_TOOL_NAME;
 
   async function registerTool(tool: RuntimeContractTool): Promise<void> {
     const controller = new AbortController();
@@ -47,13 +46,13 @@ export async function installModelContextRuntimeContract(
   const controller = createRuntimeContractController(
     state,
     async () => {
-      if (registrations.has(dynamicToolName)) return false;
+      if (registrations.has(DYNAMIC_TOOL_NAME)) return false;
       await registerTool(tools.createDynamicTool());
       return true;
     },
-    async (name = dynamicToolName) => {
+    async (name = DYNAMIC_TOOL_NAME) => {
       const registration = registrations.get(name);
-      if (name !== dynamicToolName || !registration) return false;
+      if (name !== DYNAMIC_TOOL_NAME || !registration) return false;
 
       registration.abort();
       registrations.delete(name);

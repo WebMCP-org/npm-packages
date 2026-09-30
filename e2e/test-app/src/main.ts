@@ -3,8 +3,12 @@
 
 // Import the global package to initialize document.modelContext
 import '@mcp-b/global';
-import { type PromptDescriptor, type ResourceDescriptor } from '@mcp-b/webmcp-ts-sdk';
-import type { RegistrationHandle, ToolDescriptor } from '@mcp-b/webmcp-ts-sdk';
+import type {
+  PromptDescriptor,
+  RegistrationHandle,
+  ResourceDescriptor,
+  ToolDescriptor,
+} from '@mcp-b/webmcp-ts-sdk';
 import { requireBrowserMcpServer } from './browser-mcp-server.js';
 
 function requireElement<T extends HTMLElement>(id: string): T {
@@ -120,22 +124,6 @@ function updateCounterDisplay() {
 
 function hasRegisteredTool(name: string): boolean {
   return modelContext.listTools().some((tool) => tool.name === name);
-}
-
-// Check if API is available
-function checkAPIAvailability() {
-  if ('modelContext' in document) {
-    apiStatusEl.textContent = 'API: Ready ✅';
-    apiStatusEl.className = 'status connected';
-    apiStatusEl.setAttribute('data-status', 'ready');
-    log('document.modelContext API is available', 'success');
-    return true;
-  }
-  apiStatusEl.textContent = 'API: Not Available ❌';
-  apiStatusEl.className = 'status disconnected';
-  apiStatusEl.setAttribute('data-status', 'unavailable');
-  log('document.modelContext API is NOT available', 'error');
-  return false;
 }
 
 // Register base tools using AbortSignal-scoped registerTool calls.
@@ -709,51 +697,10 @@ unregisterDynamicPromptBtn.addEventListener('click', unregisterDynamicPrompt);
 // Initialize
 updateCounterDisplay();
 log('Application initialized');
+apiStatusEl.textContent = 'API: Ready ✅';
+apiStatusEl.className = 'status connected';
+apiStatusEl.setAttribute('data-status', 'ready');
 
-if (checkAPIAvailability()) {
-  void registerBaseTools().then(() => {
-    log('✅ Test app ready! Use buttons to test two-bucket system.', 'success');
-  });
-}
-
-// Type for test API
-declare global {
-  interface Window {
-    testApp: {
-      counter: () => number;
-      registerBaseTools: () => Promise<void>;
-      registerDynamicTool: () => Promise<void>;
-      unregisterDynamicTool: () => void;
-      replaceBaseTools: () => Promise<void>;
-      listAllTools: () => void;
-      getAPIStatus: () => boolean;
-      // Resource tests
-      registerBaseResources: () => void;
-      registerDynamicResource: () => void;
-      unregisterDynamicResource: () => void;
-      // Prompt tests
-      registerBasePrompts: () => void;
-      registerDynamicPrompt: () => void;
-      unregisterDynamicPrompt: () => void;
-    };
-  }
-}
-
-// Expose functions for testing
-window.testApp = {
-  counter: () => counter,
-  registerBaseTools,
-  registerDynamicTool,
-  unregisterDynamicTool,
-  replaceBaseTools,
-  listAllTools,
-  getAPIStatus: () => 'modelContext' in document,
-  // Resource tests
-  registerBaseResources,
-  registerDynamicResource,
-  unregisterDynamicResource,
-  // Prompt tests
-  registerBasePrompts,
-  registerDynamicPrompt,
-  unregisterDynamicPrompt,
-};
+void registerBaseTools().then(() => {
+  log('✅ Test app ready! Use buttons to test two-bucket system.', 'success');
+});

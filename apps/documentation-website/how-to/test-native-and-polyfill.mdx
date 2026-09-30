@@ -26,7 +26,7 @@ then run the broader suite before merging.
 | Composed `@mcp-b/global` behavior  | `pnpm --filter @mcp-b/global test:conformance:global`          |
 | Tab and iframe transports          | `pnpm --filter mcp-e2e-tests test:runtime-contract:transport`  |
 | `<mcp-iframe>` element             | `pnpm --filter mcp-e2e-tests test:mcp-iframe`                  |
-| Repository native browser contract | `pnpm --filter mcp-e2e-tests test:native-contract:default`     |
+| Repository native browser contract | `pnpm --filter mcp-e2e-tests test:native-contract`             |
 | Local relay                        | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`             |
 | Extension template                 | `pnpm --filter @mcp-b/webmcp-extension test:e2e`               |
 | Full local E2E set                 | `pnpm test:e2e`                                                |
@@ -64,7 +64,7 @@ Native lanes need Chrome 155 or later, the first release that accepts object inp
 repository commands instead of copying browser flags into another script:
 
 ```bash title="Run the native contract"
-pnpm --filter mcp-e2e-tests test:native-contract:default
+pnpm --filter mcp-e2e-tests test:native-contract
 pnpm --filter @mcp-b/global test:conformance:native
 ```
 

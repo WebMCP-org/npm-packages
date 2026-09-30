@@ -1,15 +1,14 @@
 import type { CallToolResult, TextContent } from '@modelcontextprotocol/server';
 import { expect, type Frame, type Page } from '@playwright/test';
 import {
+  BASE_TOOL_NAMES,
   DYNAMIC_TOOL_NAME,
   firstTextContent,
-  getCanonicalToolNames,
+  type RuntimeInvocationRecord,
   type RuntimeToolArguments,
 } from '../runtime-contract/core.js';
-import type { JsonObject } from '@mcp-b/webmcp-ts-sdk';
 
-export { DYNAMIC_TOOL_NAME, firstTextContent, getCanonicalToolNames };
-export type { RuntimeToolArguments } from '../runtime-contract/core.js';
+export { DYNAMIC_TOOL_NAME, firstTextContent };
 
 export async function waitForRuntimePage(page: Page, path: string): Promise<void> {
   await page.goto(path);
@@ -102,9 +101,7 @@ export async function resetInvocations(host: RuntimeHost): Promise<void> {
   });
 }
 
-export async function readInvocations(
-  host: RuntimeHost
-): Promise<Array<{ name: string; arguments: JsonObject }>> {
+export async function readInvocations(host: RuntimeHost): Promise<RuntimeInvocationRecord[]> {
   return host.evaluate(() => window.__WEBMCP_E2E__?.readInvocations() ?? []);
 }
 
@@ -117,6 +114,6 @@ export async function unregisterDynamicTool(host: RuntimeHost): Promise<boolean>
 }
 
 export function expectBaseTools(toolNames: string[]) {
-  expect(toolNames).toEqual(expect.arrayContaining(getCanonicalToolNames(false)));
-  expect(toolNames).toHaveLength(getCanonicalToolNames(false).length);
+  expect(toolNames).toEqual(expect.arrayContaining([...BASE_TOOL_NAMES]));
+  expect(toolNames).toHaveLength(BASE_TOOL_NAMES.length);
 }

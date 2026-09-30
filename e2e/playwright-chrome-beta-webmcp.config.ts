@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
-import { MACOS_CHROME_EXECUTABLE_PATHS, resolveChromeExecutable } from './chrome-executable.js';
+import {
+  MACOS_CHROME_EXECUTABLE_PATHS,
+  MIN_NATIVE_CHROME_MAJOR,
+  resolveChromeExecutable,
+  WEBMCP_CHROME_ARGS,
+} from './chrome-executable.js';
 
 /**
  * Playwright configuration for Chrome 155+ native WebMCP verification.
@@ -7,7 +12,6 @@ import { MACOS_CHROME_EXECUTABLE_PATHS, resolveChromeExecutable } from './chrome
 const tabTransportPort = Number.parseInt(process.env.PLAYWRIGHT_TAB_TRANSPORT_PORT ?? '4173', 10);
 const tabTransportBaseUrl = `http://localhost:${tabTransportPort}`;
 const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_SERVER === '1';
-const MIN_NATIVE_CHROME_MAJOR = 155;
 const chromeExecutablePath = resolveChromeExecutable({
   candidates: [
     process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
@@ -36,10 +40,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     launchOptions: {
       executablePath: chromeExecutablePath,
-      args: [
-        '--enable-experimental-web-platform-features',
-        '--enable-features=WebMCPTesting,DevToolsWebMCPSupport',
-      ],
+      args: WEBMCP_CHROME_ARGS,
     },
   },
 

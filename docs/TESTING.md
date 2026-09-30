@@ -12,8 +12,8 @@ For type-surface rules and the repo-wide no-cast policy, see [TYPE_TESTING.md](.
   compatibility-shim checks that do not use the same public caller boundary as
   production clients.
 - **Native Chromium exception**: for native WebMCP, the real public boundary is
-  `document.modelContext`, not an SDK `Client`. Discovery uses `getTools()`.
-  Chrome execution coverage feature-detects descriptor-based `executeTool()`.
+  `document.modelContext`, not an SDK `Client`. Discovery uses `getTools()` and
+  execution uses descriptor-based `executeTool()`.
 
 ## Default Commands
 
@@ -32,16 +32,17 @@ pnpm --filter mcp-e2e-tests test:runtime-contract
 pnpm --filter mcp-e2e-tests test:integration:runtime-api
 pnpm --filter mcp-e2e-tests test:integration:frameworks
 
-# Native contract lanes (Chrome 155+ WebMCP config)
-pnpm --filter mcp-e2e-tests test:native-contract:default
+# Native lanes (Chrome 155+): contract, contract plus Chrome WebMCP smoke, showcase
+pnpm --filter mcp-e2e-tests test:native-contract
+pnpm --filter mcp-e2e-tests test:native-parity
 pnpm --filter mcp-e2e-tests test:native-showcase
 
 # Shared WebMCP conformance lanes
-# Standalone polyfill tests include core smoke and declarative forms
+# Standalone polyfill tests include core smoke and declarative tools
 pnpm --filter @mcp-b/webmcp-polyfill test --browser.headless
 # Core install, registration, execution, and abort smoke test only
 pnpm --filter @mcp-b/webmcp-polyfill test:smoke
-# MCP-B runtime and declarative forms
+# MCP-B runtime and declarative tools
 pnpm --filter @mcp-b/global test:conformance:global
 
 # Pinned upstream WebMCP WPT (requires .reference/wpt and Chrome Canary)
@@ -67,18 +68,17 @@ Notes:
 
 - `pnpm test:e2e` runs the canonical runtime suites and DOM reader checks sequentially for stability.
 - Set `CHROME_BIN` to select an installed Chrome binary for both DOM reader checks.
-- `pnpm test:e2e:ui`, `pnpm test:e2e:headed`, and `pnpm test:e2e:debug` drive the Playwright `e2e/` package only. They do not run the relay, DevTools, or extension package E2E lanes.
 
 ## Runtime Coverage Matrix
 
-| Runtime             | Canonical caller                           | Real runtime boundary under test                         | Command                                                    |
-| ------------------- | ------------------------------------------ | -------------------------------------------------------- | ---------------------------------------------------------- |
-| Tab / global        | SDK `Client` + `TabClientTransport`        | Browser page running `@mcp-b/global`                     | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
-| Iframe              | SDK `Client` + `IframeParentTransport`     | Parent/iframe runtime boundary                           | `pnpm --filter mcp-e2e-tests test:runtime-contract`        |
-| Native Chromium     | `document.modelContext`                    | Chrome 155+ with WebMCP flags in CI                      | `pnpm --filter mcp-e2e-tests test:native-contract:default` |
-| Local relay         | SDK `Client` over stdio                    | Real relay server + real browser runtime                 | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`         |
-| Extension transport | SDK `Client` + `ExtensionClientTransport`  | Real MV3 extension using `ExtensionServerTransport`      | `pnpm --filter @mcp-b/transports test:e2e`                 |
-| Extension template  | SDK `Client` in an isolated content script | Imperative and declarative tools in a real MV3 extension | `pnpm --filter @mcp-b/webmcp-extension test:e2e`           |
+| Runtime             | Canonical caller                           | Real runtime boundary under test                         | Command                                             |
+| ------------------- | ------------------------------------------ | -------------------------------------------------------- | --------------------------------------------------- |
+| Tab / global        | SDK `Client` + `TabClientTransport`        | Browser page running `@mcp-b/global`                     | `pnpm --filter mcp-e2e-tests test:runtime-contract` |
+| Iframe              | SDK `Client` + `IframeParentTransport`     | Parent/iframe runtime boundary                           | `pnpm --filter mcp-e2e-tests test:runtime-contract` |
+| Native Chromium     | `document.modelContext`                    | Chrome 155+ with WebMCP flags in CI                      | `pnpm --filter mcp-e2e-tests test:native-contract`  |
+| Local relay         | SDK `Client` over stdio                    | Real relay server + real browser runtime                 | `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`  |
+| Extension transport | SDK `Client` + `ExtensionClientTransport`  | Real MV3 extension using `ExtensionServerTransport`      | `pnpm --filter @mcp-b/transports test:e2e`          |
+| Extension template  | SDK `Client` in an isolated content script | Imperative and declarative tools in a real MV3 extension | `pnpm --filter @mcp-b/webmcp-extension test:e2e`    |
 
 ## Canonical E2E Assertions
 
@@ -118,7 +118,6 @@ This lane keeps direct runtime and demo validation for:
 
 - `e2e/tests/tab-transport.spec.ts`
 - `e2e/tests/mcp-iframe-element.spec.ts`
-
 - `e2e/tests/chrome-beta-webmcp.spec.ts`
 - `e2e/playwright-native-showcase.config.ts`
 
@@ -207,12 +206,13 @@ declare them.
 `E2E Tests (Playwright)` runs on Chrome stable: DOM reader, reader-server
 lifecycle, tab, iframe, local-relay, framework, and `@mcp-b/global` tarball
 coverage. `Extension E2E` runs the extension transport and extension-template
-suites in Playwright's Chromium. `Native API Parity` installs Chrome Beta and
-Chrome Canary and runs the pinned upstream WebMCP Web Platform Tests against the
-standalone polyfill, the IDL shape lane (non-blocking), the native runtime
-contract on both channels, the Chrome WebMCP smoke on Beta, the native React
-hook tests, the `@mcp-b/global` native conformance suite on Canary, the native
-showcase, and the native extension frame integration.
+suites in Playwright's Chromium. `Native API Parity` installs Chrome Beta, Chrome
+Canary, and a Chromium snapshot and runs the pinned upstream WebMCP Web Platform
+Tests against the standalone polyfill, the IDL shape lane (non-blocking), the
+native runtime contract on both channels, the Chrome WebMCP smoke on Beta, the
+native React hook tests, the `@mcp-b/global` native conformance suite on Canary,
+the native showcase, and the native extension frame integration on the Chromium
+snapshot.
 
 `pnpm test` runs unit tests plus the local zero-mock `pnpm test:e2e` umbrella. CI adds the
 framework, tarball, upstream WPT, and native lanes listed above.
@@ -227,7 +227,7 @@ the six declarative files that never call `executeTool()`
 and the three `toolchange-*` files). The other files, including the frame-tree,
 origin-policy, and navigation cases, target the pinned revision's older API
 shape (JSON-string `executeTool()` input, no `consequentialHint`); refresh the
-pin before restoring them. The shared declarative-form suite runs against both
+pin before restoring them. The shared declarative suite runs against both
 `@mcp-b/global` and the standalone polyfill. The polyfill harness lives in
 `packages/webmcp-polyfill/src/declarative-forms.test.ts` and runs with that
 package's default `test` and `test:coverage` scripts. Its `test:smoke` script
@@ -256,7 +256,7 @@ Two requirements beyond the behavioral lane:
 
 ## Extension Transport Testing
 
-Extension transport E2E is no longer future work. The fixture is a real MV3 extension built into `packages/transports/e2e/dist/extension` and exercised with:
+The extension transport fixture is a real MV3 extension built into `packages/transports/e2e/dist/extension` and exercised with:
 
 - real background service worker
 - real `ExtensionServerTransport`
@@ -273,14 +273,8 @@ pnpm test:e2e:headed
 pnpm test:e2e:debug
 ```
 
-These target the Playwright `e2e/` package only.
-
-### Package-Specific Runtime E2E
-
-```bash
-pnpm --filter @mcp-b/webmcp-local-relay test:e2e
-pnpm --filter @mcp-b/transports test:e2e
-```
+These target the Playwright `e2e/` package only. They do not run the relay or extension package
+E2E lanes.
 
 ## Troubleshooting
 
@@ -302,13 +296,7 @@ lsof -ti:4173 | xargs kill
 
 ### Chrome 155 Native Contract Lane
 
-The flagged native lane requires Chrome 155+ (Beta or Canary) with:
-
-- `--enable-experimental-web-platform-features`
-- `--enable-features=WebMCPTesting,DevToolsWebMCPSupport`
-
-`WebMCPTesting` is the Chromium feature-flag name used by the test
-configuration. The native contract does not treat
-`navigator.modelContextTesting` as a current browser API.
-
-See [e2e/tests/CHROMIUM_TESTING.md](../e2e/tests/CHROMIUM_TESTING.md) for the native contract details.
+The native lanes require Chrome 155+ (Beta or Canary). If browser discovery fails, set
+`CHROME_BIN` to the installed executable. See
+[e2e/tests/CHROMIUM_TESTING.md](../e2e/tests/CHROMIUM_TESTING.md) for the WebMCP flags the
+configurations pass and the native contract details.

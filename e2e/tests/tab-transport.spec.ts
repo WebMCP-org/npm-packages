@@ -133,20 +133,6 @@ test.describe('Web Model Context API E2E Tests', () => {
     expect(toolCount).toBe(4);
   });
 
-  test('should use testApp API for programmatic testing', async ({ page }) => {
-    // Test that the testApp API is exposed
-    const hasTestApp = await page.evaluate(() => 'testApp' in window);
-    expect(hasTestApp).toBe(true);
-
-    // Test counter function
-    const counter = await page.evaluate(() => window.testApp.counter());
-    expect(counter).toBe(0);
-
-    // Test getAPIStatus function
-    const apiStatus = await page.evaluate(() => window.testApp.getAPIStatus());
-    expect(apiStatus).toBe(true);
-  });
-
   test('should clear event log', async ({ page }) => {
     // Add some log entries first
     await page.click('#list-all-tools');
