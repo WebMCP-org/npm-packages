@@ -1,3 +1,5 @@
+import type { JSONRPCMessage } from '@modelcontextprotocol/server';
+
 /**
  * Channel discriminators. Both ends of a pair must agree or the envelope check in
  * `isMcpMessage` silently drops every message — no error, just a hang.
@@ -19,10 +21,13 @@ export function isMcpMessage(
   return (
     typeof data === 'object' &&
     data !== null &&
-    Reflect.get(data, 'channel') === channelId &&
-    Reflect.get(data, 'type') === 'mcp' &&
-    Reflect.get(data, 'direction') === direction &&
-    Reflect.has(data, 'payload')
+    'channel' in data &&
+    data.channel === channelId &&
+    'type' in data &&
+    data.type === 'mcp' &&
+    'direction' in data &&
+    data.direction === direction &&
+    'payload' in data
   );
 }
 
@@ -31,7 +36,7 @@ export function postMcpMessage(
   targetOrigin: string,
   channelId: string,
   direction: McpMessageDirection,
-  payload: unknown
+  payload: JSONRPCMessage | 'mcp-server-ready' | 'mcp-server-stopped' | 'mcp-check-ready'
 ): void {
   target.postMessage({ channel: channelId, type: 'mcp', direction, payload }, targetOrigin);
 }

@@ -3,7 +3,6 @@ import {
   type ConnectOptions,
   type Resource,
   type ServerCapabilities,
-  type SubscriptionFilter,
   type Tool as McpTool,
   type Transport,
 } from '@modelcontextprotocol/client';
@@ -39,37 +38,6 @@ interface McpClientContextValue {
 type ConnectionState = 'disconnected' | 'connecting' | 'initializing' | 'connected';
 
 const McpClientContext = createContext<McpClientContextValue | null>(null);
-
-function startListChangedSubscription(
-  client: Client,
-  filter: SubscriptionFilter,
-  refreshLists: () => Promise<void>
-): () => void {
-  const controller = new AbortController();
-
-  void client
-    .listen(filter, { signal: controller.signal })
-    .then(async (subscription) => {
-      if (controller.signal.aborted) {
-        await subscription.close();
-        return;
-      }
-
-      // Modern servers deliver list_changed only after listen is acknowledged.
-      await refreshLists();
-    })
-    .catch((error) => {
-      if (!controller.signal.aborted) {
-        console.error(
-          '[ReactWebMCP:McpClientProvider]',
-          'Failed to listen for list_changed notifications:',
-          error
-        );
-      }
-    });
-
-  return () => controller.abort();
-}
 
 /**
  * Props for the McpClientProvider component.
@@ -194,6 +162,9 @@ export function McpClientProvider({
   const refreshInventory = useCallback(
     async (connectionGeneration: number): Promise<void> => {
       const inventoryRequest = ++inventoryRequestRef.current;
+      const isCurrent = () =>
+        connectionGeneration === connectionGenerationRef.current &&
+        inventoryRequest === inventoryRequestRef.current;
       const serverCapabilities = client.getServerCapabilities();
 
       try {
@@ -205,11 +176,7 @@ export function McpClientProvider({
             ? client.listTools(undefined, { cacheMode: 'refresh' })
             : undefined,
         ]);
-
-        if (
-          connectionGeneration !== connectionGenerationRef.current ||
-          inventoryRequest !== inventoryRequestRef.current
-        ) {
+        if (!isCurrent()) {
           return;
         }
 
@@ -217,13 +184,10 @@ export function McpClientProvider({
         setTools(toolResponse?.tools ?? []);
         setError(null);
       } catch (cause) {
-        const error = cause instanceof Error ? cause : new Error(String(cause));
-        if (
-          connectionGeneration !== connectionGenerationRef.current ||
-          inventoryRequest !== inventoryRequestRef.current
-        ) {
+        if (!isCurrent()) {
           return;
         }
+        const error = cause instanceof Error ? cause : new Error(String(cause));
         setError(error);
         throw error;
       }
@@ -239,57 +203,40 @@ export function McpClientProvider({
    */
   const reconnect = useCallback(
     async (freshTransport?: Transport): Promise<void> => {
-      if (connectionStateRef.current === 'connected' && freshTransport === undefined) {
-        const connectionGeneration = connectionGenerationRef.current;
-        connectionStateRef.current = 'initializing';
-        setConnectionState('initializing');
+      const connectionGeneration = connectionGenerationRef.current;
+      if (connectionStateRef.current !== 'connected' || freshTransport !== undefined) {
+        if (connectionStateRef.current !== 'disconnected') {
+          return;
+        }
+
+        connectionStateRef.current = 'connecting';
+        setConnectionState('connecting');
+        setError(null);
 
         try {
-          await refreshInventory(connectionGeneration);
-        } catch {
-          // Inventory failure does not undo the completed MCP handshake.
+          await closePromiseRef.current;
+          if (connectionGeneration !== connectionGenerationRef.current) {
+            return;
+          }
+          await client.connect(freshTransport ?? transport, requestOptsRef.current);
+          if (connectionGeneration !== connectionGenerationRef.current) {
+            return;
+          }
+        } catch (e) {
+          const err = e instanceof Error ? e : new Error(String(e));
+          if (connectionGeneration === connectionGenerationRef.current) {
+            connectionStateRef.current = 'disconnected';
+            setConnectionState('disconnected');
+            setError(err);
+          }
+          throw err;
         }
 
-        if (connectionGeneration === connectionGenerationRef.current) {
-          connectionStateRef.current = 'connected';
-          setConnectionState('connected');
-        }
-        return;
+        setCapabilities(client.getServerCapabilities() ?? null);
       }
 
-      if (connectionStateRef.current !== 'disconnected') {
-        return;
-      }
-
-      connectionStateRef.current = 'connecting';
-      setConnectionState('connecting');
-      setError(null);
-      const connectionGeneration = connectionGenerationRef.current;
-
-      try {
-        await closePromiseRef.current;
-        if (connectionGeneration !== connectionGenerationRef.current) {
-          return;
-        }
-        await client.connect(freshTransport ?? transport, requestOptsRef.current);
-        if (connectionGeneration !== connectionGenerationRef.current) {
-          return;
-        }
-      } catch (e) {
-        const err = e instanceof Error ? e : new Error(String(e));
-        if (connectionGeneration === connectionGenerationRef.current) {
-          connectionStateRef.current = 'disconnected';
-          setConnectionState('disconnected');
-          setError(err);
-        }
-        throw err;
-      }
-
-      const caps = client.getServerCapabilities();
-      setCapabilities(caps ?? null);
       connectionStateRef.current = 'initializing';
       setConnectionState('initializing');
-
       try {
         await refreshInventory(connectionGeneration);
       } catch {
@@ -310,9 +257,12 @@ export function McpClientProvider({
     }
 
     const serverCapabilities = client.getServerCapabilities();
-
     const resourcesListChanged = serverCapabilities?.resources?.listChanged === true;
     const toolsListChanged = serverCapabilities?.tools?.listChanged === true;
+    if (!resourcesListChanged && !toolsListChanged) {
+      return;
+    }
+
     const refreshLists = async () => {
       try {
         await refreshInventory(connectionGenerationRef.current);
@@ -333,19 +283,35 @@ export function McpClientProvider({
       client.setNotificationHandler('notifications/tools/list_changed', refreshLists);
     }
 
-    const hasListChanged = resourcesListChanged || toolsListChanged;
-    const stopListening =
-      client.getProtocolEra() === 'modern' && hasListChanged
-        ? startListChangedSubscription(
-            client,
-            {
-              ...(toolsListChanged && { toolsListChanged: true }),
-              ...(resourcesListChanged && { resourcesListChanged: true }),
-            },
-            refreshLists
-          )
-        : undefined;
-    if (!stopListening && hasListChanged) {
+    const controller = new AbortController();
+    if (client.getProtocolEra() === 'modern') {
+      void client
+        .listen(
+          {
+            ...(toolsListChanged && { toolsListChanged: true }),
+            ...(resourcesListChanged && { resourcesListChanged: true }),
+          },
+          { signal: controller.signal }
+        )
+        .then(async (subscription) => {
+          if (controller.signal.aborted) {
+            await subscription.close();
+            return;
+          }
+
+          // Modern servers deliver list_changed only after listen is acknowledged.
+          await refreshLists();
+        })
+        .catch((error) => {
+          if (!controller.signal.aborted) {
+            console.error(
+              '[ReactWebMCP:McpClientProvider]',
+              'Failed to listen for list_changed notifications:',
+              error
+            );
+          }
+        });
+    } else {
       // Legacy servers deliver list_changed unsolicited once handlers are installed.
       void refreshLists();
     }
@@ -359,7 +325,7 @@ export function McpClientProvider({
         client.removeNotificationHandler('notifications/tools/list_changed');
       }
 
-      stopListening?.();
+      controller.abort();
     };
   }, [client, isConnected, refreshInventory]);
 
@@ -412,8 +378,8 @@ export function McpClientProvider({
       providerCloseRef.current = closeToken;
       closePromiseRef.current = client
         .close()
-        .catch((error: unknown) => {
-          console.error('[ReactWebMCP:McpClientProvider]', 'Failed to close MCP client:', error);
+        .catch((cause: unknown) => {
+          console.error('[ReactWebMCP:McpClientProvider]', 'Failed to close MCP client:', cause);
         })
         .finally(() => {
           if (providerCloseRef.current === closeToken) {

@@ -14,7 +14,7 @@ pnpm dev
 This example uses `workspace:*` dependencies to link against the local monorepo packages. To use it outside the monorepo, replace the workspace reference in `package.json`:
 
 ```json
-"@mcp-b/webmcp-polyfill": "latest"
+"@mcp-b/webmcp-polyfill": "^6.0.0"
 ```
 
 ## Key File

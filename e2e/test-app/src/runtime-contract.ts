@@ -10,6 +10,7 @@ function requireElement<T extends HTMLElement>(id: string): T {
   if (!element) {
     throw new Error(`Required DOM element not found: ${id}`);
   }
+  // SAFETY: Call sites name static fixture elements and pass their authored HTML element type.
   return element as T;
 }
 
@@ -56,7 +57,7 @@ async function renderTools(client: Client) {
 }
 
 async function bootstrap() {
-  const modelContext = document.modelContext ?? navigator.modelContext;
+  const modelContext = document.modelContext;
   if (!modelContext) {
     throw new Error('document.modelContext is unavailable');
   }

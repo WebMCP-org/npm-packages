@@ -1,6 +1,5 @@
 import { cleanupWebModelContext, initializeWebModelContext } from '@mcp-b/global';
 import { TabClientTransport } from '@mcp-b/transports';
-import { cleanupWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
 import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 import { Client } from '@modelcontextprotocol/client';
 import { Profiler, StrictMode, Suspense } from 'react';
@@ -17,10 +16,8 @@ let client: Client;
 
 beforeEach(async () => {
   cleanupWebModelContext();
-  cleanupWebMCPPolyfill();
   const channelId = `registration-hooks-${crypto.randomUUID()}`;
   initializeWebModelContext({
-    installTestingShim: false,
     transport: {
       iframeServer: false,
       tabServer: { channelId, allowedOrigins: [window.location.origin] },
@@ -41,7 +38,6 @@ afterEach(async () => {
   await client.close();
   cleanupWebModelContext();
   await server.close();
-  cleanupWebMCPPolyfill();
   vi.restoreAllMocks();
 });
 
@@ -55,7 +51,7 @@ function usePrompt({ value, ...options }: RegistrationProps = { value: 'first' }
     name: 'test_prompt',
     argsSchema: {
       type: 'object',
-      properties: { subject: { type: 'string' } },
+      properties: { subject: { type: 'string', description: 'Subject to summarize' } },
       required: ['subject'],
     } as const,
     get: async ({ subject }) => ({
@@ -69,6 +65,7 @@ function useResource({ value, ...options }: RegistrationProps = { value: 'first'
     ...options,
     uri: 'data://subject',
     name: 'Test resource',
+    mimeType: 'text/plain',
     read: async (uri) => ({ contents: [{ uri: uri.href, text: `${value}:${uri.host}` }] }),
   });
 }
@@ -78,6 +75,10 @@ describe.each([
     kind: 'prompt',
     useRegistration: usePrompt,
     registerMethod: 'registerPrompt' as const,
+    metadata: {
+      name: 'test_prompt',
+      arguments: [{ name: 'subject', description: 'Subject to summarize', required: true }],
+    },
     list: async () => (await client.listPrompts()).prompts,
     invoke: async () =>
       (await client.getPrompt({ name: 'test_prompt', arguments: { subject: 'subject' } }))
@@ -87,18 +88,18 @@ describe.each([
     kind: 'resource',
     useRegistration: useResource,
     registerMethod: 'registerResource' as const,
+    metadata: { uri: 'data://subject', name: 'Test resource', mimeType: 'text/plain' },
     list: async () => (await client.listResources()).resources,
     invoke: async () => (await client.readResource({ uri: 'data://subject' })).contents[0],
   },
 ])(
   '$kind registration lifecycle and render budgets',
-  ({ useRegistration, registerMethod, list, invoke }) => {
+  ({ useRegistration, registerMethod, metadata, list, invoke }) => {
     it('does not register or warn while disabled without a runtime', async () => {
       const register = vi.spyOn(server, registerMethod);
       await client.close();
       cleanupWebModelContext();
       await server.close();
-      cleanupWebMCPPolyfill();
       expect(getBrowserMcpServer()).toBeUndefined();
       const warn = vi.spyOn(console, 'warn');
       const hook = await renderHook<RegistrationProps, WebMCPPromptReturn>(useRegistration, {
@@ -137,7 +138,7 @@ describe.each([
         await hook.rerender({ enabled, value: 'latest' });
 
         expect(hook.result.current.isRegistered).toBe(enabled);
-        expect(await list()).toHaveLength(enabled ? 1 : 0);
+        expect(await list()).toMatchObject(enabled ? [metadata] : []);
         // One prop commit plus at most one registration-status commit, including nested updates.
         expect(onRender.mock.calls.length).toBeLessThanOrEqual(2);
       }
@@ -241,6 +242,19 @@ describe.each([
   }
 );
 
+it('registers a prompt without an argument schema', async () => {
+  await renderHook(() =>
+    useWebMCPPrompt({
+      name: 'plain_prompt',
+      get: () => ({ messages: [{ role: 'user', content: { type: 'text', text: 'Summarize' } }] }),
+    })
+  );
+  expect((await client.listPrompts()).prompts).toMatchObject([{ name: 'plain_prompt' }]);
+  expect((await client.getPrompt({ name: 'plain_prompt' })).messages[0]?.content).toMatchObject({
+    text: 'Summarize',
+  });
+});
+
 it('toggles resource templates through the same enabled option', async () => {
   const hook = await renderHook(
     ({ enabled }: { enabled: boolean } = { enabled: false }) =>
@@ -268,7 +282,7 @@ it('toggles resource templates through the same enabled option', async () => {
   expect((await client.listResourceTemplates()).resourceTemplates).toEqual([]);
 });
 
-it('forwards context enabled options without registration-induced commits or resetting local controls', async () => {
+it('forwards context enabled options with one commit per update and stable local controls', async () => {
   const register = vi.spyOn(server, 'registerTool');
   const warn = vi.spyOn(console, 'warn');
   const onRender = vi.fn();
@@ -291,11 +305,23 @@ it('forwards context enabled options without registration-induced commits or res
   expect((await client.listTools()).tools).toEqual([]);
   const { execute, reset, state } = hook.result.current;
 
+  const contextTool = {
+    name: 'test_context',
+    description: 'Current value',
+    annotations: {
+      title: 'Context: test_context',
+      readOnlyHint: true,
+      idempotentHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+  };
   for (const enabled of [true, false, true]) {
     onRender.mockClear();
     await hook.rerender({ enabled, value: 'latest' });
-    expect((await client.listTools()).tools).toHaveLength(enabled ? 1 : 0);
-    expect(onRender).toHaveBeenCalledOnce();
+    expect(hook.result.current.registrationError).toBeNull();
+    expect((await client.listTools()).tools).toMatchObject(enabled ? [contextTool] : []);
+    expect(onRender).toHaveBeenCalledTimes(1); // The requested parent update only.
     expect(hook.result.current.state).toBe(state);
     expect(hook.result.current.execute).toBe(execute);
     expect(hook.result.current.reset).toBe(reset);

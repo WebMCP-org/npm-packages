@@ -35,8 +35,9 @@ pnpm add @mcp-b/global @mcp-b/webmcp-extension
 
 ## Extension layout
 
-The template declares two static `document_start` content scripts. Chrome 111
-or newer is required for `world: "MAIN"`.
+The template declares two static `document_start` content scripts. It requires
+Chrome 126 or newer: `world: "MAIN"` needs Chrome 111, and the bundled
+`@mcp-b/global` runtime needs Chrome 126.
 
 | Entry                    | World    | Responsibility                                  |
 | ------------------------ | -------- | ----------------------------------------------- |
@@ -48,7 +49,7 @@ or newer is required for `world: "MAIN"`.
   "manifest_version": 3,
   "name": "My WebMCP Extension",
   "version": "1.0.0",
-  "minimum_chrome_version": "111",
+  "minimum_chrome_version": "126",
   "content_scripts": [
     {
       "matches": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
@@ -106,11 +107,11 @@ The MAIN-world runtime also discovers annotated forms:
 </form>
 ```
 
-`@mcp-b/global` adopts native declarative behavior when available and installs
-the polyfilled form runtime otherwise. Form tools and JavaScript registrations
-both appear in the isolated client's `listTools()` result and run through
-`callTool()`. `listChanged.tools` reports form additions, definition changes,
-and removals.
+`@mcp-b/global` adopts native declarative behavior when available; otherwise,
+`@mcp-b/webmcp-polyfill` installs its temporary declarative layer. Declarative
+tools and JavaScript registrations both appear in the isolated client's
+`listTools()` result and run through `callTool()`. `listChanged.tools` reports
+form additions, definition changes, and removals.
 
 The extension package adds no separate DOM scanner or declarative client API.
 See the [declarative API reference](/reference/webmcp/declarative-api) for the
@@ -137,8 +138,9 @@ the frame tree.
 ## Navigation results
 
 Chrome resolves `executeTool()` with `null` when a tool triggers navigation.
-The extension client reports that call as interrupted. It does not preserve the
-call across document navigation or read JSON-LD from the destination document.
+The extension client receives a successful call whose text is `null`, not an
+error. It does not preserve the call across document navigation or read JSON-LD
+from the destination document.
 For a declarative tool that must return a result without navigation, cancel the
 submission and use `SubmitEvent.respondWith()`. The upstream
 [declarative explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md#getting-the-form-response-to-the-agent)
@@ -205,7 +207,7 @@ pnpm build
 ```
 
 Load the generated `dist/` directory as an unpacked extension. The Vite+ config
-bundles both entries as self-contained, minified IIFEs targeting Chrome 111 and
+bundles both entries as self-contained, minified IIFEs targeting Chrome 126 and
 copies `manifest.json` into `dist/`. Content scripts cannot load bare npm
 imports at runtime.
 

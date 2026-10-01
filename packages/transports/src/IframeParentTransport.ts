@@ -23,7 +23,7 @@ export class IframeParentTransport implements Transport {
   private _messageHandler: ((event: MessageEvent<unknown>) => void) | undefined;
   private _checkReadyTimeout: ReturnType<typeof setTimeout> | undefined;
   private _serverReadyResolve!: () => void;
-  private _serverReadyReject!: (reason: unknown) => void;
+  private _serverReadyReject!: (reason: Error) => void;
   private _serverReadySettled = false;
 
   readonly serverReadyPromise: Promise<void>;

@@ -15,6 +15,13 @@ export const LINUX_CHROME_EXECUTABLE_PATHS = [
   '/usr/bin/chromium',
 ] as const;
 
+export const MIN_NATIVE_CHROME_MAJOR = 155;
+
+export const WEBMCP_CHROME_ARGS = [
+  '--enable-experimental-web-platform-features',
+  '--enable-features=WebMCPTesting,DevToolsWebMCPSupport',
+];
+
 interface RejectedChromeCandidate {
   executablePath: string;
   version: string | undefined;

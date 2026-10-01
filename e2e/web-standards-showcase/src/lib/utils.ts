@@ -1,18 +1,16 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import type { ModelContextRegisterToolOptions } from '@mcp-b/webmcp-types';
+import type { WebMCP } from 'webmcp-types';
 import type { ModelContext, Tool, ToolRegistration } from '../types';
+
+type ModelContextRegisterToolOptions = WebMCP.ModelContextRegisterToolOptions;
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-function isAbortError(error: unknown): boolean {
-  return (
-    Boolean(error) &&
-    typeof error === 'object' &&
-    (error as { name?: unknown }).name === 'AbortError'
-  );
+function isAbortError(cause: unknown): cause is Error {
+  return cause instanceof Error && cause.name === 'AbortError';
 }
 
 /**
@@ -39,20 +37,16 @@ export function registerShowcaseTool(
     );
   }
 
-  const registerTool = context.registerTool.bind(context) as unknown as (
-    descriptor: Tool,
-    registrationOptions?: ModelContextRegisterToolOptions
-  ) => Promise<void>;
-  void Promise.resolve(
-    registerTool(tool, {
+  void context
+    .registerTool(tool, {
       ...options,
       signal: abortController.signal,
     })
-  ).catch((error: unknown) => {
-    if (!isAbortError(error)) {
-      console.warn(`[WebMCP Showcase] registerTool("${tool.name}") rejected:`, error);
-    }
-  });
+    .catch((cause: unknown) => {
+      if (!isAbortError(cause)) {
+        console.warn(`[WebMCP Showcase] registerTool("${tool.name}") rejected:`, cause);
+      }
+    });
 
   return {
     unregister() {

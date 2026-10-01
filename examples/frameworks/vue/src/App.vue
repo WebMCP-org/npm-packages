@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { onMounted } from 'vue';
 
 onMounted(async () => {
-  initializeWebMCPPolyfill();
+  installWebMCP();
+  if (!document.modelContext) throw new Error('WebMCP is unavailable');
 
   await document.modelContext.registerTool({
     name: 'current_route',

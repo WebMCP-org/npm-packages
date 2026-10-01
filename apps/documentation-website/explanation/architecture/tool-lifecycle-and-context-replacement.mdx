@@ -27,7 +27,7 @@ The current registration pattern ties a tool to an `AbortSignal`:
 
 ```ts title="Registration lifetime"
 const controller = new AbortController();
-await document.modelContext.registerTool(tool, { signal: controller.signal });
+await document.modelContext?.registerTool(tool, { signal: controller.signal });
 
 // Remove the registration during route or component cleanup.
 controller.abort();
@@ -41,7 +41,7 @@ before publishing the replacement:
 controller.abort();
 
 const nextController = new AbortController();
-await document.modelContext.registerTool(nextTool, {
+await document.modelContext?.registerTool(nextTool, {
   signal: nextController.signal,
 });
 ```

@@ -19,8 +19,9 @@ const { F_OK } = fsConstants;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const packageVersion = (createRequire(import.meta.url)('../package.json') as { version: string })
-  .version;
+const packageVersion = z
+  .object({ version: z.string() })
+  .parse(createRequire(import.meta.url)('../package.json')).version;
 
 const EMBEDDED_LIBRARY_RELATIVE_PATH = join('..', 'lib', 'smart-dom-reader.bundle.js');
 const DEFAULT_LAUNCH_ARGS = ['--no-sandbox', '--disable-setuid-sandbox'] as const;
@@ -61,7 +62,11 @@ type ScreenshotArgs = {
   fullPage: boolean;
 };
 
-type LibraryOperation = 'structure' | 'region' | 'content' | 'interactive';
+type LibraryRequest =
+  | [operation: 'structure', args: StructureOperationArgs & { format: FormatOptions }]
+  | [operation: 'region', args: RegionOperationArgs & { format: FormatOptions }]
+  | [operation: 'content', args: ContentOperationArgs & { format: FormatOptions }]
+  | [operation: 'interactive', args: InteractiveOperationArgs & { format: FormatOptions }];
 
 type StructureOperationArgs = {
   selector: string | null;
@@ -84,32 +89,41 @@ type InteractiveOperationArgs = {
 
 const CHROME_ENV_VARS = ['CHROME_PATH', 'GOOGLE_CHROME_SHIM', 'BROWSER_PATH'] as const;
 
-const DEFAULT_CHROME_LOCATIONS: Partial<Record<NodeJS.Platform, readonly string[]>> = {
-  darwin: [
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    '/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta',
-    '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
-    '/Applications/Chromium.app/Contents/MacOS/Chromium',
+const DEFAULT_CHROME_LOCATIONS = new Map<NodeJS.Platform, readonly string[]>([
+  [
+    'darwin',
+    [
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta',
+      '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+    ],
   ],
-  linux: [
-    '/usr/bin/google-chrome',
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/chromium',
-    '/snap/bin/chromium',
+  [
+    'linux',
+    [
+      '/usr/bin/google-chrome',
+      '/usr/bin/google-chrome-stable',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/chromium',
+      '/snap/bin/chromium',
+    ],
   ],
-  win32: [
-    ...(process.env.PROGRAMFILES
-      ? [join(process.env.PROGRAMFILES, 'Google/Chrome/Application/chrome.exe')]
-      : []),
-    ...(process.env['ProgramFiles(x86)']
-      ? [join(process.env['ProgramFiles(x86)'], 'Google/Chrome/Application/chrome.exe')]
-      : []),
-    ...(process.env.LOCALAPPDATA
-      ? [join(process.env.LOCALAPPDATA, 'Google/Chrome/Application/chrome.exe')]
-      : []),
+  [
+    'win32',
+    [
+      ...(process.env.PROGRAMFILES
+        ? [join(process.env.PROGRAMFILES, 'Google/Chrome/Application/chrome.exe')]
+        : []),
+      ...(process.env['ProgramFiles(x86)']
+        ? [join(process.env['ProgramFiles(x86)'], 'Google/Chrome/Application/chrome.exe')]
+        : []),
+      ...(process.env.LOCALAPPDATA
+        ? [join(process.env.LOCALAPPDATA, 'Google/Chrome/Application/chrome.exe')]
+        : []),
+    ],
   ],
-};
+]);
 
 interface ProgressiveExtractorRegionConfig {
   mode?: 'interactive' | 'full' | undefined;
@@ -135,7 +149,7 @@ interface FormatOptions {
   maxElements?: number | undefined;
 }
 
-const COMMON_TOOL_OPTIONS_SHAPE = {
+const COMMON_TOOL_OPTIONS = {
   maxDepth: z
     .number()
     .int()
@@ -167,11 +181,7 @@ type LibraryCache = {
   mtimeMs: number;
 };
 
-async function pathExists(candidate: string | undefined): Promise<boolean> {
-  if (!candidate) {
-    return false;
-  }
-
+async function pathExists(candidate: string): Promise<boolean> {
   try {
     await access(candidate, F_OK);
     return true;
@@ -325,7 +335,7 @@ class SmartDomReaderServer {
                 .boolean()
                 .describe('Include elements that are hidden/offscreen. Default: false.')
                 .optional(),
-              ...COMMON_TOOL_OPTIONS_SHAPE,
+              ...COMMON_TOOL_OPTIONS,
             })
             .optional(),
         }),
@@ -402,7 +412,7 @@ class SmartDomReaderServer {
                 .boolean()
                 .default(false)
                 .describe('Only include elements currently within the viewport. Default: false.'),
-              ...COMMON_TOOL_OPTIONS_SHAPE,
+              ...COMMON_TOOL_OPTIONS,
             })
             .optional(),
         }),
@@ -500,12 +510,12 @@ class SmartDomReaderServer {
 
     for (const envVar of CHROME_ENV_VARS) {
       const envPath = process.env[envVar];
-      if (await pathExists(envPath)) {
-        return { path: resolve(envPath as string), source: `env:${envVar}` };
+      if (envPath && (await pathExists(envPath))) {
+        return { path: resolve(envPath), source: `env:${envVar}` };
       }
     }
 
-    const candidates = DEFAULT_CHROME_LOCATIONS[process.platform] ?? [];
+    const candidates = DEFAULT_CHROME_LOCATIONS.get(process.platform) ?? [];
     for (const candidate of candidates) {
       if (await pathExists(candidate)) {
         return { path: resolve(candidate), source: 'default' };
@@ -529,10 +539,7 @@ class SmartDomReaderServer {
   private async extractStructure(args: OptionalSelectorArgs): Promise<CallToolResult> {
     const started = Date.now();
     try {
-      const text = await this.runLibraryOperation<
-        string,
-        StructureOperationArgs & { format: FormatOptions }
-      >('structure', {
+      const text = await this.runLibraryOperation('structure', {
         selector: args.selector && args.selector.trim().length > 0 ? args.selector : null,
         format: {
           detail: args.detail ?? 'summary',
@@ -550,10 +557,7 @@ class SmartDomReaderServer {
   private async extractRegion(args: RegionArgs): Promise<CallToolResult> {
     const started = Date.now();
     try {
-      const text = await this.runLibraryOperation<
-        string,
-        RegionOperationArgs & { format: FormatOptions }
-      >('region', {
+      const text = await this.runLibraryOperation('region', {
         selector: args.selector,
         options: args.options ?? {},
         format: {
@@ -574,10 +578,7 @@ class SmartDomReaderServer {
   private async extractContent(args: ContentArgs): Promise<CallToolResult> {
     const started = Date.now();
     try {
-      const text = await this.runLibraryOperation<
-        string,
-        ContentOperationArgs & { format: FormatOptions }
-      >('content', {
+      const text = await this.runLibraryOperation('content', {
         selector: args.selector,
         options: args.options ?? {},
         format: {
@@ -598,10 +599,7 @@ class SmartDomReaderServer {
   private async extractInteractive(args: InteractiveArgs): Promise<CallToolResult> {
     const started = Date.now();
     try {
-      const text = await this.runLibraryOperation<
-        string,
-        InteractiveOperationArgs & { format: FormatOptions }
-      >('interactive', {
+      const text = await this.runLibraryOperation('interactive', {
         selector: args.selector && args.selector.trim().length > 0 ? args.selector : null,
         options: args.options ?? {},
         format: {
@@ -661,15 +659,12 @@ class SmartDomReaderServer {
    * All formatting happens in-page via the bundled library; the server never
    * imports it, so there are no server-side dynamic imports.
    */
-  private async runLibraryOperation<
-    TResult,
-    TArgs extends Record<string, unknown> & { format: FormatOptions },
-  >(operation: LibraryOperation, args: TArgs): Promise<TResult> {
+  private async runLibraryOperation(...request: LibraryRequest): Promise<string> {
     const page = this.getActivePage();
     const code = await this.readLibraryFile(resolve(__dirname, EMBEDDED_LIBRARY_RELATIVE_PATH));
 
-    return page.evaluate<TResult, { code: string; operation: LibraryOperation; args: TArgs }>(
-      async ({ code, operation, args }) => {
+    const markdown = await page.evaluate<unknown, { code: string; request: LibraryRequest }>(
+      async ({ code, request: [operation, args] }) => {
         const blob = new Blob([code], { type: 'text/javascript' });
         const url = URL.createObjectURL(blob);
 
@@ -687,12 +682,12 @@ class SmartDomReaderServer {
                 throw new Error('ProgressiveExtractor export is unavailable.');
               }
 
-              const { selector } = args as StructureOperationArgs;
+              const { selector } = args;
               const target = selector ? document.querySelector(selector) : document;
               if (!target) throw new Error(`No matching element for selector ${selector}`);
               const overview = ProgressiveExtractor.extractStructure(target);
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              return MarkdownFormatter.structure(overview, fmt, meta) as TResult;
+              return MarkdownFormatter.structure(overview, fmt, meta);
             }
 
             case 'region': {
@@ -700,12 +695,11 @@ class SmartDomReaderServer {
                 throw new Error('ProgressiveExtractor export is unavailable.');
               }
 
-              const { selector, options } = args as RegionOperationArgs;
+              const { selector, options } = args;
               const result = ProgressiveExtractor.extractRegion(selector, document, options ?? {});
-              if (!result)
-                return `No matching region for selector ${selector}` as unknown as TResult;
+              if (!result) return `No matching region for selector ${selector}`;
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              return MarkdownFormatter.region(result, fmt, meta) as TResult;
+              return MarkdownFormatter.region(result, fmt, meta);
             }
 
             case 'content': {
@@ -713,15 +707,15 @@ class SmartDomReaderServer {
                 throw new Error('ProgressiveExtractor export is unavailable.');
               }
 
-              const { selector, options } = args as ContentOperationArgs;
+              const { selector, options } = args;
               const content = ProgressiveExtractor.extractContent(
                 selector,
                 document,
                 options ?? {}
               );
-              if (!content) return `No content for selector ${selector}` as unknown as TResult;
+              if (!content) return `No content for selector ${selector}`;
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              return MarkdownFormatter.content(content, fmt, meta) as TResult;
+              return MarkdownFormatter.content(content, fmt, meta);
             }
 
             case 'interactive': {
@@ -729,20 +723,20 @@ class SmartDomReaderServer {
                 throw new Error('SmartDOMReader export is unavailable.');
               }
 
-              const { selector, options } = args as InteractiveOperationArgs;
+              const { selector, options } = args;
               const target = selector ? document.querySelector(selector) : document;
               if (!target) throw new Error(`No matching element for selector ${selector}`);
 
               if (typeof SmartDOMReader.extractInteractive === 'function') {
                 const result = SmartDOMReader.extractInteractive(target, options ?? {});
                 if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-                return MarkdownFormatter.region(result, fmt, meta) as TResult;
+                return MarkdownFormatter.region(result, fmt, meta);
               }
 
               const reader = new SmartDOMReader({ ...options, mode: 'interactive' });
               const result = reader.extract(target, options ?? {});
               if (!MarkdownFormatter) throw new Error('MarkdownFormatter export is unavailable.');
-              return MarkdownFormatter.region(result, fmt, meta) as TResult;
+              return MarkdownFormatter.region(result, fmt, meta);
             }
 
             default: {
@@ -753,8 +747,12 @@ class SmartDomReaderServer {
           URL.revokeObjectURL(url);
         }
       },
-      { code, operation, args }
+      { code, request }
     );
+    if (typeof markdown !== 'string') {
+      throw new TypeError('The embedded library returned a non-string result.');
+    }
+    return markdown;
   }
 
   private getActivePage(): Page {
@@ -773,12 +771,7 @@ class SmartDomReaderServer {
     try {
       file = await open(resolvedPath, 'r');
     } catch (error) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      ) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
         throw new ProtocolError(
           ProtocolErrorCode.InvalidParams,
           `Embedded library file not found at ${resolvedPath}. Ensure the bundled file exists.`
@@ -802,14 +795,14 @@ class SmartDomReaderServer {
     }
   }
 
-  private handleToolError(error: unknown, fallbackMessage: string): never {
-    if (error instanceof ProtocolError) {
-      throw error;
+  private handleToolError(cause: unknown, fallbackMessage: string): never {
+    if (cause instanceof ProtocolError) {
+      throw cause;
     }
 
-    if (error instanceof Error) {
-      console.error(fallbackMessage, error);
-      throw new ProtocolError(ProtocolErrorCode.InternalError, error.message);
+    if (cause instanceof Error) {
+      console.error(fallbackMessage, cause);
+      throw new ProtocolError(ProtocolErrorCode.InternalError, cause.message);
     }
 
     throw new ProtocolError(ProtocolErrorCode.InternalError, fallbackMessage);
@@ -817,7 +810,7 @@ class SmartDomReaderServer {
 }
 
 const server = new SmartDomReaderServer();
-server.run().catch((error) => {
-  console.error('Smart DOM Reader server failed to start', error);
+server.run().catch((cause) => {
+  console.error('Smart DOM Reader server failed to start', cause);
   process.exitCode = 1;
 });

@@ -1,6 +1,6 @@
 ---
 title: 'WebMCP API sources'
-description: 'Quick lookup for the document-first WebMCP surface and its compatibility APIs.'
+description: 'Quick lookup for the sources that own the document-first WebMCP surface.'
 keywords: ['document.modelContext', 'registerTool', 'getTools', 'executeTool']
 icon: 'brackets-curly'
 ---
@@ -31,16 +31,12 @@ proposal. Use the source that owns the behavior you need.
 MCP-B package references describe the code shipped by this project. They do
 not redefine the proposal.
 
-| Package surface                        | Reference                                                       |
-| -------------------------------------- | --------------------------------------------------------------- |
-| Type contracts and compatibility types | [`@mcp-b/webmcp-types`](/packages/webmcp-types/reference)       |
-| Portable runtime behavior              | [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference) |
-| Extended server behavior               | [`@mcp-b/webmcp-ts-sdk`](/packages/webmcp-ts-sdk/reference)     |
+| Package surface                             | Reference                                                       |
+| ------------------------------------------- | --------------------------------------------------------------- |
+| MCP-B adapter extensions and schema helpers | [`@mcp-b/webmcp-ts-sdk`](/packages/webmcp-ts-sdk/reference)     |
+| Portable runtime behavior                   | [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference) |
 
-MCP-B preserves some compatibility surfaces that differ from the live draft.
-The upstream `webmcp-types` package provides ambient proposal declarations;
-the scoped `@mcp-b/webmcp-types` package adds MCP-B schema inference and
-compatibility types. They are separate packages.
+MCP-B packages can lag the live draft or extend it.
 
 Use [WebMCP and MCP-B extensions](/explanation/strict-core-vs-mcp-b-extensions)
 for the boundary and [Choose a runtime](/how-to/choose-runtime) for package

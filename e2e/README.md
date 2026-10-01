@@ -16,6 +16,7 @@ Other canonical runtime E2E lanes live in package-specific commands:
 
 - `pnpm --filter @mcp-b/webmcp-local-relay test:e2e`
 - `pnpm --filter @mcp-b/transports test:e2e`
+- `pnpm --filter @mcp-b/webmcp-extension test:e2e`
 
 ## Canonical E2E Definition
 
@@ -27,9 +28,8 @@ A test is canonical E2E only if it proves:
 4. no mocked transports or fake servers are used
 
 Native Chromium is the one exception to the SDK-client rule: its real public
-boundary is `document.modelContext`. Native discovery uses `getTools()`.
-Execution uses Chrome's optional descriptor-based `executeTool()` extension
-when the browser exposes it.
+boundary is `document.modelContext`. Native discovery uses `getTools()` and
+execution uses descriptor-based `executeTool()`.
 
 ## Structure
 
@@ -52,7 +52,6 @@ e2e/
 │   ├── runtime-contract-native.spec.ts
 │   ├── tab-transport.spec.ts
 │   ├── mcp-iframe-element.spec.ts
-│   ├── chromium-native-api.spec.ts # Historical name; MCP-B compatibility shim coverage
 │   └── chrome-beta-webmcp.spec.ts
 ├── playwright.config.ts
 └── package.json
@@ -104,9 +103,9 @@ pnpm test:e2e:debug
 pnpm test
 pnpm test:runtime-contract
 
-# Native contract (Chrome 152+ WebMCP config)
-pnpm test:native-contract:default
-pnpm test:native-contract:beta
+# Native contract, then contract plus Chrome WebMCP smoke (Chrome 155+)
+pnpm test:native-contract
+pnpm test:native-parity
 
 # Runtime API integration (not canonical E2E)
 pnpm test:integration:runtime-api
@@ -114,12 +113,11 @@ pnpm test:integration:runtime-api
 # Framework integration (not canonical E2E)
 pnpm test:integration:frameworks
 
-# Older targeted commands retained for focused runs
+# Focused runs
 pnpm test:tab-transport
 pnpm test:mcp-iframe
-pnpm test:chromium-native-api # MCP-B compatibility, not native conformance
 pnpm test:native-showcase
-pnpm test:chrome-beta:webmcp
+pnpm test:chrome-beta:webmcp:smoke
 ```
 
 ## Canonical Assertions
@@ -139,9 +137,6 @@ These suites remain valuable, but they are not the default E2E definition:
 
 - `tests/tab-transport.spec.ts`
 - `tests/mcp-iframe-element.spec.ts`
-- `tests/chromium-native-api.spec.ts` (MCP-B extensions and the deprecated
-  `modelContextTesting` compatibility shim, despite the historical filename)
-- `tests/notification-batching.spec.ts`
 - `tests/chrome-beta-webmcp.spec.ts`
 - `playwright-native-showcase.config.ts`
 
@@ -181,4 +176,4 @@ pnpm --filter mcp-e2e-tests exec playwright install chromium
 
 ### Native Chromium Details
 
-See [tests/CHROMIUM_TESTING.md](./tests/CHROMIUM_TESTING.md) for the canonical native contract lanes and the Chrome 152 flagged lane.
+See [tests/CHROMIUM_TESTING.md](./tests/CHROMIUM_TESTING.md) for the canonical native contract lanes and the Chrome 155+ flagged lane.

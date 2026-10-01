@@ -25,7 +25,7 @@ pnpm dev
 Then verify the registered tool in the browser console:
 
 ```js
-await document.modelContext.getTools();
+await document.modelContext?.getTools();
 ```
 
 ## Cloning a Single Example (Sparse Checkout)

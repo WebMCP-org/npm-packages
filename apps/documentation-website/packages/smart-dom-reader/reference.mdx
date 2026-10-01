@@ -29,6 +29,22 @@ dependencies: none
 npm install @mcp-b/smart-dom-reader
 ```
 
+## Minimal example
+
+```typescript title="Extract controls and the main region"
+import { ProgressiveExtractor, SmartDOMReader } from '@mcp-b/smart-dom-reader';
+
+const interactive = SmartDOMReader.extractInteractive(document);
+
+const structure = ProgressiveExtractor.extractStructure(document);
+const mainSelector = structure.summary.mainContentSelector;
+const region = mainSelector
+  ? ProgressiveExtractor.extractRegion(mainSelector, document, { mode: 'interactive' })
+  : null;
+
+console.log({ interactive, region });
+```
+
 ## Entry points
 
 | Entry point                             | Exports                                                        |
@@ -229,7 +245,16 @@ class ContentDetection {
   static calculateContentScore(element: Element): number;
   static isNavigation(element: Element): boolean;
   static isSupplementary(element: Element): boolean;
-  static detectLandmarks(doc: Document): Record<string, Element[]>;
+  static detectLandmarks(doc: Document): {
+    navigation: Element[];
+    main: Element[];
+    complementary: Element[];
+    contentinfo: Element[];
+    banner: Element[];
+    search: Element[];
+    form: Element[];
+    region: Element[];
+  };
 }
 
 class MarkdownFormatter {
@@ -261,13 +286,13 @@ The `bundle-string` entry point exposes an injectable IIFE string and its bundle
 version marker. After evaluating `SMART_DOM_READER_BUNDLE`, call:
 
 ```typescript
-SmartDOMReaderBundle.executeExtraction<M extends ExtractionMethod>(
-  method: M,
-  args: ExtractionArgs[M],
+SmartDOMReaderBundle.executeExtraction(
+  ...request: { [M in ExtractionMethod]: [method: M, args: ExtractionArgs[M]] }[ExtractionMethod]
 ): ExtractionResult;
 ```
 
-`ExtractionResult` is the formatted `string` or `{ error: string }`.
+The `method` literal selects the argument type. `ExtractionResult` is the formatted `string` or
+`{ error: string }`.
 
 | `ExtractionMethod`   | Method-specific arguments       |
 | -------------------- | ------------------------------- |

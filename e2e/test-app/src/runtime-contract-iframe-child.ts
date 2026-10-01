@@ -6,6 +6,7 @@ function requireElement<T extends HTMLElement>(id: string): T {
   if (!element) {
     throw new Error(`Required DOM element not found: ${id}`);
   }
+  // SAFETY: Call sites name static fixture elements and pass their authored HTML element type.
   return element as T;
 }
 
@@ -19,14 +20,14 @@ function setStatus(status: 'booting' | 'ready' | 'error', text: string) {
 }
 
 async function renderTools() {
-  const modelContext = document.modelContext ?? navigator.modelContext;
+  const modelContext = document.modelContext;
   const names = modelContext ? (await modelContext.getTools()).map((tool) => tool.name).sort() : [];
   toolListEl.textContent = JSON.stringify(names, null, 2);
   toolListEl.dataset.count = String(names.length);
 }
 
 async function bootstrap() {
-  const modelContext = document.modelContext ?? navigator.modelContext;
+  const modelContext = document.modelContext;
   if (!modelContext) {
     throw new Error('document.modelContext is unavailable');
   }

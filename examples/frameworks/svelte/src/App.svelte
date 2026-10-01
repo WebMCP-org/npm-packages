@@ -1,9 +1,10 @@
 <script lang="ts">
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { onMount } from 'svelte';
 
 onMount(async () => {
-  initializeWebMCPPolyfill();
+  installWebMCP();
+  if (!document.modelContext) throw new Error('WebMCP is unavailable');
 
   await document.modelContext.registerTool({
     name: 'get_info',

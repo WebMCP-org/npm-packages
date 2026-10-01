@@ -118,11 +118,9 @@ export class DOMTraversal {
         const attrValue = element.getAttribute(attr);
         if (!attrValue) return false;
 
-        if (typeof value === 'string') {
-          if (attrValue !== value) return false;
-        } else if (value instanceof RegExp) {
+        if (value instanceof RegExp) {
           if (!value.test(attrValue)) return false;
-        }
+        } else if (attrValue !== value) return false;
       }
     }
 
@@ -247,7 +245,7 @@ export class DOMTraversal {
   private static getRelevantAttributes(
     element: Element,
     options: ExtractionOptions
-  ): Record<string, string> {
+  ): ExtractedElement['attributes'] {
     const relevant = [
       'id',
       'class',
@@ -341,26 +339,29 @@ export class DOMTraversal {
    * Get interaction information for an element (compact format)
    */
   private static getInteractionInfo(element: Element): ElementInteraction {
-    // Element has no inline on* handlers in lib.dom; they live on GlobalEventHandlers.
-    const htmlElement = element as HTMLElement;
     const interaction: ElementInteraction = {};
+    const view = element.ownerDocument.defaultView ?? window;
 
     // Only include true values to reduce token usage
     if (
-      htmlElement.onclick ||
+      ('onclick' in element && element.onclick) ||
       element.getAttribute('onclick') ||
       element.matches('button, a[href], [role="button"], [tabindex]:not([tabindex="-1"])')
     )
       interaction.click = true;
 
     if (
-      htmlElement.onchange ||
+      ('onchange' in element && element.onchange) ||
       element.getAttribute('onchange') ||
       element.matches('input, select, textarea')
     )
       interaction.change = true;
 
-    if (htmlElement.onsubmit || element.getAttribute('onsubmit') || element.matches('form'))
+    if (
+      ('onsubmit' in element && element.onsubmit) ||
+      element.getAttribute('onsubmit') ||
+      element.matches('form')
+    )
       interaction.submit = true;
 
     const triggersNavigation = element.matches('a[href], button[type="submit"]');
@@ -378,9 +379,14 @@ export class DOMTraversal {
 
     // Check form association
     if (element.matches('input, textarea, select, button')) {
-      // matches() cannot narrow, and instanceof is unsafe here (elements may come
-      // from an iframe realm). All four tags carry .form.
-      const form = (element as HTMLInputElement).form || element.closest('form');
+      const associatedForm =
+        element instanceof view.HTMLInputElement ||
+        element instanceof view.HTMLTextAreaElement ||
+        element instanceof view.HTMLSelectElement ||
+        element instanceof view.HTMLButtonElement
+          ? element.form
+          : null;
+      const form = associatedForm || element.closest('form');
       if (form) {
         interaction.form = SelectorGenerator.generateSelectors(form).css;
       }
@@ -393,15 +399,17 @@ export class DOMTraversal {
    * Get text content of an element (limited length)
    */
   private static getElementText(element: Element, options?: ExtractionOptions): string {
+    const view = element.ownerDocument.defaultView ?? window;
     // For input elements, get value or placeholder
     if (element.matches('input, textarea')) {
-      const input = element as HTMLInputElement;
-      return input.value || input.placeholder || '';
+      return element instanceof view.HTMLInputElement || element instanceof view.HTMLTextAreaElement
+        ? element.value || element.placeholder || ''
+        : '';
     }
 
     // For images, get alt text
     if (element.matches('img')) {
-      return (element as HTMLImageElement).alt || '';
+      return element instanceof view.HTMLImageElement ? element.alt || '' : '';
     }
 
     // Get text content, but limit length based on options

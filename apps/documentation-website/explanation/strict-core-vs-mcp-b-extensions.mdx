@@ -24,7 +24,7 @@ flowchart TB
   end
 
   subgraph Project["MCP-B packages"]
-    Portable["Portable layer<br/>types, helpers, polyfill"]
+    Portable["Portable layer<br/>hooks, helpers, polyfill"]
     Extensions["Extension layer<br/>BrowserMcpServer, MCP features, transports"]
     Portable -->|"extended by"| Extensions
   end
@@ -32,9 +32,10 @@ flowchart TB
   Proposal -->|"target browser contract"| Portable
 ```
 
-The live draft owns the exact `ModelContext` members and signatures. MCP-B may
-retain compatibility types or adapters while browser implementations converge.
-Do not infer proposal status from where a method appears in an MCP-B type.
+The live draft owns the exact `ModelContext` members and signatures. Upstream [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types)
+provides the browser declarations. MCP-B adapter and extension contracts live
+with [`@mcp-b/webmcp-ts-sdk`](/packages/webmcp-ts-sdk/reference). The SDK may
+include compatibility adapters, but they do not redefine the proposal.
 
 ## Why the extension boundary exists
 
@@ -52,3 +53,43 @@ that need prompts, resources, bridges, or desktop MCP clients use the extension
 layer. See [Runtime layering](/explanation/architecture/runtime-layering) for
 the composition model and [Choose a runtime](/how-to/choose-runtime) for
 package selection.
+
+## Why Standard Schema support lives in the adapters
+
+A tool needs both a description of its input and a way to check actual arguments. These are separate
+jobs. [Standard JSON Schema](https://standardschema.dev/json-schema) lets a schema library produce
+JSON Schema metadata. [Standard Schema](https://standardschema.dev/) lets an integration call that
+library's validator. The library remains responsible for its refinements, defaults, transforms, and
+async checks.
+
+The core [`usewebmcp` hook](/packages/usewebmcp/reference) accepts upstream JSON Schema metadata and
+does not validate runtime input. [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference) converts
+Standard JSON Schema metadata and calls the supplied validator before either local or agent calls.
+It adds MCP result formatting and output metadata as well.
+
+```mermaid
+flowchart TD
+  Schema["Your schema library"] --> Adapter["MCP-B React adapter"]
+  Adapter -->|"JSON Schema metadata"| Browser["WebMCP registration"]
+  Agent["Agent call"] --> Adapter
+  Local["Local execute call"] --> Adapter
+  Adapter -->|"Standard Schema validation"| Handler["Your tool implementation"]
+  Core["Core usewebmcp with JSON Schema"] --> Browser
+  Core -->|"Input passed through"| Handler
+```
+
+The standalone polyfill keeps its browser contract focused on JSON Schema metadata.
+[`@mcp-b/webmcp-ts-sdk/schema`](/packages/webmcp-ts-sdk/reference#schema-boundary) converts schemas
+for direct WebMCP registrations and the MCP adapter; it does not change
+`document.modelContext.registerTool()` or make it call a validator. Declarative tools separately use
+the browser's form constraint validation.
+
+The MCP route has another validation owner: the official server composed by
+[`BrowserMcpServer`](/packages/webmcp-ts-sdk/reference#schema-boundary). It can use a validator
+preserved by the schema adapter, but direct browser calls bypass that MCP server. React hooks
+therefore forward plain JSON metadata and keep vendor validation in their callback. Applying a
+string-to-number transform in both places would feed the first transform's number back into a
+validator expecting a string.
+
+The [schema guide](/how-to/use-schemas-and-structured-output) shows how to keep one owner for vendor
+validation when registering directly, and how to add MCP output schemas independently.

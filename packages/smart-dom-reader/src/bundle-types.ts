@@ -56,11 +56,12 @@ export interface ExtractionError {
 
 export type ExtractionResult = string | ExtractionError;
 
+export type ExtractionRequest = {
+  [M in ExtractionMethod]: [method: M, args: ExtractionArgs[M]];
+}[ExtractionMethod];
+
 interface SmartDOMReaderBundle {
-  executeExtraction<M extends ExtractionMethod>(
-    method: M,
-    args: ExtractionArgs[M]
-  ): ExtractionResult;
+  executeExtraction(...request: ExtractionRequest): ExtractionResult;
 }
 
 declare global {

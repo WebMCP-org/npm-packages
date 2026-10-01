@@ -109,8 +109,7 @@ for (const app of apps) {
           }
 
           const eventTypes = await page.evaluate(() => {
-            const log = (window as { mcpEventLog?: { getEvents: () => Array<{ type: string }> } })
-              .mcpEventLog;
+            const log = window.mcpEventLog;
             return (log?.getEvents() ?? []).map((event) => event.type);
           });
 

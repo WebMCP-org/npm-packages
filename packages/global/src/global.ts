@@ -1,118 +1,34 @@
 import { IframeChildTransport, TabServerTransport } from '@mcp-b/transports';
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer, isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
-import type { ModelContext } from '@mcp-b/webmcp-types';
 import type { Transport } from '@modelcontextprotocol/server';
 import type { WebModelContextInitOptions } from './types.js';
 
 interface RuntimeState {
   server: BrowserMcpServer;
   transport: Transport;
-  previousDocumentModelContextDescriptor: PropertyDescriptor | undefined;
-  previousNavigatorModelContextDescriptor: PropertyDescriptor | undefined;
+  previousDescriptor: PropertyDescriptor | undefined;
 }
 
 let runtime: RuntimeState | null = null;
-
-function isBrowserEnvironment(): boolean {
-  return typeof window !== 'undefined' && typeof window.navigator !== 'undefined';
-}
-
-function readCurrentModelContext(): ModelContext | undefined {
-  return document.modelContext ?? navigator.modelContext;
-}
-
-function canReplaceModelContext(target: Document | Navigator): boolean {
-  const descriptor = Object.getOwnPropertyDescriptor(target, 'modelContext');
-  return descriptor ? descriptor.configurable === true : Object.isExtensible(target);
-}
-
-function replaceDocumentModelContext(value: unknown): void {
-  Object.defineProperty(document, 'modelContext', {
-    configurable: true,
-    enumerable: true,
-    writable: false,
-    value,
-  });
-
-  if (document.modelContext !== value) {
-    console.error(
-      '[WebModelContext] Failed to replace document.modelContext.',
-      'Descriptor:',
-      Object.getOwnPropertyDescriptor(document, 'modelContext')
-    );
-  }
-}
-
-function replaceNavigatorModelContext(value: unknown): void {
-  Object.defineProperty(navigator, 'modelContext', {
-    configurable: true,
-    enumerable: true,
-    writable: false,
-    value,
-  });
-
-  if (navigator.modelContext !== value) {
-    console.error(
-      '[WebModelContext] Failed to replace navigator.modelContext.',
-      'Descriptor:',
-      Object.getOwnPropertyDescriptor(navigator, 'modelContext')
-    );
-  }
-}
-
-function restoreProperty(
-  target: Document | Navigator,
-  key: 'modelContext',
-  descriptor: PropertyDescriptor | undefined
-): void {
-  if (descriptor) Object.defineProperty(target, key, descriptor);
-  else Reflect.deleteProperty(target, key);
-}
-
-/**
- * Replace both modelContext surfaces with the given value.
- *
- * document.modelContext is canonical. @mcp-b/global still supports old
- * navigator-first users, so the bridge exposes the BrowserMcpServer wrapper
- * through both properties.
- */
-function replaceModelContext(
-  value: unknown,
-  previousDocumentDescriptor: PropertyDescriptor | undefined,
-  previousNavigatorDescriptor: PropertyDescriptor | undefined
-): void {
-  try {
-    replaceDocumentModelContext(value);
-    replaceNavigatorModelContext(value);
-  } catch (error) {
-    restoreProperty(document, 'modelContext', previousDocumentDescriptor);
-    restoreProperty(navigator, 'modelContext', previousNavigatorDescriptor);
-    throw error;
-  }
-}
 
 function createTransport(config: WebModelContextInitOptions['transport']): Transport {
   const inIframe = window.parent !== window;
 
   if (inIframe && config?.iframeServer !== false) {
-    return new IframeChildTransport(
-      typeof config?.iframeServer === 'object' ? config.iframeServer : { allowedOrigins: ['*'] }
-    );
+    return new IframeChildTransport(config?.iframeServer || { allowedOrigins: ['*'] });
   }
 
   if (config?.tabServer === false) {
     throw new Error('tabServer transport is disabled and iframe transport was not selected');
   }
 
-  return new TabServerTransport(
-    typeof config?.tabServer === 'object' ? config.tabServer : { allowedOrigins: ['*'] }
-  );
+  return new TabServerTransport(config?.tabServer || { allowedOrigins: ['*'] });
 }
 
 /** Installs the global bridge on `document.modelContext`. */
 export function initializeWebModelContext(options?: WebModelContextInitOptions): void {
-  if (!isBrowserEnvironment() || globalThis.isSecureContext === false) {
+  if (!globalThis.window || !globalThis.document || globalThis.isSecureContext === false) {
     return;
   }
 
@@ -120,58 +36,41 @@ export function initializeWebModelContext(options?: WebModelContextInitOptions):
     return;
   }
 
-  // Cross-bundle guard: if modelContext is already a BrowserMcpServer
-  // (set by another bundle in this window), skip initialization.
-  const existingContext = readCurrentModelContext();
-  if (existingContext && isBrowserMcpServer(existingContext)) {
+  // Cross-bundle guard: another bundle in this window already installed the bridge.
+  if (isBrowserMcpServer(document.modelContext)) {
     return;
   }
 
-  // 1. Install polyfill (provides modelContext + modelContextTesting)
-  initializeWebMCPPolyfill({
-    installTestingShim: options?.installTestingShim ?? true,
-  });
-
-  // 2. Save reference to the polyfill's (or native) context
-  const native = readCurrentModelContext();
+  // Preserve native/core contexts and add declarative support when it is missing.
+  installWebMCP();
+  // Capture the upstream context before installing MCP-B extensions.
+  const native = document.modelContext;
   if (!native) {
     throw new Error('modelContext is not available');
   }
 
   // Some browser hosts expose a frozen native context through non-configurable
   // own properties. It is already usable and cannot legally be wrapped.
-  if (!canReplaceModelContext(document) || !canReplaceModelContext(navigator)) {
+  const previousDescriptor = Object.getOwnPropertyDescriptor(document, 'modelContext');
+  if (previousDescriptor ? !previousDescriptor.configurable : !Object.isExtensible(document)) {
     return;
   }
 
-  // 3. Resolve transport before mutating either browser surface.
+  // Resolve transport before replacing the document context.
   const transport = createTransport(options?.transport);
 
-  // 4. Create server with native mirroring
+  // Create the MCP server with native mirroring.
   const hostname = window.location.hostname || 'localhost';
   const server = new BrowserMcpServer({ name: `${hostname}-webmcp`, version: '1.0.0' }, { native });
 
-  // 5. Replace both the canonical document surface and compatibility alias.
-  const previousDocumentModelContextDescriptor = Object.getOwnPropertyDescriptor(
-    document,
-    'modelContext'
-  );
-  const previousNavigatorModelContextDescriptor = Object.getOwnPropertyDescriptor(
-    navigator,
-    'modelContext'
-  );
   try {
-    replaceModelContext(
-      server,
-      previousDocumentModelContextDescriptor,
-      previousNavigatorModelContextDescriptor
-    );
-    runtime = {
-      server,
-      transport,
-      previousDocumentModelContextDescriptor,
-      previousNavigatorModelContextDescriptor,
-    };
+    Object.defineProperty(document, 'modelContext', {
+      configurable: true,
+      enumerable: true,
+      writable: false,
+      value: server,
+    });
+    runtime = { server, transport, previousDescriptor };
   } catch (error) {
     void server.close();
     void transport.close();
@@ -205,20 +104,16 @@ export function cleanupWebModelContext(): void {
     return;
   }
 
-  const {
-    server,
-    transport,
-    previousDocumentModelContextDescriptor,
-    previousNavigatorModelContextDescriptor,
-  } = runtime;
+  const { server, transport, previousDescriptor } = runtime;
   runtime = null;
 
   void server.close();
   void transport.close();
 
-  // Restore the descriptors that existed before we wrapped with BrowserMcpServer.
-  // We intentionally do NOT call cleanupWebMCPPolyfill() here — the polyfill
-  // manages its own lifecycle (auto-init, testing shim) independently.
-  restoreProperty(document, 'modelContext', previousDocumentModelContextDescriptor);
-  restoreProperty(navigator, 'modelContext', previousNavigatorModelContextDescriptor);
+  // The polyfill and its declarative layer remain installed for the lifetime of the document.
+  if (previousDescriptor) {
+    Object.defineProperty(document, 'modelContext', previousDescriptor);
+  } else {
+    Reflect.deleteProperty(document, 'modelContext');
+  }
 }

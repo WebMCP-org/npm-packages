@@ -1,4 +1,8 @@
 import { expect, type Page, test } from '@playwright/test';
+import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
+
+type NativeRegisterTool = NonNullable<Document['modelContext']>['registerTool'];
+type RegisterTool = (...args: Parameters<NativeRegisterTool>) => ReturnType<NativeRegisterTool>;
 
 const dynamicItemSnapshot = (page: Page) =>
   page.evaluate(() => {
@@ -46,10 +50,8 @@ test('bridges tools, resources, URI templates, and prompts', async ({ page }) =>
       return match;
     };
 
-    const tool = (await window.mcpIframeHost.getParentTool('calculate')) as {
-      title?: string;
-      annotations?: { readOnlyHint?: boolean };
-    };
+    const tool = await window.mcpIframeHost.getParentTool('calculate');
+    if (!tool) throw new Error('Parent tool is unavailable');
     const calculation = await window.mcpIframeHost.callTool('calculate', { a: 10, b: 20 });
     const calculationContent = calculation.content[0];
     const config = await window.mcpIframeHost.readResource(resource('iframe://config'));
@@ -73,9 +75,8 @@ test('bridges tools, resources, URI templates, and prompts', async ({ page }) =>
       resource('iframe://query{?q,lang}'),
       { q: 'a b', lang: 'en' }
     );
-    const prompt = (await window.mcpIframeHost.getPrompt('summarize', { text: 'hello' })) as {
-      messages: Array<{ content: { type: string; text?: string } }>;
-    };
+    const prompt = await window.mcpIframeHost.getPrompt('summarize', { text: 'hello' });
+    const promptContent = prompt.messages[0]?.content;
 
     return {
       tools: element.exposedTools,
@@ -91,7 +92,7 @@ test('bridges tools, resources, URI templates, and prompts', async ({ page }) =>
       segments: segments.contents[0]?.uri,
       fragment: fragment.contents[0]?.uri,
       query: query.contents[0]?.uri,
-      prompt: prompt.messages[0]?.content.text,
+      prompt: promptContent?.type === 'text' ? promptContent.text : undefined,
     };
   });
 
@@ -110,6 +111,56 @@ test('bridges tools, resources, URI templates, and prompts', async ({ page }) =>
     prompt: 'Summarize: hello',
   });
   expect(contract.config).toMatchObject({ uri: 'iframe://config' });
+});
+
+test('keeps ancestor tools out of child MCP servers while WebMCP discovers the frame tree', async ({
+  page,
+}) => {
+  const tools = await page.evaluate(async () => {
+    function isBrowserMcpServer(context: unknown): context is BrowserMcpServer {
+      return (
+        context !== null &&
+        typeof context === 'object' &&
+        '__isBrowserMcpServer' in context &&
+        context.__isBrowserMcpServer === true
+      );
+    }
+
+    const parentContext = document.modelContext;
+    if (!isBrowserMcpServer(parentContext)) {
+      throw new Error('Parent MCP-B server is unavailable');
+    }
+    const parent = parentContext;
+    const childWindow = window.mcpIframeHost.getMcpIframe().iframe?.contentWindow;
+    const childContext = childWindow?.document.modelContext;
+    if (!isBrowserMcpServer(childContext)) {
+      throw new Error('Child MCP-B server is unavailable');
+    }
+    const child = childContext;
+    const controller = new AbortController();
+    await parent.registerTool(
+      { name: 'parent_only', description: 'Parent tool', execute: async () => 'parent' },
+      { signal: controller.signal }
+    );
+    try {
+      await Promise.all([parent.syncNativeTools(), child.syncNativeTools()]);
+      return {
+        discovered: (await child.getTools()).map(({ name }) => name),
+        childMcp: child.listTools().map(({ name }) => name),
+        parentMcp: parent
+          .listTools()
+          .map(({ name }) => name)
+          .sort(),
+      };
+    } finally {
+      controller.abort();
+    }
+  });
+  expect(tools.discovered).toEqual(
+    expect.arrayContaining(['calculate', 'child-iframe_calculate', 'parent_only'])
+  );
+  expect(tools.childMcp).toEqual(['calculate']);
+  expect(tools.parentMcp).toEqual(['calculate', 'child-iframe_calculate', 'parent_only']);
 });
 
 test('mirrors child list changes as one observable snapshot', async ({ page }) => {
@@ -174,16 +225,11 @@ test('reattaches once and lets the latest source replace a rapid channel change'
 
 test('keeps the replacement ready when an older refresh finishes', async ({ page }) => {
   const state = await page.evaluate(async () => {
-    type ParentRegisterTool = (tool: unknown, options?: unknown) => Promise<void>;
-
     const element = window.mcpIframeHost.getMcpIframe();
     const modelContext = document.modelContext;
     if (!modelContext) throw new Error('Parent model context is unavailable');
 
-    const writableModelContext = modelContext as unknown as {
-      registerTool: ParentRegisterTool;
-    };
-    const originalRegisterTool = writableModelContext.registerTool;
+    const originalRegisterTool = modelContext.registerTool;
     const registerTool = originalRegisterTool.bind(modelContext);
     const { promise: registrationGate, resolve: releaseRegistration } =
       Promise.withResolvers<void>();
@@ -191,13 +237,14 @@ test('keeps the replacement ready when an older refresh finishes', async ({ page
       Promise.withResolvers<void>();
     let delayNextRegistration = true;
 
-    writableModelContext.registerTool = async (tool, options) => {
+    const delayedRegisterTool: RegisterTool = async (tool, options) => {
       await registerTool(tool, options);
       if (!delayNextRegistration) return;
       delayNextRegistration = false;
       registrationCompleted();
       await registrationGate;
     };
+    modelContext.registerTool = delayedRegisterTool;
 
     try {
       const staleRefresh = element.refresh();
@@ -226,7 +273,7 @@ test('keeps the replacement ready when an older refresh finishes', async ({ page
       };
     } finally {
       releaseRegistration();
-      writableModelContext.registerTool = originalRegisterTool;
+      modelContext.registerTool = originalRegisterTool;
     }
   });
 
@@ -266,10 +313,7 @@ test('never registers a child resource it cannot unregister', async ({ page }) =
   await expect.poll(() => parentResourceState(page)).toEqual({ registered: 0, exposed: 0 });
 });
 
-test('validates attributes, reconnects cross-origin, and supports a custom tag entry', async ({
-  context,
-  page,
-}) => {
+test('validates attributes and supports a custom tag entry', async ({ context, page }) => {
   const warnings: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'warning') warnings.push(message.text());
@@ -368,34 +412,6 @@ test('validates attributes, reconnects cross-origin, and supports a custom tag e
   });
   expect(opaqueOriginError).toContain('target-origin="*"');
 
-  const crossOrigin = await page.evaluate(async () => {
-    const element = window.mcpIframeHost.getMcpIframe();
-    const crossOrigin = new URL('/iframe-child.html', location.href);
-    crossOrigin.hostname = location.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
-    crossOrigin.searchParams.set('allow-tools-policy', '1');
-    const crossReady = new Promise<void>((resolve) =>
-      element.addEventListener('mcp-iframe-ready', () => resolve(), { once: true })
-    );
-    element.setAttribute('target-origin', crossOrigin.origin);
-    element.setAttribute('src', crossOrigin.href);
-    await crossReady;
-    const crossResult = await window.mcpIframeHost.callTool('calculate', { a: 2, b: 3 });
-    const crossContent = crossResult.content[0];
-
-    return {
-      tools: element.exposedTools,
-      origin: element.getAttribute('target-origin'),
-      result: crossContent?.type === 'text' ? crossContent.text : crossContent,
-    };
-  });
-  const expectedCrossOrigin = new URL(page.url());
-  expectedCrossOrigin.hostname =
-    expectedCrossOrigin.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
-  expect(crossOrigin).toEqual({
-    tools: ['renamed_frame_calculate'],
-    origin: expectedCrossOrigin.origin,
-    result: '5',
-  });
   expect(warnings).toEqual(
     expect.arrayContaining([
       expect.stringContaining('Invalid call-timeout'),
@@ -412,6 +428,68 @@ test('validates attributes, reconnects cross-origin, and supports a custom tag e
   }));
   expect(custom.tagName).toBe('custom-mcp-iframe');
   expect(custom.result.content[0]).toMatchObject({ type: 'text', text: '7' });
+});
+
+test('bridges a cross-origin child only where the browser grants the tools permission', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const nativeContext = document.modelContext;
+    if (nativeContext) window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = nativeContext;
+  });
+  const crossOrigin = new URL('/iframe-child.html', page.url());
+  crossOrigin.hostname = crossOrigin.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
+  const parent = await page.evaluate(async (source) => {
+    const element = window.mcpIframeHost.getMcpIframe();
+    const ready = new Promise<void>((resolve) =>
+      element.addEventListener('mcp-iframe-ready', () => resolve(), { once: true })
+    );
+    element.setAttribute('allow', 'tools');
+    element.setAttribute('target-origin', new URL(source).origin);
+    element.setAttribute('src', source);
+    await ready;
+    return {
+      allow: element.iframe?.getAttribute('allow'),
+      tools: element.exposedTools,
+      bridged: (await window.mcpIframeHost.getParentTool('calculate')) !== undefined,
+    };
+  }, crossOrigin.href);
+
+  const childFrame = page.frames().find((frame) => frame.url().startsWith(crossOrigin.origin));
+  if (!childFrame) throw new Error('Cross-origin child frame was not found');
+  const child = await childFrame.evaluate(async () => {
+    const native = Boolean(window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__);
+    try {
+      await document.modelContext?.registerTool({
+        name: 'probe',
+        description: 'Probes cross-origin registration',
+        execute: async () => 'probe',
+      });
+      return { native, registration: 'registered' };
+    } catch (error) {
+      return { native, registration: error instanceof Error ? error.name : String(error) };
+    }
+  });
+
+  // The vendored core lets a cross-origin child prove its permission only by its index in the
+  // parent's window.frames, and the iframe inside the element's shadow root has none.
+  expect({ ...parent, ...child }).toEqual(
+    child.native
+      ? {
+          allow: 'tools',
+          tools: ['child-iframe_calculate'],
+          bridged: true,
+          native: true,
+          registration: 'registered',
+        }
+      : {
+          allow: 'tools',
+          tools: [],
+          bridged: false,
+          native: false,
+          registration: 'NotAllowedError',
+        }
+  );
 });
 
 test('surfaces parent registration failures instead of announcing partial readiness', async ({

@@ -1,4 +1,4 @@
-import { Suspense, createElement, useLayoutEffect } from 'react';
+import { Suspense, createElement, useLayoutEffect, type RefObject } from 'react';
 import { expect, it } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { useCommittedRef } from './useCommittedRef.js';
@@ -6,8 +6,8 @@ import { useCommittedRef } from './useCommittedRef.js';
 it('publishes values at commit without leaking suspended renders', async () => {
   const pending = new Promise<never>(() => {});
   let valueSeenByLayoutEffect: string | undefined;
-  const hook = await renderHook(
-    ({ value, suspend }: { value: string; suspend?: boolean }) => {
+  const hook = await renderHook<{ value: string; suspend?: boolean }, RefObject<string>>(
+    ({ value, suspend } = { value: 'first' }) => {
       const ref = useCommittedRef(value);
       useLayoutEffect(() => {
         valueSeenByLayoutEffect = ref.current;

@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/webmcp-ts-sdk",
   "version": "5.1.0",
-  "description": "Thin WebMCP-to-MCP v2 browser adapter with native Chrome tool mirroring",
+  "description": "WebMCP browser adapter extending the upstream API with MCP capabilities",
   "keywords": [
     "adapter",
     "ai-agents",
@@ -51,6 +51,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "import": "./dist/schema.js"
     }
   },
   "publishConfig": {
@@ -58,7 +62,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "vp pack",
+    "build": "vp pack && pnpm run typecheck:consumer",
     "check": "vp check --fix",
     "clean": "rm -rf dist",
     "format": "vp fmt --write",
@@ -68,12 +72,14 @@
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
     "test:coverage": "vp test run --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:consumer": "tsc --noEmit --strict --skipLibCheck --module preserve --moduleResolution bundler --lib ES2022,DOM type-tests/consumer.ts"
   },
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "workspace:*",
-    "@mcp-b/webmcp-types": "workspace:*",
-    "@modelcontextprotocol/server": "catalog:"
+    "@modelcontextprotocol/server": "catalog:",
+    "@standard-schema/spec": "^1.1.0",
+    "webmcp-types": "0.1.9"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "catalog:",

@@ -6,12 +6,34 @@
 import { detectNativeAPI } from './api/detection';
 import { registerShowcaseTool } from './lib/utils';
 import type { ModelContext, Tool } from './types';
+import type { JSONObject as JsonObject } from '@modelcontextprotocol/server';
 
 // State tracking
 let modelContext: ModelContext;
 let bucketATools: string[] = [];
 const bucketARegistrations = new Map<string, { unregister: () => void }>();
 const bucketBRegistrations = new Map<string, { unregister: () => void }>();
+type IframeCommand =
+  | 'register-bucket-a'
+  | 'register-bucket-b'
+  | 'unregister-bucket-b'
+  | 'clear-context'
+  | 'get-tools';
+
+function isIframeCommand(
+  value: unknown
+): value is { type: 'iframe-command'; command: IframeCommand } {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (!('type' in value) || value.type !== 'iframe-command' || !('command' in value)) return false;
+
+  return (
+    value.command === 'register-bucket-a' ||
+    value.command === 'register-bucket-b' ||
+    value.command === 'unregister-bucket-b' ||
+    value.command === 'clear-context' ||
+    value.command === 'get-tools'
+  );
+}
 
 function unregisterBucketA(): void {
   for (const registration of bucketARegistrations.values()) {
@@ -34,7 +56,7 @@ function init(): void {
     return;
   }
 
-  modelContext = document.modelContext as unknown as ModelContext;
+  modelContext = detection.context;
 
   setupEventListeners();
   setupToolChangeListener();
@@ -105,12 +127,12 @@ function setupToolChangeListener(): void {
 /**
  * Handle messages from parent window
  */
-function handleParentMessage(event: MessageEvent): void {
+function handleParentMessage(event: MessageEvent<unknown>): void {
   if (event.origin !== window.location.origin || event.source !== window.parent) return;
 
   const data = event.data;
 
-  if (data?.type === 'iframe-command') {
+  if (isIframeCommand(data)) {
     switch (data.command) {
       case 'register-bucket-a':
         registerBucketATool();
@@ -136,7 +158,7 @@ function handleParentMessage(event: MessageEvent): void {
 /**
  * Send message to parent window
  */
-function notifyParent(type: string, data: unknown): void {
+function notifyParent(type: string, data: JsonObject): void {
   if (window.parent && window.parent !== window) {
     window.parent.postMessage({ type: `iframe-${type}`, data }, '*');
   }
@@ -195,7 +217,7 @@ function registerBucketBTool(): void {
   const registration = registerShowcaseTool(modelContext, tool);
   bucketBRegistrations.set('iframe_timestamp', registration);
 
-  const unregisterBtn = document.getElementById('unregister-iframe-tool-b') as HTMLButtonElement;
+  const unregisterBtn = document.querySelector<HTMLButtonElement>('#unregister-iframe-tool-b');
   if (unregisterBtn) {
     unregisterBtn.disabled = false;
   }
@@ -214,7 +236,7 @@ function unregisterBucketBTool(): void {
     registration.unregister();
     bucketBRegistrations.delete('iframe_timestamp');
 
-    const unregisterBtn = document.getElementById('unregister-iframe-tool-b') as HTMLButtonElement;
+    const unregisterBtn = document.querySelector<HTMLButtonElement>('#unregister-iframe-tool-b');
     if (unregisterBtn) {
       unregisterBtn.disabled = true;
     }
@@ -235,7 +257,7 @@ function clearContext(): void {
   }
   bucketBRegistrations.clear();
 
-  const unregisterBtn = document.getElementById('unregister-iframe-tool-b') as HTMLButtonElement;
+  const unregisterBtn = document.querySelector<HTMLButtonElement>('#unregister-iframe-tool-b');
   if (unregisterBtn) {
     unregisterBtn.disabled = true;
   }
@@ -261,10 +283,10 @@ function refreshToolDisplay(): void {
     .then((tools) => {
       renderToolDisplay(tools);
     })
-    .catch((error: unknown) => {
+    .catch((cause: unknown) => {
       logEvent(
         'error',
-        `getTools() failed: ${error instanceof Error ? error.message : String(error)}`
+        `getTools() failed: ${cause instanceof Error ? cause.message : String(cause)}`
       );
     });
 }
@@ -310,7 +332,7 @@ function logEvent(type: 'info' | 'success' | 'warning' | 'error', message: strin
   const log = document.getElementById('iframe-event-log');
   if (!log) return;
 
-  const colors: Record<string, string> = {
+  const colors = {
     info: 'text-blue-400',
     success: 'text-green-400',
     warning: 'text-yellow-400',

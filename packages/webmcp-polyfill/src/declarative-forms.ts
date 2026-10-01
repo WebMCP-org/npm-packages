@@ -1,4 +1,26 @@
-import type { InputSchema, ModelContext, WebMcpToolInput } from '@mcp-b/webmcp-types';
+import type { WebMCP } from 'webmcp-types';
+import { executionError } from './upstream/frames.js';
+
+type InputSchema = NonNullable<WebMCP.ModelContextTool['inputSchema']>;
+type WebMcpToolInput = Parameters<WebMCP.ToolExecuteCallback>[0];
+// webmcp-types accepts any schema object. This is the subset generated from form controls.
+interface FormParameterSchema {
+  type: 'string' | 'number' | 'boolean' | 'array';
+  description?: string;
+  title?: string;
+  const?: string;
+  enum?: string[];
+  anyOf?: FormParameterSchema[];
+  items?: FormParameterSchema;
+  uniqueItems?: boolean;
+  minimum?: number;
+  maximum?: number;
+  multipleOf?: number;
+  pattern?: string;
+  format?: string;
+}
+
+type WebMcpToolResult = Awaited<ReturnType<WebMCP.ToolExecuteCallback>>;
 
 type DeclarativeControl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 type Submitter = HTMLButtonElement | HTMLInputElement;
@@ -15,7 +37,7 @@ interface DeclarativeRegistration {
   controller: AbortController;
   fingerprint: string;
   form: HTMLFormElement;
-  cancelPending?: (reason: unknown) => void;
+  cancelPending?: (reason: ErrorOptions['cause']) => void;
 }
 
 interface ActiveSubmission {
@@ -25,10 +47,10 @@ interface ActiveSubmission {
 }
 
 const agentInvokedEvents = new WeakSet<SubmitEvent>();
-const agentResponses = new WeakMap<SubmitEvent, Promise<unknown>>();
+const agentResponses = new WeakMap<SubmitEvent, Promise<WebMcpToolResult>>();
 const activeSubmissions = new WeakMap<HTMLFormElement, ActiveSubmission>();
 
-export function isAgentInvokedSubmitEvent(event: SubmitEvent): boolean {
+function isAgentInvokedSubmitEvent(event: SubmitEvent): boolean {
   return (
     event.isTrusted &&
     (agentInvokedEvents.has(event) ||
@@ -38,9 +60,9 @@ export function isAgentInvokedSubmitEvent(event: SubmitEvent): boolean {
   );
 }
 
-export function respondWithAgentSubmitEvent(
+function respondWithAgentSubmitEvent(
   event: SubmitEvent,
-  agentResponse: Promise<unknown>
+  agentResponse: Promise<WebMcpToolResult>
 ): void {
   if (!isAgentInvokedSubmitEvent(event)) {
     throw new DOMException(
@@ -88,31 +110,31 @@ function isControl(element: Element): element is DeclarativeControl {
 }
 
 function getFormControls(form: HTMLFormElement): HTMLFormControlsCollection {
-  return Reflect.get(HTMLFormElement.prototype, 'elements', form);
+  return Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, 'elements')?.get?.call(form);
 }
 
 function getFormAttribute(form: HTMLFormElement, name: string): string | null {
-  return Reflect.apply(Element.prototype.getAttribute, form, [name]);
+  return Element.prototype.getAttribute.call(form, name);
 }
 
 function formHasAttribute(form: HTMLFormElement, name: string): boolean {
-  return Reflect.apply(Element.prototype.hasAttribute, form, [name]);
+  return Element.prototype.hasAttribute.call(form, name);
 }
 
-function isFormConnected(form: HTMLFormElement): boolean {
-  return Reflect.get(Node.prototype, 'isConnected', form);
+function isConnected(node: Node): boolean {
+  return Object.getOwnPropertyDescriptor(Node.prototype, 'isConnected')?.get?.call(node);
 }
 
 function getOpenShadowRoot(element: Element): ShadowRoot | null {
-  return Reflect.get(Element.prototype, 'shadowRoot', element);
+  return Object.getOwnPropertyDescriptor(Element.prototype, 'shadowRoot')?.get?.call(element);
 }
 
 function checkFormValidity(form: HTMLFormElement): boolean {
-  return Reflect.apply(HTMLFormElement.prototype.checkValidity, form, []);
+  return HTMLFormElement.prototype.checkValidity.call(form);
 }
 
 function requestFormSubmit(form: HTMLFormElement, submitter?: Submitter): void {
-  Reflect.apply(HTMLFormElement.prototype.requestSubmit, form, submitter ? [submitter] : []);
+  HTMLFormElement.prototype.requestSubmit.call(form, submitter);
 }
 
 function getControls(form: HTMLFormElement): DeclarativeControl[] {
@@ -190,11 +212,11 @@ function parameterDescription(
 }
 
 function withDescription(
-  schema: Record<string, unknown>,
+  schema: FormParameterSchema,
   form: HTMLFormElement,
   controls: readonly DeclarativeControl[],
   extra?: string
-): Record<string, unknown> {
+): FormParameterSchema {
   const description = parameterDescription(form, controls);
   const combined = description && extra ? `${description} (${extra})` : description || extra;
   return combined ? { ...schema, description: combined } : schema;
@@ -207,59 +229,53 @@ function validNumberAttribute(input: HTMLInputElement, name: 'max' | 'min'): num
   return Number.isFinite(value) ? value : undefined;
 }
 
+function validStep(input: HTMLInputElement, fallback: number): number {
+  const step = Number(input.getAttribute('step'));
+  return Number.isFinite(step) && step > 0 ? step : fallback;
+}
+
 function isStepBaseMultiple(stepBase: number, step: number): boolean {
   const quotient = stepBase / step;
   return Math.abs(quotient - Math.round(quotient)) < Number.EPSILON * 16;
 }
 
-function validPattern(input: HTMLInputElement): string | undefined {
+function withPattern(schema: FormParameterSchema, input: HTMLInputElement): FormParameterSchema {
   const pattern = input.getAttribute('pattern');
-  if (pattern === null) return undefined;
+  if (pattern === null) return schema;
   try {
     new RegExp(pattern, 'v');
-    return pattern;
   } catch {
-    return undefined;
+    return schema;
   }
+  return { ...schema, pattern };
 }
 
-function numberSchema(input: HTMLInputElement, includePattern = true): Record<string, unknown> {
-  const schema: Record<string, unknown> = { type: 'number' };
+function numberSchema(input: HTMLInputElement): FormParameterSchema {
+  const schema: FormParameterSchema = { type: 'number' };
   const minimum = validNumberAttribute(input, 'min');
   const maximum = validNumberAttribute(input, 'max');
   if (minimum !== undefined) schema.minimum = minimum;
   if (maximum !== undefined) schema.maximum = maximum;
-
-  const rawStep = input.getAttribute('step');
-  if (rawStep !== 'any') {
-    const parsedStep = rawStep === null || rawStep === '' ? 1 : Number(rawStep);
-    const step = Number.isFinite(parsedStep) && parsedStep > 0 ? parsedStep : 1;
+  if (input.getAttribute('step') !== 'any') {
+    const step = validStep(input, 1);
     const rawValue = Number(input.getAttribute('value'));
     const stepBase = minimum ?? (Number.isFinite(rawValue) ? rawValue : 0);
     if (isStepBaseMultiple(stepBase, step)) schema.multipleOf = step;
   }
-
-  const pattern = includePattern ? validPattern(input) : undefined;
-  if (pattern !== undefined) schema.pattern = pattern;
   return schema;
 }
 
 function temporalFormat(input: HTMLInputElement, datePrefix: string): string {
-  const rawStep = input.getAttribute('step');
-  const parsedStep = rawStep === null || rawStep === '' ? 60 : Number(rawStep);
-  const step = Number.isFinite(parsedStep) && parsedStep > 0 ? parsedStep : 60;
+  const step = validStep(input, 60);
   if (step < 1) return `${datePrefix}(:[0-5][0-9](\\.[0-9]{1,3})?)?$`;
   if (step < 60) return `${datePrefix}(:[0-5][0-9])?$`;
   return `${datePrefix}$`;
 }
 
-function optionSchemas(options: readonly HTMLOptionElement[]): {
-  anyOf: Record<string, unknown>[];
-  enum: string[];
-} {
+function optionSchemas(options: readonly HTMLOptionElement[]) {
   return {
     anyOf: options.map((option) => ({
-      type: 'string',
+      type: 'string' as const,
       const: option.value,
       title: option.textContent ?? '',
     })),
@@ -267,139 +283,94 @@ function optionSchemas(options: readonly HTMLOptionElement[]): {
   };
 }
 
-function groupChoiceSchemas(controls: readonly HTMLInputElement[]): {
-  anyOf: Record<string, unknown>[];
-  enum: string[];
-} {
+function groupChoiceSchemas(controls: readonly HTMLInputElement[]) {
   return {
     anyOf: controls.map((control) => {
       const title = labelText(control);
-      return { type: 'string', const: control.value, ...(title ? { title } : {}) };
+      const schema: FormParameterSchema = { type: 'string', const: control.value };
+      if (title) schema.title = title;
+      return schema;
     }),
     enum: controls.map((control) => control.value),
   };
 }
 
+function isInput(control: DeclarativeControl, type: string): control is HTMLInputElement {
+  return control instanceof HTMLInputElement && control.type === type;
+}
+
+function inputSchema(input: HTMLInputElement): FormParameterSchema | undefined {
+  if (TEXT_INPUT_TYPES.has(input.type)) return withPattern({ type: 'string' }, input);
+  switch (input.type) {
+    case 'hidden':
+      return input.getAttribute('toolparamdescription') ? { type: 'string' } : undefined;
+    case 'number':
+      return withPattern(numberSchema(input), input);
+    case 'range': {
+      const schema = numberSchema(input);
+      schema.minimum ??= 0;
+      schema.maximum ??= 100;
+      return schema;
+    }
+    case 'checkbox':
+      return { type: 'boolean' };
+    case 'date':
+      return { type: 'string', format: 'date' };
+    case 'month':
+      return { type: 'string', format: '^[0-9]{4}-(0[1-9]|1[0-2])$' };
+    case 'week':
+      return { type: 'string', format: '^[0-9]{4}-W(0[1-9]|[1-4][0-9]|5[0-3])$' };
+    case 'time':
+      return { type: 'string', format: temporalFormat(input, '^([01][0-9]|2[0-3]):[0-5][0-9]') };
+    case 'datetime-local':
+      return {
+        type: 'string',
+        format: temporalFormat(
+          input,
+          '^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}T([01][0-9]|2[0-3]):[0-5][0-9]'
+        ),
+      };
+    case 'color':
+      return { type: 'string', format: '^#[0-9a-zA-Z]{6}$' };
+    default:
+      return undefined;
+  }
+}
+
 function parameterSchema(
   form: HTMLFormElement,
   controls: readonly DeclarativeControl[]
-): Record<string, unknown> | undefined {
-  const first = controls[0];
+): FormParameterSchema | undefined {
+  const [first] = controls;
   if (!first) return undefined;
-
-  if (controls.length > 1) {
-    if (!controls.every((control) => control instanceof HTMLInputElement)) return undefined;
-    if (controls.every((control) => control.type === 'checkbox')) {
-      return withDescription(
-        {
-          type: 'array',
-          items: { type: 'string', ...groupChoiceSchemas(controls) },
-          uniqueItems: true,
-        },
-        form,
-        controls
-      );
+  let schema: FormParameterSchema | undefined;
+  if (controls.every((control) => isInput(control, 'radio'))) {
+    schema = { type: 'string', ...groupChoiceSchemas(controls) };
+  } else if (controls.length > 1) {
+    if (controls.every((control) => isInput(control, 'checkbox'))) {
+      schema = {
+        type: 'array',
+        items: { type: 'string', ...groupChoiceSchemas(controls) },
+        uniqueItems: true,
+      };
     }
-    if (controls.every((control) => control.type === 'radio')) {
-      return withDescription({ type: 'string', ...groupChoiceSchemas(controls) }, form, controls);
-    }
-    return undefined;
-  }
-
-  if (first instanceof HTMLTextAreaElement) {
-    return withDescription({ type: 'string' }, form, controls);
-  }
-
-  if (first instanceof HTMLSelectElement) {
+  } else if (first instanceof HTMLTextAreaElement) {
+    schema = { type: 'string' };
+  } else if (first instanceof HTMLSelectElement) {
     const choices = optionSchemas([...first.options]);
-    return withDescription(
-      first.multiple
-        ? { type: 'array', items: { type: 'string', ...choices }, uniqueItems: true }
-        : { type: 'string', ...choices },
-      form,
-      controls
-    );
+    schema = first.multiple
+      ? { type: 'array', items: { type: 'string', ...choices }, uniqueItems: true }
+      : { type: 'string', ...choices };
+  } else {
+    schema = inputSchema(first);
   }
-
-  if (TEXT_INPUT_TYPES.has(first.type)) {
-    const schema: Record<string, unknown> = { type: 'string' };
-    const pattern = validPattern(first);
-    if (pattern !== undefined) schema.pattern = pattern;
-    return withDescription(schema, form, controls);
-  }
-  if (first.type === 'hidden') {
-    return first.getAttribute('toolparamdescription')
-      ? withDescription({ type: 'string' }, form, controls)
-      : undefined;
-  }
-  if (first.type === 'number') {
-    return withDescription(numberSchema(first), form, controls);
-  }
-  if (first.type === 'range') {
-    const schema = numberSchema(first, false);
-    schema.minimum ??= 0;
-    schema.maximum ??= 100;
-    return withDescription(schema, form, controls);
-  }
-  if (first.type === 'checkbox') {
-    return withDescription({ type: 'boolean' }, form, controls);
-  }
-  if (first.type === 'radio') {
-    return withDescription({ type: 'string', ...groupChoiceSchemas([first]) }, form, controls);
-  }
-  if (first.type === 'date') {
-    return withDescription(
-      { type: 'string', format: 'date' },
-      form,
-      controls,
-      "Dates MUST be provided in 'YYYY-MM-DD' format."
-    );
-  }
-  if (first.type === 'month') {
-    return withDescription(
-      { type: 'string', format: '^[0-9]{4}-(0[1-9]|1[0-2])$' },
-      form,
-      controls
-    );
-  }
-  if (first.type === 'week') {
-    return withDescription(
-      { type: 'string', format: '^[0-9]{4}-W(0[1-9]|[1-4][0-9]|5[0-3])$' },
-      form,
-      controls
-    );
-  }
-  if (first.type === 'time') {
-    return withDescription(
-      {
-        type: 'string',
-        format: temporalFormat(first, '^([01][0-9]|2[0-3]):[0-5][0-9]'),
-      },
-      form,
-      controls
-    );
-  }
-  if (first.type === 'datetime-local') {
-    return withDescription(
-      {
-        type: 'string',
-        format: temporalFormat(
-          first,
-          '^[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}T([01][0-9]|2[0-3]):[0-5][0-9]'
-        ),
-      },
-      form,
-      controls
-    );
-  }
-  if (first.type === 'color') {
-    return withDescription({ type: 'string', format: '^#[0-9a-zA-Z]{6}$' }, form, controls);
-  }
-  return undefined;
+  const dateHint =
+    first.type === 'date' ? "Dates MUST be provided in 'YYYY-MM-DD' format." : undefined;
+  return schema && withDescription(schema, form, controls, dateHint);
 }
 
 function synthesizeSchema(form: HTMLFormElement): InputSchema {
-  const properties: Record<string, unknown> = {};
+  const properties: Record<string, FormParameterSchema> = {};
   const required: string[] = [];
   for (const [name, controls] of controlGroups(form)) {
     if (!name) continue;
@@ -459,39 +430,30 @@ function inputAcceptsValue(input: HTMLInputElement, value: string): boolean {
   return probe.value !== '';
 }
 
-function validatesParameter(
+type FormParameterValue = string | boolean | number | unknown[];
+
+function isFormParameterValue(
   form: HTMLFormElement,
   controls: readonly DeclarativeControl[],
   value: unknown
-): boolean {
-  const first = controls[0];
+): value is FormParameterValue {
+  const [first] = controls;
   if (!first || !parameterSchema(form, controls)) return false;
-
-  if (controls.length > 1) {
-    if (!controls.every((control) => control instanceof HTMLInputElement)) return false;
-    if (controls.every((control) => control.type === 'checkbox')) {
-      return hasUniqueAllowedValues(value, new Set(controls.map((control) => control.value)));
-    }
-    if (controls.every((control) => control.type === 'radio')) {
-      const string = toFormString(value);
-      return string !== undefined && controls.some((control) => control.value === string);
-    }
-    return false;
+  const string = toFormString(value);
+  if (controls.every((control) => isInput(control, 'radio'))) {
+    return controls.some((control) => control.value === string);
   }
-
+  // Any other group with a schema is a checkbox group.
+  if (controls.length > 1) {
+    return hasUniqueAllowedValues(value, new Set(controls.map((control) => control.value)));
+  }
   if (first instanceof HTMLSelectElement) {
     const allowed = new Set([...first.options].map((option) => option.value));
     if (first.multiple) return hasUniqueAllowedValues(value, allowed);
-    const string = toFormString(value);
     return string !== undefined && allowed.has(string);
   }
-  if (first instanceof HTMLTextAreaElement) return toFormString(value) !== undefined;
+  if (first instanceof HTMLTextAreaElement) return string !== undefined;
   if (first.type === 'checkbox') return toFormBoolean(value) !== undefined;
-  if (first.type === 'radio') {
-    const string = toFormString(value);
-    return string !== undefined && first.value === string;
-  }
-  const string = toFormString(value);
   return string !== undefined && inputAcceptsValue(first, string);
 }
 
@@ -500,101 +462,73 @@ function dispatchInputAndChange(control: DeclarativeControl): void {
   control.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-function setNativeValue(control: HTMLInputElement | HTMLTextAreaElement, value: string): void {
+// Prototype setters skip instance overrides such as React's value tracker, so frameworks
+// treat the dispatched events as real changes.
+function setValue(control: HTMLInputElement | HTMLTextAreaElement, value: string): void {
+  if (control.value === value) return;
   const prototype =
     control instanceof HTMLInputElement
       ? HTMLInputElement.prototype
       : HTMLTextAreaElement.prototype;
   Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(control, value);
+  dispatchInputAndChange(control);
 }
 
-function setNativeChecked(control: HTMLInputElement, checked: boolean): void {
+function setChecked(control: HTMLInputElement, checked: boolean): void {
+  if (control.checked === checked) return;
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'checked')?.set?.call(
     control,
     checked
   );
+  dispatchInputAndChange(control);
 }
 
-function fillParameter(controls: readonly DeclarativeControl[], value: unknown): void {
-  const first = controls[0];
-  if (!first) return;
-
-  if (controls.length > 1 && controls.every((control) => control instanceof HTMLInputElement)) {
-    if (controls.every((control) => control.type === 'checkbox') && Array.isArray(value)) {
-      const checked = new Set(value.map(toFormString));
-      for (const control of controls) {
-        const next = checked.has(control.value);
-        if (control.checked === next) continue;
-        setNativeChecked(control, next);
-        dispatchInputAndChange(control);
-      }
-      return;
+// Expects a value that isFormParameterValue() accepted.
+function fillParameter(controls: readonly DeclarativeControl[], value: FormParameterValue): void {
+  const [first] = controls;
+  const string = toFormString(value);
+  const values = new Set(Array.isArray(value) ? value.map(toFormString) : []);
+  if (controls.every((control) => isInput(control, 'radio'))) {
+    const control = controls.find((candidate) => candidate.value === string);
+    if (control) setChecked(control, true);
+  } else if (controls.length > 1) {
+    for (const control of controls) {
+      if (control instanceof HTMLInputElement) setChecked(control, values.has(control.value));
     }
-    const selected = toFormString(value);
-    const control = controls.find((candidate) => candidate.value === selected);
-    if (control && !control.checked) {
-      setNativeChecked(control, true);
-      dispatchInputAndChange(control);
-    }
-    return;
-  }
-
-  if (first instanceof HTMLSelectElement) {
-    if (first.multiple && Array.isArray(value)) {
-      const selected = new Set(value.map(toFormString));
+  } else if (first instanceof HTMLSelectElement) {
+    if (first.multiple) {
       let changed = false;
       for (const option of first.options) {
-        const next = selected.has(option.value);
+        const next = values.has(option.value);
         if (option.selected === next) continue;
         option.selected = next;
         changed = true;
       }
       if (changed) dispatchInputAndChange(first);
-      return;
-    }
-    const next = toFormString(value);
-    if (next !== undefined && first.value !== next) {
-      first.value = next;
+    } else if (string !== undefined && first.value !== string) {
+      first.value = string;
       dispatchInputAndChange(first);
     }
-    return;
-  }
-
-  if (first instanceof HTMLInputElement && first.type === 'checkbox') {
-    const next = toFormBoolean(value);
-    if (next !== undefined && first.checked !== next) {
-      setNativeChecked(first, next);
-      dispatchInputAndChange(first);
-    }
-    return;
-  }
-
-  if (first instanceof HTMLInputElement && first.type === 'radio') {
-    const next = toFormString(value);
-    if (next === first.value && !first.checked) {
-      setNativeChecked(first, true);
-      dispatchInputAndChange(first);
-    }
-    return;
-  }
-
-  const next = toFormString(value);
-  if (next !== undefined && first.value !== next) {
-    setNativeValue(first, next);
-    dispatchInputAndChange(first);
+  } else if (first && isInput(first, 'checkbox')) {
+    const checked = toFormBoolean(value);
+    if (checked !== undefined) setChecked(first, checked);
+  } else if (first && string !== undefined) {
+    setValue(first, string);
   }
 }
 
+// Upstream replaces every callback failure with its own generic error, so no reason
+// thrown or rejected from this layer reaches a caller.
 function fillForm(form: HTMLFormElement, input: WebMcpToolInput): void {
-  if (Array.isArray(input)) throw new TypeError('Declarative tool input must be an object');
+  if (Array.isArray(input)) throw executionError();
   const groups = controlGroups(form);
+  const parameters: Array<{ controls: DeclarativeControl[]; value: FormParameterValue }> = [];
   for (const [name, value] of Object.entries(input)) {
     const controls = groups.get(name);
-    if (!controls || !validatesParameter(form, controls, value)) {
-      throw new TypeError(`Invalid value for declarative form parameter "${name}"`);
-    }
+    if (!controls || !isFormParameterValue(form, controls, value)) throw executionError();
+    parameters.push({ controls, value });
   }
-  for (const [name, value] of Object.entries(input)) fillParameter(groups.get(name) ?? [], value);
+  for (const { controls, value } of parameters) fillParameter(controls, value);
 }
 
 function findSubmitter(form: HTMLFormElement): Submitter | undefined {
@@ -606,37 +540,28 @@ function findSubmitter(form: HTMLFormElement): Submitter | undefined {
   );
 }
 
-function validationError(form: HTMLFormElement): DOMException {
-  const failures = [...getFormControls(form)]
-    .filter(
-      (element): element is DeclarativeControl =>
-        isControl(element) && element.willValidate && !element.validity.valid
-    )
-    .map((control) => `${control.name.trim() || '{unknown}'}: ${control.validationMessage}`)
-    .join('. ');
-  return new DOMException(`Form validation failed: ${failures}`, 'UnknownError');
-}
-
-function toolActivatedEvent(toolName: string): Event {
-  const event = new Event('toolactivated');
+function lifecycleEvent(type: 'toolactivated' | 'toolcancel', toolName: string): Event {
+  const event = new Event(type);
   Object.defineProperty(event, 'toolName', { enumerable: true, value: toolName });
   return event;
 }
 
 function waitForSubmission(
+  context: WebMCP.ModelContext,
   registration: DeclarativeRegistration,
-  toolName: string,
-  autosubmit: boolean,
-  submitter: Submitter | undefined
-): Promise<unknown> {
+  definition: DeclarativeToolDefinition,
+  submitter: Submitter | undefined,
+  signal: AbortSignal
+): Promise<WebMcpToolResult> {
   const { form } = registration;
-  registration.cancelPending?.(new DOMException('Tool execution cancelled', 'UnknownError'));
+  registration.cancelPending?.(executionError());
 
   return new Promise((resolve, reject) => {
     let settled = false;
 
     const cleanup = () => {
-      Reflect.apply(EventTarget.prototype.removeEventListener, form, ['invalid', onInvalid, true]);
+      EventTarget.prototype.removeEventListener.call(form, 'invalid', onInvalid, true);
+      signal.removeEventListener('abort', onAbort);
       activeSubmissions.delete(form);
       if (registration.cancelPending === cancel) delete registration.cancelPending;
     };
@@ -646,17 +571,25 @@ function waitForSubmission(
       cleanup();
       callback();
     };
-    const cancel = (reason: unknown) => finish(() => reject(reason));
-    const settleResponse = (response: Promise<unknown>) => {
+    const cancel = (reason: ErrorOptions['cause']) => finish(() => reject(reason));
+    // A submission without respondWith() resolves to null, as in Chromium; an undefined
+    // response maps to null as well so that upstream can serialize the result.
+    const settleResponse = (response: Promise<WebMcpToolResult>) => {
       response.then(
-        (value) => finish(() => resolve(value)),
-        (error: unknown) => finish(() => reject(error))
+        (value) => finish(() => resolve(value ?? null)),
+        (cause: ErrorOptions['cause']) => finish(() => reject(cause))
       );
     };
     const onInvalid = (event: Event) => {
       if (!event.isTrusted) return;
       queueMicrotask(() => {
-        if (!checkFormValidity(form)) cancel(validationError(form));
+        if (!checkFormValidity(form)) cancel(executionError());
+      });
+    };
+    const onAbort = () => {
+      finish(() => {
+        context.dispatchEvent(lifecycleEvent('toolcancel', definition.name));
+        reject(signal.reason);
       });
     };
 
@@ -665,13 +598,12 @@ function waitForSubmission(
         queueMicrotask(() => {
           const response = agentResponses.get(event);
           if (response) settleResponse(response);
-          else if (event.defaultPrevented) {
-            cancel(new DOMException('preventDefault() requires respondWith()', 'UnknownError'));
-          } else finish(() => resolve(undefined));
+          else if (event.defaultPrevented) cancel(executionError());
+          else finish(() => resolve(null));
         });
       },
       direct() {
-        finish(() => resolve(undefined));
+        finish(() => resolve(null));
       },
       respond(event) {
         queueMicrotask(() => {
@@ -681,25 +613,50 @@ function waitForSubmission(
       },
     });
     registration.cancelPending = cancel;
-    Reflect.apply(EventTarget.prototype.addEventListener, form, ['invalid', onInvalid, true]);
+    EventTarget.prototype.addEventListener.call(form, 'invalid', onInvalid, true);
+    signal.addEventListener('abort', onAbort, { once: true });
 
-    if (!autosubmit) {
+    if (!definition.autosubmit) {
       submitter?.focus();
-      window.dispatchEvent(toolActivatedEvent(toolName));
+      context.dispatchEvent(lifecycleEvent('toolactivated', definition.name));
       return;
     }
     try {
       requestFormSubmit(form, submitter);
-      window.dispatchEvent(toolActivatedEvent(toolName));
+      context.dispatchEvent(lifecycleEvent('toolactivated', definition.name));
     } catch (error) {
       cancel(error);
     }
   });
 }
 
-/** Installs the DOM-backed half of the draft Declarative WebMCP API. */
-export function installDeclarativeForms(document: Document, context: ModelContext): () => void {
-  let active = true;
+/** Adds declarative tools until the vendored upstream implements them. */
+export function installWebMCPDeclarativeExtensions(context: WebMCP.ModelContext): void {
+  const prototype = SubmitEvent.prototype;
+  // Native support and earlier bundle installations already own these hooks.
+  if ('agentInvoked' in prototype && 'respondWith' in prototype) return;
+
+  if (!('agentInvoked' in prototype)) {
+    Object.defineProperty(prototype, 'agentInvoked', {
+      configurable: true,
+      enumerable: true,
+      get(this: SubmitEvent) {
+        return isAgentInvokedSubmitEvent(this);
+      },
+    });
+  }
+
+  if (!('respondWith' in prototype)) {
+    Object.defineProperty(prototype, 'respondWith', {
+      configurable: true,
+      enumerable: true,
+      writable: true,
+      value(this: SubmitEvent, agentResponse: Promise<WebMcpToolResult>) {
+        respondWithAgentSubmitEvent(this, agentResponse);
+      },
+    });
+  }
+
   const registrations = new Map<HTMLFormElement, DeclarativeRegistration>();
   const blockedDefinitions = new Map<HTMLFormElement, string>();
   const observers = new Map<Document | ShadowRoot, MutationObserver>();
@@ -724,11 +681,7 @@ export function installDeclarativeForms(document: Document, context: ModelContex
     const form = event.target;
     queueMicrotask(() => {
       if (event.defaultPrevented) return;
-      registrations
-        .get(form)
-        ?.cancelPending?.(
-          new DOMException('Tool execution cancelled by form reset', 'UnknownError')
-        );
+      registrations.get(form)?.cancelPending?.(executionError());
     });
   };
 
@@ -758,7 +711,7 @@ export function installDeclarativeForms(document: Document, context: ModelContex
   function sync(): void {
     observeRoot(document);
     for (const root of observers.keys()) {
-      if (root instanceof ShadowRoot && !Reflect.get(Node.prototype, 'isConnected', root.host)) {
+      if (root instanceof ShadowRoot && !root.host.isConnected) {
         stopObservingRoot(root);
       }
     }
@@ -778,7 +731,7 @@ export function installDeclarativeForms(document: Document, context: ModelContex
           !(element instanceof HTMLFormElement) ||
           !formHasAttribute(element, 'toolname') ||
           !formHasAttribute(element, 'tooldescription') ||
-          !isFormConnected(element)
+          !isConnected(element)
         ) {
           continue;
         }
@@ -788,19 +741,18 @@ export function installDeclarativeForms(document: Document, context: ModelContex
         const fingerprint = JSON.stringify(definition);
         const blockedFingerprint = blockedDefinitions.get(form);
         if (blockedFingerprint === fingerprint) continue;
-        const retryingChangedDefinition = blockedFingerprint !== undefined;
         blockedDefinitions.delete(form);
         const existingForm = selectedByName.get(definition.name);
-        if (existingForm && !retryingChangedDefinition) {
-          blockedDefinitions.set(form, fingerprint);
-          continue;
-        }
         if (existingForm) {
-          const existingSelection = selected.get(existingForm);
-          if (existingSelection) {
-            blockedDefinitions.set(existingForm, existingSelection.fingerprint);
-            selected.delete(existingForm);
+          // A duplicate name stays blocked until its definition changes, then takes over.
+          if (blockedFingerprint === undefined) {
+            blockedDefinitions.set(form, fingerprint);
+            continue;
           }
+          const existingSelection = selected.get(existingForm);
+          if (existingSelection)
+            blockedDefinitions.set(existingForm, existingSelection.fingerprint);
+          selected.delete(existingForm);
         }
         selectedByName.set(definition.name, form);
         selected.set(form, { definition, fingerprint });
@@ -813,9 +765,7 @@ export function installDeclarativeForms(document: Document, context: ModelContex
     for (const [form, registration] of registrations) {
       const fingerprint = selected.get(form)?.fingerprint;
       if (fingerprint !== registration.fingerprint) {
-        registration.cancelPending?.(
-          new DOMException('Tool execution cancelled because its form changed', 'UnknownError')
-        );
+        registration.cancelPending?.(executionError());
         registration.controller.abort();
         registrations.delete(form);
       }
@@ -837,102 +787,70 @@ export function installDeclarativeForms(document: Document, context: ModelContex
             title: definition.title,
             description: definition.description,
             inputSchema: definition.inputSchema,
-            execute(input: WebMcpToolInput) {
+            execute(input: WebMcpToolInput, options: WebMCP.ToolExecuteCallbackOptions) {
               const submitter = findSubmitter(form);
-              if (!definition.autosubmit && !submitter) {
-                throw new DOMException(
-                  'A declarative form without toolautosubmit requires a submit button',
-                  'UnknownError'
-                );
-              }
+              if (!definition.autosubmit && !submitter) throw executionError();
               fillForm(form, input);
               return waitForSubmission(
+                context,
                 registration,
-                definition.name,
-                definition.autosubmit,
-                submitter
+                definition,
+                submitter,
+                options.signal
               );
             },
           },
           { signal: controller.signal }
         )
-        .catch((error: unknown) => {
+        .catch((cause: ErrorOptions['cause']) => {
           controller.abort();
           // Invalid toolname/tooldescription attributes reject here. Without this the
           // form silently never becomes a tool, with no diagnostic in any channel.
           // Aborts are ordinary teardown, not a failure worth reporting.
-          if ((error as { name?: unknown } | null)?.name === 'AbortError') return;
+          if (cause instanceof DOMException && cause.name === 'AbortError') return;
           console.error(
             `[webmcp] declarative form tool "${definition.name}" was not registered:`,
-            error
+            cause
           );
         });
     }
   }
 
-  let restoreAttachShadow = () => {};
-  const elementPrototype = document.defaultView?.Element.prototype;
-  const attachShadowDescriptor = elementPrototype
-    ? Object.getOwnPropertyDescriptor(elementPrototype, 'attachShadow')
-    : undefined;
-  if (elementPrototype && attachShadowDescriptor?.configurable) {
-    const nativeAttachShadow = elementPrototype.attachShadow;
+  const attachShadowDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'attachShadow');
+  if (attachShadowDescriptor?.configurable) {
+    const nativeAttachShadow = Element.prototype.attachShadow;
     const attachShadow = function (this: Element, init: ShadowRootInit): ShadowRoot {
       const root = nativeAttachShadow.call(this, init);
       if (
-        active &&
         root.mode === 'open' &&
-        Reflect.get(Node.prototype, 'ownerDocument', this) === document &&
-        Reflect.get(Node.prototype, 'isConnected', this)
+        Object.getOwnPropertyDescriptor(Node.prototype, 'ownerDocument')?.get?.call(this) ===
+          document &&
+        isConnected(this)
       ) {
         observeRoot(root);
       }
       return root;
     };
-    Object.defineProperty(elementPrototype, 'attachShadow', {
+    Object.defineProperty(Element.prototype, 'attachShadow', {
       ...attachShadowDescriptor,
       value: attachShadow,
     });
-    restoreAttachShadow = () => {
-      if (elementPrototype.attachShadow === attachShadow) {
-        Object.defineProperty(elementPrototype, 'attachShadow', attachShadowDescriptor);
-      }
-    };
   }
 
-  let restoreFormSubmit = () => {};
-  const formPrototype = document.defaultView?.HTMLFormElement.prototype;
-  const submitDescriptor = formPrototype
-    ? Object.getOwnPropertyDescriptor(formPrototype, 'submit')
-    : undefined;
-  if (formPrototype && submitDescriptor?.configurable) {
-    const nativeSubmit = formPrototype.submit;
+  const submitDescriptor = Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, 'submit');
+  if (submitDescriptor?.configurable) {
+    const nativeSubmit = HTMLFormElement.prototype.submit;
     const submit = function (this: HTMLFormElement): void {
       nativeSubmit.call(this);
-      if (active) activeSubmissions.get(this)?.direct();
+      activeSubmissions.get(this)?.direct();
     };
-    Object.defineProperty(formPrototype, 'submit', { ...submitDescriptor, value: submit });
-    restoreFormSubmit = () => {
-      if (formPrototype.submit === submit) {
-        Object.defineProperty(formPrototype, 'submit', submitDescriptor);
-      }
-    };
+    Object.defineProperty(HTMLFormElement.prototype, 'submit', {
+      ...submitDescriptor,
+      value: submit,
+    });
   }
 
   // ponytail: a whole-tree rescan keeps DOM ownership obvious; index forms if this
   // becomes measurable on pages with thousands of annotated controls.
   sync();
-
-  return () => {
-    active = false;
-    restoreFormSubmit();
-    restoreAttachShadow();
-    for (const root of observers.keys()) stopObservingRoot(root);
-    blockedDefinitions.clear();
-    for (const registration of registrations.values()) {
-      registration.cancelPending?.(new DOMException('Tool execution cancelled', 'UnknownError'));
-      registration.controller.abort();
-    }
-    registrations.clear();
-  };
 }

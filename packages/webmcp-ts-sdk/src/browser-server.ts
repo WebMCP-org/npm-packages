@@ -1,37 +1,33 @@
+import type { WebMCP } from 'webmcp-types';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import {
   coerceWebMcpToolDescriptor,
   createInvalidStateError,
-  createToolInvocationFailedError,
-  createUnknownError,
   isPlainObject,
-  normalizeToolResponse,
+  serializeInputSchema,
+  type ToolRegistrationDictionary,
+} from './normalize.js';
+import {
+  isMcpStandardSchema,
   normalizeInputSchema,
-  parseChromeToolInput,
-  serializeChromeToolResult,
-  toWebMcpAnnotations,
-  validateExecutableOrigin,
-  validatePotentiallyTrustworthyOrigins,
-  validateWebMcpAccess,
-  validateWebMcpToolDescriptor,
-  withAbortSignal,
-} from '@mcp-b/webmcp-polyfill/schema';
-import type { NormalizedInputSchema } from '@mcp-b/webmcp-polyfill/schema';
+  normalizeToolResponse,
+  type NormalizedInputSchema,
+} from './schema.js';
 import type {
-  ChromeModelContextExecuteToolOptions,
-  ChromeModelContextExtensions,
-  InputSchema,
   ModelContext,
   ModelContextGetToolOptions,
   ModelContextRegisterToolOptions,
-  ModelContextTool,
   ModelContextWithExtensions,
-  RegistrationHandle,
   RegisteredTool,
-  ToolAnnotations,
-  ToolDescriptor,
-  ToolListItem,
+} from './model-context.js';
+import type {
+  CallToolResult,
+  InputSchema,
+  RegistrationHandle,
   WebMcpToolInput,
-} from '@mcp-b/webmcp-types';
+  WebMcpToolObjectInput,
+} from './common.js';
+import type { ModelContextTool, ToolDescriptor, ToolListItem } from './tool.js';
 import {
   fromJsonSchema,
   isInputRequiredResult,
@@ -41,13 +37,13 @@ import {
   type GetPromptResult,
   type Implementation,
   type ReadResourceResult,
+  type ResourceMetadata,
   type RegisteredPrompt as McpRegisteredPrompt,
   type RegisteredResource as McpRegisteredResource,
   type RegisteredResourceTemplate as McpRegisteredResourceTemplate,
   type RegisteredTool as McpRegisteredTool,
   type ServerOptions,
   type StandardSchemaWithJSON,
-  type ToolAnnotations as McpToolAnnotations,
   type Transport,
   type Variables,
 } from '@modelcontextprotocol/server';
@@ -64,10 +60,23 @@ export function isBrowserMcpServer(context: unknown): context is BrowserMcpServe
   );
 }
 
+export interface PeerOriginTransport extends Transport {
+  clientOrigin?: string | undefined;
+  onclientorigin?: ((origin: string) => void) | undefined;
+}
+
+function isPeerOriginTransport(transport: Transport): transport is PeerOriginTransport {
+  return (
+    'clientOrigin' in transport &&
+    (transport.clientOrigin === undefined || typeof transport.clientOrigin === 'string') &&
+    (!('onclientorigin' in transport) ||
+      transport.onclientorigin === undefined ||
+      typeof transport.onclientorigin === 'function')
+  );
+}
+
 interface RegisteredWebMcpTool {
   item: ToolListItem;
-  registeredInputSchema?: string;
-  execute: (args: WebMcpToolInput, signal?: AbortSignal) => Promise<unknown>;
   mcpHandle: McpRegisteredTool | undefined;
   exposedTo?: readonly string[];
   abortSignal?: AbortSignal;
@@ -75,18 +84,12 @@ interface RegisteredWebMcpTool {
 }
 
 type McpRegistration = McpRegisteredPrompt | McpRegisteredResource | McpRegisteredResourceTemplate;
+type ModelContextEventHandler = ModelContext['ontoolchange'];
 
 export interface BrowserMcpServerOptions extends ServerOptions {
+  /** Underlying context. Defaults to document.modelContext, installing upstream if needed. */
   native?: ModelContext;
 }
-
-type NativeStandardToolsApi = ModelContext & {
-  executeTool: NonNullable<ChromeModelContextExtensions['executeTool']>;
-};
-type NativeRegisterToolFn = (
-  tool: ModelContextTool<WebMcpToolInput>,
-  options?: ModelContextRegisterToolOptions
-) => Promise<void>;
 
 interface NativeBackfilledTool {
   source: RegisteredTool;
@@ -94,66 +97,50 @@ interface NativeBackfilledTool {
   fingerprint: string;
 }
 
-function parseNativeToolResult(serialized: string | null): unknown {
-  if (serialized === null) {
-    return {
-      content: [{ type: 'text', text: 'Tool execution interrupted by navigation' }],
-      isError: true,
-    };
-  }
-
+function parseNativeToolResult(serialized: string): CallToolResult | WebMcpToolObjectInput {
   let result: unknown;
   try {
     result = JSON.parse(serialized);
   } catch {
-    return normalizeToolResponse(serialized);
+    // Native declarative tools return plain text for string responses.
+    result = serialized;
   }
-  return isInputRequiredResult(result) ? result : normalizeToolResponse(result);
+  if (isPlainObject(result)) return result;
+  // Strings cross as their content; every other value keeps its original text.
+  return { content: [{ type: 'text', text: typeof result === 'string' ? result : serialized }] };
+}
+
+/** Runs `operation` in a microtask; rejects with the reason as soon as `signal` aborts. */
+function withAbortSignal<T>(operation: () => T | PromiseLike<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    signal.throwIfAborted();
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+    Promise.resolve()
+      .then(operation)
+      .then(resolve, reject)
+      .finally(() => signal.removeEventListener('abort', onAbort));
+  });
 }
 
 function toMcpInputSchema(
   normalized: NormalizedInputSchema
-): StandardSchemaWithJSON<Record<string, unknown>> {
-  // normalizeInputSchema() attaches a non-enumerable `~standard` when the caller supplied a
-  // Standard Schema validator, so reuse it instead of recompiling the JSON Schema projection.
-  const standardSchema = Object.getOwnPropertyDescriptor(normalized.inputSchema, '~standard');
-  return standardSchema && !standardSchema.enumerable
-    ? (normalized.inputSchema as unknown as StandardSchemaWithJSON<Record<string, unknown>>)
-    : fromJsonSchema<Record<string, unknown>>(
-        normalized.inputSchema as Parameters<typeof fromJsonSchema>[0]
-      );
-}
-
-function toMcpAnnotations(
-  annotations: ToolAnnotations | undefined
-): McpToolAnnotations | undefined {
-  if (!annotations) return undefined;
-  const { untrustedContentHint: _untrustedContentHint, ...mcpAnnotations } = annotations;
-  return mcpAnnotations;
-}
-
-function toNativeTool(
-  tool: ToolDescriptor<WebMcpToolInput>,
-  inputSchema: InputSchema | undefined,
-  execute: ModelContextTool<WebMcpToolInput>['execute']
-): ModelContextTool<WebMcpToolInput> {
-  const annotations = tool.annotations ? toWebMcpAnnotations(tool.annotations) : undefined;
-  return {
-    name: tool.name,
-    ...(tool.title !== undefined ? { title: tool.title } : {}),
-    description: tool.description,
-    ...(inputSchema !== undefined ? { inputSchema } : {}),
-    ...(annotations ? { annotations } : {}),
-    execute,
-  };
+): StandardSchemaWithJSON<WebMcpToolObjectInput> {
+  // normalizeInputSchema() keeps the caller's Standard Schema validator on the converted
+  // schema, so reuse it instead of recompiling the JSON Schema projection.
+  if (isMcpStandardSchema(normalized.inputSchema)) return normalized.inputSchema;
+  // SAFETY: normalizeInputSchema returns a plain JSON object whose keywords may exceed the SDK's
+  // declared JSON Schema type; fromJsonSchema compiles it and validates its dialect at runtime.
+  return fromJsonSchema<WebMcpToolObjectInput>(
+    normalized.inputSchema as Parameters<typeof fromJsonSchema>[0]
+  );
 }
 
 /**
  * Thin WebMCP-to-MCP v2 adapter.
  *
  * The official v2 `McpServer` owns MCP registration, validation, and transport
- * behavior. This class only adds the document-facing WebMCP contract and native
- * Chrome mirroring.
+ * behavior. This class extends the upstream WebMCP context with MCP capabilities.
  */
 export class BrowserMcpServer extends EventTarget implements ModelContextWithExtensions {
   readonly [SERVER_MARKER_PROPERTY] = true as const;
@@ -171,17 +158,28 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   private readonly removingNativeTools = new Set<string>();
   private nativeSyncQueue: Promise<void> = Promise.resolve();
   private nativeToolChangeQueue: Promise<void> = Promise.resolve();
-  private nativeToolChangeListener: EventListener | undefined;
+  private readonly nativeToolChangeListener: () => void;
   private closed = false;
   private closePromise: Promise<void> | undefined;
-  private ontoolchangeHandler: ((this: ModelContext, event: Event) => unknown) | null = null;
-  private readonly ontoolchangeListener: EventListener = (event) => {
-    this.ontoolchangeHandler?.call(this, event);
+  private readonly eventHandlers = new Map<string, NonNullable<ModelContextEventHandler>>();
+  private readonly eventHandlerListener: EventListener = (event) => {
+    this.eventHandlers.get(event.type)?.call(this, event);
+  };
+  // Lifecycle events fire at the underlying context; listeners on the extended
+  // document context see them through this target.
+  private readonly nativeLifecycleListener: EventListener = (event) => {
+    if (this.closed) return;
+    const mirrored = new Event(event.type);
+    if ('toolName' in event) {
+      Object.defineProperty(mirrored, 'toolName', { enumerable: true, value: event.toolName });
+    }
+    this.dispatchEvent(mirrored);
   };
 
   constructor(serverInfo: Implementation, options: BrowserMcpServerOptions = {}) {
     super();
-    const { native, ...serverOptions } = options;
+    const { native: suppliedContext, ...serverOptions } = options;
+    if (!suppliedContext && !globalThis.document?.modelContext) installWebMCP();
     this.mcpServer = new McpServer(serverInfo, {
       ...serverOptions,
       capabilities: mergeCapabilities(serverOptions.capabilities ?? {}, {
@@ -190,44 +188,60 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
         prompts: { listChanged: true },
       }),
     });
-    this.native = native;
+    // Outside a secure document no context exists; the server then serves MCP only.
+    this.native = suppliedContext ?? globalThis.document?.modelContext;
     this.ownerDocument = globalThis.document ?? null;
-    if (
-      native &&
-      typeof native.addEventListener === 'function' &&
-      typeof native.removeEventListener === 'function'
-    ) {
-      this.nativeToolChangeListener = () => {
-        if (this.closed) return;
-        this.nativeToolChangeQueue = this.nativeToolChangeQueue.then(async () => {
-          try {
-            await this.syncNativeTools();
-          } catch (error) {
-            console.warn('[BrowserMcpServer] Native WebMCP tool reconciliation failed:', error);
-          }
-          await this.notifyProducerToolsChanged();
-        });
-      };
-      native.addEventListener('toolchange', this.nativeToolChangeListener);
+    this.nativeToolChangeListener = () => {
+      if (this.closed) return;
+      this.nativeToolChangeQueue = this.nativeToolChangeQueue.then(async () => {
+        try {
+          await this.syncNativeTools();
+        } catch (error) {
+          console.warn('[BrowserMcpServer] Native WebMCP tool reconciliation failed:', error);
+        }
+        await this.notifyProducerToolsChanged();
+      });
+    };
+    this.native?.addEventListener('toolchange', this.nativeToolChangeListener);
+    this.native?.addEventListener('toolactivated', this.nativeLifecycleListener);
+    this.native?.addEventListener('toolcancel', this.nativeLifecycleListener);
+  }
+
+  private getEventHandler(type: string): ModelContextEventHandler {
+    return this.eventHandlers.get(type) ?? null;
+  }
+
+  private setEventHandler(type: string, handler: ModelContextEventHandler): void {
+    if (typeof handler === 'function') {
+      if (!this.eventHandlers.has(type)) super.addEventListener(type, this.eventHandlerListener);
+      this.eventHandlers.set(type, handler);
+    } else if (this.eventHandlers.delete(type)) {
+      super.removeEventListener(type, this.eventHandlerListener);
     }
   }
 
-  get ontoolchange(): ((this: ModelContext, event: Event) => unknown) | null {
-    return this.ontoolchangeHandler;
+  get ontoolchange(): ModelContextEventHandler {
+    return this.getEventHandler('toolchange');
   }
 
-  set ontoolchange(handler: ((this: ModelContext, event: Event) => unknown) | null) {
-    const listener = typeof handler === 'function' ? handler : null;
-    if (listener === null) {
-      this.ontoolchangeHandler = null;
-      super.removeEventListener('toolchange', this.ontoolchangeListener);
-      return;
-    }
+  set ontoolchange(handler: ModelContextEventHandler) {
+    this.setEventHandler('toolchange', handler);
+  }
 
-    if (this.ontoolchangeHandler === null) {
-      super.addEventListener('toolchange', this.ontoolchangeListener);
-    }
-    this.ontoolchangeHandler = listener;
+  get ontoolactivated(): ModelContextEventHandler {
+    return this.getEventHandler('toolactivated');
+  }
+
+  set ontoolactivated(handler: ModelContextEventHandler) {
+    this.setEventHandler('toolactivated', handler);
+  }
+
+  get ontoolcancel(): ModelContextEventHandler {
+    return this.getEventHandler('toolcancel');
+  }
+
+  set ontoolcancel(handler: ModelContextEventHandler) {
+    this.setEventHandler('toolcancel', handler);
   }
 
   private async notifyProducerToolsChanged(): Promise<void> {
@@ -237,40 +251,34 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     if (!this.closed) this.dispatchEvent(new Event('toolchange'));
   }
 
-  private getNativeStandardToolsApi(): NativeStandardToolsApi | undefined {
-    const candidate: (ModelContext & Partial<ChromeModelContextExtensions>) | undefined =
-      this.native;
-    return candidate && typeof candidate.executeTool === 'function'
-      ? (candidate as NativeStandardToolsApi)
-      : undefined;
-  }
-
   private async registerNativeToolMirror(
     tool: ToolDescriptor<WebMcpToolInput>,
     normalized: NormalizedInputSchema,
     options: ModelContextRegisterToolOptions,
-    execute: RegisteredWebMcpTool['execute'],
+    execute: ModelContextTool<WebMcpToolInput>['execute'],
     controller: AbortController
   ): Promise<void> {
-    if (!this.native) return;
-
-    // The overload set keys on a statically known inputSchema; mirrored tools carry a dynamic one.
-    const nativeRegister = this.native.registerTool as unknown as NativeRegisterToolFn;
+    const native = this.native;
+    if (!native) return;
     const signal = options.signal
       ? AbortSignal.any([options.signal, controller.signal])
       : controller.signal;
+    const nativeTool: WebMCP.ModelContextTool = {
+      name: tool.name,
+      description: tool.description,
+      execute,
+    };
+    if (tool.title !== undefined) nativeTool.title = tool.title;
+    if (normalized.registeredInputSchema !== undefined) {
+      const inputSchema: unknown = JSON.parse(normalized.registeredInputSchema);
+      if (!isPlainObject(inputSchema)) throw new TypeError('inputSchema must be an object');
+      nativeTool.inputSchema = inputSchema;
+    }
+    if (tool.annotations) nativeTool.annotations = tool.annotations;
 
-    const nativeInputSchema =
-      normalized.registeredInputSchema === undefined
-        ? undefined
-        : (JSON.parse(normalized.registeredInputSchema) as InputSchema);
     this.nativeToolAbortControllers.set(tool.name, controller);
     try {
-      await nativeRegister.call(
-        this.native,
-        toNativeTool(tool, nativeInputSchema, (input) => execute(input)),
-        { ...options, signal }
-      );
+      await native.registerTool(nativeTool, { ...options, signal });
     } catch (error) {
       controller.abort();
       if (this.nativeToolAbortControllers.get(tool.name) === controller) {
@@ -293,107 +301,90 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     this.nativeToolAbortControllers.delete(name);
   }
 
-  private validateToolDescriptor(tool: ToolDescriptor<WebMcpToolInput>): NormalizedInputSchema {
-    validateWebMcpToolDescriptor(tool);
-    if (this.tools.has(tool.name) || this.pendingTools.has(tool.name)) {
-      throw createInvalidStateError(`Tool already registered: ${tool.name}`);
-    }
-    return normalizeInputSchema(tool.inputSchema);
-  }
-
   private registerToolInMcp(
     tool: ToolDescriptor<WebMcpToolInput>,
     normalized: NormalizedInputSchema,
-    executeTool: RegisteredWebMcpTool['execute'],
-    exposedTo: readonly string[] | undefined
+    executeTool: ModelContextTool<WebMcpToolInput>['execute'],
+    exposedTo?: readonly string[]
   ): RegisteredWebMcpTool {
-    const outputSchema =
-      tool.outputSchema === undefined ? undefined : structuredClone(tool.outputSchema);
-    const mcpOutputSchema =
-      outputSchema === undefined
-        ? undefined
-        : fromJsonSchema(outputSchema as Parameters<typeof fromJsonSchema>[0]);
-    const mcpAnnotations = toMcpAnnotations(tool.annotations);
-    const mcpCompatibleInput =
-      normalized.inputSchema.type === undefined || normalized.inputSchema.type === 'object';
-    const mcpHandle = mcpCompatibleInput
-      ? this.mcpServer.registerTool(
-          tool.name,
-          {
-            ...(tool.title !== undefined ? { title: tool.title } : {}),
-            description: tool.description,
-            inputSchema: toMcpInputSchema(normalized),
-            ...(mcpOutputSchema ? { outputSchema: mcpOutputSchema } : {}),
-            ...(mcpAnnotations ? { annotations: mcpAnnotations } : {}),
-          },
-          async (args, context) => {
-            const result = await executeTool(args, context.mcpReq.signal);
-            if (isInputRequiredResult(result)) {
-              throw new Error(
-                `WebMCP tool "${tool.name}" returned input_required. Multi-round tool flows require BrowserMcpServer.mcpServer.registerTool().`
-              );
-            }
-            return normalizeToolResponse(result);
-          }
-        )
-      : undefined;
-    // A restricted tool is never observable on the wire before its audience is
-    // checked: the handle is disabled here, in the same synchronous step that created
-    // it, and only applyToolExposure re-enables it.
-    if (exposedTo?.length) mcpHandle?.disable();
+    const item: ToolListItem = {
+      name: tool.name,
+      description: tool.description,
+      inputSchema: normalized.inputSchema,
+    };
+    if (tool.title !== undefined) item.title = tool.title;
+    if (tool.outputSchema !== undefined) item.outputSchema = structuredClone(tool.outputSchema);
+    if (tool.annotations) item.annotations = tool.annotations;
 
-    if (!mcpCompatibleInput) {
+    const config: Omit<Parameters<McpServer['registerTool']>[1], 'inputSchema' | 'outputSchema'> & {
+      inputSchema?: ReturnType<typeof toMcpInputSchema>;
+      outputSchema?: ReturnType<typeof fromJsonSchema>;
+    } = {
+      description: tool.description,
+    };
+    if (item.outputSchema !== undefined) config.outputSchema = fromJsonSchema(item.outputSchema);
+    if (tool.title !== undefined) config.title = tool.title;
+    if (tool.annotations) {
+      const { untrustedContentHint: _untrustedContentHint, ...annotations } = tool.annotations;
+      config.annotations = annotations;
+    }
+    let mcpHandle: McpRegisteredTool | undefined;
+    if (normalized.inputSchema.type === undefined || normalized.inputSchema.type === 'object') {
+      config.inputSchema = toMcpInputSchema(normalized);
+      mcpHandle = this.mcpServer.registerTool(tool.name, config, async (args, context) => {
+        const result = await executeTool(args, { signal: context.mcpReq.signal });
+        if (isInputRequiredResult(result)) {
+          throw new Error(
+            `WebMCP tool "${tool.name}" returned input_required. Multi-round tool flows require BrowserMcpServer.mcpServer.registerTool().`
+          );
+        }
+        return normalizeToolResponse(result);
+      });
+      // A tool is never observable on the wire before it is published: the handle is
+      // disabled here, in the same synchronous step that created it, and only
+      // applyToolExposure enables it.
+      mcpHandle.disable();
+    } else {
       console.warn(
         `[BrowserMcpServer] Tool "${tool.name}" remains available through WebMCP but cannot be exposed over MCP because MCP input schemas require an object root.`
       );
     }
 
-    const item: ToolListItem = {
-      name: tool.name,
-      ...(tool.title !== undefined ? { title: tool.title } : {}),
-      description: tool.description,
-      inputSchema: normalized.inputSchema,
-      ...(outputSchema === undefined ? {} : { outputSchema }),
-      ...(tool.annotations ? { annotations: tool.annotations } : {}),
-    };
-    return {
-      item,
-      ...(normalized.registeredInputSchema !== undefined
-        ? { registeredInputSchema: normalized.registeredInputSchema }
-        : {}),
-      execute: executeTool,
-      mcpHandle,
-      ...(exposedTo?.length ? { exposedTo } : {}),
-    };
+    const registered: RegisteredWebMcpTool = { item, mcpHandle };
+    if (exposedTo?.length) registered.exposedTo = exposedTo;
+    return registered;
   }
 
   readonly registerTool: ModelContextWithExtensions['registerTool'] = async (
-    toolValue: unknown,
+    toolValue: ToolRegistrationDictionary,
     optionsValue: ModelContextRegisterToolOptions | null = {}
   ): Promise<void> => {
     const { signal, exposedTo } = optionsValue ?? {};
-    const options = {
-      ...(signal ? { signal } : {}),
-      ...(exposedTo ? { exposedTo: [...exposedTo] } : {}),
-    };
-    validateWebMcpAccess(this.ownerDocument);
+    const options: ModelContextRegisterToolOptions = {};
+    if (signal) options.signal = signal;
+    if (exposedTo) options.exposedTo = [...exposedTo];
     if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
     if (!isPlainObject(toolValue)) {
       throw new TypeError('registerTool(tool) requires a tool object');
     }
     const tool = coerceWebMcpToolDescriptor(toolValue);
-    const normalized = this.validateToolDescriptor(tool);
+    // Upstream keys names per document, so only local and pending registrations
+    // collide; a mirror of another document's tool yields once native accepts.
+    if (
+      (this.tools.has(tool.name) && !this.nativeBackfilledTools.has(tool.name)) ||
+      this.pendingTools.has(tool.name)
+    ) {
+      throw createInvalidStateError(`Tool already registered: ${tool.name}`);
+    }
+    const normalized = normalizeInputSchema(tool.inputSchema);
     options.signal?.throwIfAborted();
-    validatePotentiallyTrustworthyOrigins(options.exposedTo);
-    options.signal?.throwIfAborted();
-    const execute: RegisteredWebMcpTool['execute'] = async (args, signal) => {
-      signal?.throwIfAborted();
-      return withAbortSignal(
-        Promise.resolve().then(() => Reflect.apply(tool.execute, undefined, [args])),
-        signal
-      );
-    };
+    const callback = tool.execute;
+    const execute: ModelContextTool<WebMcpToolInput>['execute'] = (args, options) =>
+      withAbortSignal(() => callback(args, options), options.signal);
     const controller = new AbortController();
+    // An unparsable entry reaches the context, which rejects it with its own error.
+    const exposedOrigins = options.exposedTo?.map((origin) => URL.parse(origin)?.origin ?? origin);
+    // `registered` owns the MCP handle until the tool is published or the handle is released.
     let registered: RegisteredWebMcpTool | undefined;
     const abort = () => {
       if (this.pendingTools.get(tool.name) === controller) {
@@ -402,25 +393,25 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       if (registered && this.tools.get(tool.name) === registered) {
         this.removeTool(tool.name);
       } else {
+        registered?.mcpHandle?.remove();
         this.abortNativeToolMirror(tool.name, controller);
       }
+      registered = undefined;
     };
     options.signal?.addEventListener('abort', abort, { once: true });
     this.pendingTools.set(tool.name, controller);
     try {
+      // The MCP side compiles before other frames can see the tool. A mirror of
+      // another document's tool keeps the MCP name until native accepts this one.
+      if (!this.nativeBackfilledTools.has(tool.name)) {
+        registered = this.registerToolInMcp(tool, normalized, execute, exposedOrigins);
+      }
+      options.signal?.throwIfAborted();
       await this.registerNativeToolMirror(tool, normalized, options, execute, controller);
       if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
       options.signal?.throwIfAborted();
-      registered = this.registerToolInMcp(
-        tool,
-        normalized,
-        execute,
-        options.exposedTo?.map((origin) => {
-          const parsedOrigin = new URL(origin).origin;
-          // Keep exact extension identifiers when this browser cannot parse their origin.
-          return parsedOrigin === 'null' ? origin : parsedOrigin;
-        })
-      );
+      this.removeTool(tool.name, { skipNative: true });
+      registered ??= this.registerToolInMcp(tool, normalized, execute, exposedOrigins);
       this.tools.set(tool.name, registered);
       this.applyToolExposure();
       if (options.signal?.aborted) {
@@ -428,6 +419,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
         options.signal.throwIfAborted();
       }
     } catch (error) {
+      registered?.mcpHandle?.remove();
       this.abortNativeToolMirror(tool.name, controller);
       options.signal?.removeEventListener('abort', abort);
       options.signal?.throwIfAborted();
@@ -442,14 +434,13 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       registered.abortListener = abort;
     }
     if (this.tools.get(tool.name) === registered) {
-      if (this.native) await this.nativeToolChangeQueue;
-      else await this.notifyProducerToolsChanged();
+      await this.nativeToolChangeQueue;
     }
     if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
     options.signal?.throwIfAborted();
   };
 
-  private removeTool(name: string, options?: { skipNative?: boolean; notify?: boolean }): void {
+  private removeTool(name: string, options?: { skipNative?: boolean }): void {
     const registered = this.tools.get(name);
     if (registered) {
       if (registered.abortSignal && registered.abortListener) {
@@ -458,18 +449,15 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       this.tools.delete(name);
       this.nativeBackfilledTools.delete(name);
       registered.mcpHandle?.remove();
-      if ((options?.notify ?? true) && !this.native) {
-        void this.notifyProducerToolsChanged();
-      }
     }
     if (!options?.skipNative) this.abortNativeToolMirror(name);
   }
 
   syncNativeTools(): Promise<void> {
+    const native = this.native;
     const sync = this.nativeSyncQueue.then(async () => {
-      if (this.closed) return;
-      const native = this.getNativeStandardToolsApi();
-      if (native) await this.backfillNativeStandardTools(native);
+      if (this.closed || !native) return;
+      await this.backfillNativeStandardTools(native);
     });
     this.nativeSyncQueue = sync.then(
       () => undefined,
@@ -478,17 +466,35 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     return sync;
   }
 
-  private async backfillNativeStandardTools(native: NativeStandardToolsApi): Promise<void> {
-    const tools = await native.getTools();
+  private async backfillNativeStandardTools(native: ModelContext): Promise<void> {
+    // A top-level server serves its subtree; a framed one serves only its own
+    // document, so an embedder cannot reach same-origin children through the
+    // framed page, and ancestor or sibling tools never feed iframe bridges back
+    // into their source.
+    const ownerWindow = this.ownerDocument?.defaultView;
+    const tools = (await native.getTools()).filter((tool) => {
+      if (tool.window === ownerWindow) return true;
+      if (ownerWindow?.parent !== ownerWindow) return false;
+      let frame = tool.window;
+      while (frame) {
+        if (frame === ownerWindow) return true;
+        const parent = frame.parent;
+        if (parent === frame) break;
+        frame = parent;
+      }
+      return false;
+    });
     if (this.closed) return;
-    const nextTools = new Map<string, NativeBackfilledTool>();
-    const nativeNames = new Set(tools.map(({ name }) => name));
+    // A removal completes once this document no longer registers the name; a
+    // descendant's same-named tool is mirrored afterwards.
     for (const name of this.removingNativeTools) {
-      if (!nativeNames.has(name)) this.removingNativeTools.delete(name);
+      if (!tools.some((tool) => tool.name === name && tool.window === ownerWindow)) {
+        this.removingNativeTools.delete(name);
+      }
     }
+    const nextTools = new Map<string, NativeBackfilledTool>();
     for (const tool of tools) {
-      // ponytail: MCP tool names are global, so keep the first valid visible tool.
-      // Add origin-qualified aliases if MCP gains scoped tool identity.
+      // MCP tool names are global, so the first visible tool with a name wins.
       if (
         nextTools.has(tool.name) ||
         this.pendingTools.has(tool.name) ||
@@ -496,75 +502,49 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       ) {
         continue;
       }
-      let inputSchema: InputSchema | undefined = DEFAULT_INPUT_SCHEMA;
-      if (tool.inputSchema !== undefined) {
-        try {
-          // An object since webmcp#241; a serialized string from older Chrome. The
-          // round-trip detaches the object from the page's graph and rejects non-JSON.
-          const serialized =
-            typeof tool.inputSchema === 'string'
-              ? tool.inputSchema
-              : JSON.stringify(tool.inputSchema);
-          const parsed: unknown = JSON.parse(serialized);
-          inputSchema = isPlainObject(parsed) ? (parsed as InputSchema) : undefined;
-        } catch {
-          inputSchema = undefined;
-        }
-      }
-      if (!inputSchema) {
+      // Detach the schema from the page; a value that cannot cross JSON stays undefined.
+      let inputSchema: unknown;
+      try {
+        inputSchema = JSON.parse(serializeInputSchema(tool.inputSchema ?? DEFAULT_INPUT_SCHEMA));
+      } catch {}
+      if (!isPlainObject(inputSchema)) {
         console.warn(
           `[BrowserMcpServer] Native tool "${tool.name}" was not exposed over MCP because its input schema is malformed.`
         );
         continue;
       }
-      const item: ToolListItem = {
-        name: tool.name,
-        ...(tool.title !== undefined ? { title: tool.title } : {}),
-        description: tool.description,
-        inputSchema,
-        ...(tool.annotations ? { annotations: tool.annotations } : {}),
-      };
-      nextTools.set(tool.name, {
-        source: tool,
-        item,
-        fingerprint: JSON.stringify(item),
-      });
+      const item: ToolListItem = { name: tool.name, description: tool.description, inputSchema };
+      if (tool.title !== undefined) item.title = tool.title;
+      if (tool.annotations) item.annotations = tool.annotations;
+      nextTools.set(tool.name, { source: tool, item, fingerprint: JSON.stringify(item) });
     }
 
     for (const [name, current] of this.nativeBackfilledTools) {
       const next = nextTools.get(name);
-      if (!next || next.fingerprint !== current.fingerprint) {
-        this.removeTool(name, { skipNative: true, notify: false });
-        continue;
-      }
-      this.nativeBackfilledTools.set(name, next);
+      if (next?.fingerprint === current.fingerprint) this.nativeBackfilledTools.set(name, next);
+      else this.removeTool(name, { skipNative: true });
     }
 
     for (const [name, next] of nextTools) {
       if (this.tools.has(name)) continue;
-      const execute = async (args: WebMcpToolInput, signal?: AbortSignal) => {
+      const execute: ModelContextTool<WebMcpToolInput>['execute'] = async (args, options) => {
         const currentTool = this.nativeBackfilledTools.get(name)?.source;
         if (!currentTool) throw new Error(`Native tool not found: ${name}`);
-        const input = JSON.stringify(args);
-        return parseNativeToolResult(
-          signal
-            ? await native.executeTool.call(this.native, currentTool, input, { signal })
-            : await native.executeTool.call(this.native, currentTool, input)
-        );
+        try {
+          return parseNativeToolResult(await native.executeTool(currentTool, args, options));
+        } catch (error) {
+          // Upstream fires no toolchange when a frame is removed, so a failed call
+          // into a closed window is the first signal to drop its mirrors.
+          if (currentTool.window.closed) this.nativeToolChangeListener();
+          throw error;
+        }
       };
-      const tool: ToolDescriptor<WebMcpToolInput> = {
-        name,
-        ...(next.item.title !== undefined ? { title: next.item.title } : {}),
-        description: next.item.description,
-        inputSchema: next.item.inputSchema,
-        ...(next.item.annotations ? { annotations: next.item.annotations } : {}),
-        execute: (args) => execute(args),
-      };
+      const tool = { ...next.item, execute };
       try {
-        const normalized = this.validateToolDescriptor(tool);
-        // Native getTools() does not report the allowlist a tool registered with, so a
-        // backfilled mirror carries none and stays as widely exposed as it is today.
-        this.tools.set(tool.name, this.registerToolInMcp(tool, normalized, execute, undefined));
+        // Native getTools() does not report a tool's exposedTo allowlist, so a
+        // backfilled mirror is exposed to every MCP peer.
+        const normalized = normalizeInputSchema(tool.inputSchema);
+        this.tools.set(name, this.registerToolInMcp(tool, normalized, execute));
         this.nativeBackfilledTools.set(name, next);
       } catch (error) {
         console.warn(
@@ -573,19 +553,18 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
         );
       }
     }
+    this.applyToolExposure();
   }
 
   registerResource(descriptor: ResourceDescriptor): RegistrationHandle {
     if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
     const registeredDescriptor = { ...descriptor };
-    const config = {
-      ...(registeredDescriptor.description !== undefined
-        ? { description: registeredDescriptor.description }
-        : {}),
-      ...(registeredDescriptor.mimeType !== undefined
-        ? { mimeType: registeredDescriptor.mimeType }
-        : {}),
-    };
+    const config: ResourceMetadata = {};
+    if (registeredDescriptor.description !== undefined) {
+      config.description = registeredDescriptor.description;
+    }
+    if (registeredDescriptor.mimeType !== undefined)
+      config.mimeType = registeredDescriptor.mimeType;
     const template = registeredDescriptor.uri.includes('{')
       ? new ResourceTemplate(registeredDescriptor.uri, { list: undefined })
       : undefined;
@@ -612,26 +591,28 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
 
   registerPrompt(descriptor: PromptDescriptor): RegistrationHandle {
     if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
-    const registeredDescriptor = {
-      ...descriptor,
-      ...(descriptor.argsSchema === undefined
-        ? {}
-        : { argsSchema: structuredClone(descriptor.argsSchema) }),
-    };
+    const registeredDescriptor = { ...descriptor };
+    if (descriptor.argsSchema !== undefined) {
+      registeredDescriptor.argsSchema = structuredClone(descriptor.argsSchema);
+    }
     const argsSchema =
       registeredDescriptor.argsSchema === undefined
         ? undefined
         : fromJsonSchema<Record<string, string>>(
+            // SAFETY: PromptDescriptor accepts WebMCP's JSON schema shape; the MCP schema
+            // compiler validates supported keywords and values at this boundary.
             registeredDescriptor.argsSchema as Parameters<typeof fromJsonSchema>[0]
           );
+    const config: Omit<Parameters<McpServer['registerPrompt']>[1], 'argsSchema'> & {
+      argsSchema?: NonNullable<typeof argsSchema>;
+    } = {};
+    if (registeredDescriptor.description !== undefined) {
+      config.description = registeredDescriptor.description;
+    }
+    if (argsSchema) config.argsSchema = argsSchema;
     const mcpHandle = this.mcpServer.registerPrompt(
       registeredDescriptor.name,
-      {
-        ...(registeredDescriptor.description !== undefined
-          ? { description: registeredDescriptor.description }
-          : {}),
-        ...(argsSchema ? { argsSchema } : {}),
-      },
+      config,
       async (args) => registeredDescriptor.get(args ?? {})
     );
     this.registrations.add(mcpHandle);
@@ -647,106 +628,35 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
   }
 
   async getTools(options?: ModelContextGetToolOptions): Promise<RegisteredTool[]> {
-    validateWebMcpAccess(this.ownerDocument);
     if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
-    if (this.native) {
-      return this.native.getTools(options);
-    }
-    validatePotentiallyTrustworthyOrigins(options?.fromOrigins);
-    if (options?.fromOrigins?.length) {
-      throw new DOMException(
-        'Cross-document tool discovery requires native WebMCP',
-        'NotSupportedError'
-      );
-    }
-
-    const origin = globalThis.location?.origin ?? '';
-    const currentWindow = globalThis.window;
-
-    const tools = [...this.tools.values()]
-      .map(({ item, registeredInputSchema }) => {
-        // A fresh object per call, aligned with the polyfill's post-webmcp#241
-        // shape. A custom toJSON can serialize to non-object JSON; omit those
-        // rather than emit a value consumers would mistake for a pre-154
-        // serialized string.
-        const parsed: unknown =
-          registeredInputSchema === undefined ? undefined : JSON.parse(registeredInputSchema);
-        return {
-          name: item.name,
-          title: item.title ?? '',
-          description: item.description,
-          ...(isPlainObject(parsed) ? { inputSchema: parsed } : {}),
-          origin,
-          window: currentWindow,
-          ...(item.annotations ? { annotations: toWebMcpAnnotations(item.annotations) } : {}),
-        };
-      })
-      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    return tools;
+    if (!this.native) throw createInvalidStateError('BrowserMcpServer has no WebMCP context');
+    return this.native.getTools(options);
   }
 
-  async executeTool(
-    tool: RegisteredTool,
-    inputArgsJson: string,
-    options?: ChromeModelContextExecuteToolOptions
-  ): Promise<string | null> {
-    validateWebMcpAccess(this.ownerDocument);
+  async executeTool(...args: Parameters<ModelContext['executeTool']>): Promise<string> {
     if (this.closed) throw createInvalidStateError('BrowserMcpServer is closed');
-    const native = this.getNativeStandardToolsApi();
-    if (native) {
-      return native.executeTool.call(this.native, tool, inputArgsJson, options);
-    }
-
-    if (tool === null || typeof tool !== 'object') {
-      throw new TypeError('RegisteredTool must be an object');
-    }
-    for (const required of ['name', 'description', 'window', 'origin'] as const) {
-      if (!(required in tool)) {
-        throw new TypeError(`RegisteredTool.${required} is required`);
-      }
-    }
-    validateExecutableOrigin(tool.origin);
-    const origin = globalThis.location?.origin ?? '';
-    const currentWindow = globalThis.window;
-    if (tool.origin !== origin || tool.window !== currentWindow) {
-      throw createUnknownError(`Native tool not found: ${tool.name}`);
-    }
-    options?.signal?.throwIfAborted();
-    const registered = this.tools.get(tool.name);
-    if (!registered) throw createUnknownError(`Tool not found: ${tool.name}`);
-    const args = parseChromeToolInput(inputArgsJson);
-    try {
-      const result = await withAbortSignal(
-        registered.execute(args, options?.signal),
-        registered.abortSignal,
-        () => createUnknownError('Tool unregistered')
-      );
-      return serializeChromeToolResult(result);
-    } catch (error) {
-      if (options?.signal?.aborted && error === options.signal.reason) throw error;
-      if (registered.abortSignal?.aborted) throw error;
-      throw createToolInvocationFailedError(error);
-    }
+    if (!this.native) throw createInvalidStateError('BrowserMcpServer has no WebMCP context');
+    return this.native.executeTool(...args);
   }
 
   /**
    * Re-evaluate which registered tools may appear on the wire.
    *
-   * `exposedTo` narrows a tool to named embedder origins. The peer origin is only known
-   * once a transport that reports one has heard from its peer, so a restricted tool stays
-   * disabled until then — and stays disabled forever on transports that cannot name a peer
-   * at all. Failing closed keeps a tool that asked for a narrow audience from reaching a
-   * wider one; unrestricted tools are untouched and behave exactly as before.
+   * A published tool without `exposedTo` is enabled. `exposedTo` narrows a tool to named
+   * embedder origins. The peer origin is only known once a transport that reports one has
+   * heard from its peer, so a restricted tool stays disabled until then — and stays
+   * disabled forever on transports that cannot name a peer at all. Failing closed keeps a
+   * tool that asked for a narrow audience from reaching a wider one.
    */
   private applyToolExposure(): void {
     for (const { exposedTo, mcpHandle } of this.tools.values()) {
-      if (!exposedTo?.length || !mcpHandle) continue;
+      if (!mcpHandle) continue;
       // Opaque origins serialize identically and cannot identify an allowed peer.
       const visible =
-        this.peerOrigin !== undefined &&
-        this.peerOrigin !== 'null' &&
-        exposedTo.includes(this.peerOrigin);
+        !exposedTo?.length ||
+        (this.peerOrigin !== undefined &&
+          this.peerOrigin !== 'null' &&
+          exposedTo.includes(this.peerOrigin));
       if (visible === mcpHandle.enabled) continue;
       if (visible) mcpHandle.enable();
       else mcpHandle.disable();
@@ -764,11 +674,8 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     this.stopObservingPeerOrigin = undefined;
     this.peerOrigin = undefined;
     this.applyToolExposure();
-    if (!('clientOrigin' in transport)) return;
-    const peered = transport as Transport & {
-      clientOrigin?: string;
-      onclientorigin?: ((origin: string) => void) | undefined;
-    };
+    if (!isPeerOriginTransport(transport)) return;
+    const peered = transport;
     this.peerOrigin = peered.clientOrigin;
     this.applyToolExposure();
     const previous = peered.onclientorigin;
@@ -813,15 +720,14 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     this.stopObservingPeerOrigin?.();
     this.stopObservingPeerOrigin = undefined;
     this.closePromise = (async () => {
-      if (this.native && this.nativeToolChangeListener) {
-        this.native.removeEventListener('toolchange', this.nativeToolChangeListener);
-        this.nativeToolChangeListener = undefined;
-      }
+      this.native?.removeEventListener('toolchange', this.nativeToolChangeListener);
+      this.native?.removeEventListener('toolactivated', this.nativeLifecycleListener);
+      this.native?.removeEventListener('toolcancel', this.nativeLifecycleListener);
       for (const name of this.nativeToolAbortControllers.keys()) {
         this.abortNativeToolMirror(name);
       }
       for (const name of this.tools.keys()) {
-        this.removeTool(name, { notify: false });
+        this.removeTool(name);
       }
       for (const handle of this.registrations) handle.remove();
       this.registrations.clear();

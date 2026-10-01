@@ -4,3 +4,6 @@ codecov:
     wait_for_ci: false
 ignore:
   - 'e2e/web-standards-showcase/**'
+  # Vendored from webmachinelearning/webmcp-polyfill at a pinned commit.
+  # The selected upstream WPT cases and local install smoke test exercise its API.
+  - 'packages/webmcp-polyfill/src/upstream/**'

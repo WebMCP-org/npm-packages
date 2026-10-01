@@ -1,3 +1,4 @@
+import { isTcpAddress } from './portStrategy.js';
 import { type ChildProcess, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
@@ -90,7 +91,7 @@ const RUNTIME_CASES: RuntimeCase[] = [
   },
 ];
 
-function jsonForInlineScript(value: unknown): string {
+function jsonForInlineScript(value: RuntimeMode): string {
   return JSON.stringify(value).replaceAll('<', '\\u003c');
 }
 
@@ -107,11 +108,12 @@ function buildBridgeFixtureScript(): string {
 
     const makeDescriptor = (tool) => ({
       name: tool.name,
+      title: tool.title ?? '',
       ...(tool.name === 'sum'
         ? { title: 'Add numbers', annotations: { readOnlyHint: true } }
         : {}),
       description: tool.description ?? '',
-      inputSchema: JSON.stringify(tool.inputSchema ?? { type: 'object', properties: {} }),
+      inputSchema: tool.inputSchema ?? { type: 'object', properties: {} },
       window,
       origin: location.origin,
       __execute: tool.execute,
@@ -149,10 +151,13 @@ function buildBridgeFixtureScript(): string {
 
     const context = new FixtureContext();
 
-    const executeDescriptor = async (descriptor, inputJson) => {
+    const executeDescriptor = async (descriptor, inputObject) => {
       counts.executeTool++;
       if (!descriptors.includes(descriptor)) {
         throw new Error('executeTool received a stale RegisteredTool descriptor');
+      }
+      if (!inputObject || typeof inputObject !== 'object' || Array.isArray(inputObject)) {
+        throw new TypeError('executeTool expected object input');
       }
       counts.lastExecuteGeneration = descriptor.__generation;
       if (descriptor.name === 'always_fail') {
@@ -161,9 +166,10 @@ function buildBridgeFixtureScript(): string {
           requestState: 'fixture-input-required',
         });
       }
-      const result = await descriptor.__execute(JSON.parse(inputJson));
+      const result = await descriptor.__execute(inputObject);
       if (descriptor.name === 'sum') {
-        return result.content[0].text;
+        // Native declarative tools return plain text; imperative tools serialize it as JSON.
+        return generation === 0 ? result.content[0].text : JSON.stringify(result.content[0].text);
       }
       return JSON.stringify(result);
     };
@@ -174,7 +180,6 @@ function buildBridgeFixtureScript(): string {
       configurable: true,
       value: context,
     });
-    delete navigator.modelContext;
 
     window.__WEBMCP_RELAY_FIXTURE__ = {
       snapshot: () => ({ ...counts }),
@@ -258,7 +263,7 @@ async function startHttpServer(
   });
 
   const address = server.address();
-  if (!address || typeof address === 'string') {
+  if (!isTcpAddress(address)) {
     throw new Error('Expected server to bind to an IP address');
   }
 
@@ -286,7 +291,7 @@ async function getOpenPort(): Promise<number> {
   });
 
   const address = holder.address();
-  if (!address || typeof address === 'string') {
+  if (!isTcpAddress(address)) {
     throw new Error('Expected holder server to bind to an IP address');
   }
 
@@ -315,27 +320,8 @@ async function waitForValue<T>(
   throw new Error(`Timed out after ${timeoutMs}ms`);
 }
 
-function contentTextItems(result: unknown): string[] {
-  const content =
-    typeof result === 'object' && result !== null && 'content' in result
-      ? Reflect.get(result, 'content')
-      : undefined;
-  if (!Array.isArray(content)) {
-    return [];
-  }
-  return content
-    .map((item) => {
-      if (!item || typeof item !== 'object') {
-        return undefined;
-      }
-      const text = Reflect.get(item, 'text');
-      return typeof text === 'string' ? text : undefined;
-    })
-    .filter((text): text is string => typeof text === 'string');
-}
-
-function firstContentText(result: unknown): string {
-  return contentTextItems(result)[0] ?? '';
+function firstContentText(result: Awaited<ReturnType<Client['callTool']>>): string {
+  return result.content.find((item) => item.type === 'text')?.text ?? '';
 }
 
 function buildHostPageHtml(options: {
@@ -344,6 +330,7 @@ function buildHostPageHtml(options: {
   runtimeScriptRoute: string;
   runtimeContractRoute: string;
   runtimeMode: RuntimeMode;
+  pageTitle: string;
 }): string {
   const { widgetOrigin, relayPort, runtimeScriptRoute, runtimeContractRoute, runtimeMode } =
     options;
@@ -366,7 +353,7 @@ function buildHostPageHtml(options: {
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>WebMCP Relay E2E Host</title>
+    <title>${options.pageTitle}</title>
   </head>
   <body>
     <h1>WebMCP Relay E2E Host</h1>
@@ -404,11 +391,11 @@ function buildHostPageHtml(options: {
 
 function formatE2EError(
   label: string,
-  error: unknown,
+  cause: unknown,
   harness: Pick<E2EHarness, 'pageErrors' | 'pageConsole' | 'relayLogs'> | null,
   extraLogs: string[] = []
 ): Error {
-  const errorMsg = String(error instanceof Error ? error.message : error);
+  const errorMsg = String(cause instanceof Error ? cause.message : cause);
 
   if (!harness) {
     return new Error(`E2E failure (${label}): ${errorMsg}`);
@@ -522,6 +509,7 @@ async function setupE2EHarness(options: {
   relayPort: number;
   widgetOrigin: string;
   clientName: string;
+  pageTitle?: string;
 }): Promise<E2EHarness> {
   const { runtimeCase, relayPort, widgetOrigin, clientName } = options;
   const runtimeScript = readRuntimeCaseScript(runtimeCase);
@@ -570,6 +558,7 @@ async function setupE2EHarness(options: {
             runtimeScriptRoute: runtimeCase.scriptRoute,
             runtimeContractRoute: '/runtime/model-context-contract.js',
             runtimeMode: runtimeCase.mode,
+            pageTitle: options.pageTitle ?? 'WebMCP Relay E2E Host',
           })
         );
         return;
@@ -645,8 +634,19 @@ async function setupE2EHarness(options: {
   }
 }
 
+describe('relay browser bundles', () => {
+  it('keep zod out of host-page scripts and the embed under 16 KB', () => {
+    const embed = readRequiredFile(REAL_EMBED_PATH, 'packaged embed.js');
+    const widget = readRequiredFile(REAL_WIDGET_PATH, 'packaged widget.html');
+
+    expect(embed).not.toContain('__zod_globalConfig');
+    expect(widget).not.toContain('__zod_globalConfig');
+    expect(Buffer.byteLength(embed)).toBeLessThan(16 * 1024);
+  });
+});
+
 describe('relay e2e (real browser assets)', () => {
-  it('invokes a declarative form with the default origin policy', async () => {
+  it('invokes a declarative tool with the default origin policy', async () => {
     let widgetServer: StartedHttpServer | null = null;
     let harness: E2EHarness | null = null;
 
@@ -685,6 +685,42 @@ describe('relay e2e (real browser assets)', () => {
     }
   });
 
+  it('passes a page title with markup and replacement patterns to the widget as text', async () => {
+    const pageTitle =
+      "</script><script>parent.document.documentElement.dataset.relayTitleInjected = 'yes'</script> $' $` $& $$";
+    let widgetServer: StartedHttpServer | null = null;
+    let harness: E2EHarness | null = null;
+
+    try {
+      const relayPort = await getOpenPort();
+      widgetServer = await startWidgetAssetServer();
+      harness = await setupE2EHarness({
+        runtimeCase: GLOBAL_RUNTIME_CASE,
+        relayPort,
+        widgetOrigin: widgetServer.origin,
+        clientName: 'webmcp-local-relay-e2e-client-page-title',
+        pageTitle,
+      });
+
+      const sources = await harness.client.callTool({ name: 'webmcp_list_sources', arguments: {} });
+      expect(sources.structuredContent).toMatchObject({ sources: [{ title: pageTitle }] });
+      expect(
+        await harness.page.evaluate(() => document.documentElement.dataset.relayTitleInjected)
+      ).toBeUndefined();
+
+      const result = await harness.client.callTool({
+        name: harness.expectedToolName,
+        arguments: { a: 2, b: 5 },
+      });
+      expect(firstContentText(result)).toBe('sum:7');
+    } catch (error) {
+      throw formatE2EError('page title', error, harness);
+    } finally {
+      await harness?.cleanup();
+      await stopHttpServer(widgetServer?.server ?? null);
+    }
+  });
+
   it('uses async document discovery, current descriptor identity, and document toolchange', async () => {
     let widgetServer: StartedHttpServer | null = null;
     let harness: E2EHarness | null = null;
@@ -710,7 +746,6 @@ describe('relay e2e (real browser assets)', () => {
       });
       expect(sumTool?.title).toBe('Add numbers');
       expect(sumTool?.annotations).toMatchObject({ readOnlyHint: true });
-      expect(tools.tools.some((tool) => tool.name === 'decoy_extension')).toBe(false);
 
       let snapshot = await readBridgeFixtureSnapshot(harness.page);
       expect(snapshot.getTools).toBeGreaterThan(0);
@@ -884,7 +919,8 @@ describe('relay e2e (real browser assets)', () => {
           arguments: { reason: runtimeCase.mode },
         });
         expect(errorResult.isError).toBe(true);
-        expect(firstContentText(errorResult)).toContain(`always_fail:${runtimeCase.mode}`);
+        // The upstream execution boundary sanitizes callback failures.
+        expect(firstContentText(errorResult)).toBe('Tool execution failed');
       } catch (error) {
         throw formatE2EError(`${runtimeCase.mode} runtime-errors`, error, harness);
       } finally {
