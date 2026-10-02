@@ -74,6 +74,7 @@
     "typecheck": "tsc --noEmit && vp test run --typecheck.only --silent"
   },
   "dependencies": {
+    "@mcp-b/webmcp-plugins": "workspace:*",
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@modelcontextprotocol/client": "catalog:",
     "@standard-schema/spec": "^1.1.0",

@@ -62,6 +62,14 @@ Native WebMCP and the standalone polyfill do not advertise MCP `outputSchema` me
 [Schema guide](https://docs.mcp-b.ai/how-to/use-schemas-and-structured-output) ·
 [Output reference](https://docs.mcp-b.ai/packages/react-webmcp/reference#schema-compatibility)
 
+## Plugins and consent
+
+`plugins` run around every local and agent execution with the validated input, for example
+[`otel()`](../webmcp-plugins/README.md#tracing). `useGuardedWebMCP` adds a consent policy:
+calls wait in `usePendingConsentRequests()` until your UI calls `useConsentGuard().decide()`, and
+refusals reach agents as MCP errors. Render guarded tools inside `ConsentProvider`.
+[Consent details](../webmcp-plugins/README.md#consent).
+
 ## Expose context, prompts, and resources
 
 ```ts

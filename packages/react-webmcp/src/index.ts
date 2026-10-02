@@ -7,6 +7,12 @@
 
 export type { ToolExecutionState, WebMCP } from 'usewebmcp';
 export { useWebMCP } from './useWebMCP.js';
+export {
+  ConsentProvider,
+  useConsentGuard,
+  useGuardedWebMCP,
+  usePendingConsentRequests,
+} from './consent.js';
 
 export type { ToolInputSchema } from '@mcp-b/webmcp-ts-sdk/schema';
 export type { McpClientProviderProps } from './client/McpClientProvider.js';
