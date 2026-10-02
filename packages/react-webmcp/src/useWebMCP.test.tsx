@@ -6,6 +6,10 @@ import { CallToolResultSchema } from '@modelcontextprotocol/core';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderHook } from 'vitest-browser-react';
 import { z } from 'zod';
+import { ConsentGuard } from '@mcp-b/webmcp-plugins/consent';
+import type { WebMCPPlugin } from '@mcp-b/webmcp-plugins';
+import type { ReactNode } from 'react';
+import { ConsentProvider, useGuardedWebMCP, usePendingConsentRequests } from './consent.js';
 import { useWebMCP } from './useWebMCP.js';
 
 type CircularOutput = { self?: CircularOutput; ok?: boolean };
@@ -374,5 +378,80 @@ describe('useWebMCP in a browser runtime', () => {
     expect(received).toEqual([2, 3]);
     expect(validate).toHaveBeenCalledTimes(2);
     expect(hook.result.current.state.lastResult).toEqual({ total: 13 });
+  });
+
+  it('runs plugins with the validated input for agent and local calls', async () => {
+    const seen: unknown[] = [];
+    const plugin: WebMCPPlugin = {
+      name: 'spy',
+      aroundExecute: (call, next) => (seen.push(call.input), next()),
+    };
+    const hook = await renderHook(() =>
+      useWebMCP({
+        name: 'plugin_double',
+        description: 'Doubles a count',
+        inputSchema: z.object({ count: z.string().transform(Number) }),
+        plugins: [plugin],
+        execute: ({ count }) => count * 2,
+      })
+    );
+
+    await hook.act(async () => {
+      expect(
+        await client.callTool({ name: 'plugin_double', arguments: { count: '2' } })
+      ).toMatchObject({ content: [{ type: 'text', text: '4' }] });
+      expect(await hook.result.current.execute({ count: '5' })).toBe(10);
+    });
+    expect(seen).toEqual([{ count: 2 }, { count: 5 }]);
+  });
+
+  it('asks before guarded agent calls and reports refusals as MCP errors', async () => {
+    const guard = new ConsentGuard();
+    const execute = vi.fn(() => 'deleted');
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <ConsentProvider guard={guard}>{children}</ConsentProvider>
+    );
+    const hook = await renderHook(
+      () => {
+        useGuardedWebMCP({
+          name: 'guarded_delete',
+          description: 'Deletes a note',
+          consent: {
+            scope: ['write:notes'],
+            reversible: false,
+            riskLevel: 'high',
+            requiresApproval: true,
+          },
+          execute,
+        });
+        return usePendingConsentRequests();
+      },
+      { wrapper }
+    );
+
+    const { tools } = await client.listTools();
+    expect(tools.find((tool) => tool.name === 'guarded_delete')?.annotations).toMatchObject({
+      destructiveHint: true,
+      readOnlyHint: false,
+    });
+
+    const approved = client.callTool({ name: 'guarded_delete', arguments: {} });
+    await vi.waitFor(() => expect(hook.result.current).toHaveLength(1));
+    await hook.act(async () => {
+      await guard.decide(hook.result.current[0]!.id, true);
+      expect(await approved).toMatchObject({ content: [{ type: 'text', text: 'deleted' }] });
+    });
+
+    const denied = client.callTool({ name: 'guarded_delete', arguments: {} });
+    await vi.waitFor(() => expect(hook.result.current).toHaveLength(1));
+    await hook.act(async () => {
+      await guard.decide(hook.result.current[0]!.id, false);
+      expect(await denied).toMatchObject({
+        isError: true,
+        content: [{ type: 'text', text: 'Tool "guarded_delete" was not approved (user)' }],
+      });
+    });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(hook.result.current).toEqual([]);
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, type DependencyList } from 'react';
+import { withPlugins } from '@mcp-b/webmcp-plugins';
 import {
   isMcpStandardSchema,
   normalizeInputSchema,
@@ -55,7 +56,8 @@ export function useWebMCP<
     ...(config.enabled !== undefined && { enabled: config.enabled }),
     ...(config.exposedTo !== undefined && { exposedTo: config.exposedTo }),
     execute: async (args, options) => {
-      const result = await config.execute(await validateInput(config.inputSchema, args), options);
+      const { execute } = withPlugins(config, config.plugins ?? []);
+      const result = await execute(await validateInput(config.inputSchema, args), options);
       if (config.outputSchema && normalizeToolResponse(result).structuredContent === undefined) {
         throw new TypeError(
           `Tool "${config.name}" outputSchema requires execute to return a JSON-serializable result`
