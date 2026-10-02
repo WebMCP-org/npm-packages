@@ -151,11 +151,12 @@ The CDN URL pins the major version because the embed and the page runtime must s
 version. Pages on a 5.x runtime load `@5` for both scripts.
 
 Tools registered on `document.modelContext` are picked up automatically, including tools registered
-after the embed loads. The embed listens for `toolchange` and polls every two seconds as a fallback.
+after the embed loads. The widget listens for WebMCP `toolchange` events through the iframe bridge;
+it does not poll for tool updates.
 
-The embed relays the page's own tools plus tools registered by same-origin descendant frames. When
-several frames register the same name, the embed relays and invokes the page's own tool (otherwise
-the first one `getTools()` returns) and logs one console warning per name.
+The widget relays the host page's tools plus tools registered by other same-origin frames. When
+several frames register the same name, the widget relays and invokes the host page's own tool
+(otherwise the first one `getTools()` returns) and logs one console warning per name.
 
 A result that parses to a JSON object becomes structured content, and an MCP result object passes
 through unchanged. A JSON string arrives as its content; any other result keeps its original text,
@@ -194,7 +195,7 @@ Increase the per-request timeout for tools that chain several slow API calls:
 
 The relay allows `65000` ms by default. If the page timeout is higher, start the relay with a slightly larger limit. For the `120000` ms page setting above, use `--invoke-timeout 125000`.
 
-The embed script fetches the sibling `widget.html`, injects configuration, and loads it as a hidden blob iframe that inherits the host page origin. The iframe opens a WebSocket to the relay on `localhost`. Self-hosted copies must serve both `embed.js` and `widget.html`; cross-origin hosts must allow the widget fetch with CORS. The relay fails closed if that fetch fails. Page code registers tools on `document.modelContext`. The embed discovers tools through asynchronous `getTools()` and executes the returned descriptor with `executeTool(tool, inputObject)`. It does not feature-detect `executeTool()`: on a runtime without it, tools are listed but every call fails.
+The embed script fetches the sibling `widget.html`, injects configuration, and loads it as a hidden blob iframe that inherits the host page origin. The widget bundles the [upstream WebMCP polyfill](https://github.com/webmachinelearning/webmcp-polyfill) and calls its installer. It discovers tools through asynchronous `getTools()` and executes the returned descriptor with `executeTool(tool, inputObject)`. It does not feature-detect `executeTool()`: on a runtime without it, tools are listed but every call fails. When native WebMCP is unavailable, the polyfill frame bridge carries discovery, execution, and tool changes between the widget and host page; native WebMCP handles those calls when available. `postMessage` carries only reconnect and reload controls. The widget opens a WebSocket to the relay on `localhost`. Self-hosted copies must serve both `embed.js` and `widget.html`; cross-origin hosts must allow the widget fetch with CORS. The relay fails closed if that fetch fails.
 
 ## Reconnection and client mode
 
@@ -215,7 +216,7 @@ When a candidate port is owned by a compatible WebMCP relay, a second instance j
 The relay supports pages using:
 
 1. `@mcp-b/global` (recommended for the complete MCP-B runtime)
-2. Native Chrome with `document.modelContext.getTools()` and object-input `executeTool()`
+2. Native Chrome with cross-frame `getTools()` and object-input `executeTool()`
 3. `@mcp-b/webmcp-polyfill`
 
 `file:` pages report an opaque `null` origin, which the polyfill's descriptor execution path rejects.
