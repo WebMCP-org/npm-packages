@@ -77,8 +77,8 @@ Load the embed from the same major version as the page's MCP-B runtime (`@mcp-b/
 `@mcp-b/webmcp-local-relay@5`.
 
 If your page already registers tools on `document.modelContext`, they are picked up automatically.
-Tools registered after `embed.js` loads are also discovered through `toolchange` events and a polling
-fallback; script order does not control discovery.
+Tools registered after `embed.js` loads are discovered through WebMCP `toolchange` events across the
+iframe bridge; script order does not control discovery.
 
 If you are new to WebMCP, this complete example loads `@mcp-b/global`, registers a tool, and adds the
 embed:
@@ -171,13 +171,13 @@ failover.
 
 ## Troubleshoot common issues
 
-| Problem                  | Fix                                                                                                                                             |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected`   | Confirm the page loaded `embed.js` and the relay process is running                                                                             |
-| `No tools listed`        | Confirm tools are registered on the page. The embed detects changes and polls every two seconds, regardless of script order.                    |
-| `Tool not found`         | The tab reloaded or disconnected. Call `webmcp_list_tools` to refresh                                                                           |
-| Connection blocked       | Verify `--widget-origin` matches the WebSocket origin and the relay port matches `data-relay-port`                                              |
-| `Host response timeout:` | The page exceeded its per-request timeout (default 60 seconds). Raise `data-request-timeout` and set a slightly higher relay `--invoke-timeout` |
+| Problem                    | Fix                                                                                                                                             |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `No sources connected`     | Confirm the page loaded `embed.js` and the relay process is running                                                                             |
+| `No tools listed`          | Confirm the page registered tools and WebMCP is available in the host and widget frames                                                         |
+| `Tool not found`           | The tab reloaded or disconnected. Call `webmcp_list_tools` to refresh                                                                           |
+| Connection blocked         | Verify `--widget-origin` matches the WebSocket origin and the relay port matches `data-relay-port`                                              |
+| `Tool execution timed out` | The tool exceeded its per-request timeout (default 60 seconds). Raise `data-request-timeout` and set a slightly higher relay `--invoke-timeout` |
 
 After a disconnect, the widget retries on its own and rediscovers the relay when you return to the
 tab. See the [relay reference](/packages/webmcp-local-relay/reference#reconnection-and-client-mode)
