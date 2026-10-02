@@ -1,6 +1,6 @@
 # Chrome flags for the native WebMCP showcase
 
-The showcase requires Chrome 152 or newer with the experimental WebMCP feature
+The showcase requires Chrome 155 or newer with the experimental WebMCP feature
 enabled. Chrome's preview can change between releases. Check the
 [WebMCP early preview post](https://developer.chrome.com/blog/webmcp-epp) and
 [WebMCP specification](https://webmachinelearning.github.io/webmcp/) when the
@@ -22,8 +22,7 @@ The Playwright native configurations launch Chrome with:
 `WebMCPTesting` is the current Chromium feature-flag name used by this test
 environment. It does not make `navigator.modelContextTesting` part of the
 current WebMCP contract. Native assertions use `document.modelContext`,
-`getTools()`, and the feature-detectable descriptor-based `executeTool()`
-extension.
+`getTools()`, and descriptor-based `executeTool()` when the browser exposes it.
 
 ## Launch Chrome manually
 
@@ -85,7 +84,7 @@ The configuration searches these channels in order:
 5. Chrome Beta
 6. Stable Chrome
 
-It rejects binaries older than Chrome 152.
+It rejects binaries older than Chrome 155.
 
 To choose a binary explicitly:
 
@@ -106,9 +105,9 @@ console.log({
   registerTool: typeof context?.registerTool,
   getTools: typeof context?.getTools,
   toolchange: typeof context?.addEventListener,
-  chromeExecuteToolExtension: typeof context?.executeTool,
-  deprecatedNavigatorAlias: typeof navigator.modelContext,
-  deprecatedTestingShim: typeof navigator.modelContextTesting,
+  executeTool: typeof context?.executeTool,
+  deprecatedNavigatorAlias: 'modelContext' in navigator,
+  deprecatedTestingShim: 'modelContextTesting' in navigator,
 });
 ```
 
@@ -138,25 +137,16 @@ console.table(
 
 ### `document.modelContext` is missing
 
-1. Check `chrome://version` and confirm Chrome is version 152 or newer.
+1. Check `chrome://version` and confirm Chrome is version 155 or newer.
 2. Confirm both configured flags appear in the command line.
 3. Close every process using the selected test profile, then relaunch Chrome.
 4. Confirm the page does not import `@mcp-b/global` or another polyfill.
 
-### The showcase reports a polyfill
-
-The showcase treats `__isWebMCPPolyfill === true` as a polyfill marker. Remove
-polyfill imports and retry with a clean profile.
-
-```javascript
-console.log(document.modelContext?.__isWebMCPPolyfill);
-```
-
 ### `executeTool` is missing
 
-`executeTool()` is an optional Chromium preview extension, not strict WebMCP
-core. Registration and `getTools()` discovery should still work. The Playwright
-execution assertion skips when the method is absent.
+`executeTool()` is part of the current WebMCP draft. Browser previews can lag
+the draft; the native showcase skips execution assertions when the method is
+absent. MCP-B requires the upstream execution contract.
 
 Do not fall back to `navigator.modelContextTesting.executeTool()` in native
 coverage. That would test a removed compatibility surface.

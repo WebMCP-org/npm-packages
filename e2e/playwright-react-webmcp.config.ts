@@ -1,12 +1,17 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test';
 
 const chromiumChannel = process.env.PLAYWRIGHT_CHROMIUM_CHANNEL;
+const chromiumUse: NonNullable<PlaywrightTestConfig['use']> = {
+  ...devices['Desktop Chrome'],
+  launchOptions: { args: ['--disable-features=WebMCP'] },
+};
+if (chromiumChannel) chromiumUse.channel = chromiumChannel;
 
 /**
  * Playwright config for React WebMCP tests
  * See https://playwright.dev/docs/test-configuration.
  */
-export default defineConfig({
+const config: PlaywrightTestConfig = {
   testDir: './tests',
   testMatch: '**/react-webmcp.spec.ts',
   /* Run tests in files in parallel */
@@ -16,7 +21,6 @@ export default defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
   /* Opt out of parallel tests on CI. */
-  ...(process.env.CI ? { workers: 1 } : {}),
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [['html'], ['list'], ...(process.env.CI ? [['github'] as const] : [])],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
@@ -30,15 +34,7 @@ export default defineConfig({
   },
 
   /* Configure projects for major browsers */
-  projects: [
-    {
-      name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        ...(chromiumChannel ? { channel: chromiumChannel } : {}),
-      },
-    },
-  ],
+  projects: [{ name: 'chromium', use: chromiumUse }],
 
   /* Run your local dev server before starting the tests */
   webServer: {
@@ -49,4 +45,8 @@ export default defineConfig({
     stdout: 'ignore',
     stderr: 'pipe',
   },
-});
+};
+
+if (process.env.CI) config.workers = 1;
+
+export default defineConfig(config);

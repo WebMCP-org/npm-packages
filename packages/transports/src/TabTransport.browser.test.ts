@@ -17,10 +17,7 @@ async function safeClose(transport: {
 const uniqueChannel = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-function captureServerPayloads(channelId: string): {
-  payloads: unknown[];
-  stop: () => void;
-} {
+function captureServerPayloads(channelId: string) {
   const payloads: unknown[] = [];
 
   const handler = (event: MessageEvent) => {

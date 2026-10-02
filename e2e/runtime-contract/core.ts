@@ -1,11 +1,18 @@
-import type { CallToolResult, InputSchema, JsonObject, TextContent } from '@mcp-b/webmcp-types';
+import type { CallToolResult, TextContent, fromJsonSchema } from '@modelcontextprotocol/server';
+import type { JsonObject, JsonValue, WebMCP } from '@mcp-b/webmcp-ts-sdk';
 
-const BASE_TOOL_NAMES = ['echo', 'sum', 'always_fail'] as const;
+type RuntimeContractInput = Parameters<WebMCP.ToolExecuteCallback>[0];
+export type RuntimeToolArguments =
+  | { a: number; b: number }
+  | { value: string }
+  | { reason: string };
+
+export const BASE_TOOL_NAMES = ['echo', 'sum', 'always_fail'] as const;
 export const DYNAMIC_TOOL_NAME = 'dynamic_tool';
 
 export interface RuntimeInvocationRecord {
   name: string;
-  arguments: Record<string, unknown>;
+  arguments: JsonObject;
 }
 
 export interface RuntimeContractController {
@@ -18,14 +25,17 @@ export interface RuntimeContractController {
 
 export interface RuntimeContractOptions {
   runtimeLabel?: string;
-  dynamicToolName?: string;
 }
 
-export interface RuntimeContractTool {
-  name: string;
-  description: string;
-  inputSchema: InputSchema;
-  execute(args: Record<string, unknown>): Promise<CallToolResult>;
+export interface RuntimeContractTool extends Omit<
+  WebMCP.ModelContextTool,
+  'inputSchema' | 'execute'
+> {
+  inputSchema: Parameters<typeof fromJsonSchema>[0];
+  execute: (
+    input: RuntimeContractInput,
+    options?: WebMCP.ToolExecuteCallbackOptions
+  ) => Promise<CallToolResult>;
 }
 
 export interface RuntimeContractTools {
@@ -38,34 +48,50 @@ export interface RuntimeContractState {
   invocations: RuntimeInvocationRecord[];
 }
 
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function normalizeArguments(value: unknown): Record<string, unknown> {
-  return isObjectRecord(value) ? structuredClone(value) : {};
-}
-
 function textResult(text: string, structuredContent?: JsonObject): CallToolResult {
-  return {
-    content: [{ type: 'text', text }],
-    ...(structuredContent ? { structuredContent } : {}),
-  };
+  const result: CallToolResult = { content: [{ type: 'text', text }] };
+  if (structuredContent) result.structuredContent = structuredContent;
+  return result;
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every(isJsonValue);
+  return typeof value === 'object' && Object.values(value).every(isJsonValue);
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every(isJsonValue)
+  );
+}
+
+function toJsonObject(args: RuntimeContractInput): JsonObject {
+  const serialized = JSON.stringify(args);
+  if (serialized === undefined) {
+    throw new TypeError('Tool arguments must be JSON serializable');
+  }
+
+  const parsed: unknown = JSON.parse(serialized);
+  if (!isJsonObject(parsed)) {
+    throw new TypeError('Tool arguments must be a JSON object');
+  }
+  return parsed;
 }
 
 function recordInvocation(
   state: RuntimeContractState,
   name: string,
-  args: Record<string, unknown>
+  args: RuntimeContractInput
 ): void {
   state.invocations.push({
     name,
-    arguments: normalizeArguments(args),
+    arguments: toJsonObject(args),
   });
-}
-
-export function getCanonicalToolNames(includeDynamic = false): string[] {
-  return includeDynamic ? [...BASE_TOOL_NAMES, DYNAMIC_TOOL_NAME] : [...BASE_TOOL_NAMES];
 }
 
 export function firstTextContent(
@@ -87,7 +113,6 @@ export function createRuntimeContractTools(
   options: RuntimeContractOptions = {}
 ): RuntimeContractTools {
   const runtimeLabel = options.runtimeLabel ?? 'browser';
-  const dynamicToolName = options.dynamicToolName ?? DYNAMIC_TOOL_NAME;
 
   return {
     baseTools: [
@@ -102,9 +127,8 @@ export function createRuntimeContractTools(
           required: ['message'],
         },
         async execute(args) {
-          const normalized = normalizeArguments(args);
-          const message = typeof normalized.message === 'string' ? normalized.message : '';
-          recordInvocation(state, 'echo', normalized);
+          const message = typeof args.message === 'string' ? args.message : '';
+          recordInvocation(state, 'echo', args);
           return textResult(`echo:${message}`, {
             message,
             runtime: runtimeLabel,
@@ -123,9 +147,8 @@ export function createRuntimeContractTools(
           required: ['a', 'b'],
         },
         async execute(args) {
-          const normalized = normalizeArguments(args);
-          const a = Number(normalized.a ?? 0);
-          const b = Number(normalized.b ?? 0);
+          const a = Number(args.a ?? 0);
+          const b = Number(args.b ?? 0);
           const sum = a + b;
           recordInvocation(state, 'sum', { a, b });
           return textResult(`sum:${sum}`, {
@@ -146,19 +169,18 @@ export function createRuntimeContractTools(
           },
         },
         async execute(args) {
-          const normalized = normalizeArguments(args);
           const reason =
-            typeof normalized.reason === 'string' && normalized.reason.length > 0
-              ? normalized.reason
+            typeof args.reason === 'string' && args.reason.length > 0
+              ? args.reason
               : 'runtime failure';
-          recordInvocation(state, 'always_fail', normalized);
+          recordInvocation(state, 'always_fail', args);
           throw new Error(`always_fail:${reason}`);
         },
       },
     ],
     createDynamicTool() {
       return {
-        name: dynamicToolName,
+        name: DYNAMIC_TOOL_NAME,
         description: 'A dynamically registered contract tool.',
         inputSchema: {
           type: 'object',
@@ -168,9 +190,8 @@ export function createRuntimeContractTools(
           required: ['value'],
         },
         async execute(args) {
-          const normalized = normalizeArguments(args);
-          const value = typeof normalized.value === 'string' ? normalized.value : '';
-          recordInvocation(state, dynamicToolName, normalized);
+          const value = typeof args.value === 'string' ? args.value : '';
+          recordInvocation(state, DYNAMIC_TOOL_NAME, args);
           return textResult(`dynamic:${value}`, {
             value,
             runtime: runtimeLabel,

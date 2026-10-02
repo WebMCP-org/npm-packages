@@ -61,80 +61,64 @@ function getPnpmStoreDir() {
 
 async function restoreFiles(originalFileContents) {
   await Promise.all(
-    filesToRestore.map(async (filePath) => {
-      const original = originalFileContents.get(filePath);
-      if (typeof original === 'string') {
-        await writeFile(filePath, original, 'utf8');
-      }
-    })
+    [...originalFileContents].map(([filePath, content]) => writeFile(filePath, content, 'utf8'))
   );
 }
 
 async function main() {
-  const originalFileContents = new Map();
-  let tempDir;
-  let didAttemptDependencyMutation = false;
-  let runError;
   const pnpmStoreDir = getPnpmStoreDir();
-
+  const originalFileContents = new Map();
   for (const filePath of filesToRestore) {
     originalFileContents.set(filePath, await readFile(filePath, 'utf8'));
   }
+  const tempDir = await mkdtemp(path.join(tmpdir(), 'mcpb-global-tarball-'));
+  let didAttemptDependencyMutation = false;
+  let runError;
 
   try {
-    tempDir = await mkdtemp(path.join(tmpdir(), 'mcpb-global-tarball-'));
-
-    // Collect workspace:* dependencies from @mcp-b/global.
     const globalPkg = JSON.parse(
       await readFile(path.join(repoRoot, 'packages/global/package.json'), 'utf8')
     );
-    const workspaceDeps = Object.entries(globalPkg.dependencies || {})
-      .filter(([, version]) => version.startsWith('workspace:'))
-      .map(([name]) => name);
+    const packageNames = [
+      ...Object.entries(globalPkg.dependencies ?? {})
+        .filter(([, version]) => version.startsWith('workspace:'))
+        .map(([name]) => name),
+      '@mcp-b/global',
+    ];
 
     // CI already built the workspace; local runs build before packing by default.
-    const tarballMap = new Map(); // @mcp-b/<name> -> absolute tarball path
-
-    for (const depName of workspaceDeps) {
-      const shortName = depName.replace('@mcp-b/', '');
-      const depDir = `packages/${shortName}`;
-      if (!skipBuild) runCommand('pnpm', ['-C', depDir, 'build']);
-      runCommand('pnpm', ['-C', depDir, 'pack', '--pack-destination', tempDir]);
+    for (const name of packageNames) {
+      const packageDir = `packages/${name.replace('@mcp-b/', '')}`;
+      if (!skipBuild) runCommand('pnpm', ['-C', packageDir, 'build']);
+      runCommand('pnpm', ['-C', packageDir, 'pack', '--pack-destination', tempDir]);
     }
 
-    if (!skipBuild) runCommand('pnpm', ['-C', 'packages/global', 'build']);
-    runCommand('pnpm', ['-C', 'packages/global', 'pack', '--pack-destination', tempDir]);
+    // Tarball filenames: mcp-b-<name>-<version>.tgz
+    const tarballFiles = await readdir(tempDir);
+    const tarballs = new Map(
+      packageNames.map((name) => {
+        const prefix = `${name.replace('@', '').replace('/', '-')}-`;
+        const fileName = tarballFiles.find(
+          (file) => file.startsWith(prefix) && file.endsWith('.tgz')
+        );
+        if (!fileName) throw new Error(`Tarball for ${name} not found in ${tempDir}`);
+        return [name, path.join(tempDir, fileName)];
+      })
+    );
+    const globalTarball = tarballs.get('@mcp-b/global');
+    tarballs.delete('@mcp-b/global');
 
-    // Map each tarball back to its package name.
-    const allTarballs = (await readdir(tempDir)).filter((f) => f.endsWith('.tgz'));
-    for (const fileName of allTarballs) {
-      // Tarball filenames: mcp-b-<name>-<version>.tgz
-      for (const depName of [...workspaceDeps, '@mcp-b/global']) {
-        const slug = depName.replace('@mcp-b/', '').replace('/', '-');
-        if (fileName.startsWith(`mcp-b-${slug}-`)) {
-          tarballMap.set(depName, path.join(tempDir, fileName));
-        }
-      }
-    }
-
-    // Add pnpm.overrides to root package.json so that transitive workspace
-    // dependencies resolve from local tarballs instead of the npm registry.
-    // This is necessary when workspace packages haven't been published yet.
+    // Resolve transitive workspace dependencies from the local tarballs instead of the
+    // npm registry, which may not have these versions yet.
     const rootPkg = JSON.parse(await readFile(path.join(repoRoot, 'package.json'), 'utf8'));
-    const overrides = {};
-    for (const [name, tarballPath] of tarballMap) {
-      if (name !== '@mcp-b/global') {
-        overrides[name] = `file:${tarballPath}`;
-      }
-    }
-    rootPkg.pnpm = rootPkg.pnpm || {};
-    rootPkg.pnpm.overrides = { ...rootPkg.pnpm.overrides, ...overrides };
+    rootPkg.pnpm = {
+      ...rootPkg.pnpm,
+      overrides: {
+        ...rootPkg.pnpm?.overrides,
+        ...Object.fromEntries([...tarballs].map(([name, file]) => [name, `file:${file}`])),
+      },
+    };
     await writeFile(path.join(repoRoot, 'package.json'), `${JSON.stringify(rootPkg, null, 2)}\n`);
-
-    const globalTarball = tarballMap.get('@mcp-b/global');
-    if (!globalTarball) {
-      throw new Error(`Global tarball not found in ${tempDir}`);
-    }
 
     didAttemptDependencyMutation = true;
     runCommand('pnpm', [
@@ -166,20 +150,13 @@ async function main() {
       ]);
     }
   } catch (cleanupError) {
-    if (!runError) {
-      runError = cleanupError;
-    } else {
-      console.error('\nCleanup failed after test failure:', cleanupError);
-    }
+    if (!runError) runError = cleanupError;
+    else console.error('\nCleanup failed after test failure:', cleanupError);
   } finally {
-    if (tempDir) {
-      await rm(tempDir, { force: true, recursive: true });
-    }
+    await rm(tempDir, { force: true, recursive: true });
   }
 
-  if (runError) {
-    throw runError;
-  }
+  if (runError) throw runError;
 }
 
 await main();

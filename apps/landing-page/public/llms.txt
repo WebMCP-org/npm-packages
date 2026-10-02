@@ -17,12 +17,13 @@ MCP-B is maintained in the WebMCP npm packages monorepo. The public landing page
 - [Monorepo](https://github.com/WebMCP-org/npm-packages): Packages, landing page, docs site, examples, and tests
 - [Landing Page](https://github.com/WebMCP-org/npm-packages/tree/main/apps/landing-page): mcp-b.ai Astro and Cloudflare Workers app
 - [Documentation Website](https://github.com/WebMCP-org/npm-packages/tree/main/apps/documentation-website): docs.mcp-b.ai Mintlify site
-- [Core Runtime Packages](https://github.com/WebMCP-org/npm-packages/tree/main/packages): WebMCP types, polyfill, full runtime, transports, React hooks, local relay, and tooling
+- [Core Runtime Packages](https://github.com/WebMCP-org/npm-packages/tree/main/packages): polyfill, MCP-B adapter and runtime, transports, React hooks, local relay, and tooling
 
 ## Packages
 
-- [`@mcp-b/webmcp-types`](https://www.npmjs.com/package/@mcp-b/webmcp-types): TypeScript definitions for WebMCP APIs
+- [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types): Upstream TypeScript declarations for WebMCP
 - [`@mcp-b/webmcp-polyfill`](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill): Strict browser polyfill for `document.modelContext`
+- [`@mcp-b/webmcp-ts-sdk`](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk): WebMCP adapter, MCP-B extensions, and schema helpers
 - [`@mcp-b/global`](https://www.npmjs.com/package/@mcp-b/global): Full browser MCP-B runtime
 - [`@mcp-b/transports`](https://www.npmjs.com/package/@mcp-b/transports): Browser transport primitives
 - [`usewebmcp`](https://www.npmjs.com/package/usewebmcp): Lightweight React hook

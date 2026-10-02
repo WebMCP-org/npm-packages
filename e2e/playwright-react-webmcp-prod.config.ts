@@ -1,19 +1,21 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test';
 
 const chromiumChannel = process.env.PLAYWRIGHT_CHROMIUM_CHANNEL;
+const chromiumUse: NonNullable<PlaywrightTestConfig['use']> = {
+  ...devices['Desktop Chrome'],
+  launchOptions: { args: ['--disable-features=WebMCP'] },
+};
+if (chromiumChannel) chromiumUse.channel = chromiumChannel;
 
 /**
- * Playwright config for React WebMCP production build tests.
- * This tests against a minified production build to verify polyfill detection
- * works correctly even when class names are minified.
+ * Playwright config for React WebMCP tests against a minified production build.
  */
-export default defineConfig({
+const config: PlaywrightTestConfig = {
   testDir: './tests',
   testMatch: '**/react-webmcp-production.spec.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  ...(process.env.CI ? { workers: 1 } : {}),
   reporter: [['html'], ['list'], ...(process.env.CI ? [['github'] as const] : [])],
   use: {
     baseURL: 'http://localhost:8889',
@@ -21,15 +23,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
 
-  projects: [
-    {
-      name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        ...(chromiumChannel ? { channel: chromiumChannel } : {}),
-      },
-    },
-  ],
+  projects: [{ name: 'chromium', use: chromiumUse }],
 
   /* Build and preview production build */
   webServer: {
@@ -41,4 +35,8 @@ export default defineConfig({
     stdout: 'ignore',
     stderr: 'pipe',
   },
-});
+};
+
+if (process.env.CI) config.workers = 1;
+
+export default defineConfig(config);

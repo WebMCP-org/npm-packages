@@ -20,7 +20,9 @@ body:
         - '@mcp-b/webmcp-extension'
         - '@mcp-b/mcp-iframe'
         - '@mcp-b/smart-dom-reader'
-        - '@webmcp/helpers'
+        - '@mcp-b/webmcp-polyfill'
+        - '@mcp-b/webmcp-local-relay'
+        - 'usewebmcp'
         - 'New package'
         - 'Other / Multiple'
     validations:

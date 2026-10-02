@@ -3,8 +3,7 @@ const CLOSE_DELAY_MS = 160;
 const VIEWPORT_GAP_PX = 8;
 const BOUND_ATTR = 'data-hero-copy-popovers';
 
-const prefersReducedMotion = () =>
-  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function isPopoverOpen(popover: HTMLElement) {
   return popover.matches(':popover-open, .\\:popover-open');
@@ -61,10 +60,8 @@ function pairFromEvent(target: EventTarget | null) {
 
 export function initHeroCopyPopovers() {
   if (document.documentElement.hasAttribute(BOUND_ATTR)) return;
-  if (
-    typeof HTMLElement === 'undefined' ||
-    typeof HTMLElement.prototype.showPopover !== 'function'
-  ) {
+  const elementConstructor = globalThis.HTMLElement;
+  if (!elementConstructor || typeof elementConstructor.prototype.showPopover !== 'function') {
     return;
   }
   document.documentElement.setAttribute(BOUND_ATTR, 'true');

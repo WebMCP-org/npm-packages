@@ -45,7 +45,11 @@
     },
     {
       "source": "/packages/types",
-      "destination": "/packages/webmcp-types/overview"
+      "destination": "/reference/webmcp/standard-api"
+    },
+    {
+      "source": "/packages/webmcp-types/:slug*",
+      "destination": "/reference/webmcp/standard-api"
     },
     {
       "source": "/explanation/webmcp/standard-api",
@@ -200,10 +204,6 @@
           {
             "group": "Core runtime",
             "pages": [
-              {
-                "group": "@mcp-b/webmcp-types",
-                "pages": ["packages/webmcp-types/overview", "packages/webmcp-types/reference"]
-              },
               {
                 "group": "@mcp-b/webmcp-polyfill",
                 "pages": ["packages/webmcp-polyfill/overview", "packages/webmcp-polyfill/reference"]

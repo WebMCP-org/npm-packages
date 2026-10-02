@@ -234,6 +234,7 @@ export class SelectorGenerator {
   private static getSelectorRoot(element: Element): SelectorRoot {
     const root = element.getRootNode();
     if (root.nodeType === Node.DOCUMENT_NODE || root.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+      // SAFETY: nodeType identifies Document or DocumentFragment across iframe realms.
       return root as SelectorRoot;
     }
     return element.ownerDocument || document;
@@ -253,8 +254,12 @@ export class SelectorGenerator {
   private static getSelectorParent(element: Element): SelectorRoot | Element | null {
     const parent = element.parentNode;
     if (!parent) return null;
-    if (parent.nodeType === Node.ELEMENT_NODE) return parent as Element;
+    if (parent.nodeType === Node.ELEMENT_NODE) {
+      // SAFETY: nodeType identifies Element even when its constructor belongs to another realm.
+      return parent as Element;
+    }
     if (parent.nodeType === Node.DOCUMENT_NODE || parent.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+      // SAFETY: nodeType identifies Document or DocumentFragment, including ShadowRoot.
       return parent as SelectorRoot;
     }
     return null;
@@ -348,8 +353,8 @@ export class SelectorGenerator {
       // Add semantic information
       if (current.id) {
         descriptor = `${tag}#${current.id}`;
-      } else if (current.className && typeof current.className === 'string') {
-        const firstClass = current.className.split(' ')[0];
+      } else {
+        const firstClass = current.getAttribute('class')?.split(' ')[0];
         if (firstClass) {
           descriptor = `${tag}.${firstClass}`;
         }

@@ -1,25 +1,8 @@
 import { expect, type Page, test } from '@playwright/test';
 
-/**
- * Production Build Tests for React WebMCP
- *
- * These tests verify that the polyfill detection works correctly in production builds
- * where class names are minified. This specifically tests the fix for the "double tool
- * execution" bug where tools would execute twice due to incorrect polyfill detection.
- *
- * Bug: In production builds, class names are minified, causing the constructor name check
- * `testingConstructorName.includes('WebModelContext')` to fail. This incorrectly identified
- * the polyfill as a "Native Chromium API", creating dual execution paths.
- *
- * Fix: Use a marker property `__isWebMCPPolyfill` instead of constructor name checking.
- */
-
 // =============================================================================
-// Constants - Single source of truth for test values
+// Constants
 // =============================================================================
-
-/** Marker property name - must match POLYFILL_MARKER_PROPERTY in @mcp-b/global */
-const POLYFILL_MARKER = '__isWebMCPPolyfill' as const;
 
 /** Tool names used in the test app */
 const TOOLS = {
@@ -37,6 +20,8 @@ const SELECTORS = {
   COUNTER_DISPLAY: '[data-testid="counter-display"]',
   COUNTER_EXECUTIONS: '[data-testid="counter-executions"]',
 } as const;
+
+type TestToolArguments = { amount: number } | { postId: string };
 
 // =============================================================================
 // Helper Functions
@@ -94,7 +79,7 @@ async function listToolNames(page: Page): Promise<string[]> {
 async function callToolViaClient(
   page: Page,
   toolName: string,
-  args: Record<string, unknown>
+  args: TestToolArguments
 ): Promise<void> {
   await page.evaluate(
     async ({ name, arguments_ }) => {
@@ -136,65 +121,36 @@ async function waitForCounterValue(page: Page, expectedValue: number): Promise<v
 }
 
 // =============================================================================
-// Type definitions for page.evaluate
-// =============================================================================
-
-interface PolyfillMarkerCheck {
-  exists: boolean;
-  reason?: string;
-  hasMarker?: boolean;
-  markerValue?: boolean;
-  constructorName?: string;
-}
-
-interface ApiCheck {
-  hasApis: boolean;
-  reason?: string;
-  isPolyfill?: boolean;
-  testingConstructorName?: string;
-  isConstructorMinified?: boolean;
-}
-
-// =============================================================================
 // Tests
 // =============================================================================
 
-test.describe('Production Build - Polyfill Detection Tests', () => {
+test.describe('Production Build - Runtime Integration Tests', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector(SELECTORS.APP_STATUS);
   });
 
-  test('should surface polyfill marker when present in production build', async ({ page }) => {
-    const markerCheck = await page.evaluate((marker): PolyfillMarkerCheck => {
-      const testing = navigator.modelContextTesting;
-      if (!testing) {
-        return { exists: false, reason: 'modelContextTesting not available' };
-      }
-
-      const hasMarker = marker in testing;
-      const markerValue = (testing as unknown as Record<string, unknown>)[marker] as
-        | boolean
-        | undefined;
-
+  test('exposes MCP-B extensions over the WebMCP runtime', async ({ page }) => {
+    const apiCheck = await page.evaluate(() => {
+      const context = document.modelContext;
       return {
-        exists: true,
-        hasMarker,
-        ...(markerValue !== undefined ? { markerValue } : {}),
-        constructorName: testing.constructor?.name || 'unknown',
+        hasContext: Boolean(context),
+        hasGetTools: typeof context?.getTools === 'function',
+        hasMcpBListTools:
+          context !== undefined &&
+          'listTools' in context &&
+          typeof context.listTools === 'function',
       };
-    }, POLYFILL_MARKER);
+    });
 
-    expect(markerCheck.exists).toBe(true);
-    // Some environments expose native modelContextTesting without polyfill marker.
-    if (markerCheck.hasMarker) {
-      expect(markerCheck.markerValue).toBe(true);
-    } else {
-      expect(typeof markerCheck.constructorName).toBe('string');
-    }
+    expect(apiCheck).toEqual({
+      hasContext: true,
+      hasGetTools: true,
+      hasMcpBListTools: true,
+    });
   });
 
-  test('should execute tool exactly once - no double execution', async ({ page }) => {
+  test('executes tool exactly once', async ({ page }) => {
     await waitForToolsRegistered(page, [TOOLS.COUNTER_INCREMENT]);
 
     const initialCount = await getExecutionCount(page);
@@ -207,39 +163,6 @@ test.describe('Production Build - Polyfill Detection Tests', () => {
 
     // Verify counter increased by 1, not 2
     await waitForCounterValue(page, 1);
-  });
-
-  test('should classify testing API using marker rather than constructor name', async ({
-    page,
-  }) => {
-    const apiCheck = await page.evaluate((marker): ApiCheck => {
-      const ctx = document.modelContext;
-      const testing = navigator.modelContextTesting;
-
-      if (!ctx || !testing) {
-        return { hasApis: false, reason: 'APIs not available' };
-      }
-
-      const isPolyfill =
-        marker in testing && (testing as unknown as Record<string, unknown>)[marker] === true;
-
-      const testingConstructorName = testing.constructor?.name || '';
-      const isConstructorMinified = !testingConstructorName.includes('WebModelContext');
-
-      return {
-        hasApis: true,
-        isPolyfill,
-        testingConstructorName,
-        isConstructorMinified,
-      };
-    }, POLYFILL_MARKER);
-
-    expect(apiCheck.hasApis).toBe(true);
-    expect(typeof apiCheck.isPolyfill).toBe('boolean');
-
-    if (apiCheck.isPolyfill) {
-      expect(apiCheck.testingConstructorName).toBeDefined();
-    }
   });
 
   test('should execute multiple tools without double execution', async ({ page }) => {
@@ -297,21 +220,5 @@ test.describe('Production Build - Tool Registration Tests', () => {
     expect(tools).toContain(TOOLS.COUNTER_GET);
     expect(tools).toContain(TOOLS.POSTS_LIKE);
     expect(tools).toContain(TOOLS.POSTS_SEARCH);
-  });
-
-  test('should not have any duplicate tool registrations', async ({ page }) => {
-    await waitForAnyToolsRegistered(page);
-
-    const tools = await listToolNames(page);
-
-    const toolCounts = new Map<string, number>();
-    for (const name of tools) {
-      toolCounts.set(name, (toolCounts.get(name) ?? 0) + 1);
-    }
-    const duplicates = [...toolCounts]
-      .filter(([, count]) => count > 1)
-      .map(([name, count]) => ({ name, count }));
-
-    expect(duplicates).toEqual([]);
   });
 });

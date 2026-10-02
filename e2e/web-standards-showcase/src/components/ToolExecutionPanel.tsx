@@ -1,9 +1,14 @@
 import { withTheme } from '@rjsf/core';
 import { Theme as shadcnTheme } from '@rjsf/shadcn';
+import type { RJSFSchema } from '@rjsf/utils';
 import validator from '@rjsf/validator-ajv8';
 import { ChevronDown, ChevronRight, Wrench } from 'lucide-react';
 import type { FC } from 'react';
 import { useCallback, useState } from 'react';
+import type {
+  JSONObject as JsonObject,
+  JSONValue as JsonValue,
+} from '@modelcontextprotocol/server';
 import { formatMcpResult } from '../lib/mcp-utils';
 import { cn } from '../lib/utils';
 import type { ToolInfo } from '../types';
@@ -14,9 +19,19 @@ const Form = withTheme(shadcnTheme);
 
 type ToolCallState =
   | { status: 'idle' }
-  | { status: 'loading'; params: Record<string, unknown> }
-  | { status: 'success'; params: Record<string, unknown>; result: unknown }
-  | { status: 'error'; params: Record<string, unknown>; error: string };
+  | { status: 'loading'; params: JsonObject }
+  | { status: 'success'; params: JsonObject; result: JsonValue }
+  | { status: 'error'; params: JsonObject; error: string };
+
+const emptyInputSchema = { type: 'object', properties: {} } satisfies RJSFSchema;
+
+function parseResult(result: string): JsonValue | string {
+  try {
+    return JSON.parse(result);
+  } catch {
+    return result;
+  }
+}
 
 interface ToolExecutionPanelProps {
   /** Array of tools to display and execute */
@@ -45,7 +60,7 @@ export const ToolExecutionPanel: FC<ToolExecutionPanelProps> = ({
   const [toolStates, setToolStates] = useState<Record<string, ToolCallState>>({});
 
   const handleToolCall = useCallback(
-    async (toolName: string, args: Record<string, unknown>) => {
+    async (toolName: string, args: JsonObject) => {
       // Set loading state with params
       setToolStates((prev) => ({
         ...prev,
@@ -56,14 +71,7 @@ export const ToolExecutionPanel: FC<ToolExecutionPanelProps> = ({
         const argsJson = JSON.stringify(args);
         const resultString = await onToolCall(toolName, argsJson);
 
-        // Try to parse as JSON, but if it fails, treat as plain string
-        let result: unknown;
-        try {
-          result = JSON.parse(resultString);
-        } catch {
-          // If JSON parsing fails, the result is a plain string
-          result = resultString;
-        }
+        const result = parseResult(resultString);
 
         // Set success state with params and result
         setToolStates((prev) => ({
@@ -71,7 +79,7 @@ export const ToolExecutionPanel: FC<ToolExecutionPanelProps> = ({
           [toolName]: { status: 'success', params: args, result },
         }));
 
-        // Clear success state after 3 seconds
+        // Clear success state after 5 seconds
         setTimeout(() => {
           setToolStates((prev) => {
             const newState = { ...prev };
@@ -117,18 +125,8 @@ export const ToolExecutionPanel: FC<ToolExecutionPanelProps> = ({
           const isError = toolState.status === 'error';
           const hasExecuted = isLoading || isSuccess || isError;
 
-          // An object since webmcp#241; a serialized string from older Chrome.
-          // undefined means the tool takes no arguments: render an empty form.
-          let parsedSchema: unknown;
-          try {
-            parsedSchema =
-              typeof tool.inputSchema === 'string'
-                ? JSON.parse(tool.inputSchema)
-                : (tool.inputSchema ?? { type: 'object', properties: {} });
-          } catch (e) {
-            console.error(`Failed to parse schema for tool ${tool.name}:`, e);
-            parsedSchema = { type: 'object', properties: {} };
-          }
+          // Missing input schema means the tool takes no arguments.
+          const parsedSchema = tool.inputSchema ?? emptyInputSchema;
 
           // Parse MCP result if success
           const formattedResult =
@@ -235,11 +233,11 @@ export const ToolExecutionPanel: FC<ToolExecutionPanelProps> = ({
                     {!hasExecuted && (
                       <div className="pt-2">
                         <Form
-                          schema={parsedSchema as Record<string, unknown>}
+                          schema={parsedSchema}
                           validator={validator}
                           disabled={isLoading}
-                          onSubmit={(data: { formData?: unknown }) => {
-                            handleToolCall(tool.name, data.formData as Record<string, unknown>);
+                          onSubmit={(data) => {
+                            handleToolCall(tool.name, data.formData ?? {});
                           }}
                         />
                       </div>

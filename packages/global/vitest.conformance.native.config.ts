@@ -3,11 +3,11 @@ import { defineConfig } from 'vite-plus';
 import {
   LINUX_CHROME_EXECUTABLE_PATHS,
   MACOS_CHROME_EXECUTABLE_PATHS,
+  MIN_NATIVE_CHROME_MAJOR,
   resolveChromeExecutable,
 } from '../../e2e/chrome-executable.js';
 
 const isCI = process.env.CI === 'true';
-const MIN_NATIVE_CHROME_MAJOR = 152;
 const REQUIRED_WEBMCP_FEATURES = ['WebMCP', 'DevToolsWebMCPSupport'];
 
 function resolveChromeFlags(): string[] {

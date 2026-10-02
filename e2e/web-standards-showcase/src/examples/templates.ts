@@ -2,7 +2,7 @@
  * Pre-built tool templates for the live code editor
  */
 
-export const templates: Record<string, string> = {
+export const templates = {
   counter: `// Counter Tool
 let counter = 0;
 
@@ -282,4 +282,4 @@ const stateMachineTool = {
 };
 
 document.modelContext.registerTool(stateMachineTool);`,
-};
+} satisfies Record<string, string>;

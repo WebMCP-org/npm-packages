@@ -8,11 +8,21 @@ export interface ExtensionClientTransportOptions {
   portName?: string;
 }
 
+function isKeepAliveMessage(message: unknown): message is { type: 'keep-alive' } {
+  return (
+    typeof message === 'object' &&
+    message !== null &&
+    'type' in message &&
+    message.type === 'keep-alive'
+  );
+}
+
 /** Client transport for Chrome extension Port messaging. */
 export class ExtensionClientTransport implements Transport {
   private _port: chrome.runtime.Port | undefined;
   private readonly _extensionId: string | undefined;
   private readonly _portName: string;
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- port input is untrusted until JSONRPCMessageSchema parses it
   private _messageHandler: ((message: unknown) => void) | undefined;
   private _disconnectHandler: (() => void) | undefined;
   private _started = false;
@@ -47,14 +57,8 @@ export class ExtensionClientTransport implements Transport {
         ? runtime.connect(this._extensionId, { name: this._portName })
         : runtime.connect({ name: this._portName });
       this._port = port;
-      this._messageHandler = (message: unknown) => {
-        if (
-          typeof message === 'object' &&
-          message !== null &&
-          Reflect.get(message, 'type') === 'keep-alive'
-        ) {
-          return;
-        }
+      this._messageHandler = (message) => {
+        if (isKeepAliveMessage(message)) return;
 
         try {
           const mcpMessage = JSONRPCMessageSchema.parse(message);

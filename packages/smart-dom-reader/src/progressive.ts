@@ -146,7 +146,7 @@ export class ProgressiveExtractor {
     if (options.includeLists !== false) {
       const lists = element.querySelectorAll('ul, ol');
       result.text.lists = Array.from(lists).map((list) => ({
-        type: list.tagName.toLowerCase() as 'ul' | 'ol',
+        type: list.tagName.toLowerCase() === 'ul' ? 'ul' : 'ol',
         items: Array.from(list.querySelectorAll('li')).map((li) =>
           ProgressiveExtractor.getTextContent(li, options.maxTextLength)
         ),
@@ -179,7 +179,7 @@ export class ProgressiveExtractor {
 
       result.media = [
         ...Array.from(images).map((img) => {
-          const item: { type: 'img'; alt?: string; src?: string } = { type: 'img' };
+          const item: NonNullable<ExtractedContent['media']>[number] = { type: 'img' };
           const alt = img.getAttribute('alt');
           const src = img.getAttribute('src');
           if (alt) item.alt = alt;
@@ -187,13 +187,13 @@ export class ProgressiveExtractor {
           return item;
         }),
         ...Array.from(videos).map((video) => {
-          const item: { type: 'video'; src?: string } = { type: 'video' };
+          const item: NonNullable<ExtractedContent['media']>[number] = { type: 'video' };
           const src = video.getAttribute('src');
           if (src) item.src = src;
           return item;
         }),
         ...Array.from(audios).map((audio) => {
-          const item: { type: 'audio'; src?: string } = { type: 'audio' };
+          const item: NonNullable<ExtractedContent['media']>[number] = { type: 'audio' };
           const src = audio.getAttribute('src');
           if (src) item.src = src;
           return item;
@@ -318,12 +318,7 @@ export class ProgressiveExtractor {
         purpose = 'checkout';
       }
 
-      const formOverview: {
-        selector: string;
-        location: string;
-        inputCount: number;
-        purpose?: string;
-      } = {
+      const formOverview: StructuralOverview['forms'][number] = {
         selector,
         location,
         inputCount: inputs.length,

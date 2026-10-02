@@ -66,7 +66,7 @@ class IframeEventLog {
   log(type: 'info' | 'success' | 'warning' | 'error', message: string): void {
     if (!this.container) return;
 
-    const colors: Record<string, string> = {
+    const colors = {
       info: 'text-blue-400',
       success: 'text-green-400',
       warning: 'text-yellow-400',
@@ -106,25 +106,19 @@ function init(): void {
     return;
   }
 
-  // Get API references
-  const rawModelContext = document.modelContext as unknown as
-    | (ModelContext & {
-        provideContext?: unknown;
-        clearContext?: unknown;
-        unregisterTool?: unknown;
-      })
-    | undefined;
-  (
-    window as Window & { __WEBMCP_SHOWCASE_RAW_SURFACE__?: Record<string, boolean> }
-  ).__WEBMCP_SHOWCASE_RAW_SURFACE__ = {
-    hasModelContext: Boolean(rawModelContext),
-    hasGetTools: typeof rawModelContext?.getTools === 'function',
-    hasExecuteTool: typeof rawModelContext?.executeTool === 'function',
-    hasUnregisterTool: typeof rawModelContext?.unregisterTool === 'function',
-    hasClearContext: typeof rawModelContext?.clearContext === 'function',
-    hasProvideContext: typeof rawModelContext?.provideContext === 'function',
+  const rawModelContext = detection.context;
+  window.__WEBMCP_SHOWCASE_RAW_SURFACE__ = {
+    hasModelContext: true,
+    hasGetTools: typeof rawModelContext.getTools === 'function',
+    hasExecuteTool: typeof rawModelContext.executeTool === 'function',
+    hasUnregisterTool:
+      'unregisterTool' in rawModelContext && typeof rawModelContext.unregisterTool === 'function',
+    hasClearContext:
+      'clearContext' in rawModelContext && typeof rawModelContext.clearContext === 'function',
+    hasProvideContext:
+      'provideContext' in rawModelContext && typeof rawModelContext.provideContext === 'function',
   };
-  modelContext = rawModelContext as ModelContext;
+  modelContext = rawModelContext;
 
   // Initialize UI managers
   eventLog = new EventLog('event-log');
@@ -149,18 +143,10 @@ function updateDetectionBanner(detection: ReturnType<typeof detectNativeAPI>): v
 
   if (!banner || !status) return;
 
-  if (detection.isNative) {
-    banner.className = 'sticky top-0 z-50 bg-green-600 text-white shadow-lg';
-    status.innerHTML = `
-      <span class="flex items-center gap-4 py-3 text-sm">${detection.message}</span>
-    `;
-  } else if (detection.available && detection.isPolyfill) {
-    banner.className = 'sticky top-0 z-50 bg-yellow-600 text-white shadow-lg';
-    status.innerHTML = `<span class="flex items-center gap-4 py-3 text-sm">${detection.message}</span>`;
-  } else {
-    banner.className = 'sticky top-0 z-50 bg-red-600 text-white shadow-lg';
-    status.innerHTML = `<span class="flex items-center gap-4 py-3 text-sm">${detection.message}</span>`;
-  }
+  banner.className = detection.isNative
+    ? 'sticky top-0 z-50 bg-green-600 text-white shadow-lg'
+    : 'sticky top-0 z-50 bg-red-600 text-white shadow-lg';
+  status.innerHTML = `<span class="flex items-center gap-4 py-3 text-sm">${detection.message}</span>`;
 }
 
 /**
@@ -193,13 +179,14 @@ function disableApp(): void {
  */
 function setupEventListeners(): void {
   // Editor controls
-  const templateSelect = document.getElementById('template-select') as HTMLSelectElement;
+  const templateSelect = document.querySelector<HTMLSelectElement>('#template-select');
   const clearEditorBtn = document.getElementById('clear-editor');
   const registerCodeBtn = document.getElementById('register-code');
-  const codeEditor = document.getElementById('code-editor') as HTMLTextAreaElement;
+  const codeEditor = document.querySelector<HTMLTextAreaElement>('#code-editor');
+  if (!templateSelect || !codeEditor) return;
 
-  templateSelect?.addEventListener('change', () => {
-    const template = templates[templateSelect.value];
+  templateSelect.addEventListener('change', () => {
+    const template = Object.entries(templates).find(([name]) => name === templateSelect.value)?.[1];
     if (template) {
       codeEditor.value = template;
       eventLog.info('Template loaded', templateSelect.value);
@@ -223,7 +210,7 @@ function setupEventListeners(): void {
   document.getElementById('register-timer-tool')?.addEventListener('click', registerTimerTool);
   document.getElementById('unregister-timer')?.addEventListener('click', unregisterTimerTool);
 
-  // Native discovery and Chromium execution extension
+  // Native discovery and execution
   document.getElementById('list-tools')?.addEventListener('click', listToolsDemo);
   document.getElementById('execute-tool')?.addEventListener('click', executeToolDemo);
   document.getElementById('unregister-tool')?.addEventListener('click', unregisterToolDemo);
@@ -308,8 +295,8 @@ function refreshToolDisplay(): void {
       updateBucketIndicators();
       updateParentToolsDisplay(tools.map((tool) => tool.name));
     })
-    .catch((error: unknown) => {
-      eventLog.error('getTools() failed', error instanceof Error ? error.message : String(error));
+    .catch((cause: unknown) => {
+      eventLog.error('getTools() failed', cause instanceof Error ? cause.message : String(cause));
     });
 }
 
@@ -339,9 +326,8 @@ function updateReactToolExecutor(tools: ToolInfo[]): void {
 }
 
 async function executeRegisteredTool(toolName: string, argsJson: string): Promise<string> {
-  const executeTool = modelContext.executeTool;
-  if (typeof executeTool !== 'function') {
-    throw new Error("This Chromium build doesn't expose the optional executeTool() extension");
+  if (typeof modelContext.executeTool !== 'function') {
+    throw new Error("This Chromium build doesn't expose executeTool()");
   }
 
   const tool = (await modelContext.getTools()).find((candidate) => candidate.name === toolName);
@@ -349,7 +335,7 @@ async function executeRegisteredTool(toolName: string, argsJson: string): Promis
     throw new Error(`Tool "${toolName}" was not found`);
   }
 
-  return (await executeTool.call(modelContext, tool, argsJson)) ?? '';
+  return (await modelContext.executeTool(tool, JSON.parse(argsJson))) ?? '';
 }
 
 /**
@@ -373,7 +359,7 @@ function updateBucketIndicators(): void {
  * Update tool executor select dropdown
  */
 function updateToolExecutorSelect(tools: ToolInfo[]): void {
-  const select = document.getElementById('exec-tool-select') as HTMLSelectElement;
+  const select = document.querySelector<HTMLSelectElement>('#exec-tool-select');
   if (!select) return;
 
   select.innerHTML = '<option value="">Select a tool...</option>';
@@ -587,9 +573,10 @@ function clearContextDemo(): void {
 // ==================== Tool Executor ====================
 
 async function executeSelectedTool(): Promise<void> {
-  const select = document.getElementById('exec-tool-select') as HTMLSelectElement;
-  const input = document.getElementById('exec-input') as HTMLTextAreaElement;
+  const select = document.querySelector<HTMLSelectElement>('#exec-tool-select');
+  const input = document.querySelector<HTMLTextAreaElement>('#exec-input');
   const result = document.getElementById('exec-result');
+  if (!select || !input) return;
 
   if (!select.value) {
     eventLog.warning('No tool selected', 'Please select a tool first');
@@ -697,7 +684,7 @@ function setupIframeMessageListener(): void {
  * Send a command to the iframe
  */
 function sendIframeCommand(command: string): void {
-  const iframe = document.getElementById('test-iframe') as HTMLIFrameElement;
+  const iframe = document.querySelector<HTMLIFrameElement>('#test-iframe');
   if (iframe?.contentWindow) {
     if (!iframeReady && command !== 'get-tools') {
       iframeEventLog.log('warning', `Iframe not ready, command may not be processed: ${command}`);
@@ -794,7 +781,7 @@ function updateIframeStatusIndicator(ready: boolean): void {
  * Update iframe unregister button state
  */
 function updateIframeUnregisterButton(enabled: boolean): void {
-  const btn = document.getElementById('iframe-child-unregister-b') as HTMLButtonElement;
+  const btn = document.querySelector<HTMLButtonElement>('#iframe-child-unregister-b');
   if (btn) {
     btn.disabled = !enabled;
   }
@@ -881,7 +868,7 @@ function updateContextComparison(): void {
  * Reload the iframe
  */
 function reloadIframe(): void {
-  const iframe = document.getElementById('test-iframe') as HTMLIFrameElement;
+  const iframe = document.querySelector<HTMLIFrameElement>('#test-iframe');
   if (iframe) {
     iframeReady = false;
     iframeTools = [];
@@ -953,7 +940,7 @@ function iframeParentRegisterBucketB(): void {
   const registration = registerShowcaseTool(modelContext, tool);
   iframeBucketBRegistrations.set('parent_time', registration);
 
-  const btn = document.getElementById('iframe-parent-unregister-b') as HTMLButtonElement;
+  const btn = document.querySelector<HTMLButtonElement>('#iframe-parent-unregister-b');
   if (btn) {
     btn.disabled = false;
   }
@@ -972,7 +959,7 @@ function iframeParentUnregisterBucketB(): void {
     registration.unregister();
     iframeBucketBRegistrations.delete('parent_time');
 
-    const btn = document.getElementById('iframe-parent-unregister-b') as HTMLButtonElement;
+    const btn = document.querySelector<HTMLButtonElement>('#iframe-parent-unregister-b');
     if (btn) {
       btn.disabled = true;
     }
@@ -989,7 +976,7 @@ function iframeParentUnregisterBucketB(): void {
 function iframeParentClearContext(): void {
   clearIframeParentRegistrations();
 
-  const btn = document.getElementById('iframe-parent-unregister-b') as HTMLButtonElement;
+  const btn = document.querySelector<HTMLButtonElement>('#iframe-parent-unregister-b');
   if (btn) {
     btn.disabled = true;
   }

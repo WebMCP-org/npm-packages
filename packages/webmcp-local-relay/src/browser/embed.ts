@@ -11,63 +11,41 @@
  * chain multiple API calls:
  * `<script src=".../embed.js" data-request-timeout="120000"></script>`
  */
-import { normalizeToolResponse } from '@mcp-b/webmcp-polyfill/schema';
-import type {
-  ChromeModelContextExtensions,
-  ModelContext,
-  RegisteredTool,
-} from '@mcp-b/webmcp-types';
+import type { RegisteredTool, WebMcpToolObjectInput } from '@mcp-b/webmcp-ts-sdk';
 import type { CallToolResult } from '@modelcontextprotocol/server';
-import { createRequestId, isJsonObject } from './shared.js';
+import {
+  isJsonObject,
+  isMessageEnvelope,
+  type MessageEnvelope,
+  normalizeSerializedToolResult,
+  selectRelayTools,
+} from './shared.js';
 
-/** Loose JSON object: values aren't recursively typed since we just forward them. */
-type JsonObject = Record<string, unknown>;
+type RelayToolDescriptor = Pick<
+  RegisteredTool,
+  'name' | 'title' | 'description' | 'inputSchema' | 'annotations'
+>;
 
-interface RelayToolDescriptor {
-  name: string;
-  title?: string;
-  description: string;
-  inputSchema?: unknown;
-  annotations?: RegisteredTool['annotations'];
-}
-
-interface DescriptorToolContext extends ModelContext {
-  executeTool: NonNullable<ChromeModelContextExtensions['executeTool']>;
-}
-
-interface WidgetRequestMessage {
-  requestId: string;
-  type: string;
-  toolName?: unknown;
-  args?: unknown;
-}
-
+/** The widget URL plus the settings the widget's `parseConfig()` reads, by key. */
 interface RelayConfig {
-  autoConnect: boolean;
+  autoConnect: string;
   relayHost: string;
   relayPort: string;
-  relayId?: string;
-  relayWorkspace?: string;
-  requestTimeout?: string;
+  relayId: string | undefined;
+  relayWorkspace: string | undefined;
+  requestTimeout: string | undefined;
   tabId: string;
   widgetUrl: string;
-  widgetOrigin: string;
 }
 
 const RELAY_IFRAME_SELECTOR = '[data-webmcp-relay]';
 const TAB_ID_STORAGE_KEY = '__webmcp_relay_tab_id';
 const TOOL_SYNC_POLL_INTERVAL_MS = 2000;
-const INPUT_REQUIRED_UNSUPPORTED_MESSAGE =
-  'The WebMCP local relay cannot forward MCP input_required results. Multi-round tool flows require direct McpServer registration.';
 
 let widgetWindow: Window | null = null;
-let config: RelayConfig;
 
-function getCurrentScriptElement(): HTMLScriptElement | null {
-  return document.currentScript instanceof HTMLScriptElement ? document.currentScript : null;
-}
-
-const scriptEl = getCurrentScriptElement();
+const scriptEl =
+  document.currentScript instanceof HTMLScriptElement ? document.currentScript : null;
 const DEBUG = scriptEl ? scriptEl.hasAttribute('data-debug') : false;
 
 function debugWarn(...args: unknown[]): void {
@@ -84,7 +62,7 @@ function readOrCreateTabId(): string {
     debugWarn('sessionStorage read failed, tab ID will not persist:', err);
   }
 
-  const tabId = createRequestId();
+  const tabId = crypto.randomUUID();
   try {
     sessionStorage.setItem(TAB_ID_STORAGE_KEY, tabId);
   } catch (err) {
@@ -94,133 +72,75 @@ function readOrCreateTabId(): string {
   return tabId;
 }
 
-function resolveWidgetUrl(script: HTMLScriptElement | null): string {
+function buildRelayConfig(script: HTMLScriptElement | null): RelayConfig {
   if (!script?.src) {
     throw new Error('The relay embed script must be loaded from a URL');
   }
-  return new URL('widget.html', script.src).href;
-}
-
-function buildRelayConfig(script: HTMLScriptElement | null): RelayConfig {
-  const widgetUrl = resolveWidgetUrl(script);
-  const relayId = script?.getAttribute('data-relay-id') || undefined;
-  const relayWorkspace = script?.getAttribute('data-relay-workspace') || undefined;
-  const requestTimeout = script?.getAttribute('data-request-timeout') || undefined;
   return {
-    autoConnect: script?.getAttribute('data-auto-connect') !== 'false',
-    relayHost: script?.getAttribute('data-relay-host') || '127.0.0.1',
-    relayPort: script?.getAttribute('data-relay-port') || '9333',
-    ...(relayId ? { relayId } : {}),
-    ...(relayWorkspace ? { relayWorkspace } : {}),
-    ...(requestTimeout ? { requestTimeout } : {}),
+    autoConnect: String(script.getAttribute('data-auto-connect') !== 'false'),
+    relayHost: script.getAttribute('data-relay-host') || '127.0.0.1',
+    relayPort: script.getAttribute('data-relay-port') || '9333',
+    relayId: script.getAttribute('data-relay-id') || undefined,
+    relayWorkspace: script.getAttribute('data-relay-workspace') || undefined,
+    requestTimeout: script.getAttribute('data-request-timeout') || undefined,
     tabId: readOrCreateTabId(),
-    widgetUrl,
-    widgetOrigin: new URL(widgetUrl).origin,
+    widgetUrl: new URL('widget.html', script.src).href,
   };
-}
-
-function toInvokeArgs(value: unknown): JsonObject {
-  if (isJsonObject(value)) return value;
-  if (value !== undefined && value !== null) {
-    debugWarn('Tool invocation args must be an object, got', typeof value);
-  }
-  return {};
 }
 
 function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor | null {
-  let inputSchema: unknown;
-  if (tool.inputSchema !== undefined) {
-    // An object since webmcp#241 -- no copy needed, postMessage structured-clones
-    // it out of the page world. A serialized string from older Chrome.
-    if (typeof tool.inputSchema === 'string') {
-      try {
-        inputSchema = JSON.parse(tool.inputSchema) as unknown;
-      } catch {
-        // Unconditional: dropping a tool is a functional loss, not debug noise,
-        // and one bad schema must not take down the page's whole relay list.
-        console.warn(
-          `[webmcp-relay-embed] Tool "${tool.name}" was not relayed because its input schema is malformed.`
-        );
-        return null;
-      }
-    } else {
-      inputSchema = tool.inputSchema;
-    }
+  if (tool.inputSchema !== undefined && !isJsonObject(tool.inputSchema)) {
+    console.warn(
+      `[webmcp-relay-embed] Tool "${tool.name}" was not relayed because its input schema is malformed.`
+    );
+    return null;
   }
-  return {
+  const descriptor: RelayToolDescriptor = {
     name: tool.name,
-    ...(tool.title === undefined ? {} : { title: tool.title }),
+    title: tool.title,
     description: tool.description,
-    ...(inputSchema === undefined ? {} : { inputSchema }),
-    ...(tool.annotations === undefined ? {} : { annotations: tool.annotations }),
   };
-}
-
-function normalizeSerializedToolResult(serialized: string | null): CallToolResult {
-  if (serialized === null) {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: 'Tool execution interrupted by navigation' }],
-    };
-  }
-
-  let rawResult: unknown;
-  try {
-    rawResult = JSON.parse(serialized);
-  } catch {
-    // Chrome returns callback strings directly rather than JSON-quoting them.
-    rawResult = serialized;
-  }
-
-  if (isJsonObject(rawResult) && rawResult.resultType === 'input_required') {
-    return {
-      isError: true,
-      content: [{ type: 'text', text: INPUT_REQUIRED_UNSUPPORTED_MESSAGE }],
-    };
-  }
-
-  return normalizeToolResponse(rawResult);
-}
-
-function hasDescriptorToolApi(
-  modelContext: ModelContext | undefined
-): modelContext is DescriptorToolContext {
-  return Boolean(
-    modelContext && 'executeTool' in modelContext && typeof modelContext.executeTool === 'function'
-  );
-}
-
-function getDocumentDescriptorContext(): DescriptorToolContext | undefined {
-  const modelContext: ModelContext | undefined = document.modelContext;
-  return hasDescriptorToolApi(modelContext) ? modelContext : undefined;
+  if (tool.inputSchema !== undefined) descriptor.inputSchema = tool.inputSchema;
+  if (tool.annotations !== undefined) descriptor.annotations = tool.annotations;
+  return descriptor;
 }
 
 async function listRelayTools(): Promise<RelayToolDescriptor[]> {
-  const descriptorContext = getDocumentDescriptorContext();
+  const descriptorContext = document.modelContext;
   if (!descriptorContext) {
     return [];
   }
 
-  return (await descriptorContext.getTools())
+  return selectRelayTools(await descriptorContext.getTools())
     .map(mapRegisteredTool)
     .filter((tool): tool is RelayToolDescriptor => tool !== null);
 }
 
-async function invokeRelayTool(name: string, args: JsonObject): Promise<CallToolResult> {
-  const descriptorContext = getDocumentDescriptorContext();
+async function invokeRelayTool(name: string, args: WebMcpToolObjectInput): Promise<CallToolResult> {
+  const descriptorContext = document.modelContext;
   if (!descriptorContext) {
     throw new Error('No executable WebMCP runtime found on this page');
   }
 
   // Current Chrome requires a RegisteredTool returned by getTools(), not a
   // name or a stale copy.
-  const tool = (await descriptorContext.getTools()).find((candidate) => candidate.name === name);
+  const tool = selectRelayTools(await descriptorContext.getTools()).find(
+    (candidate) => candidate.name === name
+  );
   if (!tool) {
     throw new Error(`Tool not found: ${name}`);
   }
 
-  const serialized = await descriptorContext.executeTool(tool, JSON.stringify(args));
+  const serialized = await descriptorContext.executeTool(tool, args);
   return normalizeSerializedToolResult(serialized);
+}
+
+function parseInvokeArgs(value: unknown): WebMcpToolObjectInput {
+  if (isJsonObject(value)) return value;
+  if (value !== undefined && value !== null) {
+    debugWarn('Tool invocation args must be an object; using empty input');
+  }
+  return {};
 }
 
 let toolSyncScheduled = false;
@@ -228,22 +148,21 @@ let toolSyncRevision = 0;
 let toolSyncPollTimer: ReturnType<typeof setInterval> | null = null;
 let lastToolsSnapshot = '';
 
-function stableStringify(value: unknown): string {
+function serializeStableJson(value: unknown): string {
   if (value === null || typeof value !== 'object') {
     return JSON.stringify(value) ?? 'undefined';
   }
   if (Array.isArray(value)) {
-    return `[${value.map(stableStringify).join(',')}]`;
+    return `[${value.map(serializeStableJson).join(',')}]`;
   }
-  const object = value as Record<string, unknown>;
-  return `{${Object.keys(object)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${stableStringify(object[key])}`)
+  return `{${Object.entries(value)
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .map(([key, child]) => `${JSON.stringify(key)}:${serializeStableJson(child)}`)
     .join(',')}}`;
 }
 
 function toolsSnapshot(tools: RelayToolDescriptor[]): string {
-  return tools.map(stableStringify).sort().join('\n');
+  return tools.map(serializeStableJson).sort().join('\n');
 }
 
 function pushToolsIfChanged(): void {
@@ -256,9 +175,9 @@ function pushToolsIfChanged(): void {
       const nextSnapshot = toolsSnapshot(tools);
       if (nextSnapshot === lastToolsSnapshot || !widgetWindow) return;
       lastToolsSnapshot = nextSnapshot;
-      widgetWindow.postMessage({ type: 'webmcp.tools.changed', tools }, config.widgetOrigin);
+      widgetWindow.postMessage({ type: 'webmcp.tools.changed', tools }, window.location.origin);
     })
-    .catch((err: unknown) => {
+    .catch((err) => {
       debugWarn('Failed to sync tool changes:', err);
     });
 }
@@ -328,113 +247,77 @@ function subscribeToToolChanges(): void {
   scheduleRetry();
 }
 
-function respondToSource(
-  source: MessageEventSource | null,
-  origin: string,
-  payload: Record<string, unknown>
-): void {
-  if (!source || typeof source !== 'object' || !('postMessage' in source)) {
-    return;
-  }
-
-  // MessageEventSource unions Window/MessagePort/ServiceWorker, whose postMessage
-  // overloads disagree; only Window accepts a target origin.
-  (source as Window).postMessage(payload, origin);
-}
-
-function parseWidgetRequest(value: unknown): WidgetRequestMessage | null {
-  if (
-    !isJsonObject(value) ||
-    typeof value.requestId !== 'string' ||
-    typeof value.type !== 'string'
-  ) {
-    return null;
-  }
-
-  return {
-    requestId: value.requestId,
-    type: value.type,
-    toolName: value.toolName,
-    args: value.args,
-  };
-}
-
-function handleListRequest(request: WidgetRequestMessage, event: MessageEvent): void {
+function handleListRequest(source: Window, requestId: string): void {
   listRelayTools()
     .then((tools) => {
-      respondToSource(event.source, event.origin, {
-        type: 'webmcp.tools.list.response',
-        requestId: request.requestId,
-        tools,
-      });
+      source.postMessage(
+        { type: 'webmcp.tools.list.response', requestId, tools },
+        window.location.origin
+      );
     })
-    .catch((error: unknown) => {
+    .catch((error) => {
       debugWarn('Failed to list tools:', error);
-      respondToSource(event.source, event.origin, {
-        type: 'webmcp.tools.list.response',
-        requestId: request.requestId,
-        tools: [],
-        error: `Failed to list tools: ${error instanceof Error ? error.message : String(error)}`,
-      });
+      source.postMessage(
+        {
+          type: 'webmcp.tools.list.response',
+          requestId,
+          tools: [],
+          error: `Failed to list tools: ${error instanceof Error ? error.message : String(error)}`,
+        },
+        window.location.origin
+      );
     });
 }
 
-function handleInvokeRequest(request: WidgetRequestMessage, event: MessageEvent): void {
-  invokeRelayTool(String(request.toolName ?? ''), toInvokeArgs(request.args))
+function handleInvokeRequest(source: Window, request: MessageEnvelope): void {
+  const { requestId } = request;
+  invokeRelayTool(String(request.toolName ?? ''), parseInvokeArgs(request.args))
     .then((result) => {
-      respondToSource(event.source, event.origin, {
-        type: 'webmcp.tools.invoke.response',
-        requestId: request.requestId,
-        result: isJsonObject(result) ? result : {},
-      });
+      source.postMessage(
+        { type: 'webmcp.tools.invoke.response', requestId, result },
+        window.location.origin
+      );
     })
-    .catch((error: unknown) => {
-      respondToSource(event.source, event.origin, {
-        type: 'webmcp.tools.invoke.error',
-        requestId: request.requestId,
-        error: String(error instanceof Error ? error.message : error),
-      });
+    .catch((error) => {
+      source.postMessage(
+        {
+          type: 'webmcp.tools.invoke.error',
+          requestId,
+          error: String(error instanceof Error ? error.message : error),
+        },
+        window.location.origin
+      );
     });
 }
 
-async function injectRelayWidget(cfg: RelayConfig): Promise<void> {
+async function injectRelayWidget({ widgetUrl, ...widgetConfig }: RelayConfig): Promise<void> {
   if (document.querySelector(RELAY_IFRAME_SELECTOR)) {
     return;
   }
 
-  const searchParams = new URLSearchParams();
-  searchParams.set('tabId', cfg.tabId);
-  searchParams.set('hostOrigin', window.location.origin);
-  const cleanUrl = new URL(window.location.href);
-  cleanUrl.search = '';
-  cleanUrl.hash = '';
-  searchParams.set('hostUrl', cleanUrl.href);
-  searchParams.set('hostTitle', document.title || '');
-  searchParams.set('relayHost', cfg.relayHost);
-  searchParams.set('relayPort', cfg.relayPort);
-  searchParams.set('autoConnect', cfg.autoConnect ? 'true' : 'false');
-  if (cfg.relayId) {
-    searchParams.set('relayId', cfg.relayId);
-  }
-  if (cfg.relayWorkspace) {
-    searchParams.set('relayWorkspace', cfg.relayWorkspace);
-  }
-  if (cfg.requestTimeout) {
-    searchParams.set('requestTimeout', cfg.requestTimeout);
-  }
+  const hostUrl = new URL(window.location.href);
+  hostUrl.search = '';
+  hostUrl.hash = '';
+  // Escaping `<` keeps page-controlled text, such as the title, inside the script element.
+  const configJson = JSON.stringify({
+    ...widgetConfig,
+    hostOrigin: window.location.origin,
+    hostUrl: hostUrl.href,
+    hostTitle: document.title,
+  }).replace(/</g, '\\u003c');
 
   // The blob inherits the host origin, allowing the relay to verify the
   // WebSocket Origin header instead of trusting a client-reported value.
-  const response = await fetch(cfg.widgetUrl);
+  const response = await fetch(widgetUrl);
   if (!response.ok) {
     throw new Error(`Widget HTML request failed with status ${String(response.status)}`);
   }
   const html = await response.text();
-  const configScript = `<script>window.__WEBMCP_RELAY_CONFIG=${JSON.stringify(Object.fromEntries(searchParams))};</script>`;
+  const configScript = `<script>window.__WEBMCP_RELAY_CONFIG=${configJson};</script>`;
+  // A replacer function inserts the config literally; a replacement string would expand `$'`.
   const blobUrl = URL.createObjectURL(
-    new Blob([html.replace('</head>', `${configScript}</head>`)], { type: 'text/html' })
+    new Blob([html.replace('</head>', () => `${configScript}</head>`)], { type: 'text/html' })
   );
-  cfg.widgetOrigin = window.location.origin;
 
   const iframe = document.createElement('iframe');
   iframe.src = blobUrl;
@@ -459,6 +342,7 @@ async function injectRelayWidget(cfg: RelayConfig): Promise<void> {
 }
 
 if (!document.querySelector(RELAY_IFRAME_SELECTOR)) {
+  let config: RelayConfig;
   try {
     config = buildRelayConfig(scriptEl);
   } catch (err) {
@@ -467,10 +351,8 @@ if (!document.querySelector(RELAY_IFRAME_SELECTOR)) {
   }
 
   window.addEventListener('message', (event: MessageEvent) => {
-    if (event.origin !== config.widgetOrigin) {
-      return;
-    }
-    if (!widgetWindow || event.source !== widgetWindow) {
+    const source = widgetWindow;
+    if (event.origin !== window.location.origin || !source || event.source !== source) {
       return;
     }
 
@@ -479,19 +361,14 @@ if (!document.querySelector(RELAY_IFRAME_SELECTOR)) {
       window.location.reload();
       return;
     }
-
-    const request = parseWidgetRequest(event.data);
-    if (!request) {
+    if (!isMessageEnvelope(data)) {
       return;
     }
 
-    if (request.type === 'webmcp.tools.list.request') {
-      handleListRequest(request, event);
-      return;
-    }
-
-    if (request.type === 'webmcp.tools.invoke.request') {
-      handleInvokeRequest(request, event);
+    if (data.type === 'webmcp.tools.list.request') {
+      handleListRequest(source, data.requestId);
+    } else if (data.type === 'webmcp.tools.invoke.request') {
+      handleInvokeRequest(source, data);
     }
   });
 
@@ -510,7 +387,7 @@ if (!document.querySelector(RELAY_IFRAME_SELECTOR)) {
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && widgetWindow) {
-      widgetWindow.postMessage({ type: 'webmcp.connect' }, config.widgetOrigin);
+      widgetWindow.postMessage({ type: 'webmcp.connect' }, window.location.origin);
     }
   });
 }

@@ -12,36 +12,22 @@ const TEST_INIT_OPTIONS: WebModelContextInitOptions = {
   },
 };
 
-function resetGlobals(): void {
-  delete (window as unknown as { __webModelContext?: unknown }).__webModelContext;
-}
-
-function cleanupRuntime(): void {
-  try {
-    cleanupWebModelContext();
-  } finally {
-    resetGlobals();
-  }
-}
-
 runRuntimeCoreConformanceSuite({
   suiteName: 'Runtime core conformance (@mcp-b/global)',
   install() {
-    resetGlobals();
     initializeWebModelContext(TEST_INIT_OPTIONS);
   },
   cleanup() {
-    cleanupRuntime();
+    cleanupWebModelContext();
   },
 });
 
 runDeclarativeFormConformanceSuite({
-  suiteName: 'Declarative form conformance (@mcp-b/global)',
+  suiteName: 'Declarative conformance (@mcp-b/global)',
   install() {
-    resetGlobals();
     initializeWebModelContext(TEST_INIT_OPTIONS);
   },
   cleanup() {
-    cleanupRuntime();
+    cleanupWebModelContext();
   },
 });

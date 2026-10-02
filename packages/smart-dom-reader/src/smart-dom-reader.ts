@@ -129,13 +129,13 @@ export class SmartDOMReader {
   private extractLandmarks(doc: Document): PageLandmarks {
     const detected = ContentDetection.detectLandmarks(doc);
     return {
-      navigation: this.elementsToSelectors(detected.navigation || []),
-      main: this.elementsToSelectors(detected.main || []),
-      forms: this.elementsToSelectors(detected.form || []),
-      headers: this.elementsToSelectors(detected.banner || []),
-      footers: this.elementsToSelectors(detected.contentinfo || []),
-      articles: this.elementsToSelectors(detected.region || []),
-      sections: this.elementsToSelectors(detected.region || []),
+      navigation: this.elementsToSelectors(detected.navigation),
+      main: this.elementsToSelectors(detected.main),
+      forms: this.elementsToSelectors(detected.form),
+      headers: this.elementsToSelectors(detected.banner),
+      footers: this.elementsToSelectors(detected.contentinfo),
+      articles: this.elementsToSelectors(detected.region),
+      sections: this.elementsToSelectors(detected.region),
     };
   }
 

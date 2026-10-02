@@ -1,16 +1,23 @@
+import type { AddressInfo } from 'node:net';
+import { z } from 'zod/v4';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+
+export function isTcpAddress(address: AddressInfo | string | null): address is AddressInfo {
+  return address !== null && typeof address !== 'string';
+}
 
 export const DEFAULT_RELAY_PORT = 9333;
 export const DEFAULT_RELAY_PORT_RANGE_END = 9348;
 const RELAY_PORT_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
-interface PersistedRelayPort {
-  host: string;
-  port: number;
-  updatedAt: string;
-}
+const PersistedRelayPortSchema = z.object({
+  port: z.number().int().min(1).max(65535),
+  host: z.string().min(1),
+  updatedAt: z.string(),
+});
+type PersistedRelayPort = z.infer<typeof PersistedRelayPortSchema>;
 
 export interface PortStrategyOptions {
   fixedPort?: number;
@@ -46,38 +53,16 @@ export async function persistPort(
   await writeFile(path, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
 }
 
-async function readPersistedPort(
-  path = defaultRelayPortPersistPath(),
-  options: {
-    expectedHost?: string;
-    maxAgeMs?: number;
-    now?: number;
-  } = {}
-): Promise<number | null> {
+async function readPersistedPort(path: string, expectedHost: string): Promise<number | null> {
   try {
     const raw = await readFile(path, 'utf8');
-    const parsed = JSON.parse(raw) as Partial<PersistedRelayPort>;
-    if (
-      typeof parsed.port !== 'number' ||
-      !Number.isInteger(parsed.port) ||
-      parsed.port < 1 ||
-      parsed.port > 65535
-    ) {
-      return null;
-    }
-    if (typeof parsed.host !== 'string' || parsed.host.length === 0) {
-      return null;
-    }
-    if (options.expectedHost && parsed.host !== options.expectedHost) {
+    const parsed = PersistedRelayPortSchema.parse(JSON.parse(raw));
+    if (expectedHost && parsed.host !== expectedHost) {
       return null;
     }
 
-    const maxAgeMs = options.maxAgeMs ?? RELAY_PORT_CACHE_MAX_AGE_MS;
-    const now = options.now ?? Date.now();
-    const updatedAtMs =
-      typeof parsed.updatedAt === 'string' ? Date.parse(parsed.updatedAt) : Number.NaN;
-
-    if (!Number.isFinite(updatedAtMs) || now - updatedAtMs > maxAgeMs) {
+    const updatedAtMs = Date.parse(parsed.updatedAt);
+    if (!Number.isFinite(updatedAtMs) || Date.now() - updatedAtMs > RELAY_PORT_CACHE_MAX_AGE_MS) {
       return null;
     }
 
@@ -102,7 +87,7 @@ export async function buildPortCandidates(
     return [{ port: fixedPort, wasFixed: true, fromCache: false }];
   }
 
-  const cachedPort = await readPersistedPort(persistPath, { expectedHost: host });
+  const cachedPort = await readPersistedPort(persistPath, host);
   const seen = new Set<number>();
   const candidates: PortStrategyResult[] = [];
 

@@ -12,4 +12,7 @@ export default defineConfig({
     target: 'esnext',
     tsconfig: './tsconfig.json',
   },
+  test: {
+    include: ['src/**/*.test.ts'],
+  },
 });

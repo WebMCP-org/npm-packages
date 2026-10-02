@@ -1,6 +1,10 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test';
 
 const chromiumChannel = process.env.PLAYWRIGHT_CHROMIUM_CHANNEL;
+const chromiumUse: NonNullable<PlaywrightTestConfig['use']> = {
+  ...devices['Desktop Chrome'],
+};
+if (chromiumChannel) chromiumUse.channel = chromiumChannel;
 
 /**
  * Playwright config for Validation Matrix tests
@@ -32,10 +36,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        ...(chromiumChannel ? { channel: chromiumChannel } : {}),
-      },
+      use: chromiumUse,
     },
   ],
 

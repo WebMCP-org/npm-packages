@@ -27,7 +27,8 @@ Rule: if a change increases future cognitive load without clear payoff, it is in
 
 ### 2.1 Single source of truth (SSOT)
 
-- `packages/webmcp-types/` is canonical for strict WebMCP core type contracts.
+- Upstream `webmcp-types` is canonical for core browser contracts;
+  `@mcp-b/webmcp-ts-sdk` owns MCP-B adapter and extension contracts.
 - `packages/webmcp-polyfill/` is canonical for strict runtime semantics of WebMCP behavior.
 - `packages/global/` may add MCP-B integration features, but must not weaken strict core behavior.
 - Transport message and lifecycle behavior must stay centralized in `packages/transports/`; do not clone protocol shapes in consumers.
@@ -40,7 +41,7 @@ Treat all boundary input as untrusted:
 - `postMessage` payloads
 - extension/runtime messages
 - JSON-RPC envelopes
-- tool arguments and serialized testing inputs
+- tool arguments
 - external SDK or client payloads
 
 Validate at boundary entry, then narrow types for internal logic.
@@ -50,7 +51,7 @@ Do not bypass validation with assertion chains (`as any`, `as unknown as`, blind
 ### 2.3 Contracts stay synchronized
 
 - If exported types or runtime behavior change in one package, update all dependent package boundaries in the same change.
-- If `document.modelContext` (or its deprecated `navigator.modelContext` alias) or testing helper behavior changes, update type surfaces, docs, and conformance tests together.
+- If `document.modelContext` behavior changes, update type surfaces, docs, and conformance tests together.
 - If shared definitions cross package boundaries, move them into the canonical package rather than cloning.
 
 ### 2.4 Bounded behavior over implicit behavior
@@ -90,8 +91,10 @@ Performance is a design concern, not a late patch.
 
 ### 4.3 Respect stack conventions
 
-- Runtime contracts: `@mcp-b/webmcp-types` and `@mcp-b/webmcp-polyfill` define strict core behavior.
-- Integration layer: `@mcp-b/global` can extend with transport/resources/prompts/testing helpers without contract drift.
+- Runtime contracts: upstream `webmcp-types` owns browser declarations;
+  `@mcp-b/webmcp-ts-sdk` owns MCP-B adapter extensions;
+  `@mcp-b/webmcp-polyfill` distributes the upstream core runtime.
+- The polyfill temporarily retains declarative tools; `@mcp-b/global` adds transports, resources, and prompts without changing the core contract.
 - Transport behavior remains explicit and testable in `@mcp-b/transports`.
 
 ## 5) Duplication Policy

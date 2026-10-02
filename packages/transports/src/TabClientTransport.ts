@@ -17,7 +17,7 @@ export class TabClientTransport implements Transport {
   private readonly _channelId: string;
   private _messageHandler: ((event: MessageEvent<unknown>) => void) | undefined;
   private _serverReadyResolve!: () => void;
-  private _serverReadyReject!: (reason: unknown) => void;
+  private _serverReadyReject!: (reason: Error) => void;
   private _serverReadySettled = false;
 
   /** Resolves when the server signals readiness. `send()` awaits it automatically. */

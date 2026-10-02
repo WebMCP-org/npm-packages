@@ -1,4 +1,4 @@
-import type { RegistrationHandle } from '@mcp-b/webmcp-types';
+import type { RegistrationHandle } from '@mcp-b/webmcp-ts-sdk';
 import { useEffect, useState } from 'react';
 
 export function useMcpRegistration(

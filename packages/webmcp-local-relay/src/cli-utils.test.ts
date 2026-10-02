@@ -1,11 +1,14 @@
+import { z } from 'zod/v4';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseCliOptions } from './cli-utils.js';
 
-const manifest = JSON.parse(readFileSync(new URL('../manifest.json', import.meta.url), 'utf8')) as {
-  server: { mcp_config: { args: string[] } };
-  user_config?: unknown;
-};
+const manifest = z
+  .object({
+    server: z.object({ mcp_config: z.object({ args: z.array(z.string()) }) }),
+  })
+  .passthrough()
+  .parse(JSON.parse(readFileSync(new URL('../manifest.json', import.meta.url), 'utf8')));
 
 describe('MCPB manifest', () => {
   it('preserves single-click zero-configuration startup', () => {

@@ -178,25 +178,12 @@
       }
 
       async function executeRegisteredTool(modelContext, name, args) {
-        if (typeof modelContext.executeTool !== 'function') {
-          throw new Error('Chrome descriptor execution is unavailable');
-        }
-
         const tool = (await modelContext.getTools()).find((candidate) => candidate.name === name);
         if (!tool) {
           throw new Error(`Tool not found: ${name}`);
         }
 
-        const serialized = await modelContext.executeTool(tool, JSON.stringify(args));
-        if (serialized === null) {
-          throw new Error('Tool execution was interrupted');
-        }
-
-        try {
-          return JSON.parse(serialized);
-        } catch {
-          return { content: [{ type: 'text', text: serialized }] };
-        }
+        return JSON.parse(await modelContext.executeTool(tool, args));
       }
 
       async function runTests() {

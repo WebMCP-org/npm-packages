@@ -10,6 +10,12 @@ import { useState } from 'react';
 // Counter state (shared across the app)
 let globalCounter = 0;
 
+const users = new Map([
+  ['1', { name: 'Alice Johnson', email: 'alice@example.com', role: 'admin' }],
+  ['2', { name: 'Bob Smith', email: 'bob@example.com', role: 'user' }],
+  ['3', { name: 'Charlie Brown', email: 'charlie@example.com', role: 'moderator' }],
+]);
+
 const COUNTER_AMOUNT_INPUT_SCHEMA = {
   type: 'object',
   properties: {
@@ -328,13 +334,7 @@ function App() {
     mimeType: 'application/json',
     read: async (uri, params) => {
       const userId = typeof params?.userId === 'string' ? params.userId : 'unknown';
-      // Simulated user data
-      const users: Record<string, { name: string; email: string; role: string }> = {
-        '1': { name: 'Alice Johnson', email: 'alice@example.com', role: 'admin' },
-        '2': { name: 'Bob Smith', email: 'bob@example.com', role: 'user' },
-        '3': { name: 'Charlie Brown', email: 'charlie@example.com', role: 'moderator' },
-      };
-      const user = users[userId] ?? {
+      const user = users.get(userId) ?? {
         name: 'Unknown',
         email: 'unknown@example.com',
         role: 'guest',

@@ -1,26 +1,19 @@
-import type { ChromeModelContextExtensions, RegisteredTool } from '@mcp-b/webmcp-types';
 import { expect, type Page, test } from '@playwright/test';
 import {
   DYNAMIC_TOOL_NAME,
-  getCanonicalToolNames,
+  expectBaseTools,
+  firstTextContent,
   readInvocations,
   registerDynamicTool,
   resetInvocations,
   unregisterDynamicTool,
   waitForRuntimePage,
 } from './runtime-contract.helpers.js';
-
-type NativeModelContext = Pick<NonNullable<Document['modelContext']>, 'getTools'> & {
-  executeTool: NonNullable<ChromeModelContextExtensions['executeTool']>;
-};
-
-type NativeContextWindow = Window & {
-  __WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__?: NativeModelContext;
-};
+import type { RuntimeToolArguments } from '../runtime-contract/core.js';
 
 async function listNativeToolNames(page: Page): Promise<string[]> {
   return page.evaluate(async () => {
-    const modelContext = (window as NativeContextWindow).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+    const modelContext = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
     if (!modelContext) {
       throw new Error('Native document.modelContext is unavailable');
     }
@@ -32,11 +25,11 @@ async function listNativeToolNames(page: Page): Promise<string[]> {
 async function executeNativeToolText(
   page: Page,
   name: string,
-  args: Record<string, unknown>
+  args: RuntimeToolArguments
 ): Promise<string> {
-  return page.evaluate(
+  const result = await page.evaluate(
     async ({ toolName, toolArgs }) => {
-      const modelContext = (window as NativeContextWindow).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      const modelContext = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
       if (!modelContext) {
         throw new Error('Native document.modelContext is unavailable');
       }
@@ -46,33 +39,22 @@ async function executeNativeToolText(
         throw new Error(`Native tool is unavailable: ${toolName}`);
       }
 
-      const result = await modelContext.executeTool(tool, JSON.stringify(toolArgs));
-      if (typeof result !== 'string') {
-        const candidate = result as { content?: Array<{ text?: string }> } | null | undefined;
-        const content = Array.isArray(candidate?.content) ? candidate.content : [];
-        return typeof content[0]?.text === 'string' ? content[0].text : JSON.stringify(result);
-      }
-
-      try {
-        const parsed = JSON.parse(result) as { content?: Array<{ text?: string }> };
-        return typeof parsed.content?.[0]?.text === 'string' ? parsed.content[0].text : result;
-      } catch {
-        return result;
-      }
+      return modelContext.executeTool(tool, toolArgs);
     },
     { toolName: name, toolArgs: args }
   );
+  return firstTextContent(JSON.parse(result));
 }
 
 async function executeNativeToolError(
   page: Page,
   name: string,
-  args: Record<string, unknown>
+  args: RuntimeToolArguments
 ): Promise<string> {
   return page.evaluate(
     async ({ toolName, toolArgs }) => {
       try {
-        const modelContext = (window as NativeContextWindow).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+        const modelContext = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
         if (!modelContext) {
           throw new Error('Native document.modelContext is unavailable');
         }
@@ -84,7 +66,7 @@ async function executeNativeToolError(
           throw new Error(`Native tool is unavailable: ${toolName}`);
         }
 
-        await modelContext.executeTool(tool, JSON.stringify(toolArgs));
+        await modelContext.executeTool(tool, toolArgs);
         return '';
       } catch (error) {
         return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
@@ -97,103 +79,91 @@ async function executeNativeToolError(
 test.describe('Runtime Contract - Browser API Caller', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
-      (window as NativeContextWindow).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ =
-        document.modelContext as unknown as NativeModelContext;
+      const nativeContext = document.modelContext;
+      if (!nativeContext) {
+        throw new Error('Native WebMCP must be enabled before the MCP-B runtime starts');
+      }
+      window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ = nativeContext;
     });
     await waitForRuntimePage(page, '/runtime-contract.html');
+    const capturedNativeContext = await page.evaluate(() =>
+      Boolean(window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__)
+    );
+    expect(capturedNativeContext).toBe(true);
   });
 
-  test('runs against native document.modelContext instead of the MCP-B polyfill', async ({
+  test('wraps the pre-existing native document.modelContext with MCP-B extensions', async ({
     page,
   }) => {
     const runtime = await page.evaluate(() => {
-      const rawModelContext = (window as NativeContextWindow)
-        .__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__ as
-        | (NativeModelContext & {
-            __isWebMCPPolyfill?: boolean;
-            __isBrowserMcpServer?: boolean;
-          })
-        | undefined;
-      const activeModelContext = document.modelContext as unknown as {
-        __isWebMCPPolyfill?: boolean;
-        __isBrowserMcpServer?: boolean;
-      };
+      const rawModelContext = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      const activeModelContext = document.modelContext;
 
       return {
-        hasRawDocumentModelContext: typeof rawModelContext !== 'undefined',
+        hasRawDocumentModelContext: rawModelContext !== undefined,
         rawModelContextHasGetTools: typeof rawModelContext?.getTools === 'function',
         rawModelContextHasExecuteTool: typeof rawModelContext?.executeTool === 'function',
-        rawModelContextHasPolyfillMarker: rawModelContext?.__isWebMCPPolyfill === true,
-        rawModelContextHasBrowserServerMarker: rawModelContext?.__isBrowserMcpServer === true,
-        activeModelContextHasPolyfillMarker: activeModelContext.__isWebMCPPolyfill === true,
+        activeContextWrapsNative: Boolean(
+          rawModelContext && activeModelContext !== rawModelContext
+        ),
+        activeContextHasMcpBExtensions:
+          activeModelContext !== undefined &&
+          'listTools' in activeModelContext &&
+          typeof activeModelContext.listTools === 'function',
       };
     });
 
     expect(runtime.hasRawDocumentModelContext).toBe(true);
     expect(runtime.rawModelContextHasGetTools).toBe(true);
     expect(runtime.rawModelContextHasExecuteTool).toBe(true);
-    expect(runtime.rawModelContextHasPolyfillMarker).toBe(false);
-    expect(runtime.rawModelContextHasBrowserServerMarker).toBe(false);
-    expect(runtime.activeModelContextHasPolyfillMarker).toBe(false);
+    expect(runtime.activeContextWrapsNative).toBe(true);
+    expect(runtime.activeContextHasMcpBExtensions).toBe(true);
   });
 
   test('discovers the canonical base tool set through browser APIs', async ({ page }) => {
-    const toolNames = await listNativeToolNames(page);
-    expect(toolNames).toEqual(expect.arrayContaining(getCanonicalToolNames(false)));
-    expect(toolNames).toHaveLength(getCanonicalToolNames(false).length);
+    expectBaseTools(await listNativeToolNames(page));
   });
 
   test('supports producer getTools and executeTool shape on document.modelContext', async ({
     page,
   }) => {
     const result = await page.evaluate(async () => {
-      const modelContext = (window as NativeContextWindow).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+      const modelContext = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
       if (!modelContext) {
-        return { missingRawModelContext: true, missingSumTool: false, toolsArePromise: false };
+        throw new Error('Native document.modelContext is unavailable');
       }
       const toolsPromise = modelContext.getTools();
       const tools = await toolsPromise;
       const sumTool = tools.find((tool) => tool.name === 'sum');
       if (!sumTool) {
-        return { missingRawModelContext: false, missingSumTool: true, toolsArePromise: false };
+        throw new Error('Native tool is unavailable: sum');
       }
 
-      const execution = await modelContext.executeTool(sumTool, JSON.stringify({ a: 4, b: 7 }));
+      const execution = await modelContext.executeTool(sumTool, { a: 4, b: 7 });
+      const inputSchema = sumTool.inputSchema;
 
       return {
-        missingRawModelContext: false,
-        missingSumTool: false,
         toolsArePromise: typeof toolsPromise.then === 'function',
         toolInfo: {
           name: sumTool.name,
           title: sumTool.title,
           description: sumTool.description,
-          // An object since webmcp#241; Canary 154 still serves same-document
-          // tools as serialized strings, so both generations are valid here.
-          inputSchemaShape:
-            typeof sumTool.inputSchema === 'string'
-              ? 'string'
-              : typeof sumTool.inputSchema === 'object' &&
-                  sumTool.inputSchema !== null &&
-                  !Array.isArray(sumTool.inputSchema)
-                ? 'object'
-                : 'invalid',
-          originType: typeof sumTool.origin,
-          hasWindow: typeof sumTool.window === 'object',
+          inputSchemaIsObject:
+            inputSchema !== null && typeof inputSchema === 'object' && !Array.isArray(inputSchema),
+          origin: sumTool.origin,
+          hasWindow: sumTool.window === window,
         },
         execution,
       };
     });
 
-    expect(result.missingRawModelContext).toBe(false);
-    expect(result.missingSumTool).toBe(false);
     expect(result.toolsArePromise).toBe(true);
     expect(result.toolInfo).toMatchObject({
       name: 'sum',
-      originType: 'string',
+      inputSchemaIsObject: true,
+      origin: expect.any(String),
       hasWindow: true,
     });
-    expect(['string', 'object']).toContain(result.toolInfo?.inputSchemaShape);
     expect(result.execution).toContain('sum:11');
   });
 
@@ -229,8 +199,8 @@ test.describe('Runtime Contract - Browser API Caller', () => {
     await registerDynamicTool(page);
     await expect.poll(async () => await listNativeToolNames(page)).toContain(DYNAMIC_TOOL_NAME);
 
-    const staleTool = await page.evaluateHandle(async (toolName): Promise<RegisteredTool> => {
-      const modelContext = (window as NativeContextWindow).__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+    const staleTool = await page.evaluateHandle(async (toolName) => {
+      const modelContext = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
       if (!modelContext) {
         throw new Error('Native document.modelContext is unavailable');
       }
@@ -251,12 +221,11 @@ test.describe('Runtime Contract - Browser API Caller', () => {
       const errorMessage = await page.evaluate(
         async ({ tool, toolArgs }) => {
           try {
-            const modelContext = (window as NativeContextWindow)
-              .__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
+            const modelContext = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
             if (!modelContext) {
               throw new Error('Native document.modelContext is unavailable');
             }
-            await modelContext.executeTool(tool, JSON.stringify(toolArgs));
+            await modelContext.executeTool(tool, toolArgs);
             return '';
           } catch (error) {
             return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
@@ -270,18 +239,12 @@ test.describe('Runtime Contract - Browser API Caller', () => {
     }
   });
 
-  test('propagates runtime-thrown errors through the browser API caller', async ({
-    page,
-  }, testInfo) => {
+  test('propagates runtime-thrown errors through the browser API caller', async ({ page }) => {
     await resetInvocations(page);
 
     const errorMessage = await executeNativeToolError(page, 'always_fail', { reason: 'native' });
-    if (testInfo.project.name === 'chrome-m152-webmcp' || testInfo.project.name === 'chromium') {
-      // Current native Chrome builds normalize thrown tool errors into a generic failure string.
-      expect(errorMessage).toMatch(/always_fail:native|invocation failed/i);
-    } else {
-      expect(errorMessage).toContain('always_fail:native');
-    }
+    // Native Chrome normalizes thrown tool errors into a generic failure string.
+    expect(errorMessage).toMatch(/always_fail:native|invocation failed/i);
 
     await expect
       .poll(async () => await readInvocations(page))

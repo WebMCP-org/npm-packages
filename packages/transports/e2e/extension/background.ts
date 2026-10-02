@@ -1,7 +1,7 @@
 /// <reference types="chrome" />
 
 import { ExtensionServerTransport } from '@mcp-b/transports';
-import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
+import { fromJsonSchema, McpServer, type RegisteredTool } from '@modelcontextprotocol/server';
 
 import {
   createRuntimeContractController,
@@ -12,37 +12,24 @@ import {
 } from '../../../../e2e/runtime-contract/core.js';
 
 let dynamicToolEnabled = false;
-let runtimeMutationQueue: Promise<void> = Promise.resolve();
 
 interface RuntimeSession {
-  registrations: Map<string, AbortController>;
-  server: BrowserMcpServer;
+  registrations: Map<string, RegisteredTool>;
+  server: McpServer;
 }
 
 const sessions = new Set<RuntimeSession>();
 
-function enqueueRuntimeMutation<T>(operation: () => Promise<T>): Promise<T> {
-  const result = runtimeMutationQueue.then(operation, operation);
-  runtimeMutationQueue = result.then(
-    () => undefined,
-    () => undefined
+function registerSessionTool(session: RuntimeSession, tool: RuntimeContractTool): void {
+  const registration = session.server.registerTool(
+    tool.name,
+    {
+      description: tool.description,
+      inputSchema: fromJsonSchema<Parameters<RuntimeContractTool['execute']>[0]>(tool.inputSchema),
+    },
+    (args, context) => tool.execute(args, { signal: context.mcpReq.signal })
   );
-  return result;
-}
-
-async function registerSessionTool(
-  session: RuntimeSession,
-  tool: RuntimeContractTool
-): Promise<void> {
-  const controller = new AbortController();
-  session.registrations.set(tool.name, controller);
-  try {
-    await session.server.registerTool(tool, { signal: controller.signal });
-  } catch (error) {
-    session.registrations.delete(tool.name);
-    controller.abort();
-    throw error;
-  }
+  session.registrations.set(tool.name, registration);
 }
 
 const state = createRuntimeContractState();
@@ -51,42 +38,28 @@ const runtimeTools = createRuntimeContractTools(state, {
 });
 const runtimeContract = createRuntimeContractController(
   state,
-  () =>
-    enqueueRuntimeMutation(async () => {
-      if (dynamicToolEnabled) return false;
-
-      const registeredSessions: RuntimeSession[] = [];
-      try {
-        for (const session of sessions) {
-          await registerSessionTool(session, runtimeTools.createDynamicTool());
-          registeredSessions.push(session);
-        }
-      } catch (error) {
-        for (const session of registeredSessions) {
-          session.registrations.get(DYNAMIC_TOOL_NAME)?.abort();
-          session.registrations.delete(DYNAMIC_TOOL_NAME);
-        }
-        throw error;
-      }
-
-      dynamicToolEnabled = true;
-      return true;
-    }),
-  (name = DYNAMIC_TOOL_NAME) =>
-    enqueueRuntimeMutation(async () => {
-      if (name !== DYNAMIC_TOOL_NAME || !dynamicToolEnabled) return false;
-      dynamicToolEnabled = false;
-      for (const session of sessions) {
-        session.registrations.get(DYNAMIC_TOOL_NAME)?.abort();
-        session.registrations.delete(DYNAMIC_TOOL_NAME);
-      }
-      return true;
-    })
+  async () => {
+    if (dynamicToolEnabled) return false;
+    for (const session of sessions) {
+      registerSessionTool(session, runtimeTools.createDynamicTool());
+    }
+    dynamicToolEnabled = true;
+    return true;
+  },
+  async (name = DYNAMIC_TOOL_NAME) => {
+    if (name !== DYNAMIC_TOOL_NAME || !dynamicToolEnabled) return false;
+    dynamicToolEnabled = false;
+    for (const session of sessions) {
+      session.registrations.get(DYNAMIC_TOOL_NAME)?.remove();
+      session.registrations.delete(DYNAMIC_TOOL_NAME);
+    }
+    return true;
+  }
 );
 state.ready = true;
 
 async function connectRuntimeSession(port: chrome.runtime.Port): Promise<void> {
-  const server = new BrowserMcpServer({
+  const server = new McpServer({
     name: 'extension-runtime-contract',
     version: '1.0.0',
   });
@@ -96,9 +69,9 @@ async function connectRuntimeSession(port: chrome.runtime.Port): Promise<void> {
   };
 
   try {
-    const registrations = runtimeTools.baseTools.map((tool) => registerSessionTool(session, tool));
+    for (const tool of runtimeTools.baseTools) registerSessionTool(session, tool);
     if (dynamicToolEnabled) {
-      registrations.push(registerSessionTool(session, runtimeTools.createDynamicTool()));
+      registerSessionTool(session, runtimeTools.createDynamicTool());
     }
 
     const transport = new ExtensionServerTransport(port, {
@@ -114,7 +87,7 @@ async function connectRuntimeSession(port: chrome.runtime.Port): Promise<void> {
     };
 
     sessions.add(session);
-    await Promise.all([...registrations, server.connect(transport)]);
+    await server.connect(transport);
   } catch (error) {
     sessions.delete(session);
     await server.close().catch(() => undefined);
@@ -130,9 +103,10 @@ interface ControlMessage {
 
 function isControlMessage(message: unknown): message is ControlMessage {
   if (typeof message !== 'object' || message === null) return false;
-  const type = Reflect.get(message, 'type');
-  const action = Reflect.get(message, 'action');
-  const name = Reflect.get(message, 'name');
+  if (!('type' in message) || !('action' in message)) return false;
+  const type = message.type;
+  const action = message.action;
+  const name = 'name' in message ? message.name : undefined;
   return (
     type === 'runtime-contract/control' &&
     typeof action === 'string' &&
@@ -158,7 +132,7 @@ async function handleControlMessage(message: ControlMessage) {
   }
 }
 
-chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!isControlMessage(message)) {
     return false;
   }

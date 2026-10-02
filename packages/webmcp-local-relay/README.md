@@ -56,15 +56,18 @@ Tools that require MCP task execution are omitted, and multi-round `input_requir
 Add one script tag to expose your page's WebMCP tools to the relay:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"></script>
 ```
 
 That's it. If your page already registers tools on `document.modelContext`, they'll be picked up automatically.
 
+Keep the major version in CDN URLs so the embed and the page runtime upgrade
+together. Pages that still load a 5.x runtime pin `@5` for both scripts.
+
 New to WebMCP? Here's the full setup:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@latest/dist/index.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@6/dist/index.iife.js"></script>
 <script>
   void document.modelContext
     .registerTool({
@@ -75,14 +78,14 @@ New to WebMCP? Here's the full setup:
     })
     .catch(console.error);
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"></script>
 ```
 
 Custom relay port:
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"
+  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"
   data-relay-port="9444"
 ></script>
 ```
@@ -92,7 +95,7 @@ several slow API calls and might exceed one minute:
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"
+  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"
   data-request-timeout="120000"
 ></script>
 ```
@@ -230,19 +233,26 @@ After a disconnect, the widget retries the last endpoint once after about `500ms
 Supported page runtimes:
 
 1. `@mcp-b/global` (recommended for the complete MCP-B runtime)
-2. Current native Chrome with `document.modelContext.getTools()` and its descriptor-based `executeTool()` extension, which this relay requires to invoke tools
+2. Current native Chrome with `document.modelContext.getTools()` and object-input `executeTool()`, which this relay requires to invoke tools
 3. `@mcp-b/webmcp-polyfill`
 
 Runtime dispatch behavior in the browser embed/widget layer:
 
 - Uses asynchronous `document.modelContext.getTools()` and the exact returned
-  descriptor with feature-detected `executeTool()`.
+  descriptor with `executeTool()` and object input, as defined by the current
+  upstream API.
 - Refreshes the descriptor before every invocation so Chrome never receives a
   stale registration object.
+- Relays the page's own tools plus tools registered by same-origin descendant
+  frames. When names collide, the page's own tool wins and the embed logs one
+  warning per name.
+- Converts only results that parse to a JSON object into structured content.
+  A JSON string arrives as its content; any other result, such as `10.50`,
+  keeps its original text.
 
 ### WebMCP Standard Status
 
-WebMCP is an emerging web platform proposal. This relay works with the current native Chrome preview and MCP-B runtimes, but native extension details can still change as implementations mature.
+WebMCP is an emerging web platform proposal. This relay works with the current native Chrome preview and MCP-B runtimes, but the browser API can still change as implementations mature.
 
 - [W3C WebML CG draft](https://webmachinelearning.github.io/webmcp/)
 - [Proposal repository](https://github.com/webmachinelearning/webmcp)
@@ -256,13 +266,13 @@ For Chromium/Chrome Canary native preview testing:
 
 ### Troubleshooting
 
-| Problem                  | Fix                                                                                                                                       |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected`   | Ensure the page loaded `embed.js` and the relay process is running                                                                        |
-| `No tools listed`        | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits the `toolchange` event |
-| `Tool not found`         | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                  |
-| Connection blocked       | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`            |
-| `Host response timeout:` | The host page exceeded its timeout (default 60s). Raise `data-request-timeout` and keep CLI `--invoke-timeout` slightly higher            |
+| Problem                  | Fix                                                                                                                                |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `No sources connected`   | Ensure the page loaded `embed.js` and the relay process is running                                                                 |
+| `No tools listed`        | Ensure tools are registered on the page. The embed listens for changes and polls every two seconds, so load order does not matter. |
+| `Tool not found`         | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                           |
+| Connection blocked       | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`     |
+| `Host response timeout:` | The host page exceeded its timeout (default 60s). Raise `data-request-timeout` and keep CLI `--invoke-timeout` slightly higher     |
 
 ---
 

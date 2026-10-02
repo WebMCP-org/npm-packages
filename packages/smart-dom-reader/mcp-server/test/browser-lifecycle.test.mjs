@@ -73,7 +73,10 @@ test(
       assert.equal(response.result.isError, true);
       assert.match(response.result.content[0].text, /No matching element/);
       assert.equal(response.result.content[0].text.includes('Outside scope'), false);
-      assert.equal(typeof (await call(name)), 'string');
+      assert.match(await call(name), /Duration: \d+ms$/);
+    }
+    for (const name of ['dom_extract_region', 'dom_extract_content']) {
+      assert.match(await call(name, { selector: 'main' }), /Duration: \d+ms$/);
     }
     const [closed, reconnected] = await Promise.all([
       call('browser_close'),

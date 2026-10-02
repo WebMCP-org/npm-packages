@@ -1,8 +1,12 @@
-import { cleanupWebMCPPolyfill, initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
-import { Profiler, type ProfilerOnRenderCallback, type PropsWithChildren } from 'react';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
+import { act, Profiler, type ProfilerOnRenderCallback, type PropsWithChildren } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, configure, renderHook } from 'vitest-browser-react/pure';
+import { cleanup, configure, render, renderHook } from 'vitest-browser-react/pure';
 import { useWebMCP } from './useWebMCP.js';
+
+declare global {
+  var IS_REACT_ACT_ENVIRONMENT: boolean | undefined;
+}
 
 function withProfiler(onRender: ProfilerOnRenderCallback) {
   return function Wrapper({ children }: PropsWithChildren) {
@@ -14,11 +18,10 @@ function withProfiler(onRender: ProfilerOnRenderCallback) {
   };
 }
 
-beforeEach(() => initializeWebMCPPolyfill());
+beforeEach(() => installWebMCP());
 afterEach(async () => {
   await cleanup();
   configure({ reactStrictMode: false });
-  cleanupWebMCPPolyfill();
   vi.restoreAllMocks();
 });
 
@@ -68,7 +71,81 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
     expect(await modelContext.getTools()).toEqual([]);
   });
 
-  it('toggles registration without resetting state or adding effect-driven commits', async () => {
+  it('does not serialize an unchanged schema again when callbacks change', async () => {
+    const metadata = {
+      type: 'object',
+      properties: { value: { type: 'number' } },
+    };
+    const toJSON = vi.fn(() => metadata);
+    const inputSchema = { ...metadata, toJSON };
+    const register = vi.spyOn(document.modelContext!, 'registerTool');
+    const hook = await renderHook(({ revision }: { revision: number } = { revision: 1 }) =>
+      useWebMCP({
+        name: 'cached_schema',
+        description: 'Keeps schema preparation stable',
+        inputSchema,
+        execute: () => revision,
+      })
+    );
+    expect(await document.modelContext!.getTools()).toMatchObject([{ inputSchema: metadata }]);
+    toJSON.mockClear();
+    register.mockClear();
+
+    await hook.rerender({ revision: 2 });
+    expect(toJSON).not.toHaveBeenCalled();
+    expect(register).not.toHaveBeenCalled();
+    await hook.act(async () => {
+      await expect(hook.result.current.execute({})).resolves.toBe(2);
+    });
+    expect(toJSON).not.toHaveBeenCalled();
+  });
+
+  it('keeps successful asynchronous metadata registration out of UI state', async () => {
+    const onRender = vi.fn<ProfilerOnRenderCallback>();
+    const context = document.modelContext!;
+    function Consumer({ revision }: { revision: number }) {
+      const { registrationError } = useWebMCP({
+        name: 'render_metadata',
+        description: `Revision ${revision}`,
+        execute: () => revision,
+      });
+      return (
+        <Profiler id="metadata" onRender={onRender}>
+          <output aria-label="Registration error">{registrationError?.message ?? 'None'}</output>
+        </Profiler>
+      );
+    }
+    const screen = await render(<Consumer revision={1} />);
+    expect(await context.getTools()).toMatchObject([{ description: 'Revision 1' }]);
+    const delayed = Promise.withResolvers<void>();
+    const registerTool = context.registerTool;
+    const register = vi.spyOn(context, 'registerTool').mockImplementationOnce(async (...args) => {
+      await delayed.promise;
+      return registerTool.apply(context, args);
+    });
+    onRender.mockClear();
+
+    await screen.rerender(<Consumer revision={2} />);
+    expect(onRender).toHaveBeenCalledTimes(1);
+    expect(register).toHaveBeenCalledTimes(1);
+    expect(await context.getTools()).toEqual([]);
+
+    const actEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    try {
+      await act(async () => {
+        delayed.resolve();
+        await register.mock.results[0]?.value;
+      });
+    } finally {
+      globalThis.IS_REACT_ACT_ENVIRONMENT = actEnvironment;
+    }
+    expect(onRender).toHaveBeenCalledTimes(1);
+    expect(await context.getTools()).toMatchObject([{ description: 'Revision 2' }]);
+    await expect.element(screen.getByLabelText('Registration error')).toHaveTextContent('None');
+  });
+
+  it('bounds registration commits without resetting execution state', async () => {
     const onRender = vi.fn<ProfilerOnRenderCallback>();
     const modelContext = document.modelContext;
     if (!modelContext) throw new Error('WebMCP polyfill is unavailable');
@@ -95,6 +172,7 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
     expect(onRender).toHaveBeenCalled();
     expect(register).not.toHaveBeenCalled();
     expect(await modelContext.getTools()).toEqual([]);
+    expect(hook.result.current).toMatchObject({ isSupported: true, registrationError: null });
 
     // enabled controls exposure, not local execution or the lifetime of its state.
     await hook.act(async () => {
@@ -133,7 +211,7 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
     expect(await modelContext.getTools()).toEqual([]);
   });
 
-  it('does not commit when resetting an already idle state', async () => {
+  it('preserves an already idle state when resetting', async () => {
     const onRender = vi.fn<ProfilerOnRenderCallback>();
     const hook = await renderHook(
       () => useWebMCP({ name: 'render_reset', description: 'Resets state', execute: () => 'done' }),
@@ -145,7 +223,8 @@ describe.each([false, true])('useWebMCP render budgets (StrictMode: %s)', (stric
 
     await hook.act(async () => hook.result.current.reset());
 
-    expect(onRender).not.toHaveBeenCalled();
+    // React may report one empty Profiler commit after a same-state bailout.
+    expect(onRender.mock.calls.length).toBeLessThanOrEqual(1);
     expect(hook.result.current.state).toBe(state);
   });
 

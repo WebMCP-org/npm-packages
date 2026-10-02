@@ -180,51 +180,6 @@
     </div>
 
     <div class="section">
-      <h2>Deprecated MCP-B testing shim</h2>
-      <p>
-        Test <code>navigator.modelContextTesting</code> for debugging and testing tool execution.
-      </p>
-      <div
-        id="testing-api-status"
-        style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px"
-      >
-        Testing API: Not checked
-      </div>
-      <div style="text-align: center">
-        <button id="check-testing-api">Check Testing API</button>
-      </div>
-    </div>
-
-    <div class="section">
-      <h2>MCP-B compatibility API tests</h2>
-      <p>
-        Test MCP-B-only removal, listing, execution, and testing-shim callbacks. These are not the
-        current native Chrome WebMCP surface.
-      </p>
-      <div id="chromium-callback-status" style="display: none"></div>
-
-      <h3>ModelContext APIs</h3>
-      <div style="text-align: center">
-        <button id="chromium-unregister-tool">Test AbortSignal cleanup</button>
-        <button id="chromium-clear-context">Test clearContext()</button>
-      </div>
-
-      <h3>ModelContextTesting APIs</h3>
-      <div style="text-align: center">
-        <button id="chromium-execute-tool">Test executeTool()</button>
-        <button id="chromium-list-tools">Test listTools()</button>
-      </div>
-
-      <h3>Tools Changed Callbacks</h3>
-      <div style="text-align: center">
-        <button id="chromium-test-callback-register">Test Callback: registerTool()</button>
-        <button id="chromium-test-callback-unregister">Test Event: AbortSignal cleanup</button>
-        <button id="chromium-test-callback-provide">Test Callback: grouped registration</button>
-        <button id="chromium-test-callback-clear">Test Callback: signal cleanup</button>
-      </div>
-    </div>
-
-    <div class="section">
       <h2>Event Log</h2>
       <button id="clear-log">Clear Log</button>
       <div id="log"></div>

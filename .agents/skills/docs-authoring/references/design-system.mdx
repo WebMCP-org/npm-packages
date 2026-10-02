@@ -113,7 +113,7 @@ Always specify the language for syntax highlighting:
 
 ```typescript
 // TypeScript example
-document.modelContext.registerTool({
+document.modelContext?.registerTool({
   name: 'example_tool',
   description: 'An example tool',
   inputSchema: { type: 'object', properties: {} },
@@ -149,7 +149,7 @@ npm install @mcp-b/global
     import { onMounted } from 'vue';
 
     onMounted(() => {
-      document.modelContext.registerTool({
+      document.modelContext?.registerTool({
         name: 'my_tool',
         description: 'Does something',
         execute: async () => ({ content: [{ type: 'text', text: 'Done' }] })
@@ -161,7 +161,7 @@ npm install @mcp-b/global
   </Tab>
   <Tab title="Vanilla JS">
     ```javascript
-    document.modelContext.registerTool({
+    document.modelContext?.registerTool({
       name: 'my_tool',
       description: 'Does something',
       execute: async () => ({ content: [{ type: 'text', text: 'Done' }] })
@@ -172,11 +172,16 @@ npm install @mcp-b/global
 
 ## Using Snippets
 
-Import reusable content from the `/snippets` folder:
+Import reusable content from the `/snippets` folder, then render it as a component:
 
-```jsx
-<Snippet file="snippets/packages/global-quickstart.ts" />
+```mdx
+import CalculatorExample from '/snippets/packages/react-webmcp-quickstart.mdx';
+
+<CalculatorExample />
 ```
+
+Snippet files must be `.mdx`. `<Snippet file="...">` renders nothing for `.ts`, `.html`, or `.json`
+files.
 
 ## Page Frontmatter
 

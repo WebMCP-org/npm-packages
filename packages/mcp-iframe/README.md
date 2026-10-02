@@ -16,8 +16,14 @@ pnpm add @mcp-b/mcp-iframe
 
 Both pages must expose `document.modelContext`. The parent needs the MCP-B
 resource and prompt extensions from `@mcp-b/global` when the iframe exposes
-those capabilities. The deprecated `navigator.modelContext` surface is used
-only as a fallback for older runtimes.
+those capabilities.
+
+With the polyfill or `@mcp-b/global` in the child, `registerTool()` in a
+cross-origin child rejects with `NotAllowedError`, even with `allow="tools"`;
+native WebMCP does not have this limitation. A parent running `@mcp-b/global`
+also lists a same-origin child's tools unprefixed, so each such tool appears
+twice over MCP. The [reference](https://docs.mcp-b.ai/packages/mcp-iframe/reference)
+explains both.
 
 ## Use the default element
 

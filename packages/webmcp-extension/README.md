@@ -16,14 +16,14 @@ pnpm add @mcp-b/global @mcp-b/webmcp-extension
 
 ## Set up the extension
 
-Declare the runtime and client as static `document_start` content scripts: install WebMCP in the page's `MAIN` world, then connect from the default isolated world. `world: "MAIN"` requires Chrome 111 or newer. See Chrome's [content-script guide](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts) and [`content_scripts` manifest reference](https://developer.chrome.com/docs/extensions/reference/manifest/content-scripts).
+Declare the runtime and client as static `document_start` content scripts: install WebMCP in the page's `MAIN` world, then connect from the default isolated world. `world: "MAIN"` requires Chrome 111, and the `@mcp-b/global` runtime requires Chrome 126. See Chrome's [content-script guide](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts) and [`content_scripts` manifest reference](https://developer.chrome.com/docs/extensions/reference/manifest/content-scripts).
 
 ```json
 {
   "manifest_version": 3,
   "name": "My WebMCP Extension",
   "version": "1.0.0",
-  "minimum_chrome_version": "111",
+  "minimum_chrome_version": "126",
   "content_scripts": [
     {
       "matches": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
@@ -72,10 +72,11 @@ Annotated forms use the same extension connection:
 </form>
 ```
 
-`@mcp-b/global` uses native declarative support when available and installs the
-polyfilled form runtime otherwise. Imperative registrations and annotated forms
-both appear in `client.listTools()` and run through `client.callTool()`. The
-extension adds no separate DOM scanner or declarative client API. See the
+`@mcp-b/global` uses native declarative support when available. Otherwise,
+`@mcp-b/webmcp-polyfill` installs its temporary declarative layer. Imperative
+registrations and annotated forms both appear in `client.listTools()` and run
+through `client.callTool()`. The extension adds no separate DOM scanner or
+declarative client API. See the
 [declarative API reference](https://docs.mcp-b.ai/reference/webmcp/declarative-api)
 for the evolving browser behavior and polyfill compatibility boundary.
 
@@ -134,10 +135,10 @@ Load `dist/` as an unpacked extension from `chrome://extensions`.
   explicit `fromOrigins` request. The extension client does not make that
   request. Declarative tools currently have no cross-origin exposure attribute.
 - Native Chrome resolves `executeTool()` with `null` when a tool navigates. The
-  extension client reports that as an interrupted MCP call and does not carry
-  calls across navigation or read JSON-LD from the destination document. Use
-  `SubmitEvent.respondWith()` when a declarative tool must return a result
-  without navigation.
+  extension client receives a successful call whose text is `null`, not an
+  error, and does not carry calls across navigation or read JSON-LD from the
+  destination document. Use `SubmitEvent.respondWith()` when a declarative tool
+  must return a result without navigation.
 
 ## Test
 

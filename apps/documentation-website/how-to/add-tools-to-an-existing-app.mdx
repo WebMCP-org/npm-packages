@@ -31,6 +31,7 @@ Call the same function used by your interface from the tool handler. Use an `Abo
 the tool when the capability is no longer available.
 
 ```ts title="cart-tool.ts"
+if (!document.modelContext) throw new Error('WebMCP is unavailable');
 const controller = new AbortController();
 
 await document.modelContext.registerTool(
@@ -72,8 +73,8 @@ framework](/how-to/frameworks).
 Check the page registry after your registration promise resolves:
 
 ```js title="Browser console"
-const tools = await document.modelContext.getTools();
-console.table(tools.map(({ name, description }) => ({ name, description })));
+const tools = await document.modelContext?.getTools();
+console.table(tools?.map(({ name, description }) => ({ name, description })) ?? []);
 ```
 
 Use Chrome's [WebMCP DevTools

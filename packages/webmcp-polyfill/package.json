@@ -1,11 +1,10 @@
 {
   "name": "@mcp-b/webmcp-polyfill",
   "version": "5.1.0",
-  "description": "Strict WebMCP core runtime polyfill for document.modelContext (with deprecated navigator.modelContext alias)",
+  "description": "Vendored upstream WebMCP polyfill plus temporary declarative tools",
   "keywords": [
     "browser",
     "model-context",
-    "navigator-modelcontext",
     "polyfill",
     "webmcp"
   ],
@@ -21,7 +20,8 @@
     "directory": "packages/webmcp-polyfill"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE.webmcp-polyfill"
   ],
   "type": "module",
   "sideEffects": [
@@ -36,11 +36,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
-    },
-    "./schema": {
-      "types": "./dist/schema.d.ts",
-      "import": "./dist/schema.js",
-      "default": "./dist/schema.js"
     },
     "./iife": {
       "script": "./dist/index.iife.js",
@@ -61,13 +56,12 @@
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
-    "test:conformance": "vp test run conformance/polyfill-runtime.e2e.test.ts --browser.headless",
+    "test:smoke": "vp test run src/index.test.ts --browser.headless",
     "test:coverage": "vp test run --coverage",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mcp-b/webmcp-types": "workspace:*",
-    "@standard-schema/spec": "^1.1.0"
+    "webmcp-types": "0.1.9"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "catalog:",
@@ -78,5 +72,9 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "upstream": {
+    "repository": "https://github.com/webmachinelearning/webmcp-polyfill",
+    "commit": "439c6c341f1c632c63498ba206e2bd8471cb8efb"
   }
 }

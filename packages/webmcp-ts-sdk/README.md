@@ -20,10 +20,7 @@ pnpm add @mcp-b/webmcp-ts-sdk @mcp-b/transports
 import { TabServerTransport } from '@mcp-b/transports';
 import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 
-const server = new BrowserMcpServer({
-  name: 'catalog-app',
-  version: '1.0.0',
-});
+const server = new BrowserMcpServer({ name: 'catalog-app', version: '1.0.0' });
 
 await server.connect(
   new TabServerTransport({
@@ -56,7 +53,7 @@ An `AbortSignal` owns each WebMCP tool registration. Aborting it removes the loc
 
 ## What the adapter owns
 
-- WebMCP `registerTool()`, `getTools()`, `ontoolchange`, and descriptor-based `executeTool()`
+- WebMCP `registerTool()`, `getTools()`, `ontoolchange`, `ontoolactivated`, `ontoolcancel`, and descriptor-based `executeTool()`
 - Native `document.modelContext` registration mirroring and tool reconciliation
 - MCP-B `registerPrompt()`, `registerResource()`, and `listTools()` extensions
 - MCP transport lifecycle through `connect()` and `close()`
@@ -67,32 +64,34 @@ Prompt and resource discovery also belongs to MCP. Use a connected MCP client in
 
 ## Native integration
 
-Pass an existing context as `native`, then reconcile its current tools:
+The constructor uses `document.modelContext`, installing the bundled `@mcp-b/webmcp-polyfill` (about 28 KB minified) when needed, and delegates browser discovery, execution, and access checks to that context. Without a WebMCP context (no `document`, or an insecure page), the server serves MCP only. The document property keeps exposing the underlying context; `@mcp-b/global` installs the extended API and connects its default transport.
+
+To select a context explicitly, pass it as `native`, then reconcile its current tools:
 
 ```ts
-const server = new BrowserMcpServer(
-  { name: 'catalog-app', version: '1.0.0' },
-  { native: document.modelContext }
-);
+const native = document.modelContext;
+if (!native) throw new Error('Install a WebMCP runtime first');
+const server = new BrowserMcpServer({ name: 'catalog-app', version: '1.0.0' }, { native });
 
 await server.syncNativeTools();
 ```
 
-`syncNativeTools()` resolves after reconciliation. Later native `toolchange` events trigger another reconciliation. Backfill requires Chrome's optional descriptor-based `executeTool()` extension.
+`syncNativeTools()` resolves after reconciliation, and later native `toolchange` events reconcile again. The [package reference](https://docs.mcp-b.ai/packages/webmcp-ts-sdk/reference) covers frame scope, native result conversion, lifecycle events, and the MCP-only mode.
 
 ## Schema boundary
 
-The browser-facing API accepts JSON Schema and Standard Schema inputs. The adapter converts them to the MCP SDK v2 contract. Direct upstream registrations can use Zod 4.2 or newer or the official `fromJsonSchema` helper; Zod 3 is unsupported.
+`BrowserMcpServer` accepts JSON Schema and Standard JSON Schema input metadata. The official MCP server validates input and `outputSchema` on **MCP client calls** only; direct `executeTool()` calls and native mirrors invoke the browser callback without that validation, so validate in the callback when both paths can call a tool. The [`@mcp-b/react-webmcp`](../react-webmcp/README.md) hook already does this.
 
-MCP requires an object-root tool input schema. An array-root WebMCP tool remains available through WebMCP but is omitted from MCP discovery.
+MCP requires an object-root tool input schema. An array-root WebMCP tool remains available through WebMCP but is omitted from MCP discovery. Direct registrations on `server.mcpServer` use the official SDK's schema APIs; Zod 4.2 or newer is supported, and Zod 3 is unsupported. See [the package reference](https://docs.mcp-b.ai/packages/webmcp-ts-sdk/reference#schema-boundary) for the contracts and [schemas and structured output](https://docs.mcp-b.ai/how-to/use-schemas-and-structured-output) for examples.
 
 ## Exports
 
-- `BrowserMcpServer`
-- `BrowserMcpServerOptions`
-- `isBrowserMcpServer`
-- `PromptDescriptor`
-- `ResourceDescriptor`
+- `BrowserMcpServer`, `BrowserMcpServerOptions`, `isBrowserMcpServer`
+- `PromptDescriptor`, `ResourceDescriptor`, `RegistrationHandle`
+- `ModelContext`, `ModelContextWithExtensions`, `RegisteredTool`, `ToolDescriptor`, `ToolDescriptorFromSchema`, `ToolListItem`, `InputSchema`, and the other MCP-B descriptor and inference types
+- `CallToolResult`, `ContentBlock`, `TextContent`, `JsonObject`, `JsonValue`, re-exported from `@modelcontextprotocol/server`
+- `WebMCP`, the upstream namespace re-exported through `@mcp-b/webmcp-polyfill`, which also brings the polyfill's `SubmitEvent` and `ModelContext` declarations into scope
+- `@mcp-b/webmcp-ts-sdk/schema`: `normalizeInputSchema()`, `normalizeToolResponse()`, `isMcpStandardSchema()`, `ToolInputSchema`, `NormalizedInputSchema`
 
 Import MCP clients, servers, schemas, transports, and validators from the official `@modelcontextprotocol/*` packages.
 

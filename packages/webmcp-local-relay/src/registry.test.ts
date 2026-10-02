@@ -238,7 +238,7 @@ describe('RelayRegistry', () => {
     expect(toolName).toBe('tool_a');
 
     const resolved = registry.resolveInvocation({
-      toolName: toolName as string,
+      toolName: 'tool_a',
       sourceId: 'nonexistent',
     });
 
