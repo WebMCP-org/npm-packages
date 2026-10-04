@@ -10,25 +10,25 @@ packages:
   - apps/*
 
 catalog:
-  '@modelcontextprotocol/client': 2.0.0
-  '@modelcontextprotocol/core': 2.0.0
-  '@modelcontextprotocol/server': 2.0.0
-  '@oxlint/plugins': 1.85.0
-  '@types/chrome': ^0.2.7
-  '@types/node': 22.20.1
-  '@types/react': ^19.2.18
-  '@types/react-dom': ^19.2.5
-  '@vitest/coverage-v8': 4.1.8
-  chrome-types: 0.1.440
-  oxlint: 1.85.0
-  playwright: ^1.62.1
-  react: ^19.2.8
-  react-dom: ^19.2.8
+  '@modelcontextprotocol/client': 2.2.0
+  '@modelcontextprotocol/core': 2.2.0
+  '@modelcontextprotocol/server': 2.2.0
+  '@oxlint/plugins': 1.86.0
+  '@types/chrome': ^0.3.4
+  '@types/node': 22.20.4
+  '@types/react': ^19.3.0
+  '@types/react-dom': ^19.3.0
+  '@vitest/coverage-v8': 4.1.11
+  chrome-types: 0.1.450
+  oxlint: 1.86.0
+  playwright: ^1.63.0
+  react: ^19.3.0
+  react-dom: ^19.3.0
   typescript: ^5.8.3
   vite: npm:@voidzero-dev/vite-plus-core@0.1.24
-  vite-plus: 0.1.24
+  vite-plus: 0.3.3
   vitest: npm:@voidzero-dev/vite-plus-test@0.1.24
-  zod: 4.4.3
+  zod: 4.6.5
 
 onlyBuiltDependencies:
   - '@parcel/watcher'

@@ -11,6 +11,6 @@
     "validate": "mintlify validate"
   },
   "devDependencies": {
-    "mintlify": "^4.2.837"
+    "mintlify": "^4.2.964"
   }
 }
