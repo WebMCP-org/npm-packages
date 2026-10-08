@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-types",
-  "version": "5.1.0",
+  "version": "6.0.0",
   "description": "Compatibility alias for upstream webmcp-types; use webmcp-types directly",
   "homepage": "https://github.com/webmachinelearning/webmcp-types",
   "bugs": {
