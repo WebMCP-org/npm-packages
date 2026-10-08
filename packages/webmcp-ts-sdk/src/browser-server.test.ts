@@ -309,6 +309,28 @@ describe('BrowserMcpServer', () => {
     expect(server.listTools().map(({ name }) => name)).toEqual(['strict_mode_tool']);
   });
 
+  it('keeps the MCP tool when Permissions Policy blocks the native mirror', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    onTestFinished(() => warn.mockRestore());
+    const server = createServer('native-policy-test', {
+      native: createNativeContext({
+        registerTool: () =>
+          Promise.reject(
+            new DOMException('WebMCP is disabled by Permissions Policy', 'NotAllowedError')
+          ),
+      }),
+    });
+
+    await server.registerTool({
+      name: 'framed_tool',
+      description: 'Registered in a frame without allow="tools"',
+      execute: () => 'ok',
+    });
+
+    expect(server.listTools().map(({ name }) => name)).toEqual(['framed_tool']);
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
   it('backfills an existing native tool after native registration rejects', async () => {
     const nativeFailure = new DOMException('Tool already registered', 'InvalidStateError');
     const server = createServer('native-rejection-test', {
