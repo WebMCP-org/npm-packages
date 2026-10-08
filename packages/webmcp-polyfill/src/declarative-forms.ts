@@ -594,8 +594,10 @@ function waitForSubmission(
     };
 
     activeSubmissions.set(form, {
+      // A trusted dispatch runs a microtask checkpoint after each listener, so only a
+      // task observes the event after the form's own listeners have run (#342).
       complete(event) {
-        queueMicrotask(() => {
+        setTimeout(() => {
           const response = agentResponses.get(event);
           if (response) settleResponse(response);
           else if (event.defaultPrevented) cancel(executionError());
@@ -679,7 +681,8 @@ export function installWebMCPDeclarativeExtensions(context: WebMCP.ModelContext)
   const onReset = (event: Event) => {
     if (!event.isTrusted || !(event.target instanceof HTMLFormElement)) return;
     const form = event.target;
-    queueMicrotask(() => {
+    // Task, not microtask: see complete().
+    setTimeout(() => {
       if (event.defaultPrevented) return;
       registrations.get(form)?.cancelPending?.(executionError());
     });
