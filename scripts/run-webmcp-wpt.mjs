@@ -22,11 +22,14 @@ if (!existsSync(polyfill)) {
 }
 
 // ponytail: page-local allowlist; frame/origin tests qualify only if every assertion is page-local.
-// This pinned WPT revision still passes JSON strings to executeTool and predates
-// consequentialHint. Those cases target an older API shape than the vendored upstream runtime,
-// which is why the declarative list holds only the files that never call executeTool.
+// The rest of the suite needs ToolActivatedEvent/ToolCancelEvent, tool pseudo-classes, raw
+// (non-JSON) results, or frame trees, which the vendored upstream runtime does not provide.
 const imperativeTests = [
   'duplicate_tool_registration.https.html',
+  'executeTool-error-window-onerror.https.html',
+  'executeTool-invalid-dictionary.https.html',
+  'executeTool-unregister-resolution-race.https.html',
+  'getTools-imperative-annotations.https.html',
   'getTools-imperative-schema.https.html',
   'getTools.https.html',
   'model_context.https.html',
@@ -43,7 +46,15 @@ const imperativeTests = [
 ];
 const declarativeTests = [
   'duplicate-tool-name.https.html',
+  'execute_tool_change_event.https.html',
+  'execute_tool_submit_from_js.https.html',
+  'executeTool-flexible-types.https.html',
+  'executeTool-invalid-input.https.html',
+  'executeTool-respondWith-circular-object.https.html',
+  'executeTool-respondWith-reject.https.html',
   'getTools-declarative-schema.https.html',
+  'opaque-origin-tools.https.html',
+  'select-multiple-events.https.html',
   'toolchange-on-attribute-mutation.https.html',
   'toolchange-on-control-add-remove.https.html',
   'toolchange-on-name-change.https.html',

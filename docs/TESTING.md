@@ -221,14 +221,11 @@ The upstream suite lives in
 [`webmcp`](https://github.com/web-platform-tests/wpt/tree/master/webmcp). The
 workflow pins its WPT revision and injects
 `packages/webmcp-polyfill/dist/index.iife.js` with native WebMCP disabled. It
-runs an explicit allowlist: imperative files for the core surface and the
-declarative files that never call `executeTool()` (`duplicate-tool-name`,
-`getTools-declarative-schema`, and the `toolchange-*` files). The
-`document-domain-enabled` files are excluded because upstream removed the
-origin-keyed agent cluster requirement they assert. The other files, including the frame-tree,
-origin-policy, and navigation cases, target the pinned revision's older API
-shape (JSON-string `executeTool()` input, no `consequentialHint`); refresh the
-pin before restoring them. The shared declarative suite runs against both
+runs an explicit allowlist of page-local imperative and declarative files. The
+frame-tree, origin-policy, and navigation files need native coverage. The rest
+need features the vendored upstream runtime does not provide yet:
+`ToolActivatedEvent` and `ToolCancelEvent`, the tool pseudo-classes, and raw
+(non-JSON) `executeTool()` results. The shared declarative suite runs against both
 `@mcp-b/global` and the standalone polyfill. The polyfill harness lives in
 `packages/webmcp-polyfill/src/declarative-forms.test.ts` and runs with that
 package's default `test` and `test:coverage` scripts. Its `test:smoke` script
@@ -251,9 +248,10 @@ Two requirements beyond the behavioral lane:
   checkout without it fails with `Error fetching /interfaces/webmcp.idl`. The
   workflow's `sparse-checkout` block lists it; fix an existing local clone with
   `git -C .reference/wpt sparse-checkout add interfaces` (~1.8 MB).
-- The polyfill passes 20/20 subtests, matching native Chrome Canary. CI still
-  runs the lane with `continue-on-error: true`; removing that line makes it
-  blocking, which is a pending decision rather than a known gap.
+- The vendored upstream runtime does not define `ToolActivatedEvent`,
+  `ToolCancelEvent`, or the `ontoolactivated`/`ontoolcancel` handlers, so those
+  subtests fail. CI runs the lane with `continue-on-error: true` until upstream
+  ships them.
 
 ## Extension Transport Testing
 
