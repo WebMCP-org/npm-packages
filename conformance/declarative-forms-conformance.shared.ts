@@ -5,7 +5,6 @@ interface DeclarativeFormConformanceOptions {
   suiteName: string;
   install?(): void | Promise<void>;
   cleanup?(): void | Promise<void>;
-  supportsFormRemovalCancellation?: boolean;
 }
 
 const FIXTURE_ATTRIBUTE = 'data-webmcp-declarative-conformance';
@@ -894,32 +893,30 @@ export function runDeclarativeFormConformanceSuite(
       expect(scope.value).toBe('global');
     });
 
-    it.skipIf(options.supportsFormRemovalCancellation === false)(
-      'rejects a pending response when its declarative form is removed',
-      async () => {
-        const { name, form } = declareForm(
-          'declarative_removed',
-          (toolName) => `
+    it('keeps a responded call pending when its declarative form is removed', async () => {
+      const { name, form } = declareForm(
+        'declarative_removed',
+        (toolName) => `
         <form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Pending form" toolautosubmit>
           <input name="value">
         </form>`
-        );
-        let submitted: (() => void) | undefined;
-        const submission = new Promise<void>((resolve) => {
-          submitted = resolve;
-        });
+      );
+      let respond: ((value: string) => void) | undefined;
+      const submission = new Promise<void>((resolve) => {
         form.addEventListener('submit', (event) => {
           event.preventDefault();
-          submitRespondWith(event, new Promise(() => {}));
-          submitted?.();
+          submitRespondWith(event, new Promise((settle) => (respond = settle)));
+          resolve();
         });
+      });
 
-        const execution = executeTool(await waitForTool(name), { value: 'pending' });
-        await submission;
-        form.remove();
+      const execution = executeTool(await waitForTool(name), { value: 'pending' });
+      await submission;
+      form.remove();
+      await waitForToolRemoval(name);
+      respond?.('done');
 
-        await expect(execution).rejects.toMatchObject({ name: 'UnknownError' });
-      }
-    );
+      await expect(execution).resolves.toBe('done');
+    });
   });
 }

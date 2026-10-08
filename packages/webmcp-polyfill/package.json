@@ -75,6 +75,6 @@
   },
   "upstream": {
     "repository": "https://github.com/webmachinelearning/webmcp-polyfill",
-    "commit": "439c6c341f1c632c63498ba206e2bd8471cb8efb"
+    "commit": "6bf6c57bbaf3d1173d7737cfb79572632d9b7871"
   }
 }

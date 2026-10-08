@@ -575,6 +575,8 @@ function waitForSubmission(
     // A submission without respondWith() resolves to null, as in Chromium; an undefined
     // response maps to null as well so that upstream can serialize the result.
     const settleResponse = (response: Promise<WebMcpToolResult>) => {
+      // Once the page has responded, unregistering the form no longer cancels the call.
+      if (registration.cancelPending === cancel) delete registration.cancelPending;
       response.then(
         (value) => finish(() => resolve(value ?? null)),
         (cause: ErrorOptions['cause']) => finish(() => reject(cause))
@@ -594,8 +596,10 @@ function waitForSubmission(
     };
 
     activeSubmissions.set(form, {
+      // A trusted dispatch runs a microtask checkpoint after each listener, so only a
+      // task observes the event after the form's own listeners have run (#342).
       complete(event) {
-        queueMicrotask(() => {
+        setTimeout(() => {
           const response = agentResponses.get(event);
           if (response) settleResponse(response);
           else if (event.defaultPrevented) cancel(executionError());
@@ -679,7 +683,8 @@ export function installWebMCPDeclarativeExtensions(context: WebMCP.ModelContext)
   const onReset = (event: Event) => {
     if (!event.isTrusted || !(event.target instanceof HTMLFormElement)) return;
     const form = event.target;
-    queueMicrotask(() => {
+    // Task, not microtask: see complete().
+    setTimeout(() => {
       if (event.defaultPrevented) return;
       registrations.get(form)?.cancelPending?.(executionError());
     });

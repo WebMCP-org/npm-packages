@@ -11,7 +11,7 @@ supports them. For other sites, follow the
 when its distribution is available.
 
 Until then, this package bundles upstream revision
-`439c6c341f1c632c63498ba206e2bd8471cb8efb`. It installs the standard
+`6bf6c57bbaf3d1173d7737cfb79572632d9b7871`. It installs the standard
 `document.modelContext` API when the browser does not provide one, plus a
 temporary declarative tools layer. The upstream implementation and types are the
 source of truth for the core runtime. Use [`@mcp-b/global`](../global/README.md)
