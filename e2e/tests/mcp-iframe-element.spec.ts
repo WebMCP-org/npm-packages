@@ -430,7 +430,7 @@ test('validates attributes and supports a custom tag entry', async ({ context, p
   expect(custom.result.content[0]).toMatchObject({ type: 'text', text: '7' });
 });
 
-test('bridges a cross-origin child only where the browser grants the tools permission', async ({
+test('bridges a cross-origin child whether or not WebMCP grants it the tools permission', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -472,24 +472,15 @@ test('bridges a cross-origin child only where the browser grants the tools permi
   });
 
   // The vendored core lets a cross-origin child prove its permission only by its index in the
-  // parent's window.frames, and the iframe inside the element's shadow root has none.
-  expect({ ...parent, ...child }).toEqual(
-    child.native
-      ? {
-          allow: 'tools',
-          tools: ['child-iframe_calculate'],
-          bridged: true,
-          native: true,
-          registration: 'registered',
-        }
-      : {
-          allow: 'tools',
-          tools: [],
-          bridged: false,
-          native: false,
-          registration: 'NotAllowedError',
-        }
-  );
+  // parent's window.frames, and the iframe inside the element's shadow root has none. The child
+  // then registers over MCP only, so the parent still bridges its tools.
+  expect({ ...parent, ...child }).toEqual({
+    allow: 'tools',
+    tools: ['child-iframe_calculate'],
+    bridged: true,
+    native: child.native,
+    registration: 'registered',
+  });
 });
 
 test('surfaces parent registration failures instead of announcing partial readiness', async ({

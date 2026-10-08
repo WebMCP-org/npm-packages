@@ -284,6 +284,13 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       if (this.nativeToolAbortControllers.get(tool.name) === controller) {
         this.nativeToolAbortControllers.delete(tool.name);
       }
+      // A frame without allow="tools" can still serve the tool over MCP, as in 5.x.
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        console.warn(
+          `[BrowserMcpServer] Tool "${tool.name}" is available over MCP only: ${error.message}. Grant allow="tools" on the iframe to expose it to WebMCP.`
+        );
+        return;
+      }
       throw error;
     }
     if (this.nativeToolAbortControllers.get(tool.name) === controller) {
