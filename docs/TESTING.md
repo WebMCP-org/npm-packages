@@ -221,10 +221,11 @@ The upstream suite lives in
 [`webmcp`](https://github.com/web-platform-tests/wpt/tree/master/webmcp). The
 workflow pins its WPT revision and injects
 `packages/webmcp-polyfill/dist/index.iife.js` with native WebMCP disabled. It
-runs an explicit allowlist: fifteen imperative files for the core surface and
-the six declarative files that never call `executeTool()`
-(`document-domain-enabled`, `duplicate-tool-name`, `getTools-declarative-schema`,
-and the three `toolchange-*` files). The other files, including the frame-tree,
+runs an explicit allowlist: imperative files for the core surface and the
+declarative files that never call `executeTool()` (`duplicate-tool-name`,
+`getTools-declarative-schema`, and the `toolchange-*` files). The
+`document-domain-enabled` files are excluded because upstream removed the
+origin-keyed agent cluster requirement they assert. The other files, including the frame-tree,
 origin-policy, and navigation cases, target the pinned revision's older API
 shape (JSON-string `executeTool()` input, no `consequentialHint`); refresh the
 pin before restoring them. The shared declarative suite runs against both

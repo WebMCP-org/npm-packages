@@ -26,7 +26,6 @@ if (!existsSync(polyfill)) {
 // consequentialHint. Those cases target an older API shape than the vendored upstream runtime,
 // which is why the declarative list holds only the files that never call executeTool.
 const imperativeTests = [
-  'document-domain-enabled.sub.https.html',
   'duplicate_tool_registration.https.html',
   'getTools-imperative-schema.https.html',
   'getTools.https.html',
@@ -43,7 +42,6 @@ const imperativeTests = [
   'register_tool_with_schema.https.html',
 ];
 const declarativeTests = [
-  'document-domain-enabled.sub.https.html',
   'duplicate-tool-name.https.html',
   'getTools-declarative-schema.https.html',
   'toolchange-on-attribute-mutation.https.html',

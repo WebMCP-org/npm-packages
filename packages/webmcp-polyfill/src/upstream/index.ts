@@ -607,9 +607,6 @@ function requireActiveWindow(owner: Document): Window {
   if (!view) {
     throw new NativeDOMException("The document is not fully active", "InvalidStateError");
   }
-  if (view.originAgentCluster === false && view.location.protocol !== "file:") {
-    throw new NativeDOMException("An origin-keyed agent cluster is required", "SecurityError");
-  }
 
   // Synchronous where the browser exposes the policy; FrameBridge.allowed() covers the rest.
   if (readToolsPolicy(owner) === false) {

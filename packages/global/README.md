@@ -33,7 +33,7 @@
 When no context is installed, `@mcp-b/global` calls `installWebMCP()` from
 `@mcp-b/webmcp-polyfill`. That package bundles the upstream
 [WebMCP polyfill](https://github.com/webmachinelearning/webmcp-polyfill) at
-revision `439c6c341f1c632c63498ba206e2bd8471cb8efb`. It depends on the
+revision `6bf6c57bbaf3d1173d7737cfb79572632d9b7871`. It depends on the
 upstream `webmcp-types` declarations. Consumers do not install or build a Git
 dependency.
 
