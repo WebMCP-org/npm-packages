@@ -4,7 +4,7 @@
 
 **Breaking: replace the MCP-B core implementation with the upstream WebMCP polyfill.**
 Declarative tools remain available until upstream supports them.
-This package vendors [upstream revision `439c6c3`](https://github.com/webmachinelearning/webmcp-polyfill/tree/439c6c341f1c632c63498ba206e2bd8471cb8efb)
+This package vendors [upstream revision `6bf6c57`](https://github.com/webmachinelearning/webmcp-polyfill/tree/6bf6c57bbaf3d1173d7737cfb79572632d9b7871)
 and uses `webmcp-types@0.1.9` for the browser contract.
 
 The existing package name remains available as a temporary compatibility alias.
