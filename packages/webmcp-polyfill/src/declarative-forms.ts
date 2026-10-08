@@ -575,6 +575,8 @@ function waitForSubmission(
     // A submission without respondWith() resolves to null, as in Chromium; an undefined
     // response maps to null as well so that upstream can serialize the result.
     const settleResponse = (response: Promise<WebMcpToolResult>) => {
+      // Once the page has responded, unregistering the form no longer cancels the call.
+      if (registration.cancelPending === cancel) delete registration.cancelPending;
       response.then(
         (value) => finish(() => resolve(value ?? null)),
         (cause: ErrorOptions['cause']) => finish(() => reject(cause))

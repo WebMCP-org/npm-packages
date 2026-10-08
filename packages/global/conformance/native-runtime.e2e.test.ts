@@ -138,5 +138,4 @@ describe('Native WebMCP conformance', () => {
 runDeclarativeFormConformanceSuite({
   suiteName: 'Native declarative conformance (Chrome)',
   // Native Chromium keeps a pending declarative execution alive after its form is removed.
-  supportsFormRemovalCancellation: false,
 });
