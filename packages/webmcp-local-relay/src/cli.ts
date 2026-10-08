@@ -3,6 +3,8 @@
 import { parseCliOptions, printHelp } from './cli-utils.js';
 import { LocalRelayMcpServer } from './mcpRelayServer.js';
 
+declare const __RELAY_VERSION__: string;
+
 let options: ReturnType<typeof parseCliOptions>;
 try {
   options = parseCliOptions(process.argv.slice(2));
@@ -26,6 +28,7 @@ if (options.allowedOrigins.includes('*')) {
 
 const relay = new LocalRelayMcpServer({
   bridgeOptions: options,
+  serverVersion: __RELAY_VERSION__,
 });
 
 try {
