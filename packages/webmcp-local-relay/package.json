@@ -60,7 +60,7 @@
   "dependencies": {
     "@modelcontextprotocol/core": "catalog:",
     "@modelcontextprotocol/server": "catalog:",
-    "ws": "^8.21.3",
+    "ws": "^8.22.0",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -68,7 +68,7 @@
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@modelcontextprotocol/client": "catalog:",
     "@types/node": "catalog:",
-    "@types/ws": "^8.5.14",
+    "@types/ws": "^8.18.2",
     "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",
