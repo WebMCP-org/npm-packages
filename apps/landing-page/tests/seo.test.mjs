@@ -15,7 +15,8 @@ test('legacy and non-canonical paths permanently redirect in one hop', async () 
   for (const [source, destination] of redirects) {
     const response = await fetch(`${origin}${source}`, { redirect: 'manual' });
     assert.equal(response.status, 308, source);
-    assert.equal(response.headers.get('location'), `${origin}${destination}`, source);
+    const location = new URL(response.headers.get('location'), `${origin}${source}`).href;
+    assert.equal(location, `${origin}${destination}`, source);
   }
 });
 
