@@ -450,18 +450,23 @@ export class LocalRelayMcpServer {
     if (tool.annotations) registration.annotations = tool.annotations;
     if (tool.icons) registration.icons = tool.icons;
     if (tool._meta) registration._meta = tool._meta;
-    return this.mcpServer.registerTool(tool.name, registration, async (args: RelayInvokeArgs) => {
-      try {
-        return await this.bridge.invokeTool(tool.name, args);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        const details = err instanceof Error ? (err.stack ?? err.message) : String(err);
-        process.stderr.write(
-          `[webmcp-local-relay] error: dynamic tool "${tool.name}" invocation failed: ${details}\n`
-        );
-        return errorResult(`Failed to invoke relayed tool "${tool.name}": ${message}`);
+    return this.mcpServer.registerTool(
+      tool.name,
+      registration,
+      async (args: RelayInvokeArgs, context) => {
+        try {
+          return await this.bridge.invokeTool(tool.name, args, { signal: context.mcpReq.signal });
+        } catch (err) {
+          if (context.mcpReq.signal.aborted) throw err;
+          const message = err instanceof Error ? err.message : String(err);
+          const details = err instanceof Error ? (err.stack ?? err.message) : String(err);
+          process.stderr.write(
+            `[webmcp-local-relay] error: dynamic tool "${tool.name}" invocation failed: ${details}\n`
+          );
+          return errorResult(`Failed to invoke relayed tool "${tool.name}": ${message}`);
+        }
       }
-    });
+    );
   }
 
   /**
