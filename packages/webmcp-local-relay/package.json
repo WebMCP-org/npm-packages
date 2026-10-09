@@ -60,7 +60,7 @@
   "dependencies": {
     "@modelcontextprotocol/core": "catalog:",
     "@modelcontextprotocol/server": "catalog:",
-    "ws": "^8.21.3",
+    "ws": "^8.22.0",
     "zod": "catalog:"
   },
   "devDependencies": {
