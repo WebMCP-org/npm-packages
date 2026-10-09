@@ -1,3 +1,5 @@
+import type { RegisteredTool, WebMCP, WebMcpToolObjectInput } from '@mcp-b/webmcp-ts-sdk';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { z } from 'zod/v4';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseConfig, startWidgetRuntime } from './widgetRuntime.js';
@@ -31,8 +33,6 @@ interface PostedHostMessage {
 type ParentPostMessage = (payload: PostedHostMessage, targetOrigin: string) => void;
 
 interface HostWindow {
-  addEventListener(type: 'message', listener: (event: HostEvent) => void): void;
-  dispatchMessage(origin: string, data: HostEvent['data']): void;
   parentPostMessage: ReturnType<typeof vi.fn<ParentPostMessage>>;
 }
 
@@ -40,6 +40,7 @@ interface WidgetTestEnv {
   connections: RelayConnection[];
   hostOrigin: string;
   hostWindow: HostWindow;
+  modelContext: TestModelContext;
 }
 
 interface RelayOptions {
@@ -49,6 +50,58 @@ interface RelayOptions {
   sendHelloAccepted?: boolean;
   sendHelloRejected?: { message: string; reason: string } | false;
   serverHello?: { label?: string; relayId?: string; workspace?: string };
+  tools?: TestTool[];
+  withoutToolChangeEvents?: boolean;
+}
+
+interface TestTool {
+  name: string;
+  title?: string;
+  description: string;
+  inputSchema?: object;
+  annotations?: RegisteredTool['annotations'];
+  execute?: (
+    input: WebMcpToolObjectInput,
+    signal?: AbortSignal
+  ) => CallToolResult | Promise<CallToolResult>;
+}
+
+class TestModelContext extends EventTarget {
+  #tools: TestTool[];
+
+  constructor(tools: TestTool[]) {
+    super();
+    this.#tools = tools;
+  }
+
+  async getTools(): Promise<RegisteredTool[]> {
+    return this.#tools.map((tool) => ({
+      ...tool,
+      title: tool.title ?? '',
+      origin: APP_ORIGIN,
+      window: globalThis.window.parent,
+    }));
+  }
+
+  readonly executeTool = vi.fn(
+    async (
+      registered: RegisteredTool,
+      input: WebMcpToolObjectInput,
+      options: WebMCP.ModelContextExecuteToolOptions = {}
+    ): Promise<string> => {
+      const tool = this.#tools.find((candidate) => candidate.name === registered.name);
+      if (!tool) throw new Error(`Tool not found: ${registered.name}`);
+      const result = (await tool.execute?.(input, options.signal)) ?? {
+        content: [{ type: 'text', text: `executed ${tool.name}` }],
+      };
+      return JSON.stringify(result);
+    }
+  );
+
+  setTools(tools: TestTool[]): void {
+    this.#tools = tools;
+    this.dispatchEvent(new Event('toolchange'));
+  }
 }
 
 const activeRelaySockets = new Set<MockWebSocket>();
@@ -157,22 +210,7 @@ function buildSearch(
 }
 
 function createHostWindow(): HostWindow {
-  const listeners = new Set<(event: HostEvent) => void>();
-  const parentPostMessage = vi.fn<ParentPostMessage>();
-
-  return {
-    addEventListener(type: 'message', listener: (event: HostEvent) => void): void {
-      if (type === 'message') {
-        listeners.add(listener);
-      }
-    },
-    dispatchMessage(origin: string, data: HostEvent['data']): void {
-      for (const listener of listeners) {
-        listener({ origin, data, source: globalThis.window.parent });
-      }
-    },
-    parentPostMessage,
-  };
+  return { parentPostMessage: vi.fn<ParentPostMessage>() };
 }
 
 function getPostedMessages(env: WidgetTestEnv, type: string) {
@@ -182,18 +220,6 @@ function getPostedMessages(env: WidgetTestEnv, type: string) {
       targetOrigin,
     }))
     .filter(({ payload }) => payload?.type === type);
-}
-
-async function waitForPostedMessage(env: WidgetTestEnv, type: string, index = 0) {
-  await vi.waitFor(() => {
-    expect(getPostedMessages(env, type).length).toBeGreaterThan(index);
-  });
-
-  const message = getPostedMessages(env, type)[index];
-  if (!message) {
-    throw new Error(`Expected posted message ${type} at index ${String(index)}`);
-  }
-  return message;
 }
 
 async function waitForConnection(env: WidgetTestEnv, index = 0): Promise<RelayConnection> {
@@ -208,19 +234,8 @@ async function waitForConnection(env: WidgetTestEnv, index = 0): Promise<RelayCo
   return connection;
 }
 
-async function completeHandshake(
-  env: WidgetTestEnv,
-  tools: unknown[] = []
-): Promise<RelayConnection> {
+async function completeHandshake(env: WidgetTestEnv): Promise<RelayConnection> {
   const connection = await waitForConnection(env);
-  const request = await waitForPostedMessage(env, 'webmcp.tools.list.request');
-
-  env.hostWindow.dispatchMessage(env.hostOrigin, {
-    requestId: request.payload.requestId,
-    tools,
-    type: 'webmcp.tools.list.response',
-  });
-
   await vi.waitFor(() => {
     expect(connection.messages).toHaveLength(2);
   });
@@ -244,6 +259,10 @@ function installEnvironment(options?: RelayOptions): WidgetTestEnv {
   const relayPort = params.get('relayPort') || defaultRelayPort;
   const serverPort = options?.serverPort ?? relayPort;
   const hostWindow = createHostWindow();
+  const modelContext = new TestModelContext(options?.tools ?? []);
+  if (options?.withoutToolChangeEvents) {
+    Object.defineProperty(modelContext, 'addEventListener', { value: undefined });
+  }
 
   connectRelaySocket = (socket) => {
     if (new URL(socket.url).port !== serverPort) {
@@ -304,6 +323,7 @@ function installEnvironment(options?: RelayOptions): WidgetTestEnv {
     configurable: true,
     value: {
       referrer: options?.referrer ?? '',
+      modelContext,
     },
     writable: true,
   });
@@ -331,7 +351,7 @@ function installEnvironment(options?: RelayOptions): WidgetTestEnv {
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
     value: {
-      addEventListener: hostWindow.addEventListener,
+      addEventListener: vi.fn(),
       location: { search },
       parent: {
         postMessage: hostWindow.parentPostMessage,
@@ -340,7 +360,7 @@ function installEnvironment(options?: RelayOptions): WidgetTestEnv {
     writable: true,
   });
 
-  return { connections, hostOrigin, hostWindow };
+  return { connections, hostOrigin, hostWindow, modelContext };
 }
 
 function startRuntime(options?: RelayOptions): WidgetTestEnv {
@@ -559,53 +579,21 @@ describe('widget runtime', () => {
       serverPort: '9334',
     });
 
-    const request = await waitForPostedMessage(env, 'webmcp.tools.list.request');
-    env.hostWindow.dispatchMessage(APP_ORIGIN, {
-      requestId: request.payload.requestId,
-      tools: [{ name: 'sum' }],
-      type: 'webmcp.tools.list.response',
-    });
+    const connection = await completeHandshake(env);
 
-    await vi.waitFor(() => {
-      expect(env.connections).toHaveLength(1);
-      expect(env.connections[0]?.messages).toHaveLength(2);
-    });
-
-    expect(env.connections[0]?.messages[0]).toMatchObject({
+    expect(env.connections).toHaveLength(1);
+    expect(connection.messages[0]).toMatchObject({
       origin: APP_ORIGIN,
       type: 'hello',
     });
   });
 
-  it('handshakes with the host and forwards tool changes after hello', async () => {
-    const env = startRuntime({ referrer: 'https://referrer.example/page' });
-
-    const request = await waitForPostedMessage(env, 'webmcp.tools.list.request');
-    expect(request.targetOrigin).toBe(APP_ORIGIN);
-
-    env.hostWindow.dispatchMessage(APP_ORIGIN, 42);
-    env.hostWindow.dispatchMessage('https://evil.example.com', {
-      tools: [{ name: 'wrong-origin' }],
-      type: 'webmcp.tools.changed',
+  it('publishes tools and tool changes from the WebMCP frame context', async () => {
+    const env = startRuntime({
+      referrer: 'https://referrer.example/page',
+      tools: [{ name: 'before', description: 'Initial tool' }],
     });
-    env.hostWindow.dispatchMessage(APP_ORIGIN, {
-      tools: [{ name: 'pre-hello' }],
-      type: 'webmcp.tools.changed',
-    });
-
-    const connection = await waitForConnection(env);
-    await Promise.resolve();
-    expect(connection.messages).toEqual([]);
-
-    env.hostWindow.dispatchMessage(APP_ORIGIN, {
-      requestId: request.payload.requestId,
-      tools: [{ name: 'sum', description: 'Adds numbers' }],
-      type: 'webmcp.tools.list.response',
-    });
-
-    await vi.waitFor(() => {
-      expect(connection.messages).toHaveLength(2);
-    });
+    const connection = await completeHandshake(env);
 
     expect(connection.messages[0]).toMatchObject({
       origin: APP_ORIGIN,
@@ -614,63 +602,77 @@ describe('widget runtime', () => {
       url: APP_ORIGIN,
     });
     expect(connection.messages[1]).toEqual({
-      tools: [{ name: 'pre-hello' }],
+      tools: [{ name: 'before', title: '', description: 'Initial tool' }],
       type: 'tools/list',
     });
 
-    env.hostWindow.dispatchMessage(APP_ORIGIN, {
-      tools: 'not-an-array',
-      type: 'webmcp.tools.changed',
-    });
-
+    const after = {
+      name: 'after',
+      title: 'After',
+      description: 'Updated tool',
+      inputSchema: { type: 'object', properties: {} },
+      annotations: { readOnlyHint: true },
+    };
+    env.modelContext.setTools([after]);
     await vi.waitFor(() => {
-      expect(connection.messages).toHaveLength(3);
-    });
-
-    expect(connection.messages[2]).toEqual({
-      tools: [],
-      type: 'tools/changed',
+      expect(connection.messages[2]).toEqual({
+        tools: [after],
+        type: 'tools/changed',
+      });
     });
   });
 
+  it('still lists tools when the frame context has no toolchange event API', async () => {
+    const env = startRuntime({
+      withoutToolChangeEvents: true,
+      tools: [{ name: 'initial', description: 'Initial tool' }],
+    });
+    const connection = await completeHandshake(env);
+
+    expect(connection.messages[1]).toEqual({
+      tools: [{ name: 'initial', title: '', description: 'Initial tool' }],
+      type: 'tools/list',
+    });
+  });
+
+  it('completes the handshake with no tools when getTools() rejects', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(TestModelContext.prototype, 'getTools').mockRejectedValue(
+      new DOMException('Blocked by Permissions Policy', 'NotAllowedError')
+    );
+    const env = startRuntime({ tools: [{ name: 'hidden', description: 'Not readable' }] });
+    const connection = await completeHandshake(env);
+
+    expect(connection.messages[1]).toEqual({ tools: [], type: 'tools/list' });
+    expect(env.connections).toHaveLength(1);
+  });
+
   it('uses the latest tool snapshot when tools change before hello is accepted', async () => {
-    const env = startRuntime({ sendHelloAccepted: false });
-    const listRequest = await waitForPostedMessage(env, 'webmcp.tools.list.request');
+    const env = startRuntime({
+      sendHelloAccepted: false,
+      tools: [{ name: 'old', description: 'Old snapshot' }],
+    });
     const connection = await waitForConnection(env);
 
-    const latestTools = [
+    await vi.waitFor(() => expect(connection.messages).toHaveLength(1));
+    env.modelContext.setTools([
       { name: 'echo', description: 'Latest snapshot' },
       { name: 'sum', description: 'Add numbers' },
-      { name: 'always_fail', description: 'Throw an error' },
-    ];
-    env.hostWindow.dispatchMessage(APP_ORIGIN, {
-      tools: latestTools,
-      type: 'webmcp.tools.changed',
-    });
-
-    expect(connection.messages).toHaveLength(0);
-    env.hostWindow.dispatchMessage(APP_ORIGIN, {
-      requestId: listRequest.payload.requestId,
-      tools: [{ name: 'echo', description: 'Stale initial snapshot' }],
-      type: 'webmcp.tools.list.response',
-    });
-
-    await vi.waitFor(() => {
-      expect(connection.messages).toHaveLength(1);
-    });
+    ]);
     connection.client.send(JSON.stringify({ type: 'hello/accepted' }));
 
-    await vi.waitFor(() => {
-      expect(connection.messages).toHaveLength(2);
-    });
+    await vi.waitFor(() => expect(connection.messages).toHaveLength(2));
     expect(connection.messages[1]).toEqual({
-      tools: latestTools,
+      tools: [
+        { name: 'echo', title: '', description: 'Latest snapshot' },
+        { name: 'sum', title: '', description: 'Add numbers' },
+      ],
       type: 'tools/list',
     });
   });
 
   it('connects when the browser denies sessionStorage access', async () => {
-    const env = installEnvironment();
+    const env = installEnvironment({ tools: [{ name: 'sum', description: 'Adds numbers' }] });
     Object.defineProperty(globalThis, 'sessionStorage', {
       configurable: true,
       get() {
@@ -679,9 +681,12 @@ describe('widget runtime', () => {
     });
     startWidgetRuntime();
 
-    const connection = await completeHandshake(env, [{ name: 'sum' }]);
+    const connection = await completeHandshake(env);
 
-    expect(connection.messages[1]).toEqual({ tools: [{ name: 'sum' }], type: 'tools/list' });
+    expect(connection.messages[1]).toEqual({
+      tools: [{ name: 'sum', title: '', description: 'Adds numbers' }],
+      type: 'tools/list',
+    });
   });
 
   it('falls back to Unknown page when no title or referrer is available', async () => {
@@ -734,7 +739,7 @@ describe('widget runtime', () => {
     });
   });
 
-  it('invokes host tools and forwards successful results back to the relay', async () => {
+  it('executes frame tools directly and forwards their result to the relay', async () => {
     const env = startRuntime({
       search: buildSearch({
         hostOrigin: APP_ORIGIN,
@@ -744,8 +749,17 @@ describe('widget runtime', () => {
         relayPort: '9333',
         tabId: 'tab-9',
       }),
+      tools: [
+        {
+          name: 'sum',
+          title: 'Add numbers',
+          description: 'Adds numbers',
+          execute: ({ a, b }) => ({
+            content: [{ type: 'text', text: `sum:${String(Number(a) + Number(b))}` }],
+          }),
+        },
+      ],
     });
-
     const connection = await completeHandshake(env);
 
     expect(connection.messages[0]).toMatchObject({
@@ -765,114 +779,116 @@ describe('widget runtime', () => {
       })
     );
 
-    const invokeRequest = await waitForPostedMessage(env, 'webmcp.tools.invoke.request');
-    expect(invokeRequest.targetOrigin).toBe(APP_ORIGIN);
-    expect(invokeRequest.payload).toMatchObject({
-      args: { a: 1, b: 2 },
-      toolName: 'sum',
-      type: 'webmcp.tools.invoke.request',
-    });
-
-    env.hostWindow.dispatchMessage(APP_ORIGIN, {
-      requestId: invokeRequest.payload.requestId,
-      result: {
-        content: [{ text: 'sum:3', type: 'text' }],
-      },
-      type: 'webmcp.tools.invoke.response',
-    });
-
     await vi.waitFor(() => {
       expect(connection.messages).toContainEqual({
         callId: 'call-1',
-        result: {
-          content: [{ text: 'sum:3', type: 'text' }],
-        },
+        result: { content: [{ type: 'text', text: 'sum:3' }] },
         type: 'result',
       });
     });
+    expect(env.modelContext.executeTool).toHaveBeenCalled();
   });
 
-  it('normalizes invoke errors and non-object args into relay error results', async () => {
-    const env = startRuntime();
+  it('normalizes invalid arguments and execution errors into relay results', async () => {
+    const env = startRuntime({
+      tools: [
+        {
+          name: 'echo',
+          description: 'Echo input',
+          execute: (input) => ({
+            content: [{ type: 'text', text: JSON.stringify(input) }],
+          }),
+        },
+        {
+          name: 'fail',
+          description: 'Fail',
+          execute: () => {
+            throw new Error('tool failed');
+          },
+        },
+      ],
+    });
     const connection = await completeHandshake(env);
 
     connection.client.send(
       JSON.stringify({
         args: ['not-an-object'],
-        callId: 'call-2',
-        toolName: 'sum',
+        callId: 'call-invalid-args',
+        toolName: 'echo',
+        type: 'invoke',
+      })
+    );
+    connection.client.send(
+      JSON.stringify({
+        args: {},
+        callId: 'call-fail',
+        toolName: 'fail',
         type: 'invoke',
       })
     );
 
-    const invokeRequest = await waitForPostedMessage(env, 'webmcp.tools.invoke.request');
-    expect(invokeRequest.payload.args).toEqual({});
-
-    env.hostWindow.dispatchMessage(APP_ORIGIN, {
-      requestId: invokeRequest.payload.requestId,
-      type: 'webmcp.tools.invoke.error',
-    });
-
     await vi.waitFor(() => {
       expect(connection.messages).toContainEqual({
-        callId: 'call-2',
-        result: {
-          content: [{ text: 'Unknown host error', type: 'text' }],
-          isError: true,
-        },
+        callId: 'call-invalid-args',
+        result: { content: [{ type: 'text', text: '{}' }] },
+        type: 'result',
+      });
+      expect(connection.messages).toContainEqual({
+        callId: 'call-fail',
+        result: { content: [{ type: 'text', text: 'tool failed' }], isError: true },
         type: 'result',
       });
     });
   });
 
-  it('reconnects after handshake failures and closed pending invocations', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const env = startRuntime();
-
-    const firstListRequest = await waitForPostedMessage(env, 'webmcp.tools.list.request');
-    env.hostWindow.dispatchMessage(APP_ORIGIN, {
-      error: 'list failed',
-      requestId: firstListRequest.payload.requestId,
-      type: 'webmcp.tools.list.error',
+  it('aborts tool execution when the configured timeout expires', async () => {
+    let executionSignal: AbortSignal | undefined;
+    const env = startRuntime({
+      search: buildSearch({
+        hostOrigin: APP_ORIGIN,
+        relayPort: '9333',
+        requestTimeout: '20',
+      }),
+      tools: [
+        {
+          name: 'slow',
+          description: 'Wait until aborted',
+          execute: (_input, signal) => {
+            executionSignal = signal;
+            return new Promise((resolve) => {
+              signal?.addEventListener('abort', () => resolve({ content: [] }), { once: true });
+            });
+          },
+        },
+      ],
     });
+    const connection = await completeHandshake(env);
 
-    await vi.waitFor(
-      () => {
-        expect(warn).toHaveBeenCalledWith(
-          '[webmcp-relay-widget] Hello handshake failed:',
-          expect.any(Error)
-        );
-      },
-      { timeout: 1500 }
+    connection.client.send(
+      JSON.stringify({ args: {}, callId: 'call-timeout', toolName: 'slow', type: 'invoke' })
     );
-
-    const secondConnection = await waitForConnection(env, 1);
-    const secondListRequest = await waitForPostedMessage(env, 'webmcp.tools.list.request', 1);
-
-    env.hostWindow.dispatchMessage(APP_ORIGIN, {
-      requestId: secondListRequest.payload.requestId,
-      tools: [],
-      type: 'webmcp.tools.list.response',
-    });
 
     await vi.waitFor(() => {
-      expect(secondConnection.messages).toHaveLength(2);
+      expect(connection.messages).toContainEqual({
+        callId: 'call-timeout',
+        result: {
+          content: [{ type: 'text', text: 'Tool execution timed out' }],
+          isError: true,
+        },
+        type: 'result',
+      });
     });
+    expect(executionSignal?.aborted).toBe(true);
+  });
 
-    secondConnection.client.send(
-      JSON.stringify({
-        args: {},
-        callId: 'call-pending',
-        toolName: 'slow',
-        type: 'invoke',
-      })
-    );
+  it('reconnects to the relay after the socket closes', async () => {
+    const env = startRuntime();
+    const first = await completeHandshake(env);
 
-    await waitForPostedMessage(env, 'webmcp.tools.invoke.request');
-    secondConnection.client.close();
-
-    await waitForConnection(env, 2);
-    await waitForPostedMessage(env, 'webmcp.tools.list.request', 2);
+    first.client.close();
+    const second = await waitForConnection(env, 1);
+    await vi.waitFor(() => expect(second.messages).toHaveLength(2));
+    expect(second.messages[0]).toMatchObject({ type: 'hello' });
   });
 
   it('surfaces structured hello rejection before the socket closes', async () => {
@@ -884,23 +900,7 @@ describe('widget runtime', () => {
       },
     });
 
-    const request = await waitForPostedMessage(env, 'webmcp.tools.list.request');
-    env.hostWindow.dispatchMessage(APP_ORIGIN, {
-      requestId: request.payload.requestId,
-      tools: [{ name: 'sum' }],
-      type: 'webmcp.tools.list.response',
-    });
-
     const connection = await waitForConnection(env);
-    await vi.waitFor(() => {
-      expect(connection.messages).toHaveLength(1);
-    });
-
-    expect(connection.messages[0]).toMatchObject({
-      origin: APP_ORIGIN,
-      type: 'hello',
-    });
-
     await vi.waitFor(() => {
       expect(error).toHaveBeenCalledWith(
         '[webmcp-relay-widget] Relay rejected browser hello:',
@@ -909,25 +909,22 @@ describe('widget runtime', () => {
       );
     });
 
-    await vi.waitFor(() => {
-      expect(getPostedMessages(env, 'webmcp.relay.rejected')).toHaveLength(1);
+    expect(connection.messages[0]).toMatchObject({
+      origin: APP_ORIGIN,
+      type: 'hello',
     });
+    expect(env.hostWindow.parentPostMessage).not.toHaveBeenCalled();
   });
 
   it('does not publish tools until the relay acknowledges hello', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const env = startRuntime({
       sendHelloAccepted: false,
-    });
-
-    const request = await waitForPostedMessage(env, 'webmcp.tools.list.request');
-    env.hostWindow.dispatchMessage(APP_ORIGIN, {
-      requestId: request.payload.requestId,
       tools: [{ name: 'sum', description: 'Adds numbers' }],
-      type: 'webmcp.tools.list.response',
     });
-
     const connection = await waitForConnection(env);
+
+    await vi.waitFor(() => expect(connection.messages).toHaveLength(1));
     await vi.waitFor(
       () => {
         expect(warn).toHaveBeenCalledWith(
@@ -948,7 +945,7 @@ describe('widget runtime', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const env = startRuntime();
 
-    await waitForConnection(env);
+    await completeHandshake(env);
 
     expect(warn).toHaveBeenCalledTimes(0);
   });

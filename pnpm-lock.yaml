@@ -843,6 +843,9 @@ importers:
       '@anthropic-ai/mcpb':
         specifier: 2.1.2
         version: 2.1.2
+      '@mcp-b/webmcp-polyfill':
+        specifier: workspace:*
+        version: link:../webmcp-polyfill
       '@mcp-b/webmcp-ts-sdk':
         specifier: workspace:*
         version: link:../webmcp-ts-sdk

@@ -1,28 +1,32 @@
-import type { WebMcpToolObjectInput } from '@mcp-b/webmcp-ts-sdk';
+import type { RegisteredTool } from '@mcp-b/webmcp-ts-sdk';
 declare global {
   var __WEBMCP_RELAY_CONFIG: Record<string, string> | undefined;
 }
 
-/**
- * Relay widget runtime. Runs inside a hidden iframe and proxies tool messages
- * between the host page (`postMessage`) and the local relay WebSocket.
- *
- * Security: The iframe boundary provides origin isolation. All postMessage
- * exchanges validate `event.origin` against the host page's origin.
- */
+/** Runs in the hidden iframe, using WebMCP for page tools and WebSocket for MCP. */
 import {
   buildRelayEndpointCacheKey,
   isJsonObject,
   isLoopbackHost,
-  isMessageEnvelope,
-  type MessageEnvelope,
+  normalizeSerializedToolResult,
   RELAY_BROWSER_PROTOCOL,
   RELAY_DISCOVERY_PROTOCOL,
   RELAY_PORT_RANGE_END,
   RELAY_PORT_RANGE_START,
   safeSend,
   sanitizeLogText,
+  selectRelayTools,
 } from './shared.js';
+
+type RelayToolDescriptor = Pick<
+  RegisteredTool,
+  'name' | 'title' | 'description' | 'inputSchema' | 'annotations'
+>;
+
+interface RelayToolEntry {
+  registered: RegisteredTool;
+  descriptor: RelayToolDescriptor;
+}
 
 export interface WidgetConfig {
   autoConnect: boolean;
@@ -35,14 +39,6 @@ export interface WidgetConfig {
   relayWorkspace: string | undefined;
   requestTimeoutMs: number;
   tabId: string;
-}
-
-interface PendingRequest {
-  resolve: (value: MessageEnvelope) => void;
-  reject: (reason: Error) => void;
-  timeoutId: ReturnType<typeof setTimeout>;
-  responseType: string;
-  errorType: string;
 }
 
 interface RelayHelloMessage {
@@ -85,10 +81,6 @@ const RELAY_HELLO_TIMEOUT_MS = 1000;
 const REDISCOVERY_DELAYS_MS = [10000, 20000, 30000];
 /** Heartbeat probe interval while dormant (ms). */
 const DORMANT_HEARTBEAT_INTERVAL_MS = 120000;
-type HostRequestPayload = {
-  toolName?: unknown;
-  args?: WebMcpToolObjectInput;
-};
 
 export function parseConfig(search = window.location.search): WidgetConfig | null {
   const params = new URLSearchParams(search);
@@ -372,54 +364,87 @@ async function probeRelayEndpoint(candidate: {
   });
 }
 
+function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor | null {
+  if (tool.inputSchema !== undefined && !isJsonObject(tool.inputSchema)) {
+    console.warn(
+      `[webmcp-relay-widget] Tool "${tool.name}" was not relayed because its input schema is malformed.`
+    );
+    return null;
+  }
+  const descriptor: RelayToolDescriptor = {
+    name: tool.name,
+    title: tool.title,
+    description: tool.description,
+  };
+  if (tool.inputSchema !== undefined) descriptor.inputSchema = tool.inputSchema;
+  if (tool.annotations !== undefined) descriptor.annotations = tool.annotations;
+  return descriptor;
+}
+
+async function listRelayTools(): Promise<RelayToolEntry[]> {
+  const modelContext = document.modelContext;
+  if (!modelContext) {
+    return [];
+  }
+  return selectRelayTools(await modelContext.getTools(), window.parent).flatMap((registered) => {
+    const descriptor = mapRegisteredTool(registered);
+    return descriptor ? [{ registered, descriptor }] : [];
+  });
+}
+
 function runWidget(cfg: WidgetConfig): void {
-  const pendingRequests = new Map<string, PendingRequest>();
-  let currentTools: unknown[] = [];
-  let currentToolsRevision = 0;
+  let currentToolEntries: RelayToolEntry[] = [];
+  let currentTools: RelayToolDescriptor[] = [];
+  let toolChangeRevision = 0;
+  let lastToolsSnapshot = '';
   let activeEndpoint: RelayEndpoint | null = null;
   let activeSocket: WebSocket | null = null;
   let helloAccepted = false;
+  let initialToolsSent = false;
   let helloAckTimer: ReturnType<typeof setTimeout> | null = null;
   let scheduledReconnect: ReturnType<typeof setTimeout> | null = null;
   let phase: RelayRuntimePhase = 'idle';
   let discoveryCycleCount = 0;
   let dormantHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
-  const rejectPendingRequests = (reason: string): void => {
-    for (const [requestId, pending] of pendingRequests) {
-      clearTimeout(pending.timeoutId);
-      pendingRequests.delete(requestId);
-      pending.reject(new Error(reason));
+  const refreshTools = async (): Promise<void> => {
+    while (true) {
+      const revision = toolChangeRevision;
+      const entries = await listRelayTools();
+      if (revision !== toolChangeRevision) continue;
+
+      const tools = entries.map(({ descriptor }) => descriptor);
+      const snapshot = tools
+        .map((tool) => JSON.stringify(tool))
+        .sort()
+        .join('\n');
+      currentToolEntries = entries;
+      currentTools = tools;
+      if (snapshot === lastToolsSnapshot) return;
+      lastToolsSnapshot = snapshot;
+      if (activeSocket && helloAccepted && initialToolsSent) {
+        safeSend(activeSocket, JSON.stringify({ type: 'tools/changed', tools: currentTools }));
+      }
+      return;
     }
   };
 
-  function requestHost(baseType: string, payload: HostRequestPayload): Promise<MessageEnvelope> {
-    const requestId = crypto.randomUUID();
-
-    return new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        pendingRequests.delete(requestId);
-        reject(new Error(`Host response timeout: ${baseType}`));
-      }, cfg.requestTimeoutMs);
-
-      pendingRequests.set(requestId, {
-        resolve,
-        reject,
-        timeoutId,
-        responseType: `${baseType}.response`,
-        errorType: `${baseType}.error`,
-      });
-
-      window.parent.postMessage(
-        { type: `${baseType}.request`, requestId, ...payload },
-        cfg.hostOrigin
-      );
+  const onToolsChanged = (): void => {
+    toolChangeRevision++;
+    void refreshTools().catch((error) => {
+      console.warn('[webmcp-relay-widget] Failed to refresh WebMCP tools:', error);
     });
+  };
+
+  const modelContext = document.modelContext;
+  if (typeof modelContext?.addEventListener === 'function') {
+    modelContext.addEventListener('toolchange', onToolsChanged);
   }
+  void refreshTools().catch((error) => {
+    console.warn('[webmcp-relay-widget] Failed to read WebMCP tools:', error);
+  });
 
   const activateSocket = (socket: WebSocket, endpoint: RelayEndpoint): void => {
-    const toolsRevisionAtRequest = currentToolsRevision;
-
     const clearHelloAckTimer = (): void => {
       if (!helloAckTimer) {
         return;
@@ -429,6 +454,7 @@ function runWidget(cfg: WidgetConfig): void {
     };
 
     const sendInitialTools = (): void => {
+      initialToolsSent = true;
       safeSend(socket, JSON.stringify({ type: 'tools/list', tools: currentTools }));
     };
 
@@ -441,6 +467,7 @@ function runWidget(cfg: WidgetConfig): void {
     activeSocket = socket;
     discoveryCycleCount = 0;
     helloAccepted = false;
+    initialToolsSent = false;
     phase = 'idle';
 
     socket.addEventListener('message', (event) => {
@@ -466,7 +493,12 @@ function runWidget(cfg: WidgetConfig): void {
         clearHelloAckTimer();
         helloAccepted = true;
         writeCachedEndpoint(cfg, endpoint);
-        sendInitialTools();
+        void refreshTools()
+          .then(sendInitialTools)
+          .catch((error) => {
+            console.warn('[webmcp-relay-widget] Failed to refresh WebMCP tools:', error);
+            sendInitialTools();
+          });
         return;
       }
 
@@ -475,16 +507,6 @@ function runWidget(cfg: WidgetConfig): void {
         clearHelloAckTimer();
         helloAccepted = false;
         clearCachedEndpoint(cfg);
-        window.parent.postMessage(
-          {
-            type: 'webmcp.relay.rejected',
-            host: endpoint.host,
-            port: endpoint.port,
-            message: helloRejected.message,
-            reason: helloRejected.reason,
-          },
-          cfg.hostOrigin
-        );
         console.error(
           '[webmcp-relay-widget] Relay rejected browser hello:',
           helloRejected.reason,
@@ -521,38 +543,62 @@ function runWidget(cfg: WidgetConfig): void {
         return;
       }
 
-      requestHost('webmcp.tools.invoke', {
-        toolName: relayMessage.toolName,
-        args: isJsonObject(relayMessage.args) ? relayMessage.args : {},
-      })
-        .then((hostResponse) => {
+      const toolName = String(relayMessage.toolName ?? '');
+      void (async () => {
+        // Current Chrome requires a RegisteredTool returned by getTools(), not a
+        // name or a stale copy.
+        await refreshTools();
+        const entry = currentToolEntries.find(({ registered }) => registered.name === toolName);
+        const context = document.modelContext;
+        if (!entry || !context) {
+          throw new Error(`Tool not found: ${toolName}`);
+        }
+
+        const controller = new AbortController();
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        try {
+          const timeout = new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => {
+              const error = new Error('Tool execution timed out');
+              controller.abort(error);
+              reject(error);
+            }, cfg.requestTimeoutMs);
+          });
+          const execution = context.executeTool(
+            entry.registered,
+            isJsonObject(relayMessage.args) ? relayMessage.args : {},
+            { signal: controller.signal }
+          );
+          const serialized = await Promise.race([execution, timeout]);
           safeSend(
             socket,
             JSON.stringify({
               type: 'result',
               callId: relayMessage.callId,
-              result: hostResponse.result,
+              result: normalizeSerializedToolResult(serialized),
             })
           );
-        })
-        .catch((error) => {
-          safeSend(
-            socket,
-            JSON.stringify({
-              type: 'result',
-              callId: relayMessage.callId,
-              result: {
-                isError: true,
-                content: [
-                  {
-                    type: 'text',
-                    text: String(error instanceof Error ? error.message : error),
-                  },
-                ],
-              },
-            })
-          );
-        });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      })().catch((error) => {
+        safeSend(
+          socket,
+          JSON.stringify({
+            type: 'result',
+            callId: relayMessage.callId,
+            result: {
+              isError: true,
+              content: [
+                {
+                  type: 'text',
+                  text: String(error instanceof Error ? error.message : error),
+                },
+              ],
+            },
+          })
+        );
+      });
     });
 
     socket.addEventListener(
@@ -565,7 +611,6 @@ function runWidget(cfg: WidgetConfig): void {
         helloAccepted = false;
         activeSocket = null;
         clearHelloAckTimer();
-        rejectPendingRequests('WebSocket connection lost');
         scheduleRetrySameEndpoint();
       },
       { once: true }
@@ -580,11 +625,13 @@ function runWidget(cfg: WidgetConfig): void {
       }
     });
 
-    requestHost('webmcp.tools.list', {})
-      .then((message) => {
-        if (currentToolsRevision === toolsRevisionAtRequest) {
-          currentTools = Array.isArray(message.tools) ? message.tools : [];
-        }
+    refreshTools()
+      // A page that blocks getTools() still completes the handshake with no
+      // tools. Closing here would reconnect in a tight loop.
+      .catch((error) => {
+        console.warn('[webmcp-relay-widget] Failed to read WebMCP tools:', error);
+      })
+      .then(() => {
         safeSend(
           socket,
           JSON.stringify({
@@ -797,44 +844,12 @@ function runWidget(cfg: WidgetConfig): void {
     }
 
     const data = event.data;
-    if (isJsonObject(data) && data.type === 'webmcp.tools.changed') {
-      currentTools = Array.isArray(data.tools) ? data.tools : [];
-      currentToolsRevision++;
-      if (activeSocket && helloAccepted) {
-        safeSend(
-          activeSocket,
-          JSON.stringify({
-            type: 'tools/changed',
-            tools: currentTools,
-          })
-        );
-      }
-      return;
-    }
-
     if (isJsonObject(data) && data.type === 'webmcp.connect') {
       if (phase === 'dormant') {
         wakeFromDormant();
       } else if (!activeSocket && phase !== 'discovering') {
         void discoverRelay();
       }
-      return;
-    }
-
-    if (!isMessageEnvelope(data)) {
-      return;
-    }
-    const pending = pendingRequests.get(data.requestId);
-    if (!pending || (data.type !== pending.responseType && data.type !== pending.errorType)) {
-      return;
-    }
-
-    clearTimeout(pending.timeoutId);
-    pendingRequests.delete(data.requestId);
-    if (data.type === pending.responseType) {
-      pending.resolve(data);
-    } else {
-      pending.reject(new Error(String(data.error || 'Unknown host error')));
     }
   });
 
