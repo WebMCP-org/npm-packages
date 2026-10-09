@@ -4,6 +4,15 @@ import { withPlugins, type WebMCPPlugin } from './index.js';
 const signal = () => new AbortController().signal;
 
 describe('withPlugins', () => {
+  it('fails closed on a hole in the plugin array', async () => {
+    let ran = false;
+    const plugins: WebMCPPlugin[] = [];
+    plugins.length = 1;
+    const tool = withPlugins({ name: 'run', execute: () => (ran = true) }, plugins);
+    await expect(tool.execute(undefined, { signal: signal() })).rejects.toThrow(TypeError);
+    expect(ran).toBe(false);
+  });
+
   it('runs plugins outermost first around execute and returns its result', async () => {
     const order: string[] = [];
     const trace = (name: string): WebMCPPlugin => ({

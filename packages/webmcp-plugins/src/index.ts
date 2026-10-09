@@ -36,11 +36,12 @@ export function withPlugins<TInput, TResult, TTool extends { name: string }>(
   const execute = (input: TInput, options = { signal: new AbortController().signal }) => {
     const call: ToolCall = Object.freeze({ name: tool.name, input, signal: options.signal });
     const run = async (index: number): Promise<Awaited<TResult>> => {
-      const plugin = chain[index];
-      if (!plugin) {
+      if (index === chain.length) {
         options.signal.throwIfAborted();
         return await tool.execute(input, options);
       }
+      // A hole in the array throws here instead of skipping the remaining plugins.
+      const plugin = chain[index]!;
       let called = false;
       return plugin.aroundExecute<Awaited<TResult>>(call, () => {
         if (called) {

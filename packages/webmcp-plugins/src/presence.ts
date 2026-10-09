@@ -64,7 +64,11 @@ export async function registerUserPresenceCredential(
   })) as PublicKeyCredential | null;
   if (!credential) throw new Error('Presence credential enrollment was cancelled');
   const id = new Uint8Array(credential.rawId);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...id]));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...id]));
+  } catch {
+    // Without storage the credential is re-enrolled next time, but this ceremony still counts.
+  }
   return id;
 }
 

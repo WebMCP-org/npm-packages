@@ -99,6 +99,15 @@ interface Entry {
 
 const DENIED: DecideResult = { success: false, reason: 'denied' };
 
+/** A throwing listener must not fail the call or skip other listeners. */
+function report(listener: () => void): void {
+  try {
+    listener();
+  } catch (error) {
+    console.error(error);
+  }
+}
+
 /**
  * Framework-free queue of consent requests awaiting a user's decision.
  *
@@ -294,7 +303,6 @@ export class ConsentGuard {
     clearTimeout(entry.timer);
     entry.cleanup?.();
     entry.settled.abort();
-    // Resolve first so a throwing listener cannot leave the call hanging.
     entry.resolve(decision);
     this.#notify();
     this.#emit(entry.request, decision);
@@ -303,13 +311,13 @@ export class ConsentGuard {
   #notify(): void {
     this.#snapshot = Array.from(this.#pending.values(), (entry) => entry.request);
     // oxlint-disable-next-line unicorn/no-useless-spread -- a listener may unsubscribe while notified
-    for (const listener of [...this.#listeners]) listener();
+    for (const listener of [...this.#listeners]) report(listener);
   }
 
   #emit(request: PendingConsentRequest, decision: ConsentDecision): void {
     const event = { ...request, ...decision, resolvedAt: Date.now() };
     // oxlint-disable-next-line unicorn/no-useless-spread -- a listener may unsubscribe while notified
-    for (const listener of [...this.#decisionListeners]) listener(event);
+    for (const listener of [...this.#decisionListeners]) report(() => listener(event));
   }
 }
 

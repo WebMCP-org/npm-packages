@@ -188,14 +188,21 @@ describe('ConsentGuard', () => {
     await expect(decision).resolves.toEqual({ approved: false, reason: 'cancelled' });
   });
 
-  it('resolves the request even when a listener throws', async () => {
+  it('reports throwing listeners without failing the request', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const guard = new ConsentGuard();
-    guard.subscribeDecision(() => {
+    const fail = () => {
       throw new Error('listener');
-    });
+    };
+    guard.subscribe(fail);
+    guard.subscribeDecision(fail);
     const decision = guard.request(input(reversible));
-    expect(() => guard.decide(pendingId(guard), false)).toThrow('listener');
-    await expect(decision).resolves.toEqual({ approved: false, reason: 'user' });
+    await guard.decide(pendingId(guard), true);
+    await expect(decision).resolves.toEqual({ approved: true, reason: 'user' });
+    expect(
+      guard.recordDecision(input(reversible), { approved: true, reason: 'not-required' })
+    ).toMatchObject({ approved: true });
+    expect(error).toHaveBeenCalledWith(new Error('listener'));
   });
 });
 
