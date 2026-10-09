@@ -1,5 +1,6 @@
 import type { Options } from 'vite-plus/pack';
 import { defineConfig } from 'vite-plus';
+import packageJson from './package.json' with { type: 'json' };
 
 const nodeConfig: Options = {
   entry: ['src/index.ts', 'src/cli.ts'],
@@ -13,6 +14,8 @@ const nodeConfig: Options = {
   target: 'node22',
   platform: 'node',
   tsconfig: './tsconfig.json',
+  // The MCPB bundle ships dist/*.mjs without package.json, so inline the version.
+  define: { __RELAY_VERSION__: JSON.stringify(packageJson.version) },
 };
 
 // Shared browser build options

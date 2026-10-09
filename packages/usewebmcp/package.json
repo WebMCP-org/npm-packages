@@ -1,6 +1,6 @@
 {
   "name": "usewebmcp",
-  "version": "5.1.0",
+  "version": "6.0.0",
   "description": "Standalone React hooks for strict core WebMCP tool registration with document.modelContext",
   "keywords": [
     "ai",
@@ -36,6 +36,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./internal": {
+      "types": "./dist/internal.d.ts",
+      "import": "./dist/internal.js"
     }
   },
   "publishConfig": {
@@ -53,15 +57,15 @@
     "publish:dry": "pnpm publish --access public --dry-run",
     "publish:npm": "pnpm publish --access public",
     "test": "vp test run",
+    "test:native": "WEBMCP_NATIVE=1 vp test run",
     "test:watch": "vp test",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.strict-null-checks-false.json --noEmit"
   },
   "dependencies": {
-    "@mcp-b/webmcp-polyfill": "workspace:*",
-    "@mcp-b/webmcp-types": "workspace:*"
+    "webmcp-types": "0.1.9"
   },
   "devDependencies": {
-    "@mcp-b/global": "workspace:*",
+    "@mcp-b/webmcp-polyfill": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@vitest/coverage-v8": "catalog:",
@@ -71,8 +75,7 @@
     "typescript": "catalog:",
     "vite-plus": "catalog:",
     "vitest": "catalog:",
-    "vitest-browser-react": "^2.2.0",
-    "zod": "catalog:"
+    "vitest-browser-react": "^2.2.0"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0"

@@ -1,14 +1,15 @@
 import { TabClientTransport, TabServerTransport } from '@mcp-b/transports';
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 import { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
-import type { ModelContext } from '@mcp-b/webmcp-types';
+import type { ModelContext, RegisteredTool, WebMcpToolInput } from '@mcp-b/webmcp-ts-sdk';
 import { Client } from '@modelcontextprotocol/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { isCallToolResult, type CallToolResult } from '@modelcontextprotocol/server';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanupWebModelContext, initializeWebModelContext } from './global.js';
 
 const documentModelContextDescriptorStack: Array<PropertyDescriptor | undefined> = [];
 
-function setDocumentModelContext(value: unknown): void {
+function setDocumentModelContext(value: ModelContext | undefined): void {
   documentModelContextDescriptorStack.push(
     Object.getOwnPropertyDescriptor(document, 'modelContext')
   );
@@ -37,67 +38,152 @@ afterEach(() => {
 });
 
 function getModelContext(): BrowserMcpServer {
-  return document.modelContext as unknown as BrowserMcpServer;
+  const context = document.modelContext;
+  if (!(context instanceof BrowserMcpServer)) throw new Error('Global wrapper is unavailable');
+  return context;
 }
 
 async function executeRegisteredTool(
   modelContext: BrowserMcpServer,
   name: string,
-  args: unknown = {}
-): Promise<string | null> {
+  args: WebMcpToolInput = {}
+): Promise<string> {
   const tool = (await modelContext.getTools()).find((candidate) => candidate.name === name);
   if (!tool) {
     throw new Error(`Tool not found: ${name}`);
   }
-  return modelContext.executeTool(tool, JSON.stringify(args));
+  return modelContext.executeTool(tool, args);
 }
 
-function parseSerializedResult(serialized: string | null): unknown {
-  if (serialized === null) return null;
-  try {
-    return JSON.parse(serialized);
-  } catch {
-    return serialized;
-  }
+function parseSerializedResult(serialized: string): CallToolResult {
+  const result: unknown = JSON.parse(serialized);
+  if (!isCallToolResult(result)) throw new Error('Expected an MCP tool result');
+  return result;
 }
 
-function createNativeModelContextStub(): Navigator['modelContext'] {
-  const nativeContext: Record<string, unknown> = {
-    registerTool: () => {},
-    listTools: () => [],
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => true,
-  };
-
-  return nativeContext as unknown as Navigator['modelContext'];
+function createNativeModelContextStub(overrides: Partial<ModelContext> = {}): ModelContext {
+  return Object.assign(
+    new EventTarget(),
+    {
+      ontoolchange: null,
+      registerTool: async () => {},
+      getTools: async () => [],
+      executeTool: async () => {
+        throw new Error('Unexpected native execution');
+      },
+    },
+    overrides
+  );
 }
+
+describe('native declarative support', () => {
+  it('leaves native declarative support in place', async () => {
+    // Runs before the polyfill installs its own hooks, so the guard is reachable.
+    expect('agentInvoked' in SubmitEvent.prototype).toBe(false);
+    expect('respondWith' in SubmitEvent.prototype).toBe(false);
+    const nativeContext = createNativeModelContextStub();
+    const registerTool = vi.spyOn(nativeContext, 'registerTool');
+    const agentInvoked = { configurable: true, get: () => false };
+    const respondWith = { configurable: true, writable: true, value: () => {} };
+    Object.defineProperties(SubmitEvent.prototype, { agentInvoked, respondWith });
+    setDocumentModelContext(nativeContext);
+    const form = document.createElement('form');
+    form.setAttribute('toolname', 'native_declarative_tool');
+    form.setAttribute('tooldescription', 'Provided by the browser');
+    document.body.append(form);
+
+    try {
+      initializeWebModelContext();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(registerTool).not.toHaveBeenCalled();
+      expect(Object.getOwnPropertyDescriptor(SubmitEvent.prototype, 'agentInvoked')?.get).toBe(
+        agentInvoked.get
+      );
+      expect(Object.getOwnPropertyDescriptor(SubmitEvent.prototype, 'respondWith')?.value).toBe(
+        respondWith.value
+      );
+    } finally {
+      form.remove();
+      Reflect.deleteProperty(SubmitEvent.prototype, 'agentInvoked');
+      Reflect.deleteProperty(SubmitEvent.prototype, 'respondWith');
+    }
+  });
+});
 
 describe('global adapter', () => {
+  // The core and its declarative layer belong to the document, beyond each bridge initialization.
+  beforeAll(() => {
+    installWebMCP();
+  });
+
   it('wraps native document.modelContext with BrowserMcpServer by default', () => {
     const nativeContext = createNativeModelContextStub();
-    const previousNavigatorContext = navigator.modelContext;
     setDocumentModelContext(nativeContext);
 
     expect(initializeWebModelContext()).toBeUndefined();
     const server = getModelContext();
     expect(server).toBeInstanceOf(BrowserMcpServer);
-    expect(navigator.modelContext).toBe(server);
+    expect(navigator).not.toHaveProperty('modelContext');
+    expect(navigator).not.toHaveProperty('modelContextTesting');
     expect(initializeWebModelContext()).toBeUndefined();
     expect(document.modelContext).toBe(server);
 
     cleanupWebModelContext();
     expect(document.modelContext).toBe(nativeContext);
-    expect(navigator.modelContext).toBe(previousNavigatorContext);
 
     expect(initializeWebModelContext()).toBeUndefined();
     expect(document.modelContext).not.toBe(nativeContext);
-    expect(typeof getModelContext().listTools).toBe('function');
+    expect(getModelContext().listTools).toBeTypeOf('function');
+  });
+
+  it('preserves declarative tools across repeated installation and bridge cleanup', async () => {
+    installWebMCP();
+    const upstreamContext = document.modelContext;
+    if (!upstreamContext) throw new Error('Expected an installed polyfill');
+    const previousRespondWith = SubmitEvent.prototype.respondWith;
+    const form = document.createElement('form');
+    form.setAttribute('toolname', 'standalone_form');
+    form.setAttribute('tooldescription', 'Survives bridge cleanup');
+    form.setAttribute('toolautosubmit', '');
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (!event.respondWith) throw new Error('Expected declarative support');
+      event.respondWith(Promise.resolve('retained'));
+    });
+    document.body.append(form);
+
+    try {
+      await expect
+        .poll(async () => (await upstreamContext.getTools()).map(({ name }) => name))
+        .toContain('standalone_form');
+      initializeWebModelContext();
+      const server = getModelContext();
+      installWebMCP();
+      expect(document.modelContext).toBe(server);
+      await expect
+        .poll(async () => (await server.getTools()).map(({ name }) => name))
+        .toContain('standalone_form');
+
+      cleanupWebModelContext();
+      expect(document.modelContext).toBe(upstreamContext);
+      expect(SubmitEvent.prototype.respondWith).toBe(previousRespondWith);
+      form.setAttribute('toolname', 'after_cleanup');
+      await expect
+        .poll(async () => (await upstreamContext.getTools()).map(({ name }) => name))
+        .toContain('after_cleanup');
+      const tool = (await upstreamContext.getTools()).find(({ name }) => name === 'after_cleanup');
+      if (!tool) throw new Error('Expected declarative discovery after cleanup');
+      await expect(upstreamContext.executeTool(tool, {})).resolves.toBe('"retained"');
+    } finally {
+      form.remove();
+      await expect
+        .poll(async () => (await upstreamContext.getTools()).map(({ name }) => name))
+        .not.toContain('after_cleanup');
+    }
   });
 
   it('leaves a non-configurable native modelContext untouched', () => {
     const nativeContext = createNativeModelContextStub();
-    const previousNavigatorContext = navigator.modelContext;
     setDocumentModelContext(nativeContext);
     const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
     const descriptorSpy = vi
@@ -112,7 +198,6 @@ describe('global adapter', () => {
     try {
       expect(initializeWebModelContext()).toBeUndefined();
       expect(document.modelContext).toBe(nativeContext);
-      expect(navigator.modelContext).toBe(previousNavigatorContext);
     } finally {
       descriptorSpy.mockRestore();
     }
@@ -128,6 +213,19 @@ describe('global adapter', () => {
       })
     ).toThrow('tabServer transport is disabled');
     expect(document.modelContext).toBe(nativeContext);
+  });
+
+  it('skips auto-initialization on import when autoInitialize is false', async () => {
+    const nativeContext = createNativeModelContextStub();
+    setDocumentModelContext(nativeContext);
+    window.__webModelContextOptions = { autoInitialize: false };
+
+    try {
+      await import('./index.js');
+      expect(document.modelContext).toBe(nativeContext);
+    } finally {
+      Reflect.deleteProperty(window, '__webModelContextOptions');
+    }
   });
 
   it('restores the native surface and permits retry when transport connection fails', async () => {
@@ -168,11 +266,7 @@ describe('global adapter', () => {
     const pendingTools = new Promise<[]>((resolve) => {
       resolveTools = resolve;
     });
-    const nativeContext = Object.assign(new EventTarget(), {
-      registerTool: () => {},
-      getTools: vi.fn(() => pendingTools),
-      executeTool: vi.fn(async () => null),
-    });
+    const nativeContext = createNativeModelContextStub({ getTools: vi.fn(() => pendingTools) });
     const connectSpy = vi.spyOn(BrowserMcpServer.prototype, 'connect').mockResolvedValue(undefined);
     setDocumentModelContext(nativeContext);
 
@@ -197,10 +291,8 @@ describe('global adapter', () => {
 
   it('connects after an initial native tool synchronization failure', async () => {
     const synchronizationError = new Error('native discovery failed');
-    const nativeContext = Object.assign(new EventTarget(), {
-      registerTool: () => {},
+    const nativeContext = createNativeModelContextStub({
       getTools: vi.fn().mockRejectedValue(synchronizationError),
-      executeTool: vi.fn(async () => null),
     });
     const connectSpy = vi.spyOn(BrowserMcpServer.prototype, 'connect').mockResolvedValue(undefined);
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -256,10 +348,40 @@ describe('global adapter', () => {
         window: expect.any(Object),
       }),
     ]);
-    await expect(modelContext.executeTool(tools[0]!, '{"value":7}')).resolves.toBe('{"value":7}');
+    await expect(modelContext.executeTool(tools[0]!, { value: 7 })).resolves.toBe('{"value":7}');
   });
 
-  it('fires producer toolchange events and ontoolchange on wrapper mutations', async () => {
+  it('uses upstream object execution and preserves cancellation and annotations', async () => {
+    initializeWebModelContext();
+    const modelContext = getModelContext();
+    let callbackSignal: AbortSignal | undefined;
+    const started = Promise.withResolvers<void>();
+    await modelContext.registerTool({
+      name: 'upstream_execution',
+      description: 'Runs through the official polyfill',
+      annotations: { consequentialHint: true, debugging: true },
+      execute(_input, options) {
+        callbackSignal = options?.signal;
+        started.resolve();
+        return new Promise(() => {});
+      },
+    });
+    const tool = (await modelContext.getTools()).find(({ name }) => name === 'upstream_execution')!;
+    expect(tool.annotations).toMatchObject({ consequentialHint: true, debugging: true });
+    const controller = new AbortController();
+    const result = modelContext.executeTool(tool, {}, { signal: controller.signal });
+    const rejection = expect(result).rejects.toBe('cancelled');
+    await started.promise;
+    expect(callbackSignal).toBeInstanceOf(AbortSignal);
+    controller.abort('cancelled');
+    await rejection;
+    await vi.waitFor(() => expect(callbackSignal?.aborted).toBe(true));
+  });
+
+  it('forwards each upstream toolchange during concurrent registration and cleanup', async () => {
+    installWebMCP();
+    const upstream = document.modelContext;
+    if (!upstream) throw new Error('Upstream context is unavailable');
     initializeWebModelContext();
 
     const modelContext = getModelContext();
@@ -277,26 +399,48 @@ describe('global adapter', () => {
       handlerThis = this;
     };
 
-    const controller = new AbortController();
-    await modelContext.registerTool(
-      {
-        name: 'wrapper_event_tool',
-        description: 'Wrapper event tool',
-        inputSchema: { type: 'object', properties: {} },
-        async execute() {
-          return { content: [{ type: 'text', text: 'ok' }] };
-        },
+    const observations = new AbortController();
+    let upstreamCount = 0;
+    upstream.addEventListener(
+      'toolchange',
+      () => {
+        upstreamCount += 1;
       },
-      { signal: controller.signal }
+      { signal: observations.signal }
     );
+    const controller = new AbortController();
+    try {
+      await Promise.all(
+        Array.from({ length: 10 }, (_, index) =>
+          modelContext.registerTool(
+            {
+              name: `wrapper_event_tool_${index}`,
+              description: 'Wrapper event tool',
+              execute: () => 'ok',
+            },
+            { signal: controller.signal }
+          )
+        )
+      );
+      await vi.waitFor(() => {
+        expect(upstreamCount).toBeGreaterThanOrEqual(10);
+        expect(listenerCount).toBe(upstreamCount);
+        expect(handlerCount).toBe(upstreamCount);
+      });
 
-    controller.abort();
-    await vi.waitFor(() => {
-      expect(listenerCount).toBe(2);
-      expect(handlerCount).toBe(2);
-    });
-    expect(handlerTarget).toBe(modelContext);
-    expect(handlerThis).toBe(modelContext);
+      const registrationEvents = upstreamCount;
+      controller.abort();
+      await vi.waitFor(() => {
+        expect(upstreamCount).toBeGreaterThanOrEqual(registrationEvents + 10);
+        expect(listenerCount).toBe(upstreamCount);
+        expect(handlerCount).toBe(upstreamCount);
+      });
+      expect(handlerTarget).toBe(modelContext);
+      expect(handlerThis).toBe(modelContext);
+    } finally {
+      observations.abort();
+      controller.abort();
+    }
   });
 
   it('supports calling destructured registerTool', async () => {
@@ -319,21 +463,10 @@ describe('global adapter', () => {
   });
 
   it('backfills tools registered before initializeWebModelContext', async () => {
-    initializeWebMCPPolyfill();
+    installWebMCP();
 
-    const nativeContext = document.modelContext as unknown as {
-      registerTool: (
-        tool: {
-          name: string;
-          description: string;
-          inputSchema: { type: 'object'; properties: Record<string, never> };
-          execute: () => Promise<{
-            content: Array<{ type: 'text'; text: string }>;
-          }>;
-        },
-        options?: { signal?: AbortSignal }
-      ) => Promise<void>;
-    };
+    const nativeContext = document.modelContext;
+    if (!nativeContext) throw new Error('Polyfill context is unavailable');
     const controller = new AbortController();
 
     await nativeContext.registerTool(
@@ -365,74 +498,9 @@ describe('global adapter', () => {
     });
   });
 
-  it('backfills tools from a legacy native context without EventTarget methods', async () => {
-    const nativeTool = {
-      name: 'standard_native_tool',
-      description: 'registered before wrapper init through the standard API',
-      inputSchema: JSON.stringify({
-        type: 'object',
-        properties: { message: { type: 'string' } },
-        required: ['message'],
-      }),
-      origin: window.location.origin,
-      window,
-    };
-    const executeTool = vi.fn(async (_tool: unknown, input: string) =>
-      JSON.parse(input).message === 'plain'
-        ? 'standard-native-text'
-        : JSON.stringify({
-            content: [{ type: 'text', text: 'standard-native-ok' }],
-            structuredContent: { ok: true },
-          })
-    );
-    const getTools = vi.fn(async () => [nativeTool]);
-    const nativeContext = {
-      registerTool: () => {},
-      getTools,
-      executeTool,
-    };
-
-    setDocumentModelContext(nativeContext);
-
-    initializeWebModelContext();
-    await vi.waitFor(() => {
-      const names = getModelContext()
-        .listTools()
-        .map((tool) => tool.name);
-      expect(names).toContain('standard_native_tool');
-    });
-    await getModelContext().getTools({ fromOrigins: ['https://child.example'] });
-    expect(getTools).toHaveBeenLastCalledWith({ fromOrigins: ['https://child.example'] });
-
-    const result = parseSerializedResult(
-      await executeRegisteredTool(getModelContext(), 'standard_native_tool', {
-        message: 'hello',
-      })
-    ) as { content: unknown[]; structuredContent?: unknown };
-
-    expect(result.content[0]).toMatchObject({ type: 'text', text: 'standard-native-ok' });
-    expect(result.structuredContent).toEqual({ ok: true });
-    expect(executeTool).toHaveBeenCalledWith(
-      nativeTool,
-      JSON.stringify({ message: 'hello' }),
-      undefined
-    );
-
-    const plainResult = await executeRegisteredTool(getModelContext(), 'standard_native_tool', {
-      message: 'plain',
-    });
-    expect(plainResult).toBe('standard-native-text');
-  });
-
   it('reconciles native tools after toolchange events', async () => {
-    const nativeTools: Array<{
-      name: string;
-      description: string;
-      origin: string;
-      window: Window;
-    }> = [];
-    const nativeContext = Object.assign(new EventTarget(), {
-      registerTool: () => {},
+    const nativeTools: RegisteredTool[] = [];
+    const nativeContext = createNativeModelContextStub({
       getTools: async () => nativeTools,
       executeTool: async () =>
         JSON.stringify({ content: [{ type: 'text', text: 'native-event-ok' }] }),
@@ -441,6 +509,7 @@ describe('global adapter', () => {
     initializeWebModelContext();
 
     nativeTools.push({
+      title: '',
       name: 'native_event_tool',
       description: 'Added after initialization',
       origin: window.location.origin,
@@ -518,7 +587,7 @@ describe('global adapter', () => {
 
     const result = parseSerializedResult(
       await executeRegisteredTool(modelContext, 'output_no_type_tool')
-    ) as { isError?: boolean; structuredContent?: Record<string, unknown> };
+    );
     expect(result.isError).toBeFalsy();
     expect(result.structuredContent).toMatchObject({ value: 'ok' });
   });
@@ -554,10 +623,7 @@ describe('global adapter', () => {
 
     const result = parseSerializedResult(
       await executeRegisteredTool(modelContext, 'input_no_type_tool', { message: 'hi' })
-    ) as {
-      content: Array<{ type: string; text?: string }>;
-      isError?: boolean;
-    };
+    );
     expect(result.isError).toBeFalsy();
     expect(result.content[0]).toMatchObject({ type: 'text', text: 'echo:hi' });
   });
@@ -579,8 +645,12 @@ describe('cross-bundle duplicate prevention (e2e)', () => {
     const channelId = uniqueChannel();
 
     // --- Bundle A: manually create server + transport ---
+    installWebMCP();
     const serverTransport = new TabServerTransport({ allowedOrigins: ['*'], channelId });
-    const server = new BrowserMcpServer({ name: 'bundle-a', version: '1.0.0' });
+    const server = new BrowserMcpServer(
+      { name: 'bundle-a', version: '1.0.0' },
+      { native: document.modelContext! }
+    );
 
     let invocationCount = 0;
     await server.registerTool({

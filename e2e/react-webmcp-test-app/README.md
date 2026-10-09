@@ -38,7 +38,7 @@ This test app demonstrates and validates all features of the `@mcp-b/react-webmc
 pnpm --filter react-webmcp-test-app dev
 ```
 
-The app will be available at http://localhost:5174
+The app will be available at http://localhost:8888
 
 ### Build
 
@@ -74,7 +74,7 @@ pnpm --filter mcp-e2e-tests test:react-webmcp:debug
 
 ## Test Coverage
 
-The Playwright test suite includes 34 comprehensive tests:
+The Playwright test suite covers:
 
 1. **Initialization Tests**
    - App loads and initializes MCP
@@ -138,8 +138,9 @@ src/
 ### Testing Tool Registration
 
 ```typescript
-const tools = await page.evaluate(() => {
-  return (window as any).mcpTools;
+const tools = await page.evaluate(async () => {
+  const response = await window.mcpClient?.listTools();
+  return response?.tools.map((tool) => tool.name) ?? [];
 });
 expect(tools).toContain('counter_increment');
 ```

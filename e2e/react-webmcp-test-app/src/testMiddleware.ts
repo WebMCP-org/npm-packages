@@ -10,8 +10,24 @@ import type { Client } from '@modelcontextprotocol/client';
 export interface McpEvent {
   type: 'tool_call' | 'tool_result' | 'tool_error' | 'connection' | 'tools_listed';
   timestamp: number;
-  data: unknown;
+  data: McpEventData;
 }
+
+type ToolCallRequest = Parameters<Client['callTool']>[0];
+type ToolCallResponse = Awaited<ReturnType<Client['callTool']>>;
+
+type McpEventData =
+  | { tool: string; arguments: ToolCallRequest['arguments'] }
+  | {
+      tool: string;
+      result: ToolCallResponse;
+      isError: boolean;
+      hasStructuredContent: boolean;
+      structuredContent: ToolCallResponse['structuredContent'];
+    }
+  | { tool: string; error: string }
+  | { connected: boolean }
+  | { count: number; tools: string[] };
 
 class McpTestMiddleware {
   private events: McpEvent[] = [];
@@ -19,7 +35,7 @@ class McpTestMiddleware {
   /**
    * Log an event
    */
-  private log(type: McpEvent['type'], data: unknown): void {
+  private log(type: McpEvent['type'], data: McpEventData): void {
     this.events.push({
       type,
       timestamp: Date.now(),
@@ -126,7 +142,7 @@ const testMiddleware = new McpTestMiddleware();
 // Expose globally for testing
 declare global {
   interface Window {
-    mcpEventLog: {
+    mcpEventLog?: {
       getEvents: () => McpEvent[];
       getEventsByType: (type: McpEvent['type']) => McpEvent[];
       clearEvents: () => void;
@@ -135,8 +151,8 @@ declare global {
   }
 }
 
-if (typeof window !== 'undefined') {
-  window.mcpEventLog = {
+if (globalThis.window) {
+  globalThis.window.mcpEventLog = {
     getEvents: () => testMiddleware.getEvents(),
     getEventsByType: (type) => testMiddleware.getEventsByType(type),
     clearEvents: () => testMiddleware.clearEvents(),

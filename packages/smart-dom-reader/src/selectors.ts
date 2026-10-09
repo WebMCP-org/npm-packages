@@ -290,8 +290,8 @@ export class SelectorGenerator {
       // Add semantic information
       if (current.id) {
         descriptor = `${tag}#${current.id}`;
-      } else if (current.className && typeof current.className === 'string') {
-        const firstClass = current.className.split(' ')[0];
+      } else {
+        const firstClass = current.getAttribute('class')?.split(' ')[0];
         if (firstClass) {
           descriptor = `${tag}.${firstClass}`;
         }

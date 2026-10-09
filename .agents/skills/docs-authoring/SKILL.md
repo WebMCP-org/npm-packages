@@ -134,6 +134,7 @@ Follow the **writing-clearly-and-concisely** skill (`~/.claude/skills/writing-cl
 - "WebMCP" for the proposal and browser API
 - `@mcp-b/*` for packages
 - "MCP-B" only in package scope contexts (npm scope, commit messages)
+- "Declarative" for the declarative API and its tools; "form" only for the HTML form element
 
 ---
 
@@ -144,6 +145,8 @@ Follow the **writing-clearly-and-concisely** skill (`~/.claude/skills/writing-cl
 - Add titles to code blocks: `"filename.ext"`
 - Use `CodeGroup` for multi-framework examples
 - Use `twoslash` for TypeScript/TSX hover type information
+- Check `document.modelContext` before using it (`if (!document.modelContext) throw ...`) or use
+  optional chaining; `webmcp-types` declares it optional
 - Make long examples (50+ lines) expandable
 
 ---
@@ -270,12 +273,12 @@ This is critical. WebMCP is an active **Web Machine Learning Community Group pro
 **Rules for proposal vs. package content:**
 
 - When documenting `document.modelContext` API shape (methods, parameters,
-  return types), link to the Community Group draft. Describe
-  `navigator.modelContext` only as a deprecated compatibility alias. Our
+  return types), link to the Community Group draft. Do not document
+  `navigator.modelContext`; neither the draft nor MCP-B packages define it. Our
   reference pages should route readers to the authoritative source and identify
   package-specific differences. Do not maintain a competing API table or full spec.
 - When documenting the declarative API (`toolname`, form attributes, schema synthesis, CSS pseudo-classes, SubmitEvent extensions), link to Chrome's [declarative API documentation](https://developer.chrome.com/docs/ai/webmcp/declarative-api) and the Community Group's [declarative explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md). Identify the subset implemented by MCP-B, then link. Do not re-document the full type mapping table, constraint mapping table, or event contract; those will go stale as Chrome iterates.
-- When documenting `@mcp-b/*` packages, document the implemented package behavior fully and link to source. Do not call the package's current type surface the complete WebMCP draft surface. The proposal changes quickly: as of August 2026 it includes `executeTool()` with object input, while Chrome and MCP-B compatibility implementations accept serialized JSON. Link to the live draft for the proposal and describe the package signature separately. Do not describe `unregisterTool`, `provideContext`, or `clearContext` as current WebMCP methods. `BrowserMcpServer` adds `registerPrompt`, `registerResource`, `listTools`, and the composed `mcpServer` property. Protocol-version-specific elicitation and deprecated sampling remain official MCP SDK capabilities accessed through `BrowserMcpServer.mcpServer`; never describe them as `document.modelContext` methods.
+- When documenting `@mcp-b/*` packages, document the implemented package behavior fully and link to source. Do not call the package's current type surface the complete WebMCP draft surface. The proposal changes quickly: as of September 2026 it includes `executeTool()` with object input, which MCP-B packages and Chrome 155 or later implement. Link to the live draft for the proposal and describe the package signature separately. Do not describe `unregisterTool`, `provideContext`, or `clearContext` as current WebMCP methods. `BrowserMcpServer` adds `registerPrompt`, `registerResource`, `listTools`, and the composed `mcpServer` property. Protocol-version-specific elicitation and deprecated sampling remain official MCP SDK capabilities accessed through `BrowserMcpServer.mcpServer`; never describe them as `document.modelContext` methods.
 - When showing the proposal working, prefer the Chrome team's [live explainer](https://googlechromelabs.github.io/webmcp-tools/demos/explainer/) or an individual demo from `GoogleChromeLabs/webmcp-tools` rather than recreating it.
 - Security model documentation should summarize our approach but link to the draft's [security and privacy considerations](https://webmachinelearning.github.io/webmcp/#security-and-privacy-considerations) and Chrome's [secure tools guidance](https://developer.chrome.com/docs/ai/webmcp/secure-tools) for the full threat model.
 - When mentioning native Chrome support, link to the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/webmcp-model-context-tool/gbpdfapgefenggkahomfgkhfehlcenpd) extension recommended by Chrome's WebMCP documentation. Do not describe it as an officially supported Google product.
@@ -300,7 +303,7 @@ This is critical. WebMCP is an active **Web Machine Learning Community Group pro
 | React hooks                        | `packages/react-webmcp/`, `packages/usewebmcp/`                                 |
 | Transports, iframe, relay          | `packages/transports/`, `packages/mcp-iframe/`, `packages/webmcp-local-relay/`  |
 | Tooling (smart-dom-reader, etc.)   | `packages/smart-dom-reader/`, etc.                                              |
-| Type contracts                     | `packages/webmcp-types/src/*.test-d.ts`                                         |
+| Type contracts                     | `packages/*/src/*.test-d.ts`, `packages/usewebmcp/type-tests/`                  |
 | Chromium flags & testing           | `e2e/web-standards-showcase/CHROMIUM_FLAGS.md`, `e2e/tests/CHROMIUM_TESTING.md` |
 
 ---

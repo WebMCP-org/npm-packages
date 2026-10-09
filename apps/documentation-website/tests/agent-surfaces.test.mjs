@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const appRoot = new URL('../', import.meta.url);
@@ -49,4 +49,20 @@ test('documentation link hubs point to canonical section URLs', async () => {
   for (const content of contents) {
     assert.doesNotMatch(content, /\/(?:packages|tutorials|how-to|explanation)\/index\b/);
   }
+});
+
+test('pages render snippets through .mdx imports, not <Snippet file>', async () => {
+  const pages = (await readdir(appRoot, { recursive: true })).filter(
+    (path) => path.endsWith('.mdx') && !path.includes('node_modules')
+  );
+  const offenders = [];
+  for (const page of pages) {
+    if ((await readFile(new URL(page, appRoot), 'utf8')).includes('<Snippet file='))
+      offenders.push(page);
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `<Snippet file> renders nothing; import an .mdx snippet in: ${offenders.join(', ')}`
+  );
 });

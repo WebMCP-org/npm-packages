@@ -16,7 +16,7 @@ interface ControlRequest {
 
 type ControlResponse = { ok: true; value: unknown } | { ok: false; error: string };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is RuntimeInvocationRecord['arguments'] {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -25,7 +25,7 @@ function isControlResponse(value: unknown): value is ControlResponse {
   return value.ok ? 'value' in value : typeof value.error === 'string';
 }
 
-function requireBoolean(value: unknown, action: string): boolean {
+function parseBoolean(value: unknown, action: string): boolean {
   if (typeof value !== 'boolean') {
     throw new TypeError(`Control action '${action}' returned a non-boolean value`);
   }
@@ -36,7 +36,7 @@ function isRuntimeInvocationRecord(value: unknown): value is RuntimeInvocationRe
   return isRecord(value) && typeof value.name === 'string' && isRecord(value.arguments);
 }
 
-function requireInvocations(value: unknown): RuntimeInvocationRecord[] {
+function parseInvocations(value: unknown): RuntimeInvocationRecord[] {
   if (!Array.isArray(value) || !value.every(isRuntimeInvocationRecord)) {
     throw new TypeError("Control action 'readInvocations' returned an invalid value");
   }
@@ -58,12 +58,16 @@ function setStatus(status: 'booting' | 'ready' | 'error', text: string) {
   statusEl.dataset.status = status;
 }
 
-async function sendControlMessage(action: string, name?: string): Promise<unknown> {
+async function sendControlMessage<T>(
+  action: string,
+  decode: (response: Extract<ControlResponse, { ok: true }>) => T,
+  name?: string
+): Promise<T> {
   const request: ControlRequest = {
     type: 'runtime-contract/control',
     action,
-    ...(name ? { name } : {}),
   };
+  if (name) request.name = name;
   const response: unknown = await chrome.runtime.sendMessage<ControlRequest, unknown>(request);
 
   if (!isControlResponse(response)) {
@@ -73,11 +77,11 @@ async function sendControlMessage(action: string, name?: string): Promise<unknow
     throw new Error(response.error);
   }
 
-  return response.value;
+  return decode(response);
 }
 
 async function sendBooleanControlMessage(action: string, name?: string): Promise<boolean> {
-  return requireBoolean(await sendControlMessage(action, name), action);
+  return sendControlMessage(action, (response) => parseBoolean(response.value, action), name);
 }
 
 async function bootstrap() {
@@ -95,9 +99,10 @@ async function bootstrap() {
     registerDynamicTool: () => sendBooleanControlMessage('registerDynamicTool'),
     unregisterDynamicTool: (name?: string) =>
       sendBooleanControlMessage('unregisterDynamicTool', name),
-    readInvocations: async () => requireInvocations(await sendControlMessage('readInvocations')),
+    readInvocations: () =>
+      sendControlMessage('readInvocations', (response) => parseInvocations(response.value)),
     resetInvocations: async () => {
-      await sendControlMessage('resetInvocations');
+      await sendBooleanControlMessage('resetInvocations');
     },
   };
 

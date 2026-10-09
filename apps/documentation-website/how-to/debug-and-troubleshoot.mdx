@@ -49,24 +49,19 @@ import '@mcp-b/global';
 For the tool-only polyfill, initialize it explicitly:
 
 ```ts title="main.ts"
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 
-initializeWebMCPPolyfill();
+installWebMCP();
 ```
+
+The polyfill installs nothing on insecure pages or in browsers older than Chrome 126, Firefox 126,
+or Safari 18, so `document.modelContext` stays undefined there.
 
 If you load the IIFE build, place its script tag before scripts that register tools. See [Choose a
 runtime](/how-to/choose-runtime) if the application imports more than one MCP-B runtime.
 
-For a standalone polyfill installation, confirm that the polyfill won initialization by inspecting
-its private marker:
-
-```js title="Browser console"
-document.modelContext?.__isWebMCPPolyfill === true;
-```
-
-Use this marker only for diagnostics and tests. Application behavior must not depend on it.
-
-`@mcp-b/global` replaces the polyfill context with `BrowserMcpServer`. To check that runtime, add
+The standalone polyfill has no public runtime marker. `@mcp-b/global` replaces the core context
+with `BrowserMcpServer`. To check that runtime, add
 `@mcp-b/webmcp-ts-sdk` as a direct dependency and use its guard:
 
 ```ts title="runtime-check.ts"
@@ -75,21 +70,19 @@ import { isBrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 console.log(isBrowserMcpServer(document.modelContext));
 ```
 
+## Pass tool error details to agents
+
+When a tool throws, the polyfill reports only the generic `Tool execution failed` to the caller,
+including callers that reach the tool through the local relay. To give the agent details, return a
+result with `isError: true` and a text `content` item instead of throwing. See [Use input schemas
+and structured output](/how-to/use-schemas-and-structured-output) for a validation example.
+
 ## Trace missing relay tools
 
 Run `webmcp_list_sources` before `webmcp_list_tools`. This separates a missing browser connection
-from an empty page registry.
-
-| Symptom                | Check                                                                                    |
-| ---------------------- | ---------------------------------------------------------------------------------------- |
-| `No sources connected` | Confirm the page loaded `embed.js` and the relay process is running.                     |
-| Source has no tools    | Run `document.modelContext.getTools()` in that tab and check registration errors.        |
-| `Tool not found`       | The tab may have reloaded. Run `webmcp_list_tools` again to refresh discovery.           |
-| Connection blocked     | Match `--widget-origin` to the host page origin and `data-relay-port` to the relay port. |
-
-Keep the relay bound to loopback. Restrict `--widget-origin` when a specific site should publish
-tools. See [Connect desktop agents with the local
-relay](/how-to/connect-desktop-agents-with-local-relay) for configuration and security boundaries.
+from an empty page registry. If a source has no tools, inspect that tab's page registry as shown
+above. For other relay symptoms, see [Troubleshoot common
+issues](/how-to/connect-desktop-agents-with-local-relay#troubleshoot-common-issues).
 
 ## Fix iframe and tab transport origins
 

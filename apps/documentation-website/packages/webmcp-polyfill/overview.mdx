@@ -6,32 +6,32 @@ keywords:
 icon: 'puzzle-piece'
 ---
 
-`@mcp-b/webmcp-polyfill` installs the package-supported WebMCP surface on `document.modelContext` when the browser does not ship it yet. It provides browser-facing tool registration and discovery without MCP-B prompt, resource, server, or transport extensions.
+`@mcp-b/webmcp-polyfill` vendors the upstream WebMCP polyfill and installs its standard `document.modelContext` surface when the browser does not provide one. It provides browser-facing tool registration, discovery, and object-input execution. A temporary MCP-B layer adds declarative tools and their `SubmitEvent` extensions until upstream supports them. Existing browser contexts and native `SubmitEvent` hooks are preserved; missing hooks are filled in.
 
 ## When to use this package
 
-- You want `registerTool` and `getTools`, plus the package's feature-detectable serialized-JSON `executeTool` compatibility method, in browsers today.
+- You want the upstream `registerTool`, `getTools`, and object-input `executeTool` APIs in browsers today.
 - You are building a site or reusable library that wants to stay close to the Community Group draft surface.
-- You want to pair runtime behavior with [`@mcp-b/webmcp-types`](/packages/webmcp-types/overview) for type inference.
+- You want to pair runtime behavior with upstream [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) declarations.
 
 ## When not to use this package
 
 - You need prompts, resources, browser transport, or direct access to an MCP server. Use [`@mcp-b/global`](/packages/global/overview).
-- You only need types at build time. Use [`@mcp-b/webmcp-types`](/packages/webmcp-types/overview).
+- You only need types at build time. Install upstream [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) directly.
 
 ## Where it sits in the package graph
 
-This package sits directly above `@mcp-b/webmcp-types`. The full runtime in [`@mcp-b/global`](/packages/global/overview) wraps the polyfill when it initializes.
+This package bundles the upstream polyfill source. [`@mcp-b/global`](/packages/global/overview) wraps it when MCP-B extensions are needed.
 
 ## First step
 
-Initialize the polyfill before your app registers tools. The [reference page](/packages/webmcp-polyfill/reference) documents initialization, declarative forms, testing shim behavior, and registration lifecycle.
+Initialize the polyfill before your app registers tools. The [reference page](/packages/webmcp-polyfill/reference) documents the upstream installer, core API, and temporary declarative layer. For prompts, resources, transports, or MCP `outputSchema`, use the [global runtime](/packages/global/reference).
 
 ## Related pages
 
 <CardGroup cols={2}>
   <Card title="Reference" icon="book-open" href="/packages/webmcp-polyfill/reference">
-    Initialization options, testing shim details, and runtime behavior.
+    Upstream initialization and core runtime behavior.
   </Card>
   <Card title="First tool tutorial" icon="graduation-cap" href="/tutorials/first-tool">
     Build your first browser tool.

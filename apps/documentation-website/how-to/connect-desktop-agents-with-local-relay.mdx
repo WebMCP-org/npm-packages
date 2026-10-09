@@ -69,8 +69,12 @@ claude mcp add webmcp-local-relay -- npx -y @mcp-b/webmcp-local-relay@latest
 The relay discovers tools through a hidden iframe injected by `embed.js`. Add a single script tag to your page:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"></script>
 ```
+
+Load the embed from the same major version as the page's MCP-B runtime (`@mcp-b/global` or
+`@mcp-b/webmcp-polyfill`). A page that still runs a 5.x runtime must load
+`@mcp-b/webmcp-local-relay@5`.
 
 If your page already registers tools on `document.modelContext`, they are picked up automatically.
 Tools registered after `embed.js` loads are also discovered through `toolchange` events and a polling
@@ -80,8 +84,9 @@ If you are new to WebMCP, this complete example loads `@mcp-b/global`, registers
 embed:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@latest/dist/index.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mcp-b/global@6/dist/index.iife.js"></script>
 <script>
+  if (!document.modelContext) throw new Error('WebMCP is unavailable');
   void document.modelContext
     .registerTool({
       name: 'get_page_title',
@@ -91,7 +96,7 @@ embed:
     })
     .catch(console.error);
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"></script>
 ```
 
 Serve local pages from an HTTP origin such as `http://localhost:3000`. Do not open them as `file:`
@@ -132,7 +137,7 @@ npx @mcp-b/webmcp-local-relay --port 9444
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"
+  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"
   data-relay-port="9444"
 ></script>
 ```
@@ -159,25 +164,24 @@ you provide another trusted boundary.
 
 ## Handle multiple MCP clients
 
-If a candidate port belongs to a compatible WebMCP relay, a second instance joins it in **client
-mode** and proxies tool operations through it. During default discovery, an unrelated service is
-skipped and the relay tries the next port in `9333–9348`; an explicitly selected occupied port fails.
-
-If the server relay stops, the client promotes itself back to server mode after a reconnection cycle.
-This lets multiple MCP clients share the same browser connections without manual configuration.
+No configuration is needed. A relay started by a second MCP client joins the running relay in client
+mode, so both clients share the same browser connections. See [Reconnection and client
+mode](/packages/webmcp-local-relay/reference#reconnection-and-client-mode) for port discovery and
+failover.
 
 ## Troubleshoot common issues
 
-| Problem                | Fix                                                                                                                          |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected` | Confirm the page loaded `embed.js` and the relay process is running                                                          |
-| `No tools listed`      | Confirm tools are registered on the page. The embed detects changes and polls every two seconds, regardless of script order. |
-| `Tool not found`       | The tab reloaded or disconnected. Call `webmcp_list_tools` to refresh                                                        |
-| Connection blocked     | Verify `--widget-origin` matches the WebSocket origin and the relay port matches `data-relay-port`                           |
+| Problem                  | Fix                                                                                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `No sources connected`   | Confirm the page loaded `embed.js` and the relay process is running                                                                             |
+| `No tools listed`        | Confirm tools are registered on the page. The embed detects changes and polls every two seconds, regardless of script order.                    |
+| `Tool not found`         | The tab reloaded or disconnected. Call `webmcp_list_tools` to refresh                                                                           |
+| Connection blocked       | Verify `--widget-origin` matches the WebSocket origin and the relay port matches `data-relay-port`                                              |
+| `Host response timeout:` | The page exceeded its per-request timeout (default 60 seconds). Raise `data-request-timeout` and set a slightly higher relay `--invoke-timeout` |
 
-After a disconnect, the widget retries the last endpoint once after about `500ms`, then scans after
-`10s`, `20s`, and `30s`. It then enters a dormant state that probes every two minutes; returning to
-the tab triggers immediate rediscovery. See the [relay reference](/packages/webmcp-local-relay/reference#reconnection-and-client-mode) for the complete behavior.
+After a disconnect, the widget retries on its own and rediscovers the relay when you return to the
+tab. See the [relay reference](/packages/webmcp-local-relay/reference#reconnection-and-client-mode)
+for the retry schedule.
 
 ## Related pages
 

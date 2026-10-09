@@ -6,7 +6,6 @@
  * parent page's Model Context API.
  *
  * The iframe should expose its MCP server through `document.modelContext`.
- * Older runtimes that only expose `navigator.modelContext` remain supported.
  *
  * @example
  * ```html
@@ -33,22 +32,21 @@
  */
 
 import { DEFAULT_IFRAME_CHANNEL_ID, IframeParentTransport } from '@mcp-b/transports';
-import {
-  type BrowserMcpServer,
-  type PromptDescriptor,
-  type ResourceDescriptor,
-} from '@mcp-b/webmcp-ts-sdk';
 import type {
+  BrowserMcpServer,
   CallToolResult,
   InputSchema,
   ModelContext,
   ModelContextTool,
+  PromptDescriptor,
   RegistrationHandle,
-} from '@mcp-b/webmcp-types';
+  ResourceDescriptor,
+} from '@mcp-b/webmcp-ts-sdk';
 import {
   Client,
   UriTemplate,
   type GetPromptResult,
+  type CallToolRequestParams,
   type Prompt,
   type ReadResourceResult,
   type Resource,
@@ -208,14 +206,14 @@ export interface MCPIframeEventMap {
 export class MCPIframeElement extends HTMLElement {
   declare addEventListener: (<K extends keyof MCPIframeEventMap>(
     type: K,
-    listener: (this: MCPIframeElement, event: MCPIframeEventMap[K]) => unknown,
+    listener: (this: MCPIframeElement, event: MCPIframeEventMap[K]) => void,
     options?: boolean | AddEventListenerOptions
   ) => void) &
     HTMLElement['addEventListener'];
 
   declare removeEventListener: (<K extends keyof MCPIframeEventMap>(
     type: K,
-    listener: (this: MCPIframeElement, event: MCPIframeEventMap[K]) => unknown,
+    listener: (this: MCPIframeElement, event: MCPIframeEventMap[K]) => void,
     options?: boolean | EventListenerOptions
   ) => void) &
     HTMLElement['removeEventListener'];
@@ -260,49 +258,45 @@ export class MCPIframeElement extends HTMLElement {
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
     if (oldValue === newValue) return;
 
-    if (name === 'target-origin' || name === 'channel') {
-      if (this.#iframe && this.isConnected) void this.#reconnect();
-      return;
+    if (
+      name === 'call-timeout' &&
+      newValue !== null &&
+      this.#getCallTimeout() !== Number(newValue)
+    ) {
+      console.warn(
+        `[MCPIframe] Invalid call-timeout "${newValue}". Using ${DEFAULT_CALL_TIMEOUT}.`
+      );
     }
-
-    if (name === 'call-timeout') {
-      const timeout = Number(newValue);
-      if (newValue !== null && (!Number.isSafeInteger(timeout) || timeout <= 0)) {
-        console.warn(
-          `[MCPIframe] Invalid call-timeout "${newValue}". Using ${DEFAULT_CALL_TIMEOUT}.`
-        );
+    if (name === 'prefix-separator' && newValue !== null) {
+      const sanitized = sanitizeMCPNamePart(newValue);
+      if (sanitized !== newValue) {
+        console.warn(`[MCPIframe] Invalid prefix-separator "${newValue}". Using "${sanitized}".`);
       }
-      return;
     }
 
-    if (name === 'id' || name === 'prefix-separator') {
-      if (name === 'prefix-separator' && newValue !== null) {
-        const sanitized = sanitizeMCPNamePart(newValue);
-        if (sanitized !== newValue) {
-          console.warn(`[MCPIframe] Invalid prefix-separator "${newValue}". Using "${sanitized}".`);
+    const iframe = this.#iframe;
+    if (iframe && IFRAME_ATTRIBUTES.includes(name)) {
+      if (newValue === null) iframe.removeAttribute(name);
+      else iframe.setAttribute(name, newValue);
+    }
+
+    switch (name) {
+      case 'target-origin':
+      case 'channel':
+        if (iframe && this.isConnected) void this.#reconnect();
+        break;
+      case 'src':
+      case 'srcdoc':
+        if (!iframe) break;
+        ++this.#connectionRequestGeneration;
+        void this.#disconnect();
+        break;
+      case 'id':
+      case 'name':
+      case 'prefix-separator':
+        if (this.#connection) {
+          this.#requestRefresh(this.#connection, 'Failed to update parent registrations');
         }
-      }
-      const connection = this.#connection;
-      if (connection) {
-        this.#requestRefresh(connection, 'Failed to update parent registrations');
-      }
-      return;
-    }
-
-    if (!this.#iframe || !IFRAME_ATTRIBUTES.includes(name)) return;
-    if (newValue === null) {
-      this.#iframe.removeAttribute(name);
-    } else {
-      this.#iframe.setAttribute(name, newValue);
-    }
-    if (name === 'src' || name === 'srcdoc') {
-      ++this.#connectionRequestGeneration;
-      void this.#disconnect();
-    } else if (name === 'name') {
-      const connection = this.#connection;
-      if (connection) {
-        this.#requestRefresh(connection, 'Failed to update parent registrations');
-      }
     }
   }
 
@@ -557,16 +551,16 @@ export class MCPIframeElement extends HTMLElement {
     );
   }
 
-  #dispatchError(error: unknown, context: string): void {
-    console.error(`[MCPIframe] ${context}:`, error);
+  #dispatchError(cause: unknown, context: string): void {
+    console.error(`[MCPIframe] ${context}:`, cause);
     this.dispatchEvent(
-      new CustomEvent<MCPIframeErrorEventDetail>('mcp-iframe-error', { detail: { error } })
+      new CustomEvent<MCPIframeErrorEventDetail>('mcp-iframe-error', { detail: { error: cause } })
     );
   }
 
-  #failConnection(connection: Connection, error: unknown, context: string): void {
+  #failConnection(connection: Connection, cause: unknown, context: string): void {
     if (!this.#invalidateConnection(connection)) return;
-    this.#dispatchError(error, context);
+    this.#dispatchError(cause, context);
     void this.#closeConnection(connection);
   }
 
@@ -600,7 +594,7 @@ export class MCPIframeElement extends HTMLElement {
     prefix: string,
     isActive: () => boolean
   ): Promise<void> {
-    const modelContext: ModelContext | undefined = document.modelContext ?? navigator.modelContext;
+    const modelContext: ModelContext | undefined = document.modelContext;
     if (!modelContext) {
       throw new Error('Model Context API not available on parent');
     }
@@ -639,7 +633,10 @@ export class MCPIframeElement extends HTMLElement {
       const prefixedName = `${prefix}${tool.name}`;
       if (isDuplicateRegistration(connection.toolRegistrations, prefixedName, 'tool')) continue;
 
-      const descriptor: ModelContextTool<Record<string, unknown>, CallToolResult> & {
+      const descriptor: ModelContextTool<
+        NonNullable<CallToolRequestParams['arguments']>,
+        CallToolResult
+      > & {
         inputSchema: InputSchema;
       } = {
         name: prefixedName,
@@ -791,7 +788,10 @@ export class MCPIframeElement extends HTMLElement {
     return Number.isSafeInteger(timeout) && timeout > 0 ? timeout : DEFAULT_CALL_TIMEOUT;
   }
 
-  async #callIframeTool(toolName: string, args: Record<string, unknown>): Promise<CallToolResult> {
+  async #callIframeTool(
+    toolName: string,
+    args: NonNullable<CallToolRequestParams['arguments']>
+  ): Promise<CallToolResult> {
     return this.#requireClient().callTool(
       { name: toolName, arguments: args },
       { timeout: this.#getCallTimeout() }
@@ -849,7 +849,8 @@ declare global {
 
 /** Register the custom element with a custom tag name */
 export function registerMCPIframeElement(tagName = 'mcp-iframe'): void {
-  if (typeof customElements !== 'undefined' && !customElements.get(tagName)) {
-    customElements.define(tagName, MCPIframeElement);
+  const registry = globalThis.customElements;
+  if (registry && !registry.get(tagName)) {
+    registry.define(tagName, MCPIframeElement);
   }
 }

@@ -1,4 +1,4 @@
-import { normalizeInputSchema } from '@mcp-b/webmcp-polyfill/schema';
+import { normalizeInputSchema } from '@mcp-b/webmcp-ts-sdk/schema';
 import { useCallback } from 'react';
 import type { WebMCPPromptConfig, WebMCPPromptReturn } from './types.js';
 import { getBrowserMcpServer } from './model-context.js';
@@ -80,9 +80,8 @@ export function useWebMCPPrompt(config: WebMCPPromptConfig): WebMCPPromptReturn 
       return;
     }
 
-    // ponytail: read at registration time so an inline `argsSchema` literal cannot re-register
-    // every render. Ceiling: a changed schema is picked up only on re-registration;
-    // add a caller-supplied deps list, as `useWebMCP` has, if that is ever needed.
+    // Read at registration time so an inline `argsSchema` literal cannot re-register every
+    // render; a changed schema takes effect at the next registration.
     const { argsSchema } = configRef.current;
     const resolvedArgsSchema = argsSchema
       ? normalizeInputSchema(argsSchema).inputSchema

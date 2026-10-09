@@ -132,7 +132,7 @@ jobs:
         run: pnpm --filter @mcp-b/transports test:e2e && pnpm --filter @mcp-b/webmcp-extension test:e2e
 
   native-parity:
-    name: Native API Parity (chrome-canary)
+    name: Native API Parity (chrome-beta, chrome-canary)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -149,7 +149,7 @@ jobs:
         with:
           persist-credentials: false
           repository: web-platform-tests/wpt
-          ref: 9ef2de86389e3f388578fe5fc599c979078c6667
+          ref: fe52996d4465f23617bce91927bdd58e6ce8f541
           path: .reference/wpt
           # "interfaces" carries the .idl files that webmcp/idlharness.https.window.js
           # fetches at runtime (webmcp.idl plus its html/dom dependencies). ~1.8 MB.
@@ -177,6 +177,13 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      - name: Setup Chrome Beta
+        id: chrome_beta
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        with:
+          chrome-version: beta
+          install-dependencies: false
+
       - name: Setup Chrome Canary
         id: chrome_canary
         uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
@@ -192,6 +199,9 @@ jobs:
           chrome-version: latest
           install-dependencies: false
 
+      - name: Print Chrome Beta version
+        run: '"${{ steps.chrome_beta.outputs.chrome-path }}" --version'
+
       - name: Print Chrome Canary version
         run: '"${{ steps.chrome_canary.outputs.chrome-path }}" --version'
 
@@ -203,8 +213,8 @@ jobs:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
         run: pnpm test:wpt
 
-      # Passes 20/20 today; non-blocking because hard-gating API shape is a pending
-      # decision, not because it fails. See docs/TESTING.md.
+      # Non-blocking until the vendored upstream runtime defines the lifecycle event
+      # interfaces. See docs/TESTING.md.
       - name: Report WebMCP IDL conformance (non-blocking)
         continue-on-error: true
         env:
@@ -214,14 +224,26 @@ jobs:
       - name: Run Native Runtime Contract (Chrome Canary)
         env:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
-          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: ${{ steps.chrome_canary.outputs.chrome-path }}
-          PLAYWRIGHT_ENABLE_WEBMCP_FLAGS: '1'
-        run: pnpm --filter mcp-e2e-tests run test:native-contract:default
+        run: pnpm --filter mcp-e2e-tests run test:native-contract
+
+      - name: Run Native Runtime Contract and WebMCP smoke (Chrome Beta)
+        env:
+          CHROME_BIN: ${{ steps.chrome_beta.outputs.chrome-path }}
+        run: pnpm --filter mcp-e2e-tests run test:native-parity
+
+      - name: Run native React hook tests
+        env:
+          CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
+        run: pnpm --filter usewebmcp test:native
+
+      - name: Run global native conformance (Chrome Canary)
+        env:
+          CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
+        run: pnpm --filter @mcp-b/global run test:conformance:native
 
       - name: Run Native Runtime API Integration (Chrome Canary)
         env:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
-          PLAYWRIGHT_NATIVE_SHOWCASE_EXECUTABLE_PATH: ${{ steps.chrome_canary.outputs.chrome-path }}
         run: pnpm --filter mcp-e2e-tests run test:native-showcase
 
       - name: Run Native Extension Frame Integration (Chromium Snapshot)
@@ -234,7 +256,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: playwright-report-native-parity-chrome-canary
+          name: playwright-report-native-parity
           path: e2e/playwright-report/
           retention-days: 14
 
@@ -242,6 +264,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: test-results-native-parity-chrome-canary
+          name: test-results-native-parity
           path: e2e/test-results/
           retention-days: 7

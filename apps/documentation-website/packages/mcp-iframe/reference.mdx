@@ -62,7 +62,18 @@ production. A manually created MCP server can instead connect to
 
 ## Minimal example
 
-<Snippet file="snippets/packages/mcp-iframe-quickstart.html" />
+```html title="Bridge an iframe"
+<mcp-iframe src="./child-app.html" id="my-app"></mcp-iframe>
+
+<script type="module">
+  import '@mcp-b/mcp-iframe';
+
+  const el = document.querySelector('mcp-iframe');
+  el.addEventListener('mcp-iframe-ready', (event) => {
+    console.log('Exposed tools:', event.detail.tools);
+  });
+</script>
+```
 
 ## Entry points
 
@@ -86,9 +97,14 @@ production. A manually created MCP server can instead connect to
 
 Standard iframe attributes (`sandbox`, `allow`, `width`, `height`, `loading`, `referrerpolicy`, `name`, `srcdoc`, `allowfullscreen`, `credentialless`) are mirrored to the internal `<iframe>` element.
 
-For cross-origin children that use the native WebMCP API, set `allow="tools"`
-to delegate that browser feature. The attribute does not establish or authorize
-the MCP-B bridge.
+For cross-origin children that use native WebMCP, set `allow="tools"` to
+delegate that browser feature. The attribute does not establish or authorize
+the MCP-B bridge. Under the polyfill or `@mcp-b/global`, a cross-origin child
+cannot register tools at all: the polyfill's cross-origin permission handshake
+identifies a child by its index in the parent's `window.frames`, the iframe
+inside the element's shadow root has no index there, and `registerTool()`
+rejects with `NotAllowedError` even with `allow="tools"`. Native WebMCP checks
+the permission in the browser and does not have this limitation.
 
 Sandboxed iframes without `allow-same-origin`, and sources whose URL origin is `null`, have opaque origins. Set `target-origin="*"` for those sources. Other sources use the explicit attribute or the origin inferred from `src`.
 
@@ -144,6 +160,11 @@ Tools and prompts from the iframe are registered on the parent as `{id}{separato
 The parent model context performs final tool-name validation. A rejected registration emits `mcp-iframe-error` and disconnects the element without leaving a partial registration set.
 
 Bridged tools retain their `title` and WebMCP `readOnlyHint` annotation.
+
+When the parent runs `@mcp-b/global`, its server also lists a same-origin
+child's tools under their own names, so each such tool appears twice over MCP:
+once unprefixed through frame mirroring and once with the element prefix.
+Resources and prompts appear only with the prefix.
 
 ## Resource URI wrapping
 

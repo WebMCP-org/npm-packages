@@ -1,15 +1,9 @@
-import { initializeWebMCPPolyfill, type WebMCPPolyfillInitOptions } from './index.js';
+import { installWebMCP } from './index.js';
 
 export * from './index.js';
 
-declare global {
-  interface Window {
-    __webMCPPolyfillOptions?: WebMCPPolyfillInitOptions;
-  }
-}
-
 try {
-  initializeWebMCPPolyfill(window.__webMCPPolyfillOptions);
+  installWebMCP();
 } catch (error) {
   console.error('[WebMCPPolyfill] Auto-initialization failed:', error);
 }

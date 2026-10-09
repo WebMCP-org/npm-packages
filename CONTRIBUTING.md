@@ -31,7 +31,7 @@ These docs define review expectations for safety, contract synchronization, and 
   ```bash
   pnpm test:unit    # Unit tests must pass
   pnpm test:e2e     # E2E tests must pass (if applicable)
-  # For runtime/browser API changes:
+  # For runtime/browser API changes (needs Chrome 155 or later):
   pnpm --filter mcp-e2e-tests test:native-parity
   ```
 
@@ -43,6 +43,11 @@ These docs define review expectations for safety, contract synchronization, and 
   pnpm typecheck    # TypeScript type checking
   pnpm build        # Build must succeed
   ```
+- Oxlint also runs the repo's anti-slop rules as errors (listed in `vite.config.ts`, source in
+  `tools/oxlint/anti-slop`). Put a `SAFETY:` comment before each type assertion other than
+  `as const`, replace module mocks with real interfaces, use typed property access instead of
+  `Reflect.get` or `Reflect.apply`, and parse `unknown` values at their boundary instead of passing
+  them on.
 
 ### Before Submitting a PR
 
@@ -116,7 +121,7 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 
 ### Prerequisites
 
-- Node.js >= 22.12 (check `.nvmrc`)
+- Node.js >= 22.18 (check `.nvmrc`)
 - pnpm >= 10.0.0
 - Git
 
@@ -159,7 +164,7 @@ Package scopes (all in `packages/` directory):
 - `webmcp-local-relay` - @mcp-b/webmcp-local-relay
 - `webmcp-polyfill` - @mcp-b/webmcp-polyfill
 - `webmcp-ts-sdk` - @mcp-b/webmcp-ts-sdk
-- `webmcp-types` - @mcp-b/webmcp-types
+- `webmcp-types` - compatibility alias for upstream webmcp-types
 
 Repository-wide scopes:
 
@@ -222,11 +227,12 @@ npm-packages/
 │   ├── react-webmcp/            # React hooks for MCP-B runtime
 │   ├── smart-dom-reader/        # DOM extraction for AI
 │   ├── transports/              # Core transport implementations
-│   ├── webmcp-extension/         # MV3 extension template and content-script client
-│   ├── webmcp-polyfill/         # Strict core WebMCP runtime polyfill
-│   ├── webmcp-types/            # Strict core WebMCP type definitions
+│   ├── webmcp-extension/        # MV3 extension template and content-script client
+│   ├── webmcp-local-relay/      # Local relay for desktop MCP clients
+│   ├── webmcp-polyfill/         # Vendored upstream polyfill plus temporary declarative tools
 │   ├── usewebmcp/               # React hooks for strict core WebMCP API
-│   └── webmcp-ts-sdk/           # TypeScript SDK adapter
+│   ├── webmcp-ts-sdk/           # MCP SDK adapter and MCP-B extensions
+│   └── webmcp-types/            # Compatibility alias for upstream webmcp-types
 ├── e2e/                         # E2E tests and test apps
 ├── docs/                        # Technical documentation
 └── .changeset/                  # Changeset files
@@ -241,13 +247,12 @@ When contributing to a specific package:
 - Ensure compatibility with W3C Web Model Context API spec
 - Test in multiple browser environments
 - Validate tool registration and unregistration
-- Handle edge cases in two-bucket system
 
 ### @mcp-b/webmcp-ts-sdk
 
-- Minimal modifications to official SDK
+- Compose the official MCP SDK instead of forking or patching it
 - Maintain compatibility with upstream SDK updates
-- Focus on dynamic tool registration support
+- Delegate browser tool operations to the underlying WebMCP context
 
 ### @mcp-b/transports
 

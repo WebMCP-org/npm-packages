@@ -3,7 +3,7 @@
   "name": "WebMCP Extension",
   "description": "Install WebMCP on websites and consume their tools from an isolated content script.",
   "version": "1.0.0",
-  "minimum_chrome_version": "111",
+  "minimum_chrome_version": "126",
   "content_scripts": [
     {
       "matches": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],

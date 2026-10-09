@@ -7,15 +7,14 @@ icon: 'boxes-stacked'
 
 Packages are the primary entry point for this documentation. Start with a package overview when you need to choose the right building block, then move into that package's reference page for API details.
 
-Cross-package concepts stay in [Explanation](/explanation). Task-oriented setup stays in [Tutorials](/tutorials) and [How-To Guides](/how-to).
+Core browser declarations come from the Community Group package
+[`webmcp-types`](https://github.com/webmachinelearning/webmcp-types).
+Cross-package concepts stay in [Explanation](/explanation); task-oriented setup stays in
+[Tutorials](/tutorials) and [How-To Guides](/how-to).
 
 ## Core runtime
 
 <CardGroup cols={2}>
-  <Card title="@mcp-b/webmcp-types" icon="boxes-stacked" href="/packages/webmcp-types/overview">
-    Zero-runtime TypeScript contracts for MCP-B packages, schema inference, Document augmentation,
-    and deprecated Navigator compatibility.
-  </Card>
   <Card
     title="@mcp-b/webmcp-polyfill"
     icon="boxes-stacked"
@@ -29,8 +28,7 @@ Cross-package concepts stay in [Explanation](/explanation). Task-oriented setup 
     surface.
   </Card>
   <Card title="@mcp-b/webmcp-ts-sdk" icon="boxes-stacked" href="/packages/webmcp-ts-sdk/overview">
-    Browser-adapted MCP TypeScript SDK that provides BrowserMcpServer and supports dynamic tool
-    registration.
+    Browser adapter that provides `BrowserMcpServer`, MCP-B extensions, and schema helpers.
   </Card>
   <Card title="@mcp-b/transports" icon="boxes-stacked" href="/packages/transports/overview">
     Tab, iframe, and extension transport classes for moving MCP messages through browser boundaries.
@@ -61,7 +59,7 @@ Cross-package concepts stay in [Explanation](/explanation). Task-oriented setup 
     href="/packages/webmcp-extension/overview"
   >
     Chromium MV3 template and isolated-world client helper for installing WebMCP and calling page
-    tools, including declarative forms, from an extension.
+    tools, including declarative tools, from an extension.
   </Card>
   <Card
     title="@mcp-b/webmcp-local-relay"

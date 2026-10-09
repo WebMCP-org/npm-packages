@@ -15,8 +15,8 @@
 module.exports = {
   // ---------------------------------------------------------------------------
   // Source — only scan example package.json files.
-  // This prevents syncpack from touching packages/*, e2e/*, skills/*, or the
-  // root package.json. Those are managed by the pnpm catalog instead.
+  // This prevents syncpack from touching packages/*, e2e/*, or the root
+  // package.json. Those are managed by the pnpm catalog instead.
   // ---------------------------------------------------------------------------
   source: ['examples/frameworks/*/package.json'],
 
@@ -70,7 +70,8 @@ module.exports = {
   //
   // We don't need any custom version groups here because:
   //   - `source` already limits the scope to examples only
-  //   - There are no catalog: or workspace: specifiers in example packages
+  //   - Examples use no catalog: specifiers, and every workspace: specifier is
+  //     `workspace:*`, so all instances of a monorepo package already match
   //   - The default highestSemver policy is exactly what we want
   // ---------------------------------------------------------------------------
 };

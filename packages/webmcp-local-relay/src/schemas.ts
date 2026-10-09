@@ -84,11 +84,10 @@ export type RelayDescriptor = z.infer<typeof RelayDescriptorSchema>;
 /**
  * Schema for server hello messages sent immediately after WebSocket connect.
  */
-export const ServerHelloMessageSchema = z.object({
+export const ServerHelloMessageSchema = RelayDescriptorSchema.extend({
   type: z.literal('server-hello'),
   service: z.literal('webmcp-local-relay'),
   version: z.literal(1),
-  ...RelayDescriptorSchema.shape,
 });
 
 /**

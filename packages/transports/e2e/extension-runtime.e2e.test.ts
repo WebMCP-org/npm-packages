@@ -1,3 +1,4 @@
+import type { Client } from '@modelcontextprotocol/client';
 import assert from 'node:assert';
 import { accessSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -51,7 +52,11 @@ async function listTools(page: Page): Promise<string[]> {
   });
 }
 
-async function callTool(page: Page, name: string, args: Record<string, unknown>): Promise<string> {
+async function callTool(
+  page: Page,
+  name: string,
+  args: NonNullable<Parameters<Client['callTool']>[0]['arguments']>
+): Promise<string> {
   return page.evaluate(
     async ({ toolName, toolArgs }) => {
       const result = await window.mcpClient?.callTool(
@@ -69,7 +74,7 @@ async function callTool(page: Page, name: string, args: Record<string, unknown>)
 async function callToolError(
   page: Page,
   name: string,
-  args: Record<string, unknown>
+  args: NonNullable<Parameters<Client['callTool']>[0]['arguments']>
 ): Promise<string> {
   return page.evaluate(
     async ({ toolName, toolArgs }) => {

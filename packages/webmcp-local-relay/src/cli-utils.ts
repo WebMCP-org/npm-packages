@@ -69,18 +69,19 @@ export function parseCliOptions(argv: string[]): CliOptions {
     throw new Error('--widget-origin must include at least one origin.');
   }
 
-  return {
+  const options: CliOptions = {
     allowedOrigins,
     help: values.help ?? false,
     host: values.host ?? '127.0.0.1',
     port,
     portExplicitlySet: values.port !== undefined,
-    ...(values.label === undefined ? {} : { label: values.label }),
-    ...(invokeTimeoutMs === undefined ? {} : { invokeTimeoutMs }),
-    ...(maxPayloadBytes === undefined ? {} : { maxPayloadBytes }),
-    ...(values['relay-id'] === undefined ? {} : { relayId: values['relay-id'] }),
-    ...(values.workspace === undefined ? {} : { workspace: values.workspace }),
   };
+  if (values.label !== undefined) options.label = values.label;
+  if (invokeTimeoutMs !== undefined) options.invokeTimeoutMs = invokeTimeoutMs;
+  if (maxPayloadBytes !== undefined) options.maxPayloadBytes = maxPayloadBytes;
+  if (values['relay-id'] !== undefined) options.relayId = values['relay-id'];
+  if (values.workspace !== undefined) options.workspace = values.workspace;
+  return options;
 }
 
 /**

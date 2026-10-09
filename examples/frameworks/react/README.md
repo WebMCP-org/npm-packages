@@ -14,12 +14,13 @@ pnpm dev
 This example uses `workspace:*` dependencies to link against the local monorepo packages. To use it outside the monorepo, replace the workspace references in `package.json`:
 
 ```json
-"@mcp-b/webmcp-polyfill": "latest",
-"usewebmcp": "latest"
+"@mcp-b/webmcp-polyfill": "^6.0.0",
+"usewebmcp": "^6.0.0"
 ```
 
-## Key File
+## Key Files
 
+- [`src/main.tsx`](src/main.tsx) — installs the polyfill before React mounts
 - [`src/App.tsx`](src/App.tsx) — tool registration via `useWebMCP` hook
 
 ## What It Does

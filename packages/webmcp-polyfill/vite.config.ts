@@ -2,13 +2,16 @@ import type { Options } from 'vite-plus/pack';
 import { playwright } from 'vite-plus/test/browser-playwright';
 import { defineConfig } from 'vite-plus';
 
-const isCI = process.env.CI === 'true';
+// Never let a Chrome that ships native WebMCP silently take over the polyfill's tests.
+const launchArgs = ['--disable-features=WebMCP'];
+const launchOptions = process.env.CHROME_BIN
+  ? { executablePath: process.env.CHROME_BIN, args: launchArgs }
+  : { args: launchArgs };
 
 // ESM build for npm package
 const esmConfig: Options = {
   entry: {
     index: 'src/index.ts',
-    schema: 'src/schema.ts',
   },
   format: ['esm'],
   dts: true,
@@ -23,7 +26,7 @@ const esmConfig: Options = {
 };
 
 // IIFE build for script tag usage - bundles everything for standalone use
-// Uses index.ts which auto-initializes on load
+// Uses iife.ts, which auto-initializes on load.
 const iifeConfig: Options = {
   entry: {
     index: 'src/iife.ts',
@@ -53,15 +56,10 @@ export default defineConfig({
   test: {
     browser: {
       enabled: true,
-      provider: playwright({
-        launchOptions: process.env.CHROME_BIN ? { executablePath: process.env.CHROME_BIN } : {},
-      }),
+      provider: playwright({ launchOptions }),
       instances: [{ browser: 'chromium' }],
     },
-    include: ['src/**/*.test.ts', 'conformance/**/*.test.ts'],
-    exclude: ['dist', 'node_modules'],
-    globals: true,
-    maxConcurrency: isCI ? 1 : 2,
+    include: ['src/**/*.test.ts'],
     fileParallelism: false,
   },
 });

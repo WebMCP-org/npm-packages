@@ -1,51 +1,99 @@
 # @mcp-b/webmcp-polyfill
 
-A browser polyfill for the current core WebMCP API on `document.modelContext`.
-It implements tool registration, discovery, lifecycle events, and Chromium's
-optional `executeTool()` extension. MCP features such as prompts, resources,
-browser transport, and a composed MCP server belong to the MCP-B runtime built
-by `@mcp-b/global`.
+This package is a temporary compatibility distribution of the upstream
+[WebMCP polyfill](https://github.com/webmachinelearning/webmcp-polyfill), distributed
+under the existing MCP-B package name with vendored upstream source.
 
-The current WebMCP draft is published at
-[webmachinelearning.github.io/webmcp](https://webmachinelearning.github.io/webmcp/).
+**This package will eventually be removed.** There is no removal date yet. Sites
+using declarative tools should keep this package until the upstream polyfill
+supports them. For other sites, follow the
+[upstream installation instructions](https://github.com/webmachinelearning/webmcp-polyfill#readme)
+when its distribution is available.
 
-## Install
+Until then, this package bundles upstream revision
+`6bf6c57bbaf3d1173d7737cfb79572632d9b7871`. It installs the standard
+`document.modelContext` API when the browser does not provide one, plus a
+temporary declarative tools layer. The upstream implementation and types are the
+source of truth for the core runtime. Use [`@mcp-b/global`](../global/README.md)
+for transports, prompts, resources, or MCP `outputSchema` support; MCP-B schema
+helpers live in `@mcp-b/webmcp-ts-sdk/schema`.
+
+The [package reference](https://docs.mcp-b.ai/packages/webmcp-polyfill/reference)
+documents the installer, the declarative layer, and the browser baseline.
+
+## Use the compatibility package
 
 ```bash
 pnpm add @mcp-b/webmcp-polyfill
 ```
 
-## Initialize
+## Install the polyfill
 
-ES modules initialize explicitly:
+Call `installWebMCP()` before your app registers tools:
 
 ```ts
-import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@mcp-b/webmcp-polyfill';
 
-initializeWebMCPPolyfill();
+installWebMCP();
+
+const context = document.modelContext;
+if (!context) throw new Error('WebMCP is unavailable');
 ```
 
-The standalone IIFE initializes when loaded:
+The call is idempotent and preserves an existing native context. It does
+nothing when no browser document is available, on an insecure page, or on
+engines older than Chrome 126, Firefox 126, or Safari 18, so
+`if (!document.modelContext)` remains a valid feature check. The upstream
+runtime has no uninstall operation and does not provide the deprecated
+`navigator.modelContext` alias.
+
+For a script tag, load the IIFE before registering tools:
 
 ```html
-<script src="https://unpkg.com/@mcp-b/webmcp-polyfill@latest/dist/index.iife.js"></script>
+<script src="https://unpkg.com/@mcp-b/webmcp-polyfill@6/dist/index.iife.js"></script>
 ```
 
-Set testing options before loading the IIFE only when a test harness needs the
-deprecated Chromium testing surface:
+The IIFE calls `installWebMCP()` automatically and exposes it as
+`WebMCPPolyfill.installWebMCP`.
 
-```html
-<script>
-  window.__webMCPPolyfillOptions = { installTestingShim: true };
-</script>
+## Register a tool
+
+Tool registrations follow the upstream WebMCP API. Pass an `AbortSignal` when
+the registration has a lifecycle:
+
+```ts
+const registration = new AbortController();
+
+await context.registerTool(
+  {
+    name: 'page-title',
+    description: 'Get the title of this page',
+    execute() {
+      return { title: document.title };
+    },
+  },
+  { signal: registration.signal }
+);
+
+const tools = await context.getTools();
+const tool = tools.find((item) => item.name === 'page-title');
+if (tool) {
+  const result = await context.executeTool(tool);
+  console.log(result);
+}
+
+registration.abort();
 ```
 
-## Declare a form tool
+See the [WebMCP draft](https://webmachinelearning.github.io/webmcp/) and the
+[upstream polyfill](https://github.com/webmachinelearning/webmcp-polyfill) for
+the standard API and implementation details.
 
-When the polyfill owns `document.modelContext`, it observes annotated forms in
-the document and its open shadow roots and registers them as tools. It derives
-input schemas from native named controls and keeps registrations synchronized
-with DOM changes.
+## Declare a tool in HTML
+
+The declarative layer registers a tool for each form with `toolname` and
+`tooldescription` in the document and its open shadow roots. The input schema
+comes from the form's named controls.
 
 ```html
 <form toolname="search_catalog" tooldescription="Search the product catalog" toolautosubmit>
@@ -63,124 +111,12 @@ with DOM changes.
 </script>
 ```
 
-Without `toolautosubmit`, invocation fills the form and waits for the user to
-submit it. With `toolautosubmit`, the polyfill validates the form and calls
-`requestSubmit()`. Agent submissions expose `SubmitEvent.agentInvoked` and
-`SubmitEvent.respondWith()`.
-
-CI checks the standalone polyfill against the upstream
-[declarative Web Platform Tests](https://github.com/web-platform-tests/wpt/tree/master/webmcp/declarative).
-Repository-specific browser tests cover the polyfill and composed MCP-B runtime.
-See Chrome's
-[declarative API documentation](https://developer.chrome.com/docs/ai/webmcp/declarative-api)
-for the evolving API. The Community Group draft's
-[declarative section](https://webmachinelearning.github.io/webmcp/#declarative-webmcp)
-is still incomplete.
-
-## Register a tool
-
-```ts
-const registration = new AbortController();
-
-await document.modelContext.registerTool(
-  {
-    name: 'get-page-title',
-    description: 'Return the current page title',
-    inputSchema: { type: 'object', properties: {} },
-    execute: async () => ({ title: document.title }),
-  },
-  { signal: registration.signal }
-);
-
-// Remove the registration later.
-registration.abort();
-```
-
-`registerTool()` resolves after the local `toolchange` notification. Duplicate
-names, invalid descriptors, aborted registrations, and non-serializable schemas
-reject the returned promise.
-
-## Discover and execute
-
-```ts
-import type { ChromeModelContext } from '@mcp-b/webmcp-types';
-
-const context = document.modelContext as ChromeModelContext;
-const [tool] = await context.getTools();
-
-if (tool && context.executeTool) {
-  const result = await context.executeTool(tool, JSON.stringify({}));
-  console.log(result);
-}
-```
-
-`executeTool()` is a Chromium extension, not part of the core `ModelContext`
-interface. Feature-detect it.
-
-The local polyfill cannot securely implement cross-document discovery or
-exposure. Non-empty `fromOrigins` and `exposedTo` arrays reject with
-`NotSupportedError`; use native WebMCP for those capabilities. Where the host
-browser exposes the `tools` Permissions Policy, the polyfill enforces it. In
-browsers without that policy feature, cross-origin frames fail closed.
-
-## API
-
-### `initializeWebMCPPolyfill(options?)`
-
-Installs `window.ModelContext` and `document.modelContext` when native WebMCP is
-absent. It also keeps `navigator.modelContext` as the repository's deprecated
-compatibility alias.
-
-```ts
-interface WebMCPPolyfillInitOptions {
-  installTestingShim?: boolean; // default: false
-}
-```
-
-Initialization is idempotent and does not replace an existing native context or
-testing implementation.
-
-### `cleanupWebMCPPolyfill()`
-
-Removes registrations, detaches their abort listeners, and restores every
-property descriptor changed by initialization.
-
-## Testing shim
-
-`installTestingShim: true` installs the deprecated, testing-only
-`navigator.modelContextTesting` compatibility surface when it is absent:
-
-- `listTools()`
-- `executeTool(name, inputJson, options?)`
-- `toolchange` events and `ontoolchange`
-
-Prefer `getTools()` plus feature-detected `executeTool()` for native-browser
-coverage.
-
-## Schema helpers
-
-The `@mcp-b/webmcp-polyfill/schema` entry owns shared browser-runtime adapters
-used by MCP-B packages. `normalizeInputSchema()` accepts plain JSON Schema and
-Standard Schema v1 implementations that expose `~standard.jsonSchema.input()`.
-This conversion is an MCP-B adapter feature; the strict WebMCP registration
-boundary itself accepts JSON Schema.
-
-For literal-schema TypeScript inference, install `@mcp-b/webmcp-types` and use
-`JsonSchemaForInference`. Runtime-defined schemas safely fall back to
-object-or-array input.
-
-## Compatibility boundary
-
-- `document.modelContext` is canonical.
-- `navigator.modelContext` is deprecated compatibility.
-- Tool lifetime is owned by the `AbortSignal` passed to `registerTool()`.
-- `unregisterTool()`, `provideContext()`, and `clearContext()` are not exposed.
-- Importing the ESM entry has no initialization side effect.
-- Declarative forms do not emulate native CSS tool-state pseudo-classes,
-  `toolcancel`, cross-navigation responses, file inputs, or custom
-  form-associated elements.
-- Closed shadow roots cannot be inspected.
+An invocation fills the controls and either submits the form (`toolautosubmit`)
+or focuses its submit button for the user. The
+[declarative tools reference](https://docs.mcp-b.ai/packages/webmcp-polyfill/reference#declarative-tools)
+covers results, lifecycle events, cancellation, failures, and native browser
+hooks.
 
 ## License
 
-MIT
+The package includes the upstream polyfill's MIT license notice.

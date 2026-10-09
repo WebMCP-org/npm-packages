@@ -22,7 +22,7 @@ function createPort() {
       addListener: (listener: Listener<[]>) => disconnectListeners.add(listener),
       removeListener: (listener: Listener<[]>) => disconnectListeners.delete(listener),
     },
-  } as unknown as chrome.runtime.Port;
+  };
 
   return {
     port,

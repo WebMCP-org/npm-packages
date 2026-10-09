@@ -20,7 +20,9 @@ body:
         - '@mcp-b/webmcp-extension'
         - '@mcp-b/mcp-iframe'
         - '@mcp-b/smart-dom-reader'
-        - '@webmcp/helpers'
+        - '@mcp-b/webmcp-polyfill'
+        - '@mcp-b/webmcp-local-relay'
+        - 'usewebmcp'
         - 'Other / Multiple'
     validations:
       required: true
@@ -82,7 +84,7 @@ body:
       description: Please provide environment details.
       placeholder: |
         - OS: macOS 14.0
-        - Node.js: 22.12.0
+        - Node.js: 22.18.0
         - Browser: Chrome 120 (if applicable)
         - Framework: React 18, Next.js 14 (if applicable)
     validations:

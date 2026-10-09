@@ -331,7 +331,12 @@ jobs:
             fi
 
             # Sign the artifact consumers install, not a directory containing dev files.
-            TARBALL_URL=$(npm view "${PKG_NAME}@${PKG_VERSION}" dist.tarball)
+            # npm can take minutes to serve a version it just accepted, so wait for it.
+            for _ in $(seq 36); do
+              TARBALL_URL=$(npm view "${PKG_NAME}@${PKG_VERSION}" dist.tarball --prefer-online 2>/dev/null) && [ -n "$TARBALL_URL" ] && break
+              sleep 10
+            done
+            [ -n "$TARBALL_URL" ] || { echo "::error::npm did not serve ${PKG_NAME}@${PKG_VERSION} within 6 minutes"; exit 1; }
             curl --fail --silent --show-error --location --retry 3 "$TARBALL_URL" -o "/tmp/${SAFE_NAME}.tar.gz"
 
             cosign sign-blob "/tmp/${SAFE_NAME}.tar.gz" \

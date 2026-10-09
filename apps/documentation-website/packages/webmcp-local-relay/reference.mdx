@@ -78,10 +78,6 @@ npx @mcp-b/webmcp-local-relay
 
 A `.mcpb` bundle file is available from [GitHub Releases](https://github.com/WebMCP-org/npm-packages/releases) for Claude Desktop (double-click to install). It starts with the zero-configuration defaults: loopback, automatic port discovery, and all page origins allowed.
 
-## Minimal example
-
-<Snippet file="snippets/packages/webmcp-local-relay-quickstart.json" />
-
 ## CLI options
 
 ```text
@@ -148,11 +144,23 @@ The relay omits tools that declare `execution.taskSupport: 'required'`. It expos
 Add a script tag to expose a page's WebMCP tools to the relay:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"></script>
 ```
+
+The CDN URL pins the major version because the embed and the page runtime must share a major
+version. Pages on a 5.x runtime load `@5` for both scripts.
 
 Tools registered on `document.modelContext` are picked up automatically, including tools registered
 after the embed loads. The embed listens for `toolchange` and polls every two seconds as a fallback.
+
+The embed relays the page's own tools plus tools registered by same-origin descendant frames. When
+several frames register the same name, the embed relays and invokes the page's own tool (otherwise
+the first one `getTools()` returns) and logs one console warning per name.
+
+A result that parses to a JSON object becomes structured content, and an MCP result object passes
+through unchanged. A JSON string arrives as its content; any other result keeps its original text,
+so a declarative tool response of `10.50` stays `10.50`. Under the polyfill and `@mcp-b/global`, a tool that throws returns an error result with the
+text `Tool execution failed`.
 
 ### Embed attributes
 
@@ -170,7 +178,7 @@ Custom relay port:
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"
+  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"
   data-relay-port="9444"
 ></script>
 ```
@@ -179,14 +187,14 @@ Increase the per-request timeout for tools that chain several slow API calls:
 
 ```html
 <script
-  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@latest/dist/browser/embed.js"
+  src="https://cdn.jsdelivr.net/npm/@mcp-b/webmcp-local-relay@6/dist/browser/embed.js"
   data-request-timeout="120000"
 ></script>
 ```
 
 The relay allows `65000` ms by default. If the page timeout is higher, start the relay with a slightly larger limit. For the `120000` ms page setting above, use `--invoke-timeout 125000`.
 
-The embed script fetches the sibling `widget.html`, injects configuration, and loads it as a hidden blob iframe that inherits the host page origin. The iframe opens a WebSocket to the relay on `localhost`. Self-hosted copies must serve both `embed.js` and `widget.html`; cross-origin hosts must allow the widget fetch with CORS. The relay fails closed if that fetch fails. Page code registers tools on `document.modelContext`. The embed discovers tools through asynchronous `getTools()` and executes the returned descriptor through the feature-detected, serialized-JSON `executeTool()` signature supported by the package and current Chrome implementation.
+The embed script fetches the sibling `widget.html`, injects configuration, and loads it as a hidden blob iframe that inherits the host page origin. The iframe opens a WebSocket to the relay on `localhost`. Self-hosted copies must serve both `embed.js` and `widget.html`; cross-origin hosts must allow the widget fetch with CORS. The relay fails closed if that fetch fails. Page code registers tools on `document.modelContext`. The embed discovers tools through asynchronous `getTools()` and executes the returned descriptor with `executeTool(tool, inputObject)`. It does not feature-detect `executeTool()`: on a runtime without it, tools are listed but every call fails.
 
 ## Reconnection and client mode
 
@@ -207,12 +215,8 @@ When a candidate port is owned by a compatible WebMCP relay, a second instance j
 The relay supports pages using:
 
 1. `@mcp-b/global` (recommended for the complete MCP-B runtime)
-2. Native Chrome with `document.modelContext.getTools()` and the serialized-JSON `executeTool()` signature that this relay requires
+2. Native Chrome with `document.modelContext.getTools()` and object-input `executeTool()`
 3. `@mcp-b/webmcp-polyfill`
-
-The browser embed always uses document-first discovery and executes the current
-descriptor returned by `getTools()`. It does not depend on the removed
-name-based compatibility APIs.
 
 `file:` pages report an opaque `null` origin, which the polyfill's descriptor execution path rejects.
 Local integrations therefore need a non-opaque origin such as `http://localhost`.
@@ -247,7 +251,7 @@ The package exports the following for programmatic use:
 | `printHelp`                  | Function | Prints CLI usage to stderr                            |
 | `CliOptions`                 | Type     | Parsed CLI option shape                               |
 
-`LocalRelayMcpServerOptions` accepts `serverName` (default `webmcp-local-relay`), `serverVersion` (default `0.0.0`), and at most one of:
+`LocalRelayMcpServerOptions` accepts `serverName` (default `webmcp-local-relay`), `serverVersion` (default `0.0.0`), `launchBrowser` (replaces the `execFile` launcher that `webmcp_open_page` uses), and at most one of:
 
 | Field           | Type                       | Description                         |
 | --------------- | -------------------------- | ----------------------------------- |
@@ -347,13 +351,7 @@ The package exports the following for programmatic use:
 
 ## Troubleshooting
 
-| Problem                  | Fix                                                                                                                                                 |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected`   | Ensure the page loaded `embed.js` and the relay process is running                                                                                  |
-| `No tools listed`        | Ensure tools are registered on the page. The embed listens for changes and polls every two seconds, so load order does not matter.                  |
-| `Tool not found`         | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                            |
-| Connection blocked       | Verify `--widget-origin` matches the WebSocket origin (for example, `https://myapp.com`) and the relay port matches `data-relay-port`               |
-| `Host response timeout:` | The host page took longer than the per-request timeout (default 60s) to respond. Increase via `data-request-timeout="<ms>"` on the embed script tag |
+For common problems and their fixes, see [Troubleshoot common issues](/how-to/connect-desktop-agents-with-local-relay#troubleshoot-common-issues).
 
 ## Related
 
