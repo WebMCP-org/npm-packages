@@ -881,6 +881,72 @@ describe('widget runtime', () => {
     expect(executionSignal?.aborted).toBe(true);
   });
 
+  it('aborts only the cancelled execution and sends no result for it', async () => {
+    const signals = new Map<unknown, AbortSignal | undefined>();
+    const resolvers = new Map<unknown, (result: CallToolResult) => void>();
+    const env = startRuntime({
+      tools: [
+        {
+          name: 'slow',
+          description: 'Ignores its signal',
+          execute: ({ id }, signal) => {
+            signals.set(id, signal);
+            return new Promise((resolve) => resolvers.set(id, resolve));
+          },
+        },
+      ],
+    });
+    const connection = await completeHandshake(env);
+
+    for (const callId of ['cancelled', 'survivor', 'survivor']) {
+      connection.client.send(
+        JSON.stringify({ args: { id: callId }, callId, toolName: 'slow', type: 'invoke' })
+      );
+    }
+    await vi.waitFor(() => expect(signals.size).toBe(2));
+    connection.client.send(JSON.stringify({ callId: 'unknown', type: 'cancel' }));
+    connection.client.send(JSON.stringify({ callId: 'cancelled', type: 'cancel' }));
+
+    expect(signals.get('cancelled')?.reason).toEqual(new Error('Tool execution cancelled'));
+    expect(signals.get('survivor')?.aborted).toBe(false);
+    resolvers.get('cancelled')?.({ content: [{ type: 'text', text: 'late' }] });
+    resolvers.get('survivor')?.({ content: [{ type: 'text', text: 'survivor' }] });
+    await vi.waitFor(() => {
+      expect(connection.messages).toContainEqual({
+        callId: 'survivor',
+        result: { content: [{ type: 'text', text: 'survivor' }] },
+        type: 'result',
+      });
+    });
+    expect(connection.messages).toHaveLength(3);
+    expect(env.modelContext.executeTool).toHaveBeenCalledTimes(2);
+  });
+
+  it('aborts in-flight executions when the relay socket closes', async () => {
+    let executionSignal: AbortSignal | undefined;
+    const env = startRuntime({
+      tools: [
+        {
+          name: 'slow',
+          description: 'Never settles',
+          execute: (_input, signal) => {
+            executionSignal = signal;
+            return new Promise(() => {});
+          },
+        },
+      ],
+    });
+    const connection = await completeHandshake(env);
+
+    connection.client.send(
+      JSON.stringify({ args: {}, callId: 'call-close', toolName: 'slow', type: 'invoke' })
+    );
+    await vi.waitFor(() => expect(executionSignal).toBeDefined());
+    connection.client.close();
+
+    expect(executionSignal?.reason).toEqual(new Error('Relay connection closed'));
+  });
+
   it('reconnects to the relay after the socket closes', async () => {
     const env = startRuntime();
     const first = await completeHandshake(env);

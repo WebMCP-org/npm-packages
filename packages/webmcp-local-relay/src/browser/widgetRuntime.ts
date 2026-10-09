@@ -463,6 +463,9 @@ function runWidget(cfg: WidgetConfig): void {
       scheduledReconnect = null;
     }
 
+    // In-flight invocations on this socket, keyed by relay callId.
+    const invocations = new Map<string, AbortController>();
+
     activeEndpoint = endpoint;
     activeSocket = socket;
     discoveryCycleCount = 0;
@@ -535,6 +538,14 @@ function runWidget(cfg: WidgetConfig): void {
         return;
       }
 
+      if (relayMessage.type === 'cancel') {
+        // The relay settled the call when it cancelled it, so no result is sent.
+        if (typeof relayMessage.callId !== 'string') return;
+        invocations.get(relayMessage.callId)?.abort(new Error('Tool execution cancelled'));
+        invocations.delete(relayMessage.callId);
+        return;
+      }
+
       if (relayMessage.type !== 'invoke') {
         console.debug(
           '[webmcp-relay-widget] Ignoring unrecognized message type:',
@@ -543,67 +554,84 @@ function runWidget(cfg: WidgetConfig): void {
         return;
       }
 
+      const { callId } = relayMessage;
+      if (typeof callId !== 'string' || invocations.has(callId)) {
+        return;
+      }
       const toolName = String(relayMessage.toolName ?? '');
+      const controller = new AbortController();
+      invocations.set(callId, controller);
       void (async () => {
         // Current Chrome requires a RegisteredTool returned by getTools(), not a
         // name or a stale copy.
         await refreshTools();
+        controller.signal.throwIfAborted();
         const entry = currentToolEntries.find(({ registered }) => registered.name === toolName);
         const context = document.modelContext;
         if (!entry || !context) {
           throw new Error(`Tool not found: ${toolName}`);
         }
 
-        const controller = new AbortController();
         let timeoutId: ReturnType<typeof setTimeout> | undefined;
         try {
-          const timeout = new Promise<never>((_, reject) => {
-            timeoutId = setTimeout(() => {
-              const error = new Error('Tool execution timed out');
-              controller.abort(error);
-              reject(error);
-            }, cfg.requestTimeoutMs);
+          // Settle on abort even if the runtime ignores the signal.
+          const aborted = new Promise<never>((_, reject) => {
+            controller.signal.addEventListener('abort', () => reject(controller.signal.reason), {
+              once: true,
+            });
           });
+          timeoutId = setTimeout(() => {
+            controller.abort(new Error('Tool execution timed out'));
+          }, cfg.requestTimeoutMs);
           const execution = context.executeTool(
             entry.registered,
             isJsonObject(relayMessage.args) ? relayMessage.args : {},
             { signal: controller.signal }
           );
-          const serialized = await Promise.race([execution, timeout]);
+          const serialized = await Promise.race([execution, aborted]);
           safeSend(
             socket,
             JSON.stringify({
               type: 'result',
-              callId: relayMessage.callId,
+              callId,
               result: normalizeSerializedToolResult(serialized),
             })
           );
         } finally {
           clearTimeout(timeoutId);
         }
-      })().catch((error) => {
-        safeSend(
-          socket,
-          JSON.stringify({
-            type: 'result',
-            callId: relayMessage.callId,
-            result: {
-              isError: true,
-              content: [
-                {
-                  type: 'text',
-                  text: String(error instanceof Error ? error.message : error),
-                },
-              ],
-            },
-          })
-        );
-      });
+      })()
+        .catch((error) => {
+          if (invocations.get(callId) !== controller) return;
+          safeSend(
+            socket,
+            JSON.stringify({
+              type: 'result',
+              callId,
+              result: {
+                isError: true,
+                content: [
+                  {
+                    type: 'text',
+                    text: String(error instanceof Error ? error.message : error),
+                  },
+                ],
+              },
+            })
+          );
+        })
+        .finally(() => {
+          if (invocations.get(callId) === controller) invocations.delete(callId);
+        });
     });
 
     socket.addEventListener(
       'close',
       () => {
+        for (const controller of invocations.values()) {
+          controller.abort(new Error('Relay connection closed'));
+        }
+        invocations.clear();
         if (activeSocket !== socket) {
           return;
         }
