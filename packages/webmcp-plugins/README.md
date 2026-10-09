@@ -21,8 +21,12 @@ document.modelContext.registerTool(
     {
       name: 'search_notes',
       description: 'Search notes by text',
-      inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
-      execute: ({ query }) => searchNotes(query),
+      inputSchema: {
+        type: 'object',
+        properties: { query: { type: 'string' } },
+        required: ['query'],
+      } as const,
+      execute: ({ query }: { query: string }) => searchNotes(query),
     },
     [otel()]
   )
@@ -71,11 +75,13 @@ React apps use `ConsentProvider`, `useGuardedWebMCP`, and `usePendingConsentRequ
 
 - `requiresApproval` can be a function of the call's input, to prompt only for risky calls.
 - `decide(id, true, true)` approves the tool for the rest of the session. This applies only to
-  reversible tools without `requireUserPresence`.
+  reversible tools without `requireUserPresence`, and it covers every later input, even when
+  `requiresApproval` is a function.
 - `requireUserPresence` runs a WebAuthn user-verification ceremony (Touch ID, Windows Hello,
   or a security key) on every approval. Call `decide()` directly from the click handler so the
   ceremony keeps the click's user activation. After three failed ceremonies, the tool is
   refused as `rate-limited` for 10 seconds, then 30 seconds, then 90 seconds, up to 5 minutes.
+  Requests already waiting for that tool are refused too.
 - The default ceremony is local. It proves that a person was present, not who they are. To
   verify on your server, pass `new ConsentGuard({ verifyPresence })`. It receives the request
   and an `AbortSignal` that aborts when the request is cancelled or denied. The request's timeout
@@ -85,7 +91,8 @@ React apps use `ConsentProvider`, `useGuardedWebMCP`, and `usePendingConsentRequ
 
 ## Tracing
 
-`otel()` records one span per call with the application's OpenTelemetry tracer. It installs no
+`otel()` records one span per call that reaches it, with the application's OpenTelemetry
+tracer. Calls refused by an earlier plugin, such as `consent`, get no span. It installs no
 SDK or exporter and records no inputs, results, or error messages. Install
 `@opentelemetry/api` to use it. Pass `otel({ tracer })` to choose a tracer.
 
