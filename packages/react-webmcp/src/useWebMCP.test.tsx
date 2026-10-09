@@ -454,4 +454,29 @@ describe('useWebMCP in a browser runtime', () => {
     expect(execute).toHaveBeenCalledOnce();
     expect(hook.result.current).toEqual([]);
   });
+
+  it('drops pending consent when the guarded tool unregisters', async () => {
+    const guard = new ConsentGuard();
+    const execute = vi.fn(() => 'deleted');
+    const hook = await renderHook(
+      () =>
+        useGuardedWebMCP({
+          name: 'guarded_unmount',
+          description: 'Deletes a note',
+          consent: { scope: [], reversible: false, riskLevel: 'high', requiresApproval: true },
+          execute,
+        }),
+      { wrapper: ({ children }) => <ConsentProvider guard={guard}>{children}</ConsentProvider> }
+    );
+
+    const call = client.callTool({ name: 'guarded_unmount', arguments: {} });
+    await vi.waitFor(() => expect(guard.getPending()).toHaveLength(1));
+    const [request] = guard.getPending();
+    await hook.unmount();
+
+    expect(guard.getPending()).toEqual([]);
+    expect(await guard.decide(request!.id, true)).toMatchObject({ success: false });
+    expect(await call).toMatchObject({ isError: true });
+    expect(execute).not.toHaveBeenCalled();
+  });
 });
