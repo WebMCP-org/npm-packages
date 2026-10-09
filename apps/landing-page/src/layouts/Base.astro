@@ -1,17 +1,8 @@
 ---
 import Codeforge from './Codeforge.astro';
+import type { ComponentProps } from 'astro/types';
 
-interface Props {
-  title: string;
-  description: string;
-  image?: string;
-  article?: {
-    publishedTime?: string;
-    modifiedTime?: string;
-    authors?: string[];
-    tags?: string[];
-  };
-}
+type Props = ComponentProps<typeof Codeforge>;
 
 const { title, description, image, article } = Astro.props;
 ---

@@ -10,7 +10,8 @@
     "dev": "wrangler types && astro dev",
     "fmt": "vp fmt",
     "lint": "vp lint",
-    "preview": "wrangler types && astro preview"
+    "preview": "wrangler types && astro preview",
+    "test:seo": "node --test tests/seo.test.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.10",

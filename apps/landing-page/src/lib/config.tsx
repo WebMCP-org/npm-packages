@@ -1,6 +1,6 @@
 import { Icons } from '@/components/icons';
 
-const BOOKING_HREF = '/contact';
+const BOOKING_HREF = '/contact/';
 const ROOK_HREF = 'https://chromewebstore.google.com/detail/opojeelojlkcinlhkbahpcekdolfjmhi';
 
 export const siteConfig = {
@@ -46,7 +46,7 @@ export const siteConfig = {
         ],
       },
       { id: 2, name: 'Docs', href: 'https://docs.mcp-b.ai' },
-      { id: 3, name: 'Blog', href: '/blog' },
+      { id: 3, name: 'Blog', href: '/blog/' },
       { id: 4, name: 'GitHub', href: 'https://github.com/WebMCP-org' },
       { id: 5, name: 'Book a call', href: BOOKING_HREF },
     ],
@@ -87,7 +87,7 @@ export const siteConfig = {
     description: [
       {
         text: 'MCP-B helped inspire',
-        href: '/blog/mcp-b-introduction',
+        href: '/blog/mcp-b-introduction/',
         variant: 'origin',
         preview: { title: 'Original post' },
       },
