@@ -7,8 +7,8 @@ settings:
 catalogs:
   default:
     '@modelcontextprotocol/client':
-      specifier: 2.0.0
-      version: 2.0.0
+      specifier: 2.2.0
+      version: 2.2.0
     '@modelcontextprotocol/core':
       specifier: 2.0.0
       version: 2.0.0
@@ -210,7 +210,7 @@ importers:
         version: link:../packages/webmcp-ts-sdk
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
-        version: 2.0.0
+        version: 2.2.0
       '@modelcontextprotocol/server':
         specifier: 'catalog:'
         version: 2.0.0
@@ -237,7 +237,7 @@ importers:
         version: link:../../packages/transports
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
-        version: 2.0.0
+        version: 2.2.0
       react:
         specifier: 'catalog:'
         version: 19.2.8
@@ -280,7 +280,7 @@ importers:
         version: link:../../packages/webmcp-ts-sdk
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
-        version: 2.0.0
+        version: 2.2.0
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -574,7 +574,7 @@ importers:
     devDependencies:
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
-        version: 2.0.0
+        version: 2.2.0
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.1
@@ -601,7 +601,7 @@ importers:
         version: link:../transports
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
-        version: 2.0.0
+        version: 2.2.0
     devDependencies:
       '@mcp-b/webmcp-ts-sdk':
         specifier: workspace:*
@@ -623,7 +623,7 @@ importers:
         version: link:../webmcp-ts-sdk
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
-        version: 2.0.0
+        version: 2.2.0
       '@standard-schema/spec':
         specifier: ^1.1.0
         version: 1.1.0
@@ -734,7 +734,7 @@ importers:
     devDependencies:
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
-        version: 2.0.0
+        version: 2.2.0
       '@types/chrome':
         specifier: 'catalog:'
         version: 0.2.7
@@ -807,7 +807,7 @@ importers:
         version: link:../transports
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
-        version: 2.0.0
+        version: 2.2.0
     devDependencies:
       '@mcp-b/global':
         specifier: workspace:*
@@ -848,7 +848,7 @@ importers:
         version: link:../webmcp-ts-sdk
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
-        version: 2.0.0
+        version: 2.2.0
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.1
@@ -910,7 +910,7 @@ importers:
     devDependencies:
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
-        version: 2.0.0
+        version: 2.2.0
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.8(@voidzero-dev/vite-plus-test@0.1.24)
@@ -3004,12 +3004,16 @@ packages:
   '@mintlify/validation@0.1.842':
     resolution: {integrity: sha512-CUJAOwPFM+WYIdpD4pcXIPgo8j563Q4FVuBqppcp3K6oeYtD8JRVBQp0HHJ5qIW/Bxum+kjc+4T2hdBr8ldrBg==}
 
-  '@modelcontextprotocol/client@2.0.0':
-    resolution: {integrity: sha512-8f1OghQ2rjzIOfqgUCP+8GiUWqRs89njoWLNqAe8kWmDePv3s1fZXseej+QXemssEuuOvLLmLO/kqM3IQHtISw==}
+  '@modelcontextprotocol/client@2.2.0':
+    resolution: {integrity: sha512-LxCou/CSYQ6dwEnjhLZY0KnEuc8V4UJ3IEQCl/uR2yHobSQIEdJKUlKLRYRF5i5FqRGHy1eK7une3aAWDHLtig==}
     engines: {node: '>=20'}
 
   '@modelcontextprotocol/core@2.0.0':
     resolution: {integrity: sha512-pJCEwGG7Lfr/+PQp9ZTwKXNeO5wzbfKL7H3MYpCorM4oFBoQrdjnBgEoqG+RjhsvS1FKrDbKux+M1HhlnGWqcA==}
+    engines: {node: '>=20'}
+
+  '@modelcontextprotocol/core@2.2.0':
+    resolution: {integrity: sha512-iLhmprRmWI8EcosOA3wVvww22z02NkgqhV4fBH6f/odQBsi7xnJc0HGmi21yWO+/iKw2yzqVE127Zhna5/+JXw==}
     engines: {node: '>=20'}
 
   '@modelcontextprotocol/sdk@1.30.0':
@@ -14098,19 +14102,23 @@ snapshots:
       - supports-color
       - typescript
 
-  '@modelcontextprotocol/client@2.0.0':
+  '@modelcontextprotocol/client@2.2.0':
     dependencies:
-      '@modelcontextprotocol/core': 2.0.0
+      '@modelcontextprotocol/core': 2.2.0
       cross-spawn: 7.0.6
       eventsource: 3.0.7
       eventsource-parser: 3.0.6
       jose: 6.1.3
       pkce-challenge: 5.0.1
-      zod: 4.4.3
+      zod: 4.6.5
 
   '@modelcontextprotocol/core@2.0.0':
     dependencies:
       zod: 4.4.3
+
+  '@modelcontextprotocol/core@2.2.0':
+    dependencies:
+      zod: 4.6.5
 
   '@modelcontextprotocol/sdk@1.30.0(@cfworker/json-schema@4.1.1)(zod@4.3.6)':
     dependencies:
