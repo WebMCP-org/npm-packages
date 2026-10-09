@@ -43,7 +43,7 @@
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@modelcontextprotocol/client": "catalog:",
     "@modelcontextprotocol/server": "catalog:",
-    "@playwright/test": "^1.62.1",
+    "@playwright/test": "^1.63.0",
     "@types/node": "catalog:",
     "typescript": "catalog:"
   }
