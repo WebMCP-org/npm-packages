@@ -626,6 +626,11 @@ function runWidget(cfg: WidgetConfig): void {
     });
 
     refreshTools()
+      // A page that blocks getTools() still completes the handshake with no
+      // tools. Closing here would reconnect in a tight loop.
+      .catch((error) => {
+        console.warn('[webmcp-relay-widget] Failed to read WebMCP tools:', error);
+      })
       .then(() => {
         safeSend(
           socket,

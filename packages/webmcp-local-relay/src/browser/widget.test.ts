@@ -635,6 +635,18 @@ describe('widget runtime', () => {
     });
   });
 
+  it('completes the handshake with no tools when getTools() rejects', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(TestModelContext.prototype, 'getTools').mockRejectedValue(
+      new DOMException('Blocked by Permissions Policy', 'NotAllowedError')
+    );
+    const env = startRuntime({ tools: [{ name: 'hidden', description: 'Not readable' }] });
+    const connection = await completeHandshake(env);
+
+    expect(connection.messages[1]).toEqual({ tools: [], type: 'tools/list' });
+    expect(env.connections).toHaveLength(1);
+  });
+
   it('uses the latest tool snapshot when tools change before hello is accepted', async () => {
     const env = startRuntime({
       sendHelloAccepted: false,
@@ -834,6 +846,7 @@ describe('widget runtime', () => {
     const env = startRuntime({
       search: buildSearch({
         hostOrigin: APP_ORIGIN,
+        relayPort: '9333',
         requestTimeout: '20',
       }),
       tools: [
