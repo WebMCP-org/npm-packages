@@ -136,6 +136,34 @@ describe('ConsentGuard', () => {
     expect(guard.getCooldownRemaining('https://app.test', 'save')).toBe(30_000);
   });
 
+  it('denies requests queued before a lockout and keeps escalating after a success', async () => {
+    vi.useFakeTimers();
+    let verified = false;
+    const guard = new ConsentGuard({ verifyPresence: () => verified });
+    const first = guard.request(input(presence));
+    const queued = guard.request(input(presence));
+    const [a, b] = guard.getPending();
+
+    await guard.decide(a!.id, true);
+    expect(guard.getPending()[1]).toMatchObject({ attemptsRemaining: 2 });
+    await guard.decide(a!.id, true);
+    await guard.decide(a!.id, true);
+    await expect(first).resolves.toEqual({ approved: false, reason: 'presence-lockout' });
+    await expect(queued).resolves.toEqual({ approved: false, reason: 'presence-lockout' });
+    await expect(guard.decide(b!.id, true)).resolves.toMatchObject({ success: false });
+
+    vi.advanceTimersByTime(10_000);
+    verified = true;
+    void guard.request(input(presence));
+    await guard.decide(pendingId(guard), true);
+    verified = false;
+    void guard.request(input(presence));
+    const retry = pendingId(guard);
+    for (let attempt = 0; attempt < MAX_PRESENCE_ATTEMPTS; attempt++)
+      await guard.decide(retry, true);
+    expect(guard.getCooldownRemaining('https://app.test', 'save')).toBe(30_000);
+  });
+
   it('pauses the timeout during a ceremony and aborts it when the request settles', async () => {
     vi.useFakeTimers();
     let finish!: (verified: boolean) => void;

@@ -232,14 +232,15 @@ export class ConsentGuard {
       if (this.#pending.get(id) !== entry) return DENIED;
       const { origin, toolName, consent } = entry.request;
       const key = `${origin}::${toolName}`;
+      const presence = this.#presence.get(key) ?? { attempts: 0, lockouts: 0, cooldownUntil: 0 };
+      this.#presence.set(key, presence);
       if (ok) {
-        this.#presence.delete(key);
+        // Lockouts keep escalating for the session; only the attempt window resets.
+        presence.attempts = 0;
         if (rememberForSession && consent.reversible) this.#sessionApprovals.add(key);
         this.#settle(id, { approved: true, reason: 'user' });
         return { success: true, reason: 'approved' };
       }
-      const presence = this.#presence.get(key) ?? { attempts: 0, lockouts: 0, cooldownUntil: 0 };
-      this.#presence.set(key, presence);
       presence.attempts += 1;
       if (presence.attempts >= MAX_PRESENCE_ATTEMPTS) {
         if (presence.attempts === MAX_PRESENCE_ATTEMPTS) {
@@ -247,10 +248,22 @@ export class ConsentGuard {
           presence.cooldownUntil =
             Date.now() + Math.min(BASE_COOLDOWN_MS * 3 ** (presence.lockouts - 1), MAX_COOLDOWN_MS);
         }
-        this.#settle(id, { approved: false, reason: 'presence-lockout' });
+        // Requests queued before the lockout are denied too, so an agent cannot line up
+        // prompts ahead of it.
+        for (const [otherId, other] of this.#pending) {
+          if (`${other.request.origin}::${other.request.toolName}` === key) {
+            this.#settle(otherId, { approved: false, reason: 'presence-lockout' });
+          }
+        }
         return { success: false, reason: 'presence-lockout' };
       }
       const attemptsRemaining = MAX_PRESENCE_ATTEMPTS - presence.attempts;
+      for (const other of this.#pending.values()) {
+        const { origin: o, toolName: t, consent: c } = other.request;
+        if (other !== entry && `${o}::${t}` === key && c.requireUserPresence) {
+          other.request = { ...other.request, attemptsRemaining };
+        }
+      }
       entry.request = {
         ...entry.request,
         lastError: 'Presence verification failed',
