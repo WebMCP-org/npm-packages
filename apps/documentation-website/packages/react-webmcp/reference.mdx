@@ -87,6 +87,7 @@ The published entry point preserves `'use client'`; server rendering is tested o
 | `execute(input, options)` | `(input, { signal }) => T \| Promise<T>` | Yes      | Tool implementation              |
 | `formatOutput`            | `(result: T) => unknown`                 | No       | Overrides MCP success formatting |
 | `formatError`             | `(error: Error) => unknown`              | No       | Overrides MCP error formatting   |
+| `plugins`                 | `WebMCPPlugin[]`                         | No       | Run around every execution       |
 
 **Returns:** `WebMCPReturn`, including `state`, `execute`, `reset`, `isSupported`, and `registrationError`.
 
@@ -95,6 +96,61 @@ Agent failures default to `{ content: [{ type: "text", text: error.message }], i
 whose text is `undefined`; `formatOutput` overrides that. Both formatters may be async and are awaited. Local failures
 and cancellation always reject. `state.error` retains execution failures separately
 from `registrationError`. Core-hook behavior is in the [usewebmcp reference](/packages/usewebmcp/reference).
+
+### Plugins and consent
+
+`plugins` run around every local and agent execution, outermost first, and receive the validated
+input. A plugin that throws refuses the call; agents receive the refusal through `formatError`.
+Plugins come from [`@mcp-b/webmcp-plugins`](https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-plugins).
+
+```tsx title="Ask before an agent deletes a note"
+import {
+  ConsentProvider,
+  useGuardedWebMCP,
+  usePendingConsentRequests,
+  useConsentGuard,
+} from '@mcp-b/react-webmcp';
+
+function DeleteNoteTool() {
+  useGuardedWebMCP({
+    name: 'delete_note',
+    description: 'Delete a note by id',
+    inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
+    consent: {
+      scope: ['write:notes'],
+      reversible: false,
+      riskLevel: 'high',
+      requiresApproval: true,
+    },
+    execute: ({ id }) => deleteNote(id),
+  });
+  return null;
+}
+
+function ApprovalCards() {
+  const guard = useConsentGuard();
+  return usePendingConsentRequests().map((request) => (
+    <div key={request.id}>
+      {request.toolName}
+      <button onClick={() => guard.decide(request.id, true)}>Allow</button>
+      <button onClick={() => guard.decide(request.id, false)}>Deny</button>
+    </div>
+  ));
+}
+
+// <ConsentProvider><DeleteNoteTool /><ApprovalCards /></ConsentProvider>
+```
+
+| Export                        | Description                                                               |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| `ConsentProvider`             | Shares one `ConsentGuard`; pass `guard` to supply your own                |
+| `useGuardedWebMCP(config)`    | `useWebMCP` plus a `consent` policy, with MCP annotations derived from it |
+| `usePendingConsentRequests()` | Requests awaiting a decision; re-renders only when the queue changes      |
+| `useConsentGuard()`           | The guard, for `decide(id, approved, rememberForSession?)`                |
+
+Refused calls reject with a `NotAllowedError`. The
+[package README](https://github.com/WebMCP-org/npm-packages/tree/main/packages/webmcp-plugins#consent)
+covers session approval, WebAuthn user presence, and lockout.
 
 ### `useWebMCPContext(name, description, getValue, options?)`
 
