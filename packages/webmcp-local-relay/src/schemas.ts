@@ -8,10 +8,19 @@ import {
   type RelayTool,
 } from './protocol.js';
 
-function normalizeSupportedInboundTools(tools: z.infer<typeof InboundToolSchema>[]): RelayTool[] {
-  return tools
-    .map(normalizeInboundTool)
-    .filter((tool) => tool.execution?.taskSupport !== 'required');
+/** Parses each tool on its own, so one malformed tool does not hide the page's other tools. */
+function parseBrowserTools(tools: unknown[]): RelayTool[] {
+  return tools.flatMap((raw) => {
+    const parsed = InboundToolSchema.safeParse(raw);
+    if (!parsed.success) {
+      process.stderr.write(
+        `[webmcp-local-relay] warn: skipped a malformed page tool: ${parsed.error.message}\n`
+      );
+      return [];
+    }
+    const tool = normalizeInboundTool(parsed.data);
+    return tool.execution?.taskSupport === 'required' ? [] : [tool];
+  });
 }
 
 const BrowserHelloMessageSchema = z.object({
@@ -25,12 +34,12 @@ const BrowserHelloMessageSchema = z.object({
 
 const BrowserToolsListMessageSchema = z.object({
   type: z.literal('tools/list'),
-  tools: z.array(InboundToolSchema).transform(normalizeSupportedInboundTools),
+  tools: z.array(z.unknown()).transform(parseBrowserTools),
 });
 
 const BrowserToolsChangedMessageSchema = z.object({
   type: z.literal('tools/changed'),
-  tools: z.array(InboundToolSchema).transform(normalizeSupportedInboundTools),
+  tools: z.array(z.unknown()).transform(parseBrowserTools),
 });
 
 const BrowserToolResultMessageSchema = z.object({

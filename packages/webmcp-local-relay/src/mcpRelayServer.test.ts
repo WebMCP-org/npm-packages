@@ -655,7 +655,7 @@ describe('LocalRelayMcpServer', () => {
     await cleanup();
   });
 
-  it('drops invalid annotations with a warning', async () => {
+  it('skips a tool with invalid annotations and keeps the rest', async () => {
     const { bridge, relay, cleanup } = await createConnectedRelay();
 
     const ws = await connectBrowser(bridge, {
@@ -679,14 +679,15 @@ describe('LocalRelayMcpServer', () => {
               idempotentHint: 42,
             },
           },
+          { name: 'good_tool', description: 'Valid' },
         ],
       })
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // Tool should still be registered (annotations dropped)
-    expect(relay.listDynamicToolNames().length).toBeGreaterThan(0);
+    await waitFor(() =>
+      relay.listDynamicToolNames().some((name) => name.includes('good_tool')) ? true : undefined
+    );
+    expect(relay.listDynamicToolNames().some((name) => name.includes('bad_ann_tool'))).toBe(false);
 
     ws.close();
     await cleanup();

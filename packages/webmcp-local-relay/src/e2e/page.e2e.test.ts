@@ -164,6 +164,22 @@ describe.each(RUNTIMES)('a page on %s', (runtime) => {
     expect(result.content).toEqual([{ type: 'text', text: 'total 3' }]);
   });
 
+  // WebMCP accepts any JSON object as an input schema; MCP wants `type: 'object'`.
+  it('keeps the other tools when one has an input schema MCP rejects', async () => {
+    const { relay, page } = await setup({
+      runtime,
+      script: `${TOOLS}
+        document.modelContext.registerTool({
+          name: 'untyped',
+          description: 'Input schema without a type',
+          inputSchema: { properties: { q: { type: 'string' } } },
+          execute: () => ({ content: [{ type: 'text', text: 'untyped' }] }),
+        });`,
+    });
+    await toolsBecome(relay, page, ['echo', 'untyped']);
+    expect(await relay.call('untyped', { q: 'x' })).toBe('untyped');
+  });
+
   it('keeps one source across a reload and drops it when the tab closes', async () => {
     const { relay, page } = await setup({ runtime });
     await toolsBecome(relay, page, ['echo']);
