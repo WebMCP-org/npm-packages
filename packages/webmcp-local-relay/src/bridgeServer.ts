@@ -178,8 +178,6 @@ export class RelayBridgeServer extends EventEmitter {
    * Maximum delay for relay-to-relay reconnection backoff in client mode.
    */
   private readonly clientMaxReconnectDelay = 3_000;
-  private readonly clientMaxReconnectAttempts = 100;
-  private clientReconnectAttempts = 0;
   private readonly clientPendingInvocations = new Map<string, PendingInvocation>();
   private clientTools: RelayTool[] = [];
   private clientSources: RelaySourceInfo[] = [];
@@ -978,7 +976,6 @@ export class RelayBridgeServer extends EventEmitter {
       const { bufferedMessages, socket } = await this.connectToRelayServer(port);
       this.clientSocket = socket;
       this.clientReconnectDelay = 500;
-      this.clientReconnectAttempts = 0;
       this.setupClientHandlers(socket, bufferedMessages);
     } catch (error) {
       this._mode = previousMode;
@@ -1177,14 +1174,6 @@ export class RelayBridgeServer extends EventEmitter {
       return;
     }
 
-    this.clientReconnectAttempts++;
-    if (this.clientReconnectAttempts >= this.clientMaxReconnectAttempts) {
-      process.stderr.write(
-        `[webmcp-local-relay] error: giving up reconnection after ${this.clientReconnectAttempts} attempts\n`
-      );
-      return;
-    }
-
     const delay = this.clientReconnectDelay;
     this.clientReconnectDelay = Math.min(
       this.clientReconnectDelay * 1.5,
@@ -1209,7 +1198,6 @@ export class RelayBridgeServer extends EventEmitter {
     try {
       await this.startUsingPortStrategy();
       this.clientReconnectDelay = 500;
-      this.clientReconnectAttempts = 0;
       if (this._mode === 'server') {
         process.stderr.write('[webmcp-local-relay] info: promoted from client to server mode\n');
         this.emit('stateChanged');
