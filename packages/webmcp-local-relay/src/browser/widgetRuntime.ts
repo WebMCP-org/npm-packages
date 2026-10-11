@@ -455,8 +455,10 @@ function runWidget(cfg: WidgetConfig): void {
 
     activeEndpoint = endpoint;
     activeSocket = socket;
-    discoveryCycleCount = 0;
     helloAccepted = false;
+    // Set when the relay rejects or ignores the hello. It would do so again, so the widget
+    // backs off instead of retrying the same endpoint.
+    let refused = false;
     phase = 'idle';
 
     socket.addEventListener('message', (event) => {
@@ -481,6 +483,7 @@ function runWidget(cfg: WidgetConfig): void {
       if (isJsonObject(parsed) && parsed.type === 'hello/accepted') {
         clearHelloAckTimer();
         helloAccepted = true;
+        discoveryCycleCount = 0;
         writeCachedEndpoint(cfg, endpoint);
         sendInitialTools();
         return;
@@ -490,6 +493,7 @@ function runWidget(cfg: WidgetConfig): void {
       if (helloRejected) {
         clearHelloAckTimer();
         helloAccepted = false;
+        refused = true;
         clearCachedEndpoint(cfg);
         window.parent.postMessage(
           {
@@ -582,7 +586,11 @@ function runWidget(cfg: WidgetConfig): void {
         activeSocket = null;
         clearHelloAckTimer();
         rejectPendingRequests('WebSocket connection lost');
-        scheduleRetrySameEndpoint();
+        if (refused) {
+          scheduleRediscovery();
+        } else {
+          scheduleRetrySameEndpoint();
+        }
       },
       { once: true }
     );
@@ -617,6 +625,7 @@ function runWidget(cfg: WidgetConfig): void {
             return;
           }
           console.warn('[webmcp-relay-widget] Relay did not acknowledge browser hello');
+          refused = true;
           socket.close(4000, 'Browser hello was not acknowledged');
         }, RELAY_HELLO_TIMEOUT_MS);
       })
@@ -713,9 +722,10 @@ function runWidget(cfg: WidgetConfig): void {
 
     scheduledReconnect = setTimeout(() => {
       scheduledReconnect = null;
+      // Counted before connecting: only an accepted hello resets the backoff.
+      discoveryCycleCount += 1;
       void discoverRelay().then((connected) => {
         if (!connected) {
-          discoveryCycleCount += 1;
           scheduleRediscovery();
         }
       });
@@ -780,9 +790,7 @@ function runWidget(cfg: WidgetConfig): void {
     cleanupDormantListeners();
 
     for (const candidate of candidates) {
-      const connected = await connectToEndpoint(candidate);
-      if (connected) {
-        discoveryCycleCount = 0;
+      if (await connectToEndpoint(candidate)) {
         return;
       }
     }
