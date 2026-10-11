@@ -886,6 +886,43 @@ describe('RelayBridgeServer', () => {
     }
   });
 
+  it('stays stopped when stop() lands during a reconnect', async () => {
+    const owner = new RelayBridgeServer({ host: '127.0.0.1', port: 0, allowedOrigins: ['*'] });
+    await owner.start();
+    const port = owner.port;
+    const joiner = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port,
+      portRangeEnd: port + 1,
+      allowedOrigins: ['*'],
+    });
+    await joiner.start();
+    expect(joiner.mode).toBe('client');
+
+    // A service that never answers takes the port, so the joiner's reconnect probes it.
+    await owner.stop();
+    const silentSockets = new Set<Socket>();
+    const silent = createNetServer((socket) => silentSockets.add(socket));
+    await new Promise<void>((resolve) => silent.listen(port, '127.0.0.1', resolve));
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      await joiner.stop();
+      // Let the probe time out; a restarted joiner would now bind the next port.
+      await new Promise((resolve) => setTimeout(resolve, 5_000));
+
+      const next = createNetServer();
+      await new Promise<void>((resolve, reject) => {
+        next.once('error', reject);
+        next.listen(port + 1, '127.0.0.1', resolve);
+      });
+      await new Promise((resolve) => next.close(resolve));
+    } finally {
+      await joiner.stop();
+      for (const socket of silentSockets) socket.destroy();
+      await new Promise((resolve) => silent.close(resolve));
+    }
+  }, 15_000);
+
   it('skips a non-relay port owner and binds the next available port', async () => {
     const preferredPort = await getOpenPort();
     const preferredPortHolder = await occupyTcpPort(preferredPort);

@@ -971,8 +971,6 @@ export class RelayBridgeServer extends EventEmitter {
   }
 
   private async startAsClient(port = this.desiredPort): Promise<void> {
-    this.stopping = false;
-
     const previousMode = this._mode;
     const previousPort = this.desiredPort;
     this._mode = 'client';
@@ -1203,6 +1201,11 @@ export class RelayBridgeServer extends EventEmitter {
   private async reconnectWithModePromotion(): Promise<void> {
     try {
       await this.startUsingPortStrategy();
+      if (this.stopping) {
+        // stop() ran while this attempt was connecting; undo what it just started.
+        await this.stop();
+        return;
+      }
       this.clientReconnectDelay = 500;
       if (this._mode === 'server') {
         process.stderr.write('[webmcp-local-relay] info: promoted from client to server mode\n');
