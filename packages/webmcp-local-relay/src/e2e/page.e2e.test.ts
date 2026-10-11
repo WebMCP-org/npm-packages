@@ -251,9 +251,9 @@ it('keeps tools from two tabs apart when they share a name', async () => {
   await toolsBecome(relay, page, ['echo']);
   await open(site.origin);
 
-  await vi.waitFor(async () => expect(await sources(relay)).toHaveLength(2), 15_000);
+  // The relay publishes tool changes after a debounce, so wait on the tools, not the sources.
+  await vi.waitFor(async () => expect(await relay.pageTools()).toHaveLength(2), 15_000);
   const names = await relay.pageTools();
-  expect(names).toHaveLength(2);
   for (const name of names) {
     expect(await relay.call(name, { text: name })).toBe(`echo:${name}`);
   }
