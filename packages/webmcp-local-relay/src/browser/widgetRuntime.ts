@@ -79,6 +79,12 @@ type RelayRuntimePhase = 'idle' | 'discovering' | 'dormant';
 const RECONNECT_DELAY_MS = 500;
 const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
 const RELAY_SERVER_HELLO_TIMEOUT_MS = 1200;
+/**
+ * Chrome holds back new WebSockets for up to about 5 s once earlier ones failed, as they do
+ * while scanning for a relay that is not running yet. The hello timeout therefore starts
+ * when the socket opens, and this caps the wait for the open itself.
+ */
+const RELAY_CONNECT_TIMEOUT_MS = 10000;
 const RELAY_HELLO_TIMEOUT_MS = 1000;
 
 /** Delay before each rediscovery attempt (ms). Running out of entries goes dormant. */
@@ -362,9 +368,19 @@ async function probeRelayEndpoint(candidate: {
       });
     };
 
-    const timeoutId = setTimeout(() => {
+    let timeoutId = setTimeout(() => {
       settle(null);
-    }, RELAY_SERVER_HELLO_TIMEOUT_MS);
+    }, RELAY_CONNECT_TIMEOUT_MS);
+    socket.addEventListener(
+      'open',
+      () => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          settle(null);
+        }, RELAY_SERVER_HELLO_TIMEOUT_MS);
+      },
+      { once: true }
+    );
 
     socket.addEventListener('close', onClose, { once: true });
     socket.addEventListener('error', onError, { once: true });
