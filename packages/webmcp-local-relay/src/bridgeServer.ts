@@ -3,15 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 
 import WebSocket, { WebSocketServer } from 'ws';
-import {
-  buildPortCandidates,
-  DEFAULT_RELAY_PORT,
-  DEFAULT_RELAY_PORT_RANGE_END,
-  defaultRelayPortPersistPath,
-  persistPort,
-  isTcpAddress,
-  type PortStrategyOptions,
-} from './portStrategy.js';
+import { DEFAULT_RELAY_PORT, DEFAULT_RELAY_PORT_RANGE_END, isTcpAddress } from './portStrategy.js';
 import {
   CallToolResultSchema,
   type RelayCallToolResult,
@@ -90,8 +82,8 @@ export interface RelayBridgeServerOptions {
    */
   portRangeEnd?: number;
   /**
-   * File path used to cache the last successful relay port.
-   * @defaultValue `~/.webmcp/relay-port.json`
+   * @deprecated Ignored. The relay no longer caches its port, so it always joins a relay
+   * that owns the preferred port instead of starting a second one elsewhere.
    */
   persistPath?: string;
   /**
@@ -151,7 +143,6 @@ export class RelayBridgeServer extends EventEmitter {
   private desiredPort: number;
   private readonly portExplicitlySet: boolean;
   private readonly portRangeEnd: number;
-  private readonly persistPath: string;
   private readonly allowedOrigins: string[];
   private readonly maxPayloadBytes: number;
   private readonly invokeTimeoutMs: number;
@@ -204,7 +195,6 @@ export class RelayBridgeServer extends EventEmitter {
     this.portExplicitlySet = options.portExplicitlySet ?? false;
     this.portRangeEnd =
       options.portRangeEnd ?? Math.max(DEFAULT_RELAY_PORT_RANGE_END, this.preferredPort);
-    this.persistPath = options.persistPath ?? defaultRelayPortPersistPath();
     this.allowedOrigins = options.allowedOrigins ?? ['*'];
     // 10MB default: large enough for typical JSON API responses while
     // still protecting the relay process from unbounded memory growth.
@@ -306,39 +296,28 @@ export class RelayBridgeServer extends EventEmitter {
       return;
     }
 
-    const strategyOptions: PortStrategyOptions = {
-      defaultPort: this.preferredPort,
-      host: this.host,
-      persistPath: this.persistPath,
-      rangeEnd: this.portRangeEnd,
-    };
-    if (this.portExplicitlySet) strategyOptions.fixedPort = this.preferredPort;
-    const candidates = await buildPortCandidates(strategyOptions);
-
-    for (const candidate of candidates) {
+    const lastPort = this.portExplicitlySet ? this.preferredPort : this.portRangeEnd;
+    for (let port = this.preferredPort; port <= lastPort; port++) {
       try {
-        await this.startAsServer(candidate.port);
-        await this.persistSelectedPort();
+        await this.startAsServer(port);
         return;
       } catch (err) {
         if (!this.isAddressInUseError(err)) {
           throw err;
         }
 
-        const attached = await this.tryAttachToExistingRelay(candidate.port);
-        if (attached) {
-          await this.persistSelectedPort();
+        if (await this.tryAttachToExistingRelay(port)) {
           return;
         }
 
-        if (candidate.wasFixed) {
+        if (this.portExplicitlySet) {
           throw new Error(
-            `Port ${candidate.port} is already in use by a non-WebMCP service and cannot be shared.`
+            `Port ${port} is already in use by a non-WebMCP service and cannot be shared.`
           );
         }
 
         process.stderr.write(
-          `[webmcp-local-relay] info: port ${candidate.port} is occupied by a non-relay service, trying next port\n`
+          `[webmcp-local-relay] info: port ${port} is occupied by a non-relay service, trying next port\n`
         );
       }
     }
@@ -353,16 +332,6 @@ export class RelayBridgeServer extends EventEmitter {
       cause instanceof Error &&
       ('code' in cause ? cause.code === 'EADDRINUSE' : cause.message.includes('EADDRINUSE'))
     );
-  }
-
-  private async persistSelectedPort(): Promise<void> {
-    try {
-      await persistPort(this.port, this.persistPath, this.host);
-    } catch (error) {
-      process.stderr.write(
-        `[webmcp-local-relay] warn: could not cache relay port: ${error instanceof Error ? error.message : String(error)}\n`
-      );
-    }
   }
 
   private async tryAttachToExistingRelay(port: number): Promise<boolean> {

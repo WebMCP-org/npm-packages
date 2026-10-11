@@ -1,17 +1,9 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 
 import { RelayBridgeServer } from './bridgeServer.js';
 import { LocalRelayMcpServer } from './mcpRelayServer.js';
-
-// The relay caches its chosen port in ~/.webmcp/relay-port.json by default;
-// tests must never touch the developer's real home directory. mkdtemp gives a
-// 0700 directory with an unpredictable name, so this is not a temp-file race.
-const persistPath = join(mkdtempSync(join(tmpdir(), 'webmcp-relay-test-')), 'relay-port.json');
 
 const execFileMock = vi.fn(
   (_command: string, _args: readonly string[], callback: (cause: Error | null) => void) => {
@@ -420,7 +412,6 @@ describe('LocalRelayMcpServer', () => {
         host: '127.0.0.1',
         port: serverBridge.port,
         allowedOrigins: ['*'],
-        persistPath,
       });
       await clientBridge.start();
       expect(clientBridge.mode).toBe('client');
@@ -800,7 +791,6 @@ describe('LocalRelayMcpServer', () => {
         host: '127.0.0.1',
         port: serverBridge.port,
         allowedOrigins: ['*'],
-        persistPath,
       });
       await clientBridge.start();
 

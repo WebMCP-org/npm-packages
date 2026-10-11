@@ -1,6 +1,6 @@
 import { isTcpAddress } from './portStrategy.js';
 import { z } from 'zod/v4';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer as createNetServer, type Socket } from 'node:net';
@@ -25,11 +25,6 @@ type OutboundMessage = z.infer<typeof OutboundMessageSchema>;
 function readServerMessage(raw: WebSocket.RawData): OutboundMessage {
   return OutboundMessageSchema.parse(JSON.parse(String(raw)));
 }
-
-// The relay caches its chosen port in ~/.webmcp/relay-port.json by default;
-// tests must never touch the developer's real home directory. mkdtemp gives a
-// 0700 directory with an unpredictable name, so this is not a temp-file race.
-const persistPath = join(mkdtempSync(join(tmpdir(), 'webmcp-relay-test-')), 'relay-port.json');
 
 /**
  * Polls until a value is available or times out.
@@ -848,7 +843,6 @@ describe('RelayBridgeServer', () => {
       host: '127.0.0.1',
       port: usedPort,
       allowedOrigins: ['*'],
-      persistPath,
     });
 
     await bridge2.start();
@@ -856,6 +850,36 @@ describe('RelayBridgeServer', () => {
 
     await bridge2.stop();
     await bridge1.stop();
+  });
+
+  it('joins the relay on the preferred port even when an old port cache points elsewhere', async () => {
+    const owner = new RelayBridgeServer({ host: '127.0.0.1', port: 0, allowedOrigins: ['*'] });
+    await owner.start();
+    const cachePath = join(mkdtempSync(join(tmpdir(), 'webmcp-relay-test-')), 'relay-port.json');
+    writeFileSync(
+      cachePath,
+      JSON.stringify({
+        port: owner.port + 1,
+        host: '127.0.0.1',
+        updatedAt: new Date().toISOString(),
+      })
+    );
+    const joiner = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: owner.port,
+      portRangeEnd: owner.port + 2,
+      allowedOrigins: ['*'],
+      persistPath: cachePath,
+    });
+
+    try {
+      await joiner.start();
+      expect(joiner.mode).toBe('client');
+      expect(joiner.port).toBe(owner.port);
+    } finally {
+      await joiner.stop();
+      await owner.stop();
+    }
   });
 
   it('skips a non-relay port owner and binds the next available port', async () => {
@@ -866,7 +890,6 @@ describe('RelayBridgeServer', () => {
       port: preferredPort,
       portRangeEnd: preferredPort + 1,
       allowedOrigins: ['*'],
-      persistPath,
     });
 
     try {
@@ -887,7 +910,6 @@ describe('RelayBridgeServer', () => {
       port: preferredPort,
       portExplicitlySet: true,
       allowedOrigins: ['*'],
-      persistPath,
     });
 
     try {
@@ -1235,7 +1257,6 @@ describe('RelayBridgeServer', () => {
       host: '256.256.256.256',
       port: 9333,
       allowedOrigins: ['*'],
-      persistPath,
     });
 
     await expect(bridge.start()).rejects.toThrow();
@@ -1276,7 +1297,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
-        persistPath,
       });
 
       await client.start();
@@ -1338,7 +1358,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
-        persistPath,
         invokeTimeoutMs: 2000,
       });
 
@@ -1468,7 +1487,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
-        persistPath,
       });
 
       await client.start();
@@ -1519,7 +1537,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
-        persistPath,
         invokeTimeoutMs: 500,
       });
 
@@ -1563,7 +1580,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
-        persistPath,
       });
 
       await client.start();
@@ -1612,7 +1628,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
-        persistPath,
       });
 
       await client.start();
@@ -1669,7 +1684,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port,
         allowedOrigins: ['*'],
-        persistPath,
       });
 
       await client.start();
@@ -1756,7 +1770,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
-        persistPath,
         invokeTimeoutMs: 5000,
       });
 

@@ -200,7 +200,7 @@ The embed script fetches the sibling `widget.html`, injects configuration, and l
 
 After a disconnect, the widget retries the last endpoint once after about `500ms`, then rescans the relay range after `10s`, `20s`, and `30s`. If no relay responds, it enters a dormant state and probes the configured or cached endpoint every two minutes. Returning to the tab or sending `webmcp.connect` triggers immediate rediscovery.
 
-**Port range discovery and browser probing:** Unless `--port` is explicit, the server tries ports `9333–9348` instead of failing on a single port. The chosen port is persisted to `~/.webmcp/relay-port.json` for stable restarts. The widget probes the port range sequentially and caches discovered endpoints in `sessionStorage`.
+**Port range discovery and browser probing:** Unless `--port` is explicit, the server tries ports `9333–9348` instead of failing on a single port. A relay that finds another relay on a port joins it in client mode, so the lowest relay port always serves the browser. The widget probes the port range sequentially and caches discovered endpoints in `sessionStorage`.
 
 **Subprotocol handshake:** WebSocket connections negotiate `webmcp.v1` as the primary subprotocol and `webmcp-discovery.v1` for discovery probes. On connect, the server sends a `server-hello` message containing the relay's identity: `instanceId`, `host`, `port`, `relayId`, and optional `label` and `workspace`. Without `--relay-id`, `relayId` defaults to the ephemeral `instanceId`. The browser responds with a `hello` message carrying `tabId`, `origin`, `title`, and `url`. The widget requires `hello/accepted` before it sends tools and closes the socket if no acknowledgement arrives within one second.
 
@@ -266,7 +266,6 @@ The package exports the following for programmatic use:
 | `port`              | `number`   | `9333`                       |
 | `portExplicitlySet` | `boolean`  | `false`                      |
 | `portRangeEnd`      | `number`   | `9348`                       |
-| `persistPath`       | `string`   | `~/.webmcp/relay-port.json`  |
 | `allowedOrigins`    | `string[]` | `['*']`                      |
 | `maxPayloadBytes`   | `number`   | `10000000`                   |
 | `invokeTimeoutMs`   | `number`   | `65000`                      |
