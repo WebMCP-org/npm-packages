@@ -3,7 +3,8 @@
  * widget.html served from a CDN-like origin, a real page, and a real Chrome. Nothing
  * inside the relay or the browser is replaced.
  */
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
 import { createServer, type IncomingHttpHeaders } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { homedir, tmpdir } from 'node:os';
@@ -84,6 +85,22 @@ export async function serve(routes: Record<string, Route>): Promise<Site> {
   };
 }
 
+/** Published `@mcp-b/global` releases that pages in the wild still load. */
+export const PUBLISHED_GLOBALS = ['5.1.0'] as const;
+
+/** A file from a published npm package, downloaded once per machine. */
+export function publishedFile(name: string, version: string, path: string): string {
+  const dir = join(tmpdir(), 'relay-harness-packages', `${name.replace('/', '+')}@${version}`);
+  if (!existsSync(join(dir, 'package'))) {
+    mkdirSync(dir, { recursive: true });
+    const tarball = execFileSync('npm', ['pack', `${name}@${version}`, '--silent'], { cwd: dir })
+      .toString()
+      .trim();
+    execFileSync('tar', ['-xzf', tarball], { cwd: dir });
+  }
+  return read(join(dir, 'package', path));
+}
+
 /** The relay's published assets as a CDN would serve them. */
 export function serveCdn(widget: Partial<Exclude<Route, string>> = {}): Promise<Site> {
   return serve({
@@ -91,14 +108,26 @@ export function serveCdn(widget: Partial<Exclude<Route, string>> = {}): Promise<
     '/widget.html': { body: read(ASSETS.widget), ...widget },
     '/global.js': read(ASSETS.global),
     '/polyfill.js': read(ASSETS.polyfill),
+    ...Object.fromEntries(
+      PUBLISHED_GLOBALS.map((version) => [
+        `/global@${version}.js`,
+        publishedFile('@mcp-b/global', version, 'dist/index.iife.js'),
+      ])
+    ),
   });
 }
+
+export type Runtime =
+  | 'global'
+  | 'polyfill'
+  | 'none'
+  | `global@${(typeof PUBLISHED_GLOBALS)[number]}`;
 
 export interface PageOptions {
   cdn: Site;
   relay: Pick<Relay, 'port' | 'id'>;
   /** Page runtime loaded before embed.js. */
-  runtime?: 'global' | 'polyfill' | 'none';
+  runtime?: Runtime;
   /** Inline script run after the runtime and before embed.js. */
   script?: string;
   /** Extra markup at the top of the body. */

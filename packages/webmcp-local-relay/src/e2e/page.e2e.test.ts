@@ -4,6 +4,8 @@ import {
   hostPage,
   launchBrowser,
   NATIVE,
+  PUBLISHED_GLOBALS,
+  type Runtime,
   openPage,
   type PageOptions,
   pageLog,
@@ -47,7 +49,7 @@ const TOOLS = `
   });`;
 
 // On native Chrome a page can also register tools with no runtime script at all.
-const RUNTIMES = ['global', 'polyfill', ...(NATIVE ? (['none'] as const) : [])] as const;
+const RUNTIMES: Runtime[] = ['global', 'polyfill', ...(NATIVE ? (['none'] as const) : [])];
 
 let browser: Browser;
 let cdn: Site;
@@ -143,6 +145,43 @@ describe.each(RUNTIMES)('a page on %s', (runtime) => {
     expect(result.content).toEqual([{ type: 'text', text: expect.any(String) }]);
   });
 
+  it('aborts the page tool when the MCP client cancels the call', async () => {
+    const { relay, page } = await setup({
+      runtime,
+      script: `${TOOLS}
+        register({
+          name: 'wait',
+          description: 'Runs until aborted',
+          inputSchema: { type: 'object', properties: {} },
+          execute: (_input, { signal }) => {
+            document.body.dataset.started = 'yes';
+            return new Promise((resolve) => {
+              signal.addEventListener('abort', () => {
+                document.body.dataset.aborted = 'yes';
+                resolve({ content: [{ type: 'text', text: 'aborted' }] });
+              });
+            });
+          },
+        });`,
+    });
+    await toolsBecome(relay, page, ['echo', 'wait']);
+
+    const controller = new AbortController();
+    const call = relay.client.callTool(
+      { name: 'wait', arguments: {} },
+      { signal: controller.signal }
+    );
+    const rejected = expect(call).rejects.toThrow();
+    await vi.waitFor(async () =>
+      expect(await page.evaluate(() => document.body.dataset.started)).toBe('yes')
+    );
+    controller.abort();
+    await rejected;
+    await vi.waitFor(async () =>
+      expect(await page.evaluate(() => document.body.dataset.aborted)).toBe('yes')
+    );
+  });
+
   it('passes structured and plain results through', async () => {
     const { relay, page } = await setup({
       runtime,
@@ -198,6 +237,13 @@ describe.each(RUNTIMES)('a page on %s', (runtime) => {
     await vi.waitFor(async () => expect(await sources(relay)).toEqual([]), 15_000);
     await toolsBecome(relay, page, []);
   });
+});
+
+// Pages pin their own runtime, so an older global can sit next to a newer embed. Its
+// tools are listed; calling them needs object input, which arrived in 6.0.
+it.each(PUBLISHED_GLOBALS)('lists the tools of a page on global %s', async (version) => {
+  const { relay, page } = await setup({ runtime: `global@${version}` });
+  await toolsBecome(relay, page, ['echo']);
 });
 
 it('keeps tools from two tabs apart when they share a name', async () => {
