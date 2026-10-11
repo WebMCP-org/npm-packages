@@ -77,10 +77,12 @@ function connectAndRegister(
   });
 }
 
+/** Holds a port the way another HTTP service would, answering every request with a 404. */
 async function occupyTcpPort(port: number): Promise<{ close: () => Promise<void> }> {
   const server = createNetServer();
   const sockets = new Set<Socket>();
   server.on('connection', (socket) => {
+    socket.end('HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\n\r\n');
     sockets.add(socket);
     socket.on('close', () => {
       sockets.delete(socket);

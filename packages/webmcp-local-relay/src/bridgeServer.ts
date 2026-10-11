@@ -28,7 +28,11 @@ import {
 const RELAY_BROWSER_PROTOCOL = 'webmcp.v1';
 const RELAY_DISCOVERY_PROTOCOL = 'webmcp-discovery.v1';
 const RELAY_INTERNAL_PROTOCOL = 'webmcp-relay.v1';
-const RELAY_SERVER_MESSAGE_TIMEOUT_MS = 750;
+/**
+ * How long a joining relay waits for the relay on a port to greet it. Too short, and a busy
+ * relay is mistaken for another service, so a second relay starts and splits pages from clients.
+ */
+const RELAY_SERVER_MESSAGE_TIMEOUT_MS = 5_000;
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const HEARTBEAT_DEAD_THRESHOLD_MS = 25_000;
 const RawMessageTypeSchema = z.object({ type: z.unknown().optional() });
@@ -342,9 +346,9 @@ export class RelayBridgeServer extends EventEmitter {
       );
       return true;
     } catch (error) {
-      // The caller reports every false here as "occupied by a non-relay service". A slow
-      // but healthy relay hits the 750ms hello timeout and lands here too, so name the
-      // real reason rather than leaving the operator with a wrong hypothesis.
+      // The caller reports every false here as "occupied by a non-relay service". A relay
+      // that is stuck past the hello timeout lands here too, so name the real reason rather
+      // than leaving the operator with a wrong hypothesis.
       process.stderr.write(
         `[webmcp-local-relay] info: port ${port} did not complete a relay handshake: ${error instanceof Error ? error.message : String(error)}\n`
       );

@@ -86,6 +86,19 @@ describe('several relays', () => {
     expect(await joiner.sources()).not.toHaveProperty('mode', 'client');
   });
 
+  it('joins a relay that is too busy to answer at once', async () => {
+    const owner = await relay();
+    process.kill(owner.pid, 'SIGSTOP');
+    const resume = setTimeout(() => process.kill(owner.pid, 'SIGCONT'), 2_000);
+    try {
+      const joiner = await relay({ port: owner.port, id: owner.id });
+      expect(await joiner.sources()).toMatchObject({ mode: 'client' });
+    } finally {
+      clearTimeout(resume);
+      process.kill(owner.pid, 'SIGCONT');
+    }
+  });
+
   it('ignores a relay with a different id', async () => {
     const other = await relay();
     const { page } = await pageFor({ port: other.port, id: 'someone-else' });

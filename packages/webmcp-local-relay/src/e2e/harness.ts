@@ -149,6 +149,8 @@ export interface Relay {
    */
   id: string | null;
   port: number;
+  /** Process id of the relay; for a published version, of npx. */
+  pid: number;
   logs: string[];
   /** Public names of the page tools, sorted, without the relay's own `webmcp_*` tools. */
   pageTools(): Promise<string[]>;
@@ -216,6 +218,8 @@ export async function startRelay(
     client,
     id,
     port,
+    // SAFETY: the transport has spawned the process once connect() resolved.
+    pid: transport.pid as number,
     logs,
     call,
     sources: async (): Promise<Sources> => JSON.parse(await call('webmcp_list_sources')),
