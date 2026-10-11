@@ -722,6 +722,10 @@ function runWidget(cfg: WidgetConfig): void {
       });
   };
 
+  const matchesConfig = (endpoint: RelayEndpoint): boolean =>
+    (!cfg.relayId || endpoint.hello.relayId === cfg.relayId) &&
+    (!cfg.relayWorkspace || endpoint.hello.workspace === cfg.relayWorkspace);
+
   const connectToEndpoint = async (
     endpoint: { host: string; port: number } | RelayEndpoint
   ): Promise<boolean> => {
@@ -734,17 +738,12 @@ function runWidget(cfg: WidgetConfig): void {
       return false;
     }
 
-    const selectedEndpoint = probed.endpoint;
-    if (cfg.relayId && selectedEndpoint.hello.relayId !== cfg.relayId) {
-      probed.socket.close();
-      return false;
-    }
-    if (cfg.relayWorkspace && selectedEndpoint.hello.workspace !== cfg.relayWorkspace) {
+    if (!matchesConfig(probed.endpoint)) {
       probed.socket.close();
       return false;
     }
 
-    activateSocket(probed.socket, selectedEndpoint);
+    activateSocket(probed.socket, probed.endpoint);
     return true;
   };
 
@@ -752,14 +751,23 @@ function runWidget(cfg: WidgetConfig): void {
     phase = 'discovering';
 
     try {
-      for (const candidate of buildDiscoveryCandidates(cfg)) {
-        const connected = await connectToEndpoint(candidate);
-        if (connected) {
-          return true;
-        }
+      const [hint, ...others] = buildDiscoveryCandidates(cfg);
+      if (hint && (await connectToEndpoint(hint))) {
+        return true;
       }
 
-      return false;
+      // The rest are probed together: Chrome delays each refused WebSocket longer after
+      // every failure, so probing the range one port at a time takes about a minute.
+      const probed = await Promise.all(others.map((candidate) => probeRelayEndpoint(candidate)));
+      const match = probed.find((result) => result !== null && matchesConfig(result.endpoint));
+      for (const result of probed) {
+        if (result && result !== match) result.socket.close();
+      }
+      if (!match) {
+        return false;
+      }
+      activateSocket(match.socket, match.endpoint);
+      return true;
     } finally {
       if (phase === 'discovering') {
         phase = 'idle';

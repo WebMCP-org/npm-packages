@@ -265,7 +265,9 @@ function installEnvironment(options?: RelayOptions): WidgetTestEnv {
   }
 
   connectRelaySocket = (socket) => {
-    if (new URL(socket.url).port !== serverPort) {
+    // Like the relay's default bind, the fake relay listens on IPv4 only.
+    const url = new URL(socket.url);
+    if (url.port !== serverPort || url.hostname === '[::1]') {
       socket.close();
       return;
     }

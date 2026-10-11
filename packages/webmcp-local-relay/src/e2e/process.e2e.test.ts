@@ -136,11 +136,9 @@ describe('one relay over time', () => {
     const { page } = await pageFor({ port, id: `harness-${String(port)}` });
     await page.waitForTimeout(2_000);
 
-    // On Linux, Chrome throttles each refused WebSocket, so the page's first scan of the
-    // port range outlasts the relay start and the next scan finds it about a minute in.
     const late = await relay({ port });
-    await seesEcho(late, page, 90_000);
-  }, 120_000);
+    await seesEcho(late, page, 40_000);
+  }, 60_000);
 
   it('is found again after it restarts', async () => {
     const first = await relay();
