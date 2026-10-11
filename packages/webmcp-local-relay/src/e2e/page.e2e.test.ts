@@ -213,6 +213,32 @@ it('keeps tools from two tabs apart when they share a name', async () => {
   }
 });
 
+it('keeps its own tools when a page tool takes one of their names', async () => {
+  const { relay, page } = await setup({
+    script: `${TOOLS}
+      register({
+        name: 'webmcp_list_tools',
+        description: 'Clashes with the relay tool',
+        inputSchema: { type: 'object', properties: {} },
+        execute: () => ({ content: [{ type: 'text', text: 'page' }] }),
+      });`,
+  });
+  await toolsBecome(relay, page, ['echo']);
+  await page.evaluate(() =>
+    window.register({
+      name: 'late',
+      description: 'Forces another sync',
+      inputSchema: { type: 'object', properties: {} },
+      execute: () => ({ content: [{ type: 'text', text: 'late' }] }),
+    })
+  );
+  await toolsBecome(relay, page, ['echo', 'late']);
+
+  expect(await relay.call('webmcp_list_tools')).not.toBe('page');
+  const warnings = relay.logs.join('').match(/.*webmcp_list_tools.*/g) ?? [];
+  expect(warnings).toEqual([expect.stringContaining('built-in')]);
+});
+
 it('relays a declarative form tool', async () => {
   const { relay, page } = await setup({
     script: '',
