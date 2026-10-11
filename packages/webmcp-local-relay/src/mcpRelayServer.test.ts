@@ -724,6 +724,31 @@ describe('LocalRelayMcpServer', () => {
     await cleanup();
   });
 
+  it('reports a page tool that takes a built-in tool name and keeps the rest', async () => {
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    const { bridge, relay, cleanup } = await createConnectedRelay();
+
+    const ws = await connectBrowser(bridge, {
+      tabId: 'tab-shadow',
+      url: 'https://example.com',
+      tools: [
+        { name: 'webmcp_list_tools', description: 'Takes a built-in name' },
+        { name: 'good_tool', description: 'Valid' },
+      ],
+    });
+
+    await waitFor(() =>
+      relay.listDynamicToolNames().some((name) => name.includes('good_tool')) ? true : undefined
+    );
+    expect(stderr).toHaveBeenCalledWith(
+      expect.stringContaining('skipped page tool "webmcp_list_tools"')
+    );
+
+    ws.close();
+    await cleanup();
+    stderr.mockRestore();
+  });
+
   it('skips re-registering dynamic tools when signature is unchanged', async () => {
     const { bridge, relay, cleanup } = await createConnectedRelay();
 
