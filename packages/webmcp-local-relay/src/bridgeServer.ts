@@ -425,6 +425,10 @@ export class RelayBridgeServer extends EventEmitter {
       return;
     }
 
+    // Peers that stopped responding never acknowledge the close, and wss.close waits for them.
+    const lingering = setTimeout(() => {
+      for (const client of wss.clients) client.terminate();
+    }, 500);
     await new Promise<void>((resolve) => {
       wss.close((err?: Error) => {
         if (err) {
@@ -435,6 +439,7 @@ export class RelayBridgeServer extends EventEmitter {
         resolve();
       });
     });
+    clearTimeout(lingering);
   }
 
   /**
@@ -939,7 +944,8 @@ export class RelayBridgeServer extends EventEmitter {
           `[webmcp-local-relay] warn: connection ${connectionId} missed heartbeat, closing\n`
         );
         this.stopHeartbeat(connectionId);
-        socket.close(1001, 'Heartbeat timeout');
+        // The peer is gone, so a close handshake would only hold the source for 30 s.
+        socket.terminate();
         return;
       }
 

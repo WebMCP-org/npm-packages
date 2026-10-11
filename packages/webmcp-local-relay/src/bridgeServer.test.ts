@@ -3,7 +3,8 @@ import { z } from 'zod/v4';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createServer as createNetServer, type Socket } from 'node:net';
+import { once } from 'node:events';
+import { connect, createServer as createNetServer, type Socket } from 'node:net';
 
 import { describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
@@ -785,9 +786,10 @@ describe('RelayBridgeServer', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(ws.readyState).toBe(WebSocket.OPEN);
 
-      // Second tick crosses the threshold with no pong received.
+      // Second tick crosses the threshold with no pong received. The relay drops the socket
+      // without a close handshake, so the client sees an abnormal closure.
       vi.advanceTimersByTime(15_000);
-      await expect(closeCode).resolves.toBe(1001);
+      await expect(closeCode).resolves.toBe(1006);
     } finally {
       vi.useRealTimers();
       await bridge.stop();
@@ -1268,6 +1270,37 @@ describe('RelayBridgeServer', () => {
 // ---------------------------------------------------------------------------
 // Client mode (relay-to-relay) integration tests
 // ---------------------------------------------------------------------------
+
+describe('RelayBridgeServer with a peer that stopped responding', () => {
+  it('stops without waiting for the peer to acknowledge the close', async () => {
+    const bridge = new RelayBridgeServer({ host: '127.0.0.1', port: 0, allowedOrigins: ['*'] });
+    await bridge.start();
+    const peer = connect(bridge.port, '127.0.0.1');
+    peer.write(
+      [
+        'GET / HTTP/1.1',
+        'Host: 127.0.0.1',
+        'Upgrade: websocket',
+        'Connection: Upgrade',
+        'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+        'Sec-WebSocket-Version: 13',
+        'Sec-WebSocket-Protocol: webmcp.v1',
+        'Origin: http://peer.test',
+        '\r\n',
+      ].join('\r\n')
+    );
+    await once(peer, 'data');
+    peer.pause();
+
+    try {
+      const started = Date.now();
+      await bridge.stop();
+      expect(Date.now() - started).toBeLessThan(1_000);
+    } finally {
+      peer.destroy();
+    }
+  });
+});
 
 describe('RelayBridgeServer client mode', () => {
   it('receives tools from the server relay via relay/tools', async () => {
