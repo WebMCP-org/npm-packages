@@ -88,6 +88,29 @@ describe('tool wire contract', () => {
     expect(InboundToolSchema.safeParse(tool).success).toBe(false);
   });
 
+  it('adds the object type MCP requires to an input schema without one', () => {
+    expect(
+      normalizeInboundTool(
+        InboundToolSchema.parse({ name: 'search', inputSchema: { properties: {} } })
+      )
+    ).toEqual({ name: 'search', inputSchema: { type: 'object', properties: {} } });
+    expect(
+      InboundToolSchema.safeParse({ name: 'search', inputSchema: { type: 'string' } }).success
+    ).toBe(false);
+  });
+
+  it('drops only the malformed tools from a browser tool snapshot', () => {
+    const message = BrowserToRelayMessageSchema.parse({
+      type: 'tools/list',
+      tools: [{ name: '' }, { name: 'ordinary' }, { name: 'bad', inputSchema: 'not-a-schema' }],
+    });
+
+    expect(message).toEqual({
+      type: 'tools/list',
+      tools: [{ name: 'ordinary', inputSchema: DEFAULT_TOOL_INPUT_SCHEMA }],
+    });
+  });
+
   it('filters task-required tools from both browser tool snapshots', () => {
     for (const type of ['tools/list', 'tools/changed'] as const) {
       const message = BrowserToRelayMessageSchema.parse({
@@ -135,10 +158,6 @@ describe('browser to relay wire contract', () => {
     ['missing type', { tabId: 'tab-1' }],
     ['empty tab ID', { type: 'hello', tabId: '' }],
     ['missing tools', { type: 'tools/list' }],
-    [
-      'invalid tool metadata',
-      { type: 'tools/list', tools: [{ name: 'search', annotations: { readOnlyHint: 'yes' } }] },
-    ],
     ['empty result call ID', { type: 'result', callId: '', result: {} }],
   ])('rejects %s', (_case, message) => {
     expect(BrowserToRelayMessageSchema.safeParse(message).success).toBe(false);

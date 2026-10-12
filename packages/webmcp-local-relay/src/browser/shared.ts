@@ -27,21 +27,6 @@ export function isJsonObject(value: unknown): value is WebMcpToolObjectInput {
 }
 
 /**
- * A request or response exchanged between the embed and the widget over
- * `postMessage`. Payload fields (`tools`, `args`, `result`, ...) vary by type.
- */
-export interface MessageEnvelope extends WebMcpToolObjectInput {
-  requestId: string;
-  type: string;
-}
-
-export function isMessageEnvelope(value: unknown): value is MessageEnvelope {
-  return (
-    isJsonObject(value) && typeof value.requestId === 'string' && typeof value.type === 'string'
-  );
-}
-
-/**
  * Converts an `executeTool()` result to an MCP result. Only a JSON object is
  * structured; any other result, including numbers, keeps its original text.
  */
@@ -68,10 +53,10 @@ export function normalizeSerializedToolResult(serialized: string): CallToolResul
 }
 
 /**
- * Keeps one tool per name. `getTools()` also returns tools from same-origin
- * descendant frames; a tool registered by this document wins a name collision.
+ * Keeps one tool per name. `getTools()` also returns tools from other
+ * same-origin frames; a tool registered by `page` wins a name collision.
  */
-export function selectRelayTools(tools: RegisteredTool[]): RegisteredTool[] {
+export function selectRelayTools(tools: RegisteredTool[], page: Window): RegisteredTool[] {
   const selected = new Map<string, RegisteredTool>();
   for (const tool of tools) {
     const kept = selected.get(tool.name);
@@ -79,10 +64,10 @@ export function selectRelayTools(tools: RegisteredTool[]): RegisteredTool[] {
       if (!warnedDuplicateToolNames.has(tool.name)) {
         warnedDuplicateToolNames.add(tool.name);
         console.warn(
-          `[webmcp-relay-embed] More than one frame registered a tool named "${tool.name}". Only one is relayed, preferring this page's own tool.`
+          `[webmcp-relay-widget] More than one frame registered a tool named "${tool.name}". Only one is relayed, preferring the host page's own tool.`
         );
       }
-      if (kept.window === window || tool.window !== window) continue;
+      if (kept.window === page || tool.window !== page) continue;
     }
     selected.set(tool.name, tool);
   }

@@ -53,6 +53,8 @@ CHROME_BIN=/path/to/chrome-canary pnpm test:wpt:idl
 
 # Runtime-specific canonical E2E packages
 pnpm --filter @mcp-b/webmcp-local-relay test:e2e
+# Relay page suite on native WebMCP, including pages with no runtime script
+CHROME_BIN=/path/to/chrome-beta WEBMCP_NATIVE=1 pnpm --filter @mcp-b/webmcp-local-relay test:e2e src/e2e/page
 pnpm --filter @mcp-b/transports test:e2e
 pnpm --filter @mcp-b/webmcp-extension test:e2e
 

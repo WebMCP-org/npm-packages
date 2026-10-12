@@ -65,6 +65,14 @@ describe('parseCliOptions', () => {
     });
   });
 
+  // Launchers often pass `--label "$LABEL"` with the variable unset.
+  it('treats empty identity flags as unset', () => {
+    const options = parseCliOptions(['--label', '', '--workspace', '', '--relay-id', '']);
+    expect(options).not.toHaveProperty('label');
+    expect(options).not.toHaveProperty('workspace');
+    expect(options).not.toHaveProperty('relayId');
+  });
+
   it.each(['--allowed-origin', '--ws-origin'])('accepts the legacy %s alias', (flag) => {
     expect(parseCliOptions([flag, 'https://legacy.example.com']).allowedOrigins).toEqual([
       'https://legacy.example.com',

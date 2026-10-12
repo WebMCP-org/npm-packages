@@ -62,7 +62,7 @@ let shuttingDown = false;
  * Gracefully shuts down bridge and MCP server for process termination signals.
  * Force-exits after 5 seconds if graceful shutdown does not complete, preventing hangs.
  */
-const shutdown = async (signal: string) => {
+const shutdown = async (signal: string, exitCode = 0) => {
   if (shuttingDown) {
     return;
   }
@@ -90,7 +90,7 @@ const shutdown = async (signal: string) => {
     process.exit(1);
   }
   clearTimeout(forceExitTimer);
-  process.exit(0);
+  process.exit(exitCode);
 };
 
 process.stdin.on('end', () => {
@@ -126,12 +126,12 @@ process.on('uncaughtException', (err) => {
   process.stderr.write(
     `[webmcp-local-relay] error: uncaught exception: ${err.stack ?? err.message}\n`
   );
-  void shutdown('uncaughtException');
+  void shutdown('uncaughtException', 1);
 });
 process.on('unhandledRejection', (reason) => {
   const message = reason instanceof Error ? (reason.stack ?? reason.message) : String(reason);
   process.stderr.write(`[webmcp-local-relay] error: unhandled rejection: ${message}\n`);
-  void shutdown('unhandledRejection');
+  void shutdown('unhandledRejection', 1);
 });
 
 process.on('SIGINT', () => {

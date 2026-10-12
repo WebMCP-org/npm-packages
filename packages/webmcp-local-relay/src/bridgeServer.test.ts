@@ -1,9 +1,10 @@
 import { isTcpAddress } from './portStrategy.js';
 import { z } from 'zod/v4';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createServer as createNetServer, type Socket } from 'node:net';
+import { once } from 'node:events';
+import { connect, createServer as createNetServer, type Socket } from 'node:net';
 
 import { describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
@@ -25,11 +26,6 @@ type OutboundMessage = z.infer<typeof OutboundMessageSchema>;
 function readServerMessage(raw: WebSocket.RawData): OutboundMessage {
   return OutboundMessageSchema.parse(JSON.parse(String(raw)));
 }
-
-// The relay caches its chosen port in ~/.webmcp/relay-port.json by default;
-// tests must never touch the developer's real home directory. mkdtemp gives a
-// 0700 directory with an unpredictable name, so this is not a temp-file race.
-const persistPath = join(mkdtempSync(join(tmpdir(), 'webmcp-relay-test-')), 'relay-port.json');
 
 /**
  * Polls until a value is available or times out.
@@ -82,10 +78,12 @@ function connectAndRegister(
   });
 }
 
+/** Holds a port the way another HTTP service would, answering every request with a 404. */
 async function occupyTcpPort(port: number): Promise<{ close: () => Promise<void> }> {
   const server = createNetServer();
   const sockets = new Set<Socket>();
   server.on('connection', (socket) => {
+    socket.end('HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\n\r\n');
     sockets.add(socket);
     socket.on('close', () => {
       sockets.delete(socket);
@@ -128,6 +126,77 @@ async function getOpenPort(): Promise<number> {
 }
 
 describe('RelayBridgeServer', () => {
+  it.each(['server', 'client'] as const)(
+    'cancels only the pending invocation in %s mode',
+    async (mode) => {
+      const server = new RelayBridgeServer({ host: '127.0.0.1', port: 0, allowedOrigins: ['*'] });
+      let client: RelayBridgeServer | undefined;
+      try {
+        await server.start();
+        const ws = await connectAndRegister(server, {
+          tabId: 'tab-cancel',
+          url: 'https://example.com',
+          tools: [{ name: 'echo' }],
+        });
+        const messages: Array<{ type: string; callId: string }> = [];
+        ws.on('message', (raw) => messages.push(JSON.parse(String(raw))));
+        const toolName = await waitFor(() => server.registry.listTools()[0]?.name);
+        if (mode === 'client') {
+          client = new RelayBridgeServer({
+            host: '127.0.0.1',
+            port: server.port,
+            allowedOrigins: ['*'],
+          });
+          await client.start();
+        }
+        const bridge = client ?? server;
+        const reason = { code: 'caller-stopped' };
+        await expect(
+          bridge.invokeTool(toolName, {}, { signal: AbortSignal.abort(reason) })
+        ).rejects.toBe(reason);
+
+        const controller = new AbortController();
+        const cancelled = bridge.invokeTool(toolName, {}, { signal: controller.signal });
+        const rejected = expect(cancelled).rejects.toBe(reason);
+        const first = await waitFor(() => messages.find((message) => message.type === 'invoke'));
+        expect(messages.filter((message) => message.type === 'invoke')).toHaveLength(1);
+        controller.abort(reason);
+        await rejected;
+        await waitFor(() => messages.find((message) => message.type === 'cancel'));
+        expect(messages.filter((message) => message.type === 'cancel')).toEqual([
+          { type: 'cancel', callId: first.callId },
+        ]);
+
+        const completedController = new AbortController();
+        const removeListener = vi.spyOn(completedController.signal, 'removeEventListener');
+        const completed = bridge.invokeTool(toolName, {}, { signal: completedController.signal });
+        const second = await waitFor(() =>
+          messages.find((message) => message.type === 'invoke' && message.callId !== first.callId)
+        );
+        for (const [callId, text] of [
+          [first.callId, 'late'],
+          [second.callId, 'fresh'],
+        ]) {
+          ws.send(
+            JSON.stringify({
+              type: 'result',
+              callId,
+              result: { content: [{ type: 'text', text }] },
+            })
+          );
+        }
+        await expect(completed).resolves.toMatchObject({
+          content: [{ type: 'text', text: 'fresh' }],
+        });
+        expect(removeListener).toHaveBeenCalledWith('abort', expect.any(Function));
+        ws.close();
+      } finally {
+        await client?.stop();
+        await server.stop();
+      }
+    }
+  );
+
   it('rejects invokeTool when no provider exists for the tool name', async () => {
     const bridge = new RelayBridgeServer({
       host: '127.0.0.1',
@@ -190,32 +259,50 @@ describe('RelayBridgeServer', () => {
     }
   });
 
-  it('times out when the tab does not return a result', async () => {
-    const bridge = new RelayBridgeServer({
-      host: '127.0.0.1',
-      port: 0,
-      allowedOrigins: ['*'],
-      invokeTimeoutMs: 50,
-    });
-
-    try {
-      await bridge.start();
-
-      const ws = await connectAndRegister(bridge, {
-        tabId: 'tab-1',
-        url: 'https://example.com',
-        tools: [{ name: 'slow_tool' }],
+  it.each(['server', 'client'] as const)(
+    'cancels browser execution after a %s timeout',
+    async (mode) => {
+      const bridge = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port: 0,
+        allowedOrigins: ['*'],
+        invokeTimeoutMs: mode === 'server' ? 50 : 2000,
       });
+      let client: RelayBridgeServer | undefined;
 
-      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+      try {
+        await bridge.start();
 
-      await expect(bridge.invokeTool(toolName, {})).rejects.toThrow(/timed out/i);
+        const ws = await connectAndRegister(bridge, {
+          tabId: 'tab-1',
+          url: 'https://example.com',
+          tools: [{ name: 'slow_tool' }],
+        });
 
-      ws.close();
-    } finally {
-      await bridge.stop();
+        const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+        const messages: Array<{ type: string; callId: string }> = [];
+        ws.on('message', (raw) => messages.push(JSON.parse(String(raw))));
+        if (mode === 'client') {
+          client = new RelayBridgeServer({
+            host: '127.0.0.1',
+            port: bridge.port,
+            allowedOrigins: ['*'],
+            invokeTimeoutMs: 50,
+          });
+          await client.start();
+        }
+
+        await expect((client ?? bridge).invokeTool(toolName, {})).rejects.toThrow(/timed out/i);
+        const cancel = await waitFor(() => messages.find((message) => message.type === 'cancel'));
+        expect(cancel.callId).toBe(messages.find((message) => message.type === 'invoke')?.callId);
+
+        ws.close();
+      } finally {
+        await client?.stop();
+        await bridge.stop();
+      }
     }
-  });
+  );
 
   it('rejects hello with disallowed host page origin', async () => {
     const bridge = new RelayBridgeServer({
@@ -788,9 +875,10 @@ describe('RelayBridgeServer', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(ws.readyState).toBe(WebSocket.OPEN);
 
-      // Second tick crosses the threshold with no pong received.
+      // Second tick crosses the threshold with no pong received. The relay drops the socket
+      // without a close handshake, so the client sees an abnormal closure.
       vi.advanceTimersByTime(15_000);
-      await expect(closeCode).resolves.toBe(1001);
+      await expect(closeCode).resolves.toBe(1006);
     } finally {
       vi.useRealTimers();
       await bridge.stop();
@@ -848,7 +936,6 @@ describe('RelayBridgeServer', () => {
       host: '127.0.0.1',
       port: usedPort,
       allowedOrigins: ['*'],
-      persistPath,
     });
 
     await bridge2.start();
@@ -858,6 +945,73 @@ describe('RelayBridgeServer', () => {
     await bridge1.stop();
   });
 
+  it('joins the relay on the preferred port even when an old port cache points elsewhere', async () => {
+    const owner = new RelayBridgeServer({ host: '127.0.0.1', port: 0, allowedOrigins: ['*'] });
+    await owner.start();
+    const cachePath = join(mkdtempSync(join(tmpdir(), 'webmcp-relay-test-')), 'relay-port.json');
+    writeFileSync(
+      cachePath,
+      JSON.stringify({
+        port: owner.port + 1,
+        host: '127.0.0.1',
+        updatedAt: new Date().toISOString(),
+      })
+    );
+    const joiner = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port: owner.port,
+      portRangeEnd: owner.port + 2,
+      allowedOrigins: ['*'],
+      persistPath: cachePath,
+    });
+
+    try {
+      await joiner.start();
+      expect(joiner.mode).toBe('client');
+      expect(joiner.port).toBe(owner.port);
+    } finally {
+      await joiner.stop();
+      await owner.stop();
+    }
+  });
+
+  it('stays stopped when stop() lands during a reconnect', async () => {
+    const owner = new RelayBridgeServer({ host: '127.0.0.1', port: 0, allowedOrigins: ['*'] });
+    await owner.start();
+    const port = owner.port;
+    const joiner = new RelayBridgeServer({
+      host: '127.0.0.1',
+      port,
+      portRangeEnd: port + 1,
+      allowedOrigins: ['*'],
+    });
+    await joiner.start();
+    expect(joiner.mode).toBe('client');
+
+    // A service that never answers takes the port, so the joiner's reconnect probes it.
+    await owner.stop();
+    const silentSockets = new Set<Socket>();
+    const silent = createNetServer((socket) => silentSockets.add(socket));
+    await new Promise<void>((resolve) => silent.listen(port, '127.0.0.1', resolve));
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      await joiner.stop();
+      // Let the probe time out; a restarted joiner would now bind the next port.
+      await new Promise((resolve) => setTimeout(resolve, 5_000));
+
+      const next = createNetServer();
+      await new Promise<void>((resolve, reject) => {
+        next.once('error', reject);
+        next.listen(port + 1, '127.0.0.1', resolve);
+      });
+      await new Promise((resolve) => next.close(resolve));
+    } finally {
+      await joiner.stop();
+      for (const socket of silentSockets) socket.destroy();
+      await new Promise((resolve) => silent.close(resolve));
+    }
+  }, 15_000);
+
   it('skips a non-relay port owner and binds the next available port', async () => {
     const preferredPort = await getOpenPort();
     const preferredPortHolder = await occupyTcpPort(preferredPort);
@@ -866,7 +1020,6 @@ describe('RelayBridgeServer', () => {
       port: preferredPort,
       portRangeEnd: preferredPort + 1,
       allowedOrigins: ['*'],
-      persistPath,
     });
 
     try {
@@ -887,7 +1040,6 @@ describe('RelayBridgeServer', () => {
       port: preferredPort,
       portExplicitlySet: true,
       allowedOrigins: ['*'],
-      persistPath,
     });
 
     try {
@@ -1235,7 +1387,6 @@ describe('RelayBridgeServer', () => {
       host: '256.256.256.256',
       port: 9333,
       allowedOrigins: ['*'],
-      persistPath,
     });
 
     await expect(bridge.start()).rejects.toThrow();
@@ -1246,7 +1397,111 @@ describe('RelayBridgeServer', () => {
 // Client mode (relay-to-relay) integration tests
 // ---------------------------------------------------------------------------
 
+describe('RelayBridgeServer with a peer that stopped responding', () => {
+  it('stops without waiting for the peer to acknowledge the close', async () => {
+    const bridge = new RelayBridgeServer({ host: '127.0.0.1', port: 0, allowedOrigins: ['*'] });
+    await bridge.start();
+    const peer = connect(bridge.port, '127.0.0.1');
+    peer.write(
+      [
+        'GET / HTTP/1.1',
+        'Host: 127.0.0.1',
+        'Upgrade: websocket',
+        'Connection: Upgrade',
+        'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+        'Sec-WebSocket-Version: 13',
+        'Sec-WebSocket-Protocol: webmcp.v1',
+        'Origin: http://peer.test',
+        '\r\n',
+      ].join('\r\n')
+    );
+    await once(peer, 'data');
+    peer.pause();
+
+    try {
+      const started = Date.now();
+      await bridge.stop();
+      expect(Date.now() - started).toBeLessThan(1_000);
+    } finally {
+      peer.destroy();
+    }
+  });
+});
+
 describe('RelayBridgeServer client mode', () => {
+  it('ignores cancellation from another relay connection', async () => {
+    const server = new RelayBridgeServer({ host: '127.0.0.1', port: 0, allowedOrigins: ['*'] });
+    const sockets: WebSocket[] = [];
+    try {
+      await server.start();
+      const browser = await connectAndRegister(server, {
+        tabId: 'tab-owned',
+        url: 'https://example.com',
+        tools: [{ name: 'echo' }],
+      });
+      sockets.push(browser);
+      const browserMessages: Array<{ type: string; callId: string }> = [];
+      browser.on('message', (raw) => browserMessages.push(JSON.parse(String(raw))));
+      const toolName = await waitFor(() => server.registry.listTools()[0]?.name);
+      const clients = await Promise.all(
+        [0, 1].map(async () => {
+          const ws = new WebSocket(`ws://127.0.0.1:${server.port}`, 'webmcp-relay.v1');
+          sockets.push(ws);
+          const messages: Array<{ type: string; callId: string; result?: unknown }> = [];
+          ws.on('message', (raw) => messages.push(JSON.parse(String(raw))));
+          await new Promise<void>((resolve, reject) => {
+            ws.once('open', resolve);
+            ws.once('error', reject);
+          });
+          ws.send(JSON.stringify({ type: 'relay/hello' }));
+          return { ws, messages };
+        })
+      );
+      const owner = clients[0]!;
+      const other = clients[1]!;
+      owner.ws.send(
+        JSON.stringify({ type: 'relay/invoke', callId: 'owned-call', toolName, args: {} })
+      );
+      const invocation = await waitFor(() =>
+        browserMessages.find((message) => message.type === 'invoke')
+      );
+
+      other.ws.send(JSON.stringify({ type: 'relay/cancel', callId: 'owned-call' }));
+      other.ws.send(JSON.stringify({ type: 'relay/list-tools' }));
+      // The reply confirms the server processed the preceding unauthorized cancel.
+      await waitFor(() => other.messages.find((message) => message.type === 'relay/tools'));
+      browser.send(
+        JSON.stringify({
+          type: 'result',
+          callId: invocation.callId,
+          result: { content: [{ type: 'text', text: 'still-running' }] },
+        })
+      );
+      const response = await waitFor(() =>
+        owner.messages.find((message) => message.type === 'relay/result')
+      );
+      expect(response.result).toMatchObject({ content: [{ type: 'text', text: 'still-running' }] });
+      expect(browserMessages.filter((message) => message.type === 'cancel')).toEqual([]);
+
+      owner.ws.send(
+        JSON.stringify({ type: 'relay/invoke', callId: 'owned-call', toolName, args: {} })
+      );
+      const next = await waitFor(() =>
+        browserMessages.find(
+          (message) => message.type === 'invoke' && message.callId !== invocation.callId
+        )
+      );
+      owner.ws.send(JSON.stringify({ type: 'relay/cancel', callId: 'owned-call' }));
+      const cancel = await waitFor(() =>
+        browserMessages.find((message) => message.type === 'cancel')
+      );
+      expect(cancel.callId).toBe(next.callId);
+    } finally {
+      for (const socket of sockets) socket.close();
+      await server.stop();
+    }
+  });
+
   it('receives tools from the server relay via relay/tools', async () => {
     const server = new RelayBridgeServer({
       host: '127.0.0.1',
@@ -1276,7 +1531,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
-        persistPath,
       });
 
       await client.start();
@@ -1338,7 +1592,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
-        persistPath,
         invokeTimeoutMs: 2000,
       });
 
@@ -1468,7 +1721,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
-        persistPath,
       });
 
       await client.start();
@@ -1519,7 +1771,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
-        persistPath,
         invokeTimeoutMs: 500,
       });
 
@@ -1563,7 +1814,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
-        persistPath,
       });
 
       await client.start();
@@ -1612,7 +1862,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
-        persistPath,
       });
 
       await client.start();
@@ -1669,7 +1918,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port,
         allowedOrigins: ['*'],
-        persistPath,
       });
 
       await client.start();
@@ -1756,7 +2004,6 @@ describe('RelayBridgeServer client mode', () => {
         host: '127.0.0.1',
         port: server.port,
         allowedOrigins: ['*'],
-        persistPath,
         invokeTimeoutMs: 5000,
       });
 

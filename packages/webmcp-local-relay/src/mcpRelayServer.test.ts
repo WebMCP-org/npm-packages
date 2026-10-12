@@ -1,17 +1,9 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 
 import { RelayBridgeServer } from './bridgeServer.js';
 import { LocalRelayMcpServer } from './mcpRelayServer.js';
-
-// The relay caches its chosen port in ~/.webmcp/relay-port.json by default;
-// tests must never touch the developer's real home directory. mkdtemp gives a
-// 0700 directory with an unpredictable name, so this is not a temp-file race.
-const persistPath = join(mkdtempSync(join(tmpdir(), 'webmcp-relay-test-')), 'relay-port.json');
 
 const execFileMock = vi.fn(
   (_command: string, _args: readonly string[], callback: (cause: Error | null) => void) => {
@@ -420,7 +412,6 @@ describe('LocalRelayMcpServer', () => {
         host: '127.0.0.1',
         port: serverBridge.port,
         allowedOrigins: ['*'],
-        persistPath,
       });
       await clientBridge.start();
       expect(clientBridge.mode).toBe('client');
@@ -664,7 +655,38 @@ describe('LocalRelayMcpServer', () => {
     await cleanup();
   });
 
-  it('drops invalid annotations with a warning', async () => {
+  it('forwards MCP caller cancellation to the browser execution', async () => {
+    const { bridge, client, cleanup } = await createConnectedRelay({ invokeTimeoutMs: 2000 });
+    let ws: WebSocket | undefined;
+    try {
+      ws = await connectBrowser(bridge, {
+        tabId: 'tab-cancel',
+        url: 'https://example.com',
+        tools: [{ name: 'slow_tool', description: 'Waits for cancellation' }],
+      });
+      const messages: Array<{ type: string; callId: string }> = [];
+      ws.on('message', (raw) => messages.push(JSON.parse(String(raw))));
+      const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
+      await waitForClientTool(client, toolName);
+
+      const controller = new AbortController();
+      const pending = client.callTool(
+        { name: toolName, arguments: {} },
+        { signal: controller.signal }
+      );
+      const rejected = expect(pending).rejects.toThrow('caller cancelled');
+      const invocation = await waitFor(() => messages.find((message) => message.type === 'invoke'));
+      controller.abort(new Error('caller cancelled'));
+      await rejected;
+      const cancel = await waitFor(() => messages.find((message) => message.type === 'cancel'));
+      expect(cancel.callId).toBe(invocation.callId);
+    } finally {
+      ws?.close();
+      await cleanup();
+    }
+  });
+
+  it('skips a tool with invalid annotations and keeps the rest', async () => {
     const { bridge, relay, cleanup } = await createConnectedRelay();
 
     const ws = await connectBrowser(bridge, {
@@ -688,17 +710,43 @@ describe('LocalRelayMcpServer', () => {
               idempotentHint: 42,
             },
           },
+          { name: 'good_tool', description: 'Valid' },
         ],
       })
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // Tool should still be registered (annotations dropped)
-    expect(relay.listDynamicToolNames().length).toBeGreaterThan(0);
+    await waitFor(() =>
+      relay.listDynamicToolNames().some((name) => name.includes('good_tool')) ? true : undefined
+    );
+    expect(relay.listDynamicToolNames().some((name) => name.includes('bad_ann_tool'))).toBe(false);
 
     ws.close();
     await cleanup();
+  });
+
+  it('reports a page tool that takes a built-in tool name and keeps the rest', async () => {
+    const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+    const { bridge, relay, cleanup } = await createConnectedRelay();
+
+    const ws = await connectBrowser(bridge, {
+      tabId: 'tab-shadow',
+      url: 'https://example.com',
+      tools: [
+        { name: 'webmcp_list_tools', description: 'Takes a built-in name' },
+        { name: 'good_tool', description: 'Valid' },
+      ],
+    });
+
+    await waitFor(() =>
+      relay.listDynamicToolNames().some((name) => name.includes('good_tool')) ? true : undefined
+    );
+    expect(stderr).toHaveBeenCalledWith(
+      expect.stringContaining('skipped page tool "webmcp_list_tools"')
+    );
+
+    ws.close();
+    await cleanup();
+    stderr.mockRestore();
   });
 
   it('skips re-registering dynamic tools when signature is unchanged', async () => {
@@ -800,7 +848,6 @@ describe('LocalRelayMcpServer', () => {
         host: '127.0.0.1',
         port: serverBridge.port,
         allowedOrigins: ['*'],
-        persistPath,
       });
       await clientBridge.start();
 

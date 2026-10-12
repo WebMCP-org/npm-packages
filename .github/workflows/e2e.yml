@@ -231,6 +231,12 @@ jobs:
           CHROME_BIN: ${{ steps.chrome_beta.outputs.chrome-path }}
         run: pnpm --filter mcp-e2e-tests run test:native-parity
 
+      - name: Run native local relay E2E tests (Chrome Beta)
+        env:
+          CHROME_BIN: ${{ steps.chrome_beta.outputs.chrome-path }}
+          WEBMCP_NATIVE: '1'
+        run: pnpm --filter @mcp-b/webmcp-local-relay test:e2e src/e2e/page
+
       - name: Run native React hook tests
         env:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}

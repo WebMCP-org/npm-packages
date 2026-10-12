@@ -76,11 +76,11 @@ export function parseCliOptions(argv: string[]): CliOptions {
     port,
     portExplicitlySet: values.port !== undefined,
   };
-  if (values.label !== undefined) options.label = values.label;
+  if (values.label) options.label = values.label;
   if (invokeTimeoutMs !== undefined) options.invokeTimeoutMs = invokeTimeoutMs;
   if (maxPayloadBytes !== undefined) options.maxPayloadBytes = maxPayloadBytes;
-  if (values['relay-id'] !== undefined) options.relayId = values['relay-id'];
-  if (values.workspace !== undefined) options.workspace = values.workspace;
+  if (values['relay-id']) options.relayId = values['relay-id'];
+  if (values.workspace) options.workspace = values.workspace;
   return options;
 }
 

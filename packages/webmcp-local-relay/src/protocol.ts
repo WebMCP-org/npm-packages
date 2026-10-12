@@ -30,7 +30,12 @@ export const DEFAULT_TOOL_INPUT_SCHEMA: Tool['inputSchema'] = {
 
 /** SDK tool schema with a browser-compatible default input schema. */
 export const InboundToolSchema = NormalizedToolSchema.extend({
-  inputSchema: NormalizedToolSchema.shape.inputSchema.optional(),
+  // WebMCP accepts any JSON object as an input schema; MCP requires `type: 'object'`.
+  inputSchema: z
+    .looseObject({})
+    .transform((schema) => ({ type: 'object', ...schema }))
+    .pipe(NormalizedToolSchema.shape.inputSchema)
+    .optional(),
 });
 
 /**
