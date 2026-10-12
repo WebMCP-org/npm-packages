@@ -1,5 +1,47 @@
 # @mcp-b/webmcp-local-relay
 
+## 6.0.1
+
+### Patch Changes
+
+- 450cedd: A page tool named like a built-in relay tool, such as `webmcp_list_tools`, is skipped with one
+  clear warning. Before, every tool sync logged that its schema could not be compiled.
+- 4386dda: A relay now waits up to 5 seconds, instead of 750 ms, for the relay that owns its port to
+  answer. A busy relay was mistaken for another service, so a second relay started on the next
+  port, or failed to start when `--port` was set.
+- f672fe2: The CLI exits with code 1 after an uncaught exception or unhandled rejection, instead of 0.
+- 23b8cec: The relay drops a page that stopped answering heartbeats at once, instead of keeping its tools
+  listed for another 30 seconds. Shutdown no longer waits for such pages, so the CLI exits cleanly
+  instead of hitting its 5-second forced exit.
+- cb95996: Empty `--label`, `--workspace` and `--relay-id` values are ignored. They broke the relay's
+  handshake, so other relays treated it as a foreign service and started a second server.
+- 9c3e425: Forward MCP request cancellation through direct and shared relay connections to the browser's `executeTool()` signal. `RelayBridgeServer.invokeTool()` also accepts an optional `signal`. Timeouts and connection teardown cancel outstanding calls and clean up their listeners; cancellations are scoped to the requesting connection.
+
+  Stopping handler work requires a browser runtime that forwards execution signals and a handler that observes them.
+
+- 0a4b2a1: The relay widget now lists and runs the page's tools by reading the host page's
+  `document.modelContext` directly instead of asking the embed over `postMessage`. Native
+  WebMCP, the polyfill, and `@mcp-b/global` all work. Slow tools now fail with
+  `Tool execution timed out` and receive an abort signal. Reconnect and reload controls
+  still use `postMessage`.
+- 4eb7226: A relay in client mode no longer stops reconnecting after 100 failed attempts. It kept running
+  with no tools and no way to recover; it now keeps retrying every 3 seconds.
+- d85728f: A page that loads before the relay starts now finds it. Chrome delays new WebSockets after
+  failed ones, so the widget's 1.2 s probe timeout expired before each socket opened and the
+  page never connected. The timeout now starts once the socket opens, and the widget probes
+  the port range in parallel after the configured port, so a scan takes seconds instead of
+  about a minute.
+- 5ad96c5: A page whose origin the relay rejects now backs off instead of reconnecting every half second.
+- 24a07a6: A relay now joins the relay that already owns the default port instead of starting a second
+  server on the port it used last time. Before, a stale `~/.webmcp/relay-port.json` could split
+  pages and MCP clients across two relays, so page tools never appeared. The relay no longer
+  reads or writes that file, and the `persistPath` option is ignored.
+- 5e307be: `RelayBridgeServer.stop()` now holds when it runs during a reconnect. Before, the reconnect
+  could finish afterwards and leave the bridge listening.
+- cbdfd59: One malformed tool no longer hides every other tool on the page. The relay skips that tool
+  with a warning. An input schema without `type`, which WebMCP accepts, is relayed as an object
+  schema instead of being rejected.
+
 ## 6.0.0
 
 ### Major Changes
