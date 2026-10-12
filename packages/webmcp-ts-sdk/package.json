@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-ts-sdk",
-  "version": "6.0.0",
+  "version": "6.0.1",
   "description": "WebMCP browser adapter extending the upstream API with MCP capabilities",
   "keywords": [
     "adapter",

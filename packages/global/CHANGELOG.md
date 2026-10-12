@@ -1,5 +1,13 @@
 # @mcp-b/global
 
+## 6.0.1
+
+### Patch Changes
+
+- @mcp-b/webmcp-polyfill@6.0.1
+- @mcp-b/webmcp-ts-sdk@6.0.1
+- @mcp-b/transports@6.0.1
+
 ## 6.0.0
 
 ### Major Changes
