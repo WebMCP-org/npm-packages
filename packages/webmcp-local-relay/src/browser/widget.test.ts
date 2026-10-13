@@ -58,7 +58,8 @@ interface TestTool {
   name: string;
   title?: string;
   description: string;
-  inputSchema?: object;
+  /** A string is what Chrome before 155 reports. */
+  inputSchema?: object | string;
   annotations?: RegisteredTool['annotations'];
   execute?: (
     input: WebMcpToolObjectInput,
@@ -588,6 +589,24 @@ describe('widget runtime', () => {
       origin: APP_ORIGIN,
       type: 'hello',
     });
+  });
+
+  it('skips a tool with a string input schema and names the Chrome version it needs', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const env = startRuntime({
+      tools: [
+        { name: 'old', description: 'Chrome 154', inputSchema: '{"type":"object"}' },
+        { name: 'ok', description: 'Valid' },
+      ],
+    });
+    const connection = await completeHandshake(env);
+
+    expect(connection.messages[1]).toEqual({
+      tools: [{ name: 'ok', title: '', description: 'Valid' }],
+      type: 'tools/list',
+    });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Chrome 155'));
+    warn.mockRestore();
   });
 
   it('publishes tools and tool changes from the host page model context', async () => {
