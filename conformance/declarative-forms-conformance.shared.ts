@@ -116,6 +116,17 @@ export function runDeclarativeFormConformanceSuite(
       return { name, form };
     }
 
+    // A rejected registration fires no toolchange, so wait for a later one to land first.
+    async function settleRegistrations() {
+      const { name, form } = declareForm(
+        'declarative_sentinel',
+        (toolName) =>
+          `<form ${FIXTURE_ATTRIBUTE} toolname="${toolName}" tooldescription="Sentinel"></form>`
+      );
+      await waitForTool(name);
+      form.remove();
+    }
+
     beforeAll(async () => {
       await options.cleanup?.();
       await options.install?.();
@@ -796,10 +807,12 @@ export function runDeclarativeFormConformanceSuite(
         (await requireModelContext().getTools()).filter((tool) => tool.name === name)
       ).toHaveLength(1);
 
-      second.setAttribute('tooldescription', 'Second form promoted');
+      // A rejected duplicate retries when it changes but cannot take the name (WPT duplicate-tool-name).
+      second.setAttribute('tooldescription', 'Second form retried');
+      await settleRegistrations();
       expect(
-        await waitForTool(name, (tool) => tool.description === 'Second form promoted')
-      ).toMatchObject({ description: 'Second form promoted' });
+        (await requireModelContext().getTools()).filter((tool) => tool.name === name)
+      ).toMatchObject([{ description: 'First form' }]);
 
       first.setAttribute('tooltitle', 'Updated title');
       first.setAttribute('tooldescription', 'Updated form');
@@ -833,6 +846,15 @@ export function runDeclarativeFormConformanceSuite(
       await waitForToolRemoval(name);
       second.setAttribute('tooldescription', 'Restored form');
       expect(await waitForTool(name)).toMatchObject({ description: 'Restored form' });
+
+      second.insertAdjacentHTML(
+        'beforebegin',
+        `<form ${FIXTURE_ATTRIBUTE} toolname="${name}" tooldescription="Earlier duplicate"></form>`
+      );
+      await settleRegistrations();
+      expect(
+        (await requireModelContext().getTools()).filter((tool) => tool.name === name)
+      ).toMatchObject([{ description: 'Restored form' }]);
     });
 
     it('emits a tool change when toolautosubmit is added', async () => {

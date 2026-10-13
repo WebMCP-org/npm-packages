@@ -37,6 +37,7 @@ interface DeclarativeRegistration {
   controller: AbortController;
   fingerprint: string;
   form: HTMLFormElement;
+  name: string;
   cancelPending?: (reason: ErrorOptions['cause']) => void;
 }
 
@@ -749,8 +750,11 @@ export function installWebMCPDeclarativeExtensions(context: WebMCP.ModelContext)
         blockedDefinitions.delete(form);
         const existingForm = selectedByName.get(definition.name);
         if (existingForm) {
-          // A duplicate name stays blocked until its definition changes, then takes over.
-          if (blockedFingerprint === undefined) {
+          // The form registered under a name keeps it; a duplicate stays blocked and retries
+          // when its definition changes (WPT duplicate-tool-name).
+          const holdsName = (candidate: HTMLFormElement) =>
+            registrations.get(candidate)?.name === definition.name;
+          if (!holdsName(form) || holdsName(existingForm)) {
             blockedDefinitions.set(form, fingerprint);
             continue;
           }
@@ -783,6 +787,7 @@ export function installWebMCPDeclarativeExtensions(context: WebMCP.ModelContext)
         controller,
         fingerprint,
         form,
+        name: definition.name,
       };
       registrations.set(form, registration);
       void context
