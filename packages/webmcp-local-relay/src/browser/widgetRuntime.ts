@@ -381,6 +381,13 @@ async function probeRelayEndpoint(candidate: {
 }
 
 function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor | null {
+  // Native WebMCP before Chrome 155 reports schemas as JSON strings and takes string input.
+  if (typeof tool.inputSchema === 'string') {
+    console.warn(
+      `[webmcp-relay-widget] Tool "${tool.name}" was not relayed because this browser's WebMCP predates Chrome 155. Update Chrome, or turn off the WebMCP testing flag to use the polyfill.`
+    );
+    return null;
+  }
   if (tool.inputSchema !== undefined && !isJsonObject(tool.inputSchema)) {
     console.warn(
       `[webmcp-relay-widget] Tool "${tool.name}" was not relayed because its input schema is malformed.`
