@@ -1,5 +1,12 @@
 # @mcp-b/react-webmcp
 
+## 6.0.2
+
+### Patch Changes
+
+- @mcp-b/webmcp-ts-sdk@6.0.2
+- usewebmcp@6.0.2
+
 ## 6.0.1
 
 ### Patch Changes

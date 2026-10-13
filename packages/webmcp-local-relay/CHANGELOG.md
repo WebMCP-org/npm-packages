@@ -1,5 +1,13 @@
 # @mcp-b/webmcp-local-relay
 
+## 6.0.2
+
+### Patch Changes
+
+- f1c3a70: The widget now says why it skips tools on native WebMCP before Chrome 155, which reports input
+  schemas as strings: update Chrome, or turn off the WebMCP testing flag to use the polyfill. It
+  used to call the schema malformed.
+
 ## 6.0.1
 
 ### Patch Changes
