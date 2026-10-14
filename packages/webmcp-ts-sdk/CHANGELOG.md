@@ -1,5 +1,12 @@
 # @mcp-b/webmcp-ts-sdk
 
+## 6.0.3
+
+### Patch Changes
+
+- Updated dependencies [d1c3454]
+  - @mcp-b/webmcp-polyfill@6.0.3
+
 ## 6.0.2
 
 ### Patch Changes

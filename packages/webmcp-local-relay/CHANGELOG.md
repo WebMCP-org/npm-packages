@@ -1,5 +1,11 @@
 # @mcp-b/webmcp-local-relay
 
+## 6.0.3
+
+### Patch Changes
+
+- e47a094: Restore `webmcp_call_tool`, so clients that don't refresh their tool list on `tools/list_changed` can call page tools registered after they connect.
+
 ## 6.0.2
 
 ### Patch Changes

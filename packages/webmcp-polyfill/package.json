@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-polyfill",
-  "version": "6.0.2",
+  "version": "6.0.3",
   "description": "Vendored upstream WebMCP polyfill plus temporary declarative tools",
   "keywords": [
     "browser",
