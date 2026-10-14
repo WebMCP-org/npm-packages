@@ -109,12 +109,13 @@ npx @mcp-b/webmcp-local-relay --label "dev" --workspace "myapp" --relay-id "rela
 
 ## Static management tools
 
-The relay always exposes three management tools:
+The relay always exposes four management tools:
 
 | Tool                  | Description                                                                         |
 | --------------------- | ----------------------------------------------------------------------------------- |
 | `webmcp_list_sources` | Lists connected browser tabs that publish tools, with tab metadata                  |
 | `webmcp_list_tools`   | Lists all relayed tools with source info                                            |
+| `webmcp_call_tool`    | Calls a relayed tool by name, for clients that don't refresh their tool list        |
 | `webmcp_open_page`    | Opens a URL, or in server mode refreshes a connected source page by matching origin |
 
 ## Dynamic tool registration
