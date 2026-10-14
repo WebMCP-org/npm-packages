@@ -105,6 +105,9 @@ describe.each(RUNTIMES)('a page on %s', (runtime) => {
     expect(tool?.description).toContain('Echo the input');
     expect(tool?.inputSchema).toMatchObject({ properties: { text: { type: 'string' } } });
     expect(await relay.call('echo', { text: 'hi' })).toBe('echo:hi');
+    expect(await relay.call('webmcp_call_tool', { name: 'echo', arguments: { text: 'hi' } })).toBe(
+      'echo:hi'
+    );
   });
 
   it('follows tools registered and unregistered after connecting', async () => {
@@ -121,6 +124,8 @@ describe.each(RUNTIMES)('a page on %s', (runtime) => {
     );
     await toolsBecome(relay, page, ['echo', 'late']);
     expect(await relay.call('late')).toBe('late');
+    // For clients that never refresh their tool list.
+    expect(await relay.call('webmcp_call_tool', { name: 'late' })).toBe('late');
 
     await page.evaluate(() => window.unregister('echo'));
     await toolsBecome(relay, page, ['late']);

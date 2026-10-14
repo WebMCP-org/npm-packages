@@ -46,7 +46,7 @@ Once connected, your AI client can see and call tools from any open browser tab 
 
 1. `webmcp_list_sources` — see which tabs are connected
 2. `webmcp_list_tools` — see all available tools
-3. Call any tool directly by name (e.g., `create_issue`, `search_docs`)
+3. Call any tool directly by name (e.g., `create_issue`, `search_docs`), or through `webmcp_call_tool`
 
 Tools appear and disappear automatically as you open, reload, and close tabs.
 Tools that require MCP task execution are omitted, and multi-round `input_required` results return an error.
@@ -127,12 +127,13 @@ npx @mcp-b/webmcp-local-relay
 
 ### Exposed Tools
 
-The relay exposes three static management tools that are always available:
+The relay exposes four static management tools that are always available:
 
 | Tool                  | Description                                                                         |
 | --------------------- | ----------------------------------------------------------------------------------- |
 | `webmcp_list_sources` | Lists connected browser tabs that publish tools, with tab metadata                  |
 | `webmcp_list_tools`   | Lists all relayed tools with source info                                            |
+| `webmcp_call_tool`    | Calls a relayed tool by name, for clients that don't refresh their tool list        |
 | `webmcp_open_page`    | Opens a URL, or in server mode refreshes a connected source page by matching origin |
 
 **Dynamic tools** are registered directly on the MCP server using the original tool name, sanitized to `[a-zA-Z0-9_]`. When tools from different tabs share a name, a short tab-ID suffix is appended for disambiguation:
@@ -203,6 +204,7 @@ npx @mcp-b/webmcp-local-relay --widget-origin https://myapp.com
 │        LocalRelayMcpServer           │
 │   webmcp_list_sources                │
 │   webmcp_list_tools                  │
+│   webmcp_call_tool                   │
 │   + dynamic tools from browser       │
 └──────────────────┬───────────────────┘
                    │ in process
@@ -266,13 +268,14 @@ For Chromium/Chrome Canary native preview testing:
 
 ### Troubleshooting
 
-| Problem                    | Fix                                                                                                                                       |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `No sources connected`     | Ensure the page loaded `embed.js` and the relay process is running                                                                        |
-| `No tools listed`          | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits the `toolchange` event |
-| `Tool not found`           | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                  |
-| Connection blocked         | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`            |
-| `Tool execution timed out` | A page tool exceeded the timeout (default 60s). Raise `data-request-timeout` and keep CLI `--invoke-timeout` slightly higher              |
+| Problem                    | Fix                                                                                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `No sources connected`     | Ensure the page loaded `embed.js` and the relay process is running                                                                            |
+| `No tools listed`          | Ensure tools are registered on the page's WebMCP runtime. If tools register after load, confirm your runtime emits the `toolchange` event     |
+| `Tool not found`           | Tab reloaded or disconnected — call `webmcp_list_tools` again to refresh                                                                      |
+| New page tool missing      | Your client doesn't refresh its tool list on `tools/list_changed`. Find the tool with `webmcp_list_tools` and call it with `webmcp_call_tool` |
+| Connection blocked         | Verify `--widget-origin` matches your host page's origin (e.g., `https://myapp.com`), and relay port matches `data-relay-port`                |
+| `Tool execution timed out` | A page tool exceeded the timeout (default 60s). Raise `data-request-timeout` and keep CLI `--invoke-timeout` slightly higher                  |
 
 ---
 

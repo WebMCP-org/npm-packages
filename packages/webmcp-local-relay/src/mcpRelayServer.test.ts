@@ -103,6 +103,25 @@ async function createConnectedRelay(options?: { invokeTimeoutMs?: number }): Pro
 }
 
 /**
+ * Answers each invoke with the page's tab ID and the arguments it received.
+ */
+function echoInvokes(ws: WebSocket, tabId: string, invokes: unknown[] = []): unknown[] {
+  ws.on('message', (raw) => {
+    const msg = JSON.parse(String(raw));
+    if (msg.type !== 'invoke') return;
+    invokes.push(msg);
+    ws.send(
+      JSON.stringify({
+        type: 'result',
+        callId: msg.callId,
+        result: { content: [{ type: 'text', text: `${tabId}:${JSON.stringify(msg.args)}` }] },
+      })
+    );
+  });
+  return invokes;
+}
+
+/**
  * Connects a browser websocket fixture and optionally handles invoke calls.
  */
 async function connectBrowser(
@@ -470,6 +489,206 @@ describe('LocalRelayMcpServer', () => {
     });
   });
 
+  describe('webmcp_call_tool', () => {
+    it('calls a page tool registered after the client listed tools', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+      // The client snapshots the list before the page connects and never refreshes it.
+      const before = await client.listTools();
+      expect(before.tools.map((tool) => tool.name).sort()).toEqual([
+        'webmcp_call_tool',
+        'webmcp_list_sources',
+        'webmcp_list_tools',
+        'webmcp_open_page',
+      ]);
+
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-late',
+        url: 'https://example.com',
+        tools: [{ name: 'late_tool', description: 'Registered late' }],
+      });
+      echoInvokes(ws, 'tab-late');
+      const name = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const result = await client.callTool({
+        name: 'webmcp_call_tool',
+        arguments: { name, arguments: { query: 'webmcp' } },
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(firstContentText(result)).toBe('tab-late:{"query":"webmcp"}');
+
+      ws.close();
+      await cleanup();
+    });
+
+    it('sends empty arguments when they are omitted', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-empty',
+        url: 'https://example.com',
+        tools: [{ name: 'no_args' }],
+      });
+      echoInvokes(ws, 'tab-empty');
+      const name = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const result = await client.callTool({ name: 'webmcp_call_tool', arguments: { name } });
+
+      expect(firstContentText(result)).toBe('tab-empty:{}');
+
+      ws.close();
+      await cleanup();
+    });
+
+    it('reports an unknown tool without invoking any page', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-known',
+        url: 'https://example.com',
+        tools: [{ name: 'known_tool' }],
+      });
+      const invokes = echoInvokes(ws, 'tab-known');
+      await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const result = await client.callTool({
+        name: 'webmcp_call_tool',
+        arguments: { name: 'missing_tool', arguments: {} },
+      });
+
+      expect(result.isError).toBe(true);
+      expect(firstContentText(result)).toBe(
+        'Tool "missing_tool" not found. Call webmcp_list_tools to see available tools.'
+      );
+      expect(invokes).toEqual([]);
+
+      ws.close();
+      await cleanup();
+    });
+
+    it('routes a disambiguated name to the tab that provides it', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay();
+      const first = await connectBrowser(bridge, {
+        tabId: 'tab-one',
+        url: 'https://one.example.com',
+        tools: [{ name: 'search' }],
+      });
+      const second = await connectBrowser(bridge, {
+        tabId: 'tab-two',
+        url: 'https://two.example.com',
+        tools: [{ name: 'search' }],
+      });
+      echoInvokes(first, 'tab-one');
+      echoInvokes(second, 'tab-two');
+      const tools = await waitFor(() => {
+        const listed = bridge.registry.listTools();
+        return listed.length === 2 ? listed : undefined;
+      });
+
+      for (const tool of tools) {
+        const tabId = tool.sources[0]?.tabId;
+        expect(tool.name).not.toBe('search');
+        const result = await client.callTool({
+          name: 'webmcp_call_tool',
+          arguments: { name: tool.name, arguments: {} },
+        });
+        expect(firstContentText(result)).toBe(`${tabId}:{}`);
+      }
+
+      first.close();
+      second.close();
+      await cleanup();
+    });
+
+    it('returns an error result when the page call fails', async () => {
+      const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+      const { bridge, client, cleanup } = await createConnectedRelay({ invokeTimeoutMs: 100 });
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-silent',
+        url: 'https://example.com',
+        tools: [{ name: 'silent_tool' }],
+      });
+      const name = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const result = await client.callTool({ name: 'webmcp_call_tool', arguments: { name } });
+
+      expect(result.isError).toBe(true);
+      expect(firstContentText(result)).toContain(`Failed to invoke relayed tool "${name}"`);
+      expect(firstContentText(result)).toContain('timed out');
+
+      ws.close();
+      await cleanup();
+      stderr.mockRestore();
+    });
+
+    it('forwards caller cancellation to the page', async () => {
+      const { bridge, client, cleanup } = await createConnectedRelay({ invokeTimeoutMs: 2000 });
+      const ws = await connectBrowser(bridge, {
+        tabId: 'tab-cancel-call',
+        url: 'https://example.com',
+        tools: [{ name: 'slow_tool' }],
+      });
+      const messages: Array<{ type: string; callId?: string }> = [];
+      ws.on('message', (raw) => messages.push(JSON.parse(String(raw))));
+      const name = await waitFor(() => bridge.registry.listTools()[0]?.name);
+
+      const controller = new AbortController();
+      const pending = client.callTool(
+        { name: 'webmcp_call_tool', arguments: { name } },
+        { signal: controller.signal }
+      );
+      const rejected = expect(pending).rejects.toThrow('caller cancelled');
+      const invocation = await waitFor(() => messages.find((message) => message.type === 'invoke'));
+      controller.abort(new Error('caller cancelled'));
+      await rejected;
+      const cancel = await waitFor(() => messages.find((message) => message.type === 'cancel'));
+      expect(cancel.callId).toBe(invocation.callId);
+
+      ws.close();
+      await cleanup();
+    });
+
+    it('calls page tools through the server relay in client mode', async () => {
+      const serverBridge = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port: 0,
+        allowedOrigins: ['*'],
+      });
+      await serverBridge.start();
+      const ws = await connectBrowser(serverBridge, {
+        tabId: 'tab-via-server',
+        url: 'https://example.com',
+        tools: [{ name: 'shared_tool' }],
+      });
+      echoInvokes(ws, 'tab-via-server');
+      await waitFor(() => serverBridge.registry.listTools()[0]?.name);
+
+      const clientBridge = new RelayBridgeServer({
+        host: '127.0.0.1',
+        port: serverBridge.port,
+        allowedOrigins: ['*'],
+      });
+      const relay = new LocalRelayMcpServer({ bridge: clientBridge });
+      await relay.start();
+      expect(clientBridge.mode).toBe('client');
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      const client = createTestClient();
+      await relay.connect(serverTransport);
+      await client.connect(clientTransport);
+      const name = await waitFor(() => clientBridge.listToolsFromRelay()[0]?.name);
+
+      const result = await client.callTool({
+        name: 'webmcp_call_tool',
+        arguments: { name, arguments: { via: 'client' } },
+      });
+
+      expect(firstContentText(result)).toBe('tab-via-server:{"via":"client"}');
+
+      ws.close();
+      await client.close();
+      await relay.stop();
+      await serverBridge.stop();
+    });
+  });
+
   it('registers dynamic tools with valid annotations', async () => {
     const { bridge, client, cleanup } = await createConnectedRelay();
 
@@ -733,6 +952,7 @@ describe('LocalRelayMcpServer', () => {
       url: 'https://example.com',
       tools: [
         { name: 'webmcp_list_tools', description: 'Takes a built-in name' },
+        { name: 'webmcp_call_tool', description: 'Takes a built-in name' },
         { name: 'good_tool', description: 'Valid' },
       ],
     });
@@ -742,6 +962,9 @@ describe('LocalRelayMcpServer', () => {
     );
     expect(stderr).toHaveBeenCalledWith(
       expect.stringContaining('skipped page tool "webmcp_list_tools"')
+    );
+    expect(stderr).toHaveBeenCalledWith(
+      expect.stringContaining('skipped page tool "webmcp_call_tool"')
     );
 
     ws.close();
@@ -1087,6 +1310,20 @@ describe('LocalRelayMcpServer', () => {
           type: 'object',
           properties: {},
         },
+        webmcp_call_tool: {
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Tool name as returned by webmcp_list_tools.' },
+            arguments: {
+              type: 'object',
+              propertyNames: { type: 'string' },
+              additionalProperties: {},
+              description: 'Arguments matching the tool input schema.',
+            },
+          },
+          required: ['name'],
+        },
         webmcp_open_page: {
           $schema: 'https://json-schema.org/draft/2020-12/schema',
           type: 'object',
@@ -1115,8 +1352,8 @@ describe('LocalRelayMcpServer', () => {
       const dynamicTool = list.tools.find((t) => t.name === toolName);
       expect(dynamicTool?.inputSchema).toEqual(dynamicSchema);
 
-      // Total count: 3 static + 1 dynamic
-      expect(list.tools).toHaveLength(4);
+      // Total count: 4 static + 1 dynamic
+      expect(list.tools).toHaveLength(5);
 
       ws.close();
       await cleanup();
@@ -1206,7 +1443,7 @@ describe('LocalRelayMcpServer', () => {
 
       const list2 = await client.listTools();
       expect(list2.tools.filter((t) => !t.name.startsWith('webmcp_'))).toHaveLength(0);
-      expect(list2.tools).toHaveLength(3); // only static tools
+      expect(list2.tools).toHaveLength(4); // only static tools
 
       await cleanup();
     });
@@ -1244,7 +1481,7 @@ describe('LocalRelayMcpServer', () => {
       });
 
       const list = await client.listTools();
-      expect(list.tools).toHaveLength(6); // 3 static + 3 dynamic
+      expect(list.tools).toHaveLength(7); // 4 static + 3 dynamic
 
       for (const expected of tools) {
         const found = list.tools.find((t) => t.name.includes(expected.name));
@@ -1352,7 +1589,7 @@ describe('LocalRelayMcpServer', () => {
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
       const list = await waitForClientToolList(client, toolName);
-      expect(list.tools).toHaveLength(4); // 3 static + 1 dynamic
+      expect(list.tools).toHaveLength(5); // 4 static + 1 dynamic
       const tool = list.tools.find((t) => t.name === toolName);
       expect(tool?.inputSchema).toEqual(finalSchema);
 
@@ -1404,16 +1641,16 @@ describe('LocalRelayMcpServer', () => {
 
       const list1 = await waitFor(async () => {
         const list = await client.listTools();
-        return list.tools.length === 5 ? list : undefined; // 3 static + 2 dynamic
+        return list.tools.length === 6 ? list : undefined; // 4 static + 2 dynamic
       });
-      expect(list1.tools).toHaveLength(5);
+      expect(list1.tools).toHaveLength(6);
 
       ws1.close();
       await waitFor(() => (bridge.registry.listSources().length === 0 ? true : undefined));
 
       await waitFor(async () => {
         const list = await client.listTools();
-        return list.tools.length === 3 ? true : undefined; // only static tools
+        return list.tools.length === 4 ? true : undefined; // only static tools
       });
 
       const ws2 = await connectBrowser(bridge, {
@@ -1424,7 +1661,7 @@ describe('LocalRelayMcpServer', () => {
 
       const list2 = await waitFor(async () => {
         const list = await client.listTools();
-        return list.tools.length === 5 ? list : undefined;
+        return list.tools.length === 6 ? list : undefined;
       });
 
       const dynamicTools2 = list2.tools.filter((t) => !t.name.startsWith('webmcp_'));

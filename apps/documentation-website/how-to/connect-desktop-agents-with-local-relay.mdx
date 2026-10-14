@@ -104,12 +104,13 @@ URLs, whose opaque origin cannot be used for descriptor-based tool execution.
 
 ## Verify the connection
 
-Once the relay is running and your page has loaded `embed.js`, your AI agent has access to three management tools:
+Once the relay is running and your page has loaded `embed.js`, your AI agent has access to four management tools:
 
 | Tool                  | What it does                                                                               |
 | --------------------- | ------------------------------------------------------------------------------------------ |
 | `webmcp_list_sources` | Lists connected browser tabs with metadata (tab ID, origin, URL, title, tool count)        |
 | `webmcp_list_tools`   | Lists all relayed tools with source info                                                   |
+| `webmcp_call_tool`    | Calls a relayed tool by name, for clients that don't refresh their tool list               |
 | `webmcp_open_page`    | Opens a URL in the default browser or refreshes a connected source page by matching origin |
 
 Tools also register as first-class MCP tools using their original name. When multiple tabs register a tool with the same name, the relay appends a short tab-ID suffix for disambiguation (e.g. `search_ed93`, `search_a1b2`).
@@ -176,6 +177,7 @@ failover.
 | `No sources connected`     | Confirm the page loaded `embed.js` and the relay process is running                                                                             |
 | `No tools listed`          | Confirm the page registered tools and has native WebMCP, the polyfill, or `@mcp-b/global`                                                       |
 | `Tool not found`           | The tab reloaded or disconnected. Call `webmcp_list_tools` to refresh                                                                           |
+| New page tool missing      | The client doesn't refresh its tool list on `tools/list_changed`. Find the tool with `webmcp_list_tools` and call it with `webmcp_call_tool`    |
 | Connection blocked         | Verify `--widget-origin` matches the WebSocket origin and the relay port matches `data-relay-port`                                              |
 | `Tool execution timed out` | The tool exceeded its per-request timeout (default 60 seconds). Raise `data-request-timeout` and set a slightly higher relay `--invoke-timeout` |
 

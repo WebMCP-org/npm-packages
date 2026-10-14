@@ -160,8 +160,8 @@ export function hostPage({
 </html>`;
 }
 
-/** Arguments the harness passes to tools. Every test tool takes strings. */
-export type ToolArgs = Record<string, string>;
+/** Arguments the harness passes to tools. `webmcp_call_tool` nests the page tool's arguments. */
+export type ToolArgs = Record<string, string | Record<string, string>>;
 
 /** The `webmcp_list_sources` reply. `mode` is only set on a relay in client mode. */
 export interface Sources {
