@@ -1,0 +1,12 @@
+# Static assets answer before the worker, so legacy paths redirect here, not in middleware.
+/about /about/ 308
+/blog /blog/ 308
+/contact /contact/ 308
+/privacy /privacy/ 308
+/terms /terms/ 308
+/blog/mcp-b-introduction /blog/mcp-b-introduction/ 308
+/blog/webmcp-challenge /blog/webmcp-challenge/ 308
+/blogs /blog/ 308
+/blogs/ /blog/ 308
+/blogs/mcp-b-introduction /blog/mcp-b-introduction/ 308
+/blogs/mcp-b-introduction/ /blog/mcp-b-introduction/ 308

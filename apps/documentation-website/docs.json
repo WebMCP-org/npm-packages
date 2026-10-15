@@ -32,6 +32,30 @@
   },
   "redirects": [
     {
+      "source": "/index",
+      "destination": "/"
+    },
+    {
+      "source": "/packages/index",
+      "destination": "/packages"
+    },
+    {
+      "source": "/tutorials/index",
+      "destination": "/tutorials"
+    },
+    {
+      "source": "/how-to/index",
+      "destination": "/how-to"
+    },
+    {
+      "source": "/explanation/index",
+      "destination": "/explanation"
+    },
+    {
+      "source": "/skill",
+      "destination": "/start-here/choose-your-path"
+    },
+    {
       "source": "/packages/chrome-devtools-mcp/:slug*",
       "destination": "/how-to/debug-and-troubleshoot"
     },

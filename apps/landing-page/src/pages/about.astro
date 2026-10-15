@@ -1,0 +1,140 @@
+---
+export const prerender = true;
+
+import Base from '../layouts/Codeforge.astro';
+---
+
+<Base
+  title="About MCP-B"
+  description="MCP-B builds open-source WebMCP packages, browser tooling, and implementation guidance that help websites expose structured actions to AI agents."
+>
+  <article class="about-page">
+    <header class="about-page__hero">
+      <p class="about-page__eyebrow">About MCP-B</p>
+      <h1>MCP-B builds WebMCP tools for websites and agents.</h1>
+      <p>
+        We help developers publish structured website actions that AI agents can discover and call
+        without guessing their way through screenshots or click sequences.
+      </p>
+    </header>
+
+    <div class="about-page__content">
+      <section>
+        <h2>What we build</h2>
+        <p>
+          MCP-B maintains open-source WebMCP runtimes, React bindings, browser transports, iframe
+          bridges, and a local relay. The packages let teams add agent-facing tools to the web
+          applications and workflows they already operate.
+        </p>
+        <p>
+          Start with the <a href="https://docs.mcp-b.ai/start-here/choose-your-path"
+            >implementation guide</a
+          >, browse the <a href="https://docs.mcp-b.ai/packages">package reference</a>, or review the
+          <a href="https://github.com/WebMCP-org/npm-packages">source on GitHub</a>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Where WebMCP fits</h2>
+        <p>
+          WebMCP is a W3C Community Group proposal for exposing structured page actions through the
+          browser. MCP-B helped inspire the proposal and now provides implementation packages and
+          bridges around it. The Community Group draft remains the authority for the proposed web
+          API.
+        </p>
+        <p>
+          Read <a href="https://docs.mcp-b.ai/explanation/what-is-webmcp">What is WebMCP?</a> or the
+          <a href="https://webmachinelearning.github.io/webmcp/">Community Group draft</a> for the
+          current boundary between the proposal and MCP-B.
+        </p>
+      </section>
+
+      <section>
+        <h2>Who is behind MCP-B</h2>
+        <p>
+          MCP-B was founded by <a href="https://alexnahas.com/">Alex Nahas</a>. The project works in
+          public through the <a href="https://github.com/WebMCP-org">WebMCP GitHub organization</a>
+          and the <a href="https://www.npmjs.com/org/mcp-b">@mcp-b npm organization</a>.
+        </p>
+        <p>
+          If you are evaluating WebMCP for a product or want help designing an agent-ready workflow,
+          <a href="/contact/">book a call</a>.
+        </p>
+      </section>
+    </div>
+  </article>
+</Base>
+
+<style>
+  .about-page {
+    width: 100%;
+    max-width: 72rem;
+    margin-inline: auto;
+    padding: clamp(4rem, 8vw, 7rem) clamp(1.5rem, 6vw, 5rem);
+  }
+
+  .about-page__hero {
+    max-width: 58rem;
+  }
+
+  .about-page__eyebrow {
+    margin: 0;
+    color: var(--primary);
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .about-page__hero h1 {
+    margin: 1rem 0 0;
+    font-size: clamp(2.75rem, 7vw, 6rem);
+    font-weight: 700;
+    letter-spacing: -0.055em;
+    line-height: 0.96;
+    text-wrap: balance;
+  }
+
+  .about-page__hero > p:last-child {
+    max-width: 48rem;
+    margin: 1.75rem 0 0;
+    color: var(--muted-foreground);
+    font-size: clamp(1.1rem, 2vw, 1.35rem);
+    line-height: 1.6;
+  }
+
+  .about-page__content {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2rem;
+    margin-top: clamp(3rem, 7vw, 5rem);
+  }
+
+  .about-page__content section {
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .about-page__content h2 {
+    margin: 0;
+    font-size: 1.35rem;
+  }
+
+  .about-page__content p {
+    margin: 1rem 0 0;
+    color: var(--muted-foreground);
+    line-height: 1.7;
+  }
+
+  .about-page__content a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  @media (max-width: 52rem) {
+    .about-page__content {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
