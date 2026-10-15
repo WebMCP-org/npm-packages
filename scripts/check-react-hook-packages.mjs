@@ -33,6 +33,7 @@ try {
     'webmcp-types',
     'webmcp-polyfill',
     'webmcp-ts-sdk',
+    'webmcp-plugins',
     'usewebmcp',
     'react-webmcp',
   ]) {

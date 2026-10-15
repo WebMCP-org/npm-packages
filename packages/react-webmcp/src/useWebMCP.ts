@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, type DependencyList } from 'react';
+import { useEffect, useMemo, useRef, type DependencyList } from 'react';
+import { withPlugins } from '@mcp-b/webmcp-plugins';
 import {
   isMcpStandardSchema,
   normalizeInputSchema,
@@ -47,6 +48,15 @@ export function useWebMCP<
       return { error: error instanceof Error ? error : new Error(String(error)) };
     }
   }, [config.inputSchema]);
+  // Aborts in-flight calls, and their pending plugin work such as consent prompts, once the
+  // tool unregisters.
+  const lifetime = useRef(new AbortController());
+  useEffect(() => {
+    const controller = new AbortController();
+    lifetime.current = controller;
+    return () =>
+      controller.abort(new DOMException(`Tool "${config.name}" was unregistered`, 'AbortError'));
+  }, [config.name, config.enabled]);
   const coreConfig: CoreWebMCPConfig<InputSchema, InferOutput<TOutput>> = {
     name: config.name,
     ...(config.title !== undefined && { title: config.title }),
@@ -55,7 +65,12 @@ export function useWebMCP<
     ...(config.enabled !== undefined && { enabled: config.enabled }),
     ...(config.exposedTo !== undefined && { exposedTo: config.exposedTo }),
     execute: async (args, options) => {
-      const result = await config.execute(await validateInput(config.inputSchema, args), options);
+      const { execute } = withPlugins(config, config.plugins ?? []);
+      const signal = AbortSignal.any([options.signal, lifetime.current.signal]);
+      const result = await execute(await validateInput(config.inputSchema, args), {
+        ...options,
+        signal,
+      });
       if (config.outputSchema && normalizeToolResponse(result).structuredContent === undefined) {
         throw new TypeError(
           `Tool "${config.name}" outputSchema requires execute to return a JSON-serializable result`
