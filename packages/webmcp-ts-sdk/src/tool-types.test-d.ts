@@ -121,6 +121,12 @@ test('standard and extended annotations stay distinct', () => {
   }>();
 });
 
+test('MCP _meta is an MCP-B extension that reaches listTools()', () => {
+  expectTypeOf<ToolDescriptor['_meta']>().toEqualTypeOf<McpTool['_meta']>();
+  expectTypeOf<ToolListItem['_meta']>().toEqualTypeOf<McpTool['_meta']>();
+  expectTypeOf<ModelContextTool>().not.toHaveProperty('_meta');
+});
+
 test('output schemas narrow wrapped structured content', () => {
   type Result = ToolResultFromOutputSchema<{
     type: 'object';

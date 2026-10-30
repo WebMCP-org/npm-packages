@@ -322,6 +322,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     if (tool.title !== undefined) item.title = tool.title;
     if (tool.outputSchema !== undefined) item.outputSchema = structuredClone(tool.outputSchema);
     if (tool.annotations) item.annotations = tool.annotations;
+    if (tool._meta !== undefined) item._meta = structuredClone(tool._meta);
 
     const config: Omit<Parameters<McpServer['registerTool']>[1], 'inputSchema' | 'outputSchema'> & {
       inputSchema?: ReturnType<typeof toMcpInputSchema>;
@@ -330,6 +331,8 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
       description: tool.description,
     };
     if (item.outputSchema !== undefined) config.outputSchema = fromJsonSchema(item.outputSchema);
+    // One detached copy serves both: listTools() clones `item` again before returning it.
+    if (item._meta !== undefined) config._meta = item._meta;
     if (tool.title !== undefined) config.title = tool.title;
     if (tool.annotations) {
       const { untrustedContentHint: _untrustedContentHint, ...annotations } = tool.annotations;

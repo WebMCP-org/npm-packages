@@ -68,6 +68,7 @@ export function useWebMCP<
     descriptor: {
       ...(config.outputSchema !== undefined && { outputSchema: config.outputSchema }),
       ...(config.annotations !== undefined && { annotations: config.annotations }),
+      ...(config._meta !== undefined && { _meta: config._meta }),
     },
     ...(input.error && { preparationError: input.error }),
     formatOutput: config.formatOutput ?? normalizeToolResponse,

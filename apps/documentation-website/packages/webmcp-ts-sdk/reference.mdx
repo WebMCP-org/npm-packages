@@ -108,6 +108,8 @@ registerTool(
 
 Registers a WebMCP descriptor and its MCP representation. Registration succeeds only after the upstream context accepts the tool.
 
+A descriptor's `_meta` object is published as the MCP tool's `_meta` in `tools/list`, for example the `ui.resourceUri` that links an [MCP Apps](https://modelcontextprotocol.io/extensions/apps) tool to its UI resource. WebMCP has no such member, so it is not mirrored to the upstream context. A non-object `_meta` rejects with `TypeError`.
+
 | Option      | Type           | Description                                                 |
 | ----------- | -------------- | ----------------------------------------------------------- |
 | `signal`    | `AbortSignal?` | Removes the MCP registration and native mirror when aborted |
@@ -167,7 +169,7 @@ Narrows an installed `document.modelContext` without changing the package's glob
 listTools(): ToolListItem[]
 ```
 
-Returns a clone of the adapter's MCP-B tool metadata, including `outputSchema` when registered.
+Returns a clone of the adapter's MCP-B tool metadata, including `outputSchema` and `_meta` when registered.
 
 ### `syncNativeTools()`
 
