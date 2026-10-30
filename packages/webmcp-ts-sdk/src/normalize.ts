@@ -27,6 +27,7 @@ export interface ToolRegistrationDictionary {
   annotations?: unknown;
   inputSchema?: ToolDescriptor<WebMcpToolInput>['inputSchema'];
   outputSchema?: ToolDescriptor<WebMcpToolInput>['outputSchema'];
+  _meta?: unknown;
   execute?: unknown;
 }
 
@@ -40,7 +41,7 @@ export function coerceWebMcpToolDescriptor(
   if (description === undefined) {
     throw new TypeError('Tool "description" is required');
   }
-  const { annotations, inputSchema, outputSchema, execute } = tool;
+  const { annotations, inputSchema, outputSchema, _meta: meta, execute } = tool;
 
   const coercedName = toDomString(name);
   const coercedTitle = title === undefined ? undefined : toDomString(title).toWellFormed();
@@ -52,6 +53,12 @@ export function coerceWebMcpToolDescriptor(
   if (coercedTitle !== undefined) descriptor.title = coercedTitle;
   if (inputSchema !== undefined) descriptor.inputSchema = inputSchema;
   if (outputSchema !== undefined) descriptor.outputSchema = outputSchema;
+  if (meta !== undefined) {
+    if (!isPlainObject(meta)) {
+      throw new TypeError('Tool "_meta" must be an object');
+    }
+    descriptor._meta = meta;
+  }
   if (annotations !== undefined) {
     const members = isPlainObject(annotations) ? annotations : {};
     const normalized: ToolAnnotations = {

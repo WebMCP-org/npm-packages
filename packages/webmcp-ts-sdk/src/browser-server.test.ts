@@ -764,6 +764,16 @@ describe('BrowserMcpServer', () => {
         description: 'Missing execute callback',
       })
     ).rejects.toBeInstanceOf(TypeError);
+    await expect(
+      server.registerTool({
+        name: 'string_meta_tool',
+        description: 'Non-object _meta',
+        // @ts-expect-error External JavaScript can pass a non-object _meta.
+        _meta: 'ui://app.html',
+        async execute() {},
+      })
+    ).rejects.toBeInstanceOf(TypeError);
+    expect(server.listTools()).toEqual([]);
     await expect(server.getTools({ fromOrigins: ['not an origin'] })).rejects.toMatchObject({
       name: 'SecurityError',
     });
@@ -1280,6 +1290,39 @@ describe('BrowserMcpServer', () => {
       arguments: {},
     });
     expect(objectResult.structuredContent).toEqual({ total: 1 });
+  });
+
+  it('publishes tool _meta over MCP without mirroring it to the native context', async () => {
+    const nativeTools: NativeToolDictionary[] = [];
+    const native = createNativeContext({
+      async registerTool(tool: NativeToolDictionary) {
+        nativeTools.push(tool);
+      },
+    });
+    const server = createServer('meta-transport-server', { native });
+    const meta = { ui: { resourceUri: 'ui://todos/app.html' } };
+
+    await server.registerTool({
+      name: 'app_tool',
+      description: 'Renders an MCP app',
+      _meta: meta,
+      async execute() {
+        return 'ready';
+      },
+    });
+    meta.ui.resourceUri = 'ui://mutated.html';
+
+    expect(server.listTools().find((tool) => tool.name === 'app_tool')?._meta).toEqual({
+      ui: { resourceUri: 'ui://todos/app.html' },
+    });
+    expect(nativeTools.map(({ name }) => name)).toEqual(['app_tool']);
+    expect(nativeTools[0]).not.toHaveProperty('_meta');
+
+    const client = await connectClient(server);
+    const listed = await client.listTools();
+    expect(listed.tools.find((tool) => tool.name === 'app_tool')?._meta).toEqual({
+      ui: { resourceUri: 'ui://todos/app.html' },
+    });
   });
 });
 

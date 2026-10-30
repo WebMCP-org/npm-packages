@@ -243,9 +243,9 @@ importing the guard; do not add extensions to the standard global type.
 
 ### `BrowserMcpServer` Tool Descriptor
 
-The MCP-B runtime consumes `outputSchema` when a separately typed descriptor is
+The MCP-B runtime consumes `outputSchema` and `_meta` when a separately typed descriptor is
 passed to `document.modelContext.registerTool()`. Native and strict polyfill
-runtimes ignore the extra field.
+runtimes ignore the extra fields.
 
 | Property       | Type                                    | Required | Description                                                                             |
 | -------------- | --------------------------------------- | -------- | --------------------------------------------------------------------------------------- |
@@ -254,6 +254,7 @@ runtimes ignore the extra field.
 | `inputSchema`  | `InputSchema`                           | No       | JSON Schema describing accepted input. Defaults to `{ type: 'object', properties: {} }` |
 | `outputSchema` | `InputSchema`                           | No       | MCP-B helper metadata for output typing and structured MCP responses                    |
 | `annotations`  | `ToolAnnotations`                       | No       | Hints about tool behavior for LLM planners                                              |
+| `_meta`        | `Record<string, unknown>`               | No       | MCP tool metadata published in `tools/list`, such as MCP Apps' `ui.resourceUri`         |
 | `execute`      | `(args) => unknown \| Promise<unknown>` | Yes      | Function implementing the tool logic                                                    |
 
 ### Tool Response Format
