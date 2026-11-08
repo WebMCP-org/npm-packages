@@ -79,7 +79,7 @@
     "@mcp-b/webmcp-polyfill": "workspace:*",
     "@modelcontextprotocol/server": "catalog:",
     "@standard-schema/spec": "^1.1.0",
-    "webmcp-types": "0.1.9"
+    "webmcp-types": "0.1.10"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "catalog:",
