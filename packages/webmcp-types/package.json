@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-types",
-  "version": "6.1.0",
+  "version": "6.2.0",
   "description": "Deprecated: forwards webmcp-types; use webmcp-types directly",
   "homepage": "https://github.com/webmachinelearning/webmcp-types",
   "bugs": {

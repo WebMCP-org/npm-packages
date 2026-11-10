@@ -1,5 +1,11 @@
 # @mcp-b/mcp-iframe
 
+## 6.2.0
+
+### Patch Changes
+
+- @mcp-b/transports@6.2.0
+
 ## 6.1.0
 
 ### Minor Changes
