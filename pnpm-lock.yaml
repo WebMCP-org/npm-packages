@@ -343,8 +343,8 @@ importers:
         specifier: ^3.6.0
         version: 3.6.0
       webmcp-types:
-        specifier: ^0.1.9
-        version: 0.1.9
+        specifier: ^0.1.10
+        version: 0.1.10
     devDependencies:
       '@cloudflare/vite-plugin':
         specifier: ^1.54.1
@@ -403,9 +403,9 @@ importers:
       '@angular/platform-browser':
         specifier: ^21.2.22
         version: 21.2.22(@angular/common@21.2.22(@angular/core@21.2.22(@angular/compiler@21.2.22)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.22(@angular/compiler@21.2.22)(rxjs@7.8.2))
-      '@mcp-b/webmcp-polyfill':
-        specifier: workspace:*
-        version: link:../../../packages/webmcp-polyfill
+      '@w3c/webmcp-polyfill':
+        specifier: ^0.1.0
+        version: 0.1.0
       rxjs:
         specifier: ^7.8.0
         version: 7.8.2
@@ -428,18 +428,18 @@ importers:
 
   examples/frameworks/astro:
     dependencies:
-      '@mcp-b/webmcp-polyfill':
-        specifier: workspace:*
-        version: link:../../../packages/webmcp-polyfill
+      '@w3c/webmcp-polyfill':
+        specifier: ^0.1.0
+        version: 0.1.0
       astro:
         specifier: ^7.3.5
         version: 7.3.5(@types/node@26.4.0)(jiti@2.7.0)(sass@1.97.3)(terser@5.50.0)(tsx@4.23.13)(yaml@2.8.3)
 
   examples/frameworks/nextjs:
     dependencies:
-      '@mcp-b/webmcp-polyfill':
-        specifier: workspace:*
-        version: link:../../../packages/webmcp-polyfill
+      '@w3c/webmcp-polyfill':
+        specifier: ^0.1.0
+        version: 0.1.0
       next:
         specifier: 16.3.8
         version: 16.3.8(@opentelemetry/api@1.9.1)(@playwright/test@1.62.1)(@types/node@22.19.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.97.3)
@@ -465,9 +465,9 @@ importers:
 
   examples/frameworks/react:
     dependencies:
-      '@mcp-b/webmcp-polyfill':
-        specifier: workspace:*
-        version: link:../../../packages/webmcp-polyfill
+      '@w3c/webmcp-polyfill':
+        specifier: ^0.1.0
+        version: 0.1.0
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -496,9 +496,9 @@ importers:
 
   examples/frameworks/svelte:
     dependencies:
-      '@mcp-b/webmcp-polyfill':
-        specifier: workspace:*
-        version: link:../../../packages/webmcp-polyfill
+      '@w3c/webmcp-polyfill':
+        specifier: ^0.1.0
+        version: 0.1.0
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: ^6.2.1
@@ -521,9 +521,9 @@ importers:
 
   examples/frameworks/vanilla:
     dependencies:
-      '@mcp-b/webmcp-polyfill':
-        specifier: workspace:*
-        version: link:../../../packages/webmcp-polyfill
+      '@w3c/webmcp-polyfill':
+        specifier: ^0.1.0
+        version: 0.1.0
     devDependencies:
       typescript:
         specifier: ~5.9.3
@@ -534,9 +534,9 @@ importers:
 
   examples/frameworks/vue:
     dependencies:
-      '@mcp-b/webmcp-polyfill':
-        specifier: workspace:*
-        version: link:../../../packages/webmcp-polyfill
+      '@w3c/webmcp-polyfill':
+        specifier: ^0.1.0
+        version: 0.1.0
       vue:
         specifier: ^3.5.42
         version: 3.5.42(typescript@5.9.3)
@@ -763,8 +763,8 @@ importers:
   packages/usewebmcp:
     dependencies:
       webmcp-types:
-        specifier: 0.1.9
-        version: 0.1.9
+        specifier: 0.1.10
+        version: 0.1.10
     devDependencies:
       '@mcp-b/webmcp-polyfill':
         specifier: workspace:*
@@ -873,9 +873,12 @@ importers:
 
   packages/webmcp-polyfill:
     dependencies:
+      '@w3c/webmcp-polyfill':
+        specifier: 0.1.0
+        version: 0.1.0
       webmcp-types:
-        specifier: 0.1.9
-        version: 0.1.9
+        specifier: 0.1.10
+        version: 0.1.10
     devDependencies:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
@@ -905,8 +908,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
       webmcp-types:
-        specifier: 0.1.9
-        version: 0.1.9
+        specifier: 0.1.10
+        version: 0.1.10
     devDependencies:
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
@@ -930,8 +933,8 @@ importers:
   packages/webmcp-types:
     dependencies:
       webmcp-types:
-        specifier: 0.1.9
-        version: 0.1.9
+        specifier: 0.1.10
+        version: 0.1.10
 
 packages:
 
@@ -3365,7 +3368,6 @@ packages:
   '@opentelemetry/sdk-trace-base@2.10.0':
     resolution: {integrity: sha512-GuYQQT7QD2EeO8lcZLRQzcbOyhqAzL+6WWTKTU9mSUBYBazkEDl+VrQcXQhbB08OWM9anD1aHleVadzulpOaUQ==}
     engines: {node: ^18.19.0 || >=20.6.0}
-    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': '>=1.3.0 <1.10.0'
 
@@ -6291,6 +6293,9 @@ packages:
         optional: true
       vue:
         optional: true
+
+  '@w3c/webmcp-polyfill@0.1.0':
+    resolution: {integrity: sha512-FNzmob4B72T9cHDVODskyFjNi0JaZgcD1U0eFmuc2J4o3Lr5k1xabZ5rjw1AuvzgvdxRfvNr9FHUP9yG1s/StA==}
 
   '@x0k/json-schema-merge@1.0.5':
     resolution: {integrity: sha512-bPvwYpTkhBOXkvbC8KMNhkgzv+gWu6Yx6FVho3mL+vMf8Fy3gdn9YrlrBrXphznvOHhB85BudH/ywtVRZ/HG3A==}
@@ -11443,8 +11448,8 @@ packages:
   webidl-conversions@3.0.1:
     resolution: {integrity: sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==}
 
-  webmcp-types@0.1.9:
-    resolution: {integrity: sha512-ibdkppgRDkQ/nvH541YS48kVt96OiuDr+d9JHnirAtI5k0coaFdo2QqCipbXyfwrteDC6xXwPoUGC9uS5ZGwfw==}
+  webmcp-types@0.1.10:
+    resolution: {integrity: sha512-U4GQ1RpJ0tqCUt2ALMV9Pnhi+hsy8L31f/Q1v4mLVhW64r5sYhh+2+SjP/Lq4/9jP33vZgNkuRZARJl65A/ZIg==}
 
   whatwg-mimetype@3.0.0:
     resolution: {integrity: sha512-nt+N2dzIutVRxARx1nghPKGv1xHikU7HKdfafKkLNLindmPU/ch3U31NOCGGA/dmPcmb1VlofO0vnKAcsm0o/Q==}
@@ -17573,6 +17578,10 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
       vue: 3.5.42(typescript@5.9.3)
+
+  '@w3c/webmcp-polyfill@0.1.0':
+    dependencies:
+      webmcp-types: 0.1.10
 
   '@x0k/json-schema-merge@1.0.5':
     dependencies:
@@ -24686,7 +24695,7 @@ snapshots:
 
   webidl-conversions@3.0.1: {}
 
-  webmcp-types@0.1.9: {}
+  webmcp-types@0.1.10: {}
 
   whatwg-mimetype@3.0.0:
     optional: true

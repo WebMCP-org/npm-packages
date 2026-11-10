@@ -1,15 +1,18 @@
-import type { WebMCP } from './upstream/index.js';
+import type { WebMCP } from '@w3c/webmcp-polyfill';
 
+import { installWebMCP as installUpstream } from '@w3c/webmcp-polyfill';
 import { installWebMCPDeclarativeExtensions } from './declarative-forms.js';
-import { installWebMCP as installUpstream } from './upstream/index.js';
 
-export type { WebMCP } from './upstream/index.js';
+export type { WebMCP } from '@w3c/webmcp-polyfill';
 
 /**
  * Installs upstream WebMCP and the temporary declarative tools layer.
- * Engines missing an API the vendored core calls are left untouched: upstream defines
+ * Engines missing an API the upstream core calls are left untouched: upstream defines
  * the document getter before it constructs the context, so a failed construction would
  * leave `document.modelContext` throwing.
+ *
+ * @deprecated Use `installWebMCP` from `@w3c/webmcp-polyfill`. This wrapper only adds
+ * declarative tools until upstream ships them.
  */
 export function installWebMCP(): void {
   if (typeof document === 'undefined' || !globalThis.isSecureContext) return;

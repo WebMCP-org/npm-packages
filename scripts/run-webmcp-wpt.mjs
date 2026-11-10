@@ -23,7 +23,7 @@ if (!existsSync(polyfill)) {
 
 // ponytail: page-local allowlist; frame/origin tests qualify only if every assertion is page-local.
 // The rest of the suite needs ToolActivatedEvent/ToolCancelEvent, tool pseudo-classes, raw
-// (non-JSON) results, or frame trees, which the vendored upstream runtime does not provide.
+// (non-JSON) results, or frame trees, which the upstream runtime does not provide.
 const imperativeTests = [
   'duplicate_tool_registration.https.html',
   'executeTool-error-window-onerror.https.html',

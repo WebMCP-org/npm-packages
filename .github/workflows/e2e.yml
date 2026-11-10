@@ -213,7 +213,7 @@ jobs:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
         run: pnpm test:wpt
 
-      # Non-blocking until the vendored upstream runtime defines the lifecycle event
+      # Non-blocking until the upstream runtime defines the lifecycle event
       # interfaces. See docs/TESTING.md.
       - name: Report WebMCP IDL conformance (non-blocking)
         continue-on-error: true

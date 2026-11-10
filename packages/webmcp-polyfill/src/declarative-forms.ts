@@ -1,5 +1,4 @@
 import type { WebMCP } from 'webmcp-types';
-import { executionError } from './upstream/frames.js';
 
 type InputSchema = NonNullable<WebMCP.ModelContextTool['inputSchema']>;
 type WebMcpToolInput = Parameters<WebMCP.ToolExecuteCallback>[0];
@@ -541,6 +540,10 @@ function findSubmitter(form: HTMLFormElement): Submitter | undefined {
   );
 }
 
+function executionError(): DOMException {
+  return new DOMException('Tool execution failed', 'UnknownError');
+}
+
 function lifecycleEvent(type: 'toolactivated' | 'toolcancel', toolName: string): Event {
   const event = new Event(type);
   Object.defineProperty(event, 'toolName', { enumerable: true, value: toolName });
@@ -635,7 +638,7 @@ function waitForSubmission(
   });
 }
 
-/** Adds declarative tools until the vendored upstream implements them. */
+/** Adds declarative tools until upstream implements them. */
 export function installWebMCPDeclarativeExtensions(context: WebMCP.ModelContext): void {
   const prototype = SubmitEvent.prototype;
   // Native support and earlier bundle installations already own these hooks.

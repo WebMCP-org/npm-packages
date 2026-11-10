@@ -104,6 +104,8 @@ function createNativeContext(
 ): ModelContext {
   return Object.assign(new EventTarget(), {
     ontoolchange: null,
+    ontoolactivated: null,
+    ontoolcancel: null,
     registerTool: async () => {},
     getTools: async () => [],
     executeTool: async () => {
