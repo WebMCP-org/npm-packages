@@ -1,37 +1,41 @@
 ---
 title: '@mcp-b/webmcp-polyfill overview'
-description: 'When to use the WebMCP polyfill, where it fits in the stack, and when to move up to the full runtime.'
+description: 'When to use the deprecated @mcp-b/webmcp-polyfill, when to use the official W3C polyfill instead, and when to move up to the full runtime.'
 keywords:
   ['@mcp-b/webmcp-polyfill', 'overview', 'polyfill', 'document.modelContext', 'tool registration']
 icon: 'puzzle-piece'
 ---
 
-`@mcp-b/webmcp-polyfill` vendors the upstream WebMCP polyfill and installs its standard `document.modelContext` surface when the browser does not provide one. It provides browser-facing tool registration, discovery, and object-input execution. A temporary MCP-B layer adds declarative tools and their `SubmitEvent` extensions until upstream supports them. Existing browser contexts and native `SubmitEvent` hooks are preserved; missing hooks are filled in.
+<Warning>
+  `@mcp-b/webmcp-polyfill` is deprecated. For the standard imperative API, install the W3C Community
+  Group polyfill, [`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill).
+</Warning>
+
+`@mcp-b/webmcp-polyfill` passes through to [`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill), which installs the standard `document.modelContext` surface when the browser does not provide one. It adds one thing: a temporary MCP-B layer for declarative tools and their `SubmitEvent` extensions, kept until the official polyfill ships them. Existing browser contexts and native `SubmitEvent` hooks are preserved; missing hooks are filled in.
 
 ## When to use this package
 
-- You want the upstream `registerTool`, `getTools`, and object-input `executeTool` APIs in browsers today.
-- You are building a site or reusable library that wants to stay close to the Community Group draft surface.
-- You want to pair runtime behavior with upstream [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) declarations.
+- You need declarative tools in browsers without native support and do not want the full [`@mcp-b/global`](/packages/global/overview) runtime.
 
 ## When not to use this package
 
+- You only use the imperative API (`registerTool`, `getTools`, `executeTool`). Use [`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill).
 - You need prompts, resources, browser transport, or direct access to an MCP server. Use [`@mcp-b/global`](/packages/global/overview).
-- You only need types at build time. Install upstream [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) directly.
+- You only need types at build time. Install [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types), the package Chrome's [Imperative API guide](https://developer.chrome.com/docs/ai/webmcp/imperative-api) recommends.
 
 ## Where it sits in the package graph
 
-This package bundles the upstream polyfill source. [`@mcp-b/global`](/packages/global/overview) wraps it when MCP-B extensions are needed.
+This package depends on `@w3c/webmcp-polyfill` as a normal npm dependency and adds the declarative layer on top. [`@mcp-b/global`](/packages/global/overview) wraps it when MCP-B extensions are needed.
 
 ## First step
 
-Initialize the polyfill before your app registers tools. The [reference page](/packages/webmcp-polyfill/reference) documents the upstream installer, core API, and temporary declarative layer. For prompts, resources, transports, or MCP `outputSchema`, use the [global runtime](/packages/global/reference).
+Initialize the polyfill before your app registers tools. The [reference page](/packages/webmcp-polyfill/reference) documents the installer and the temporary declarative layer. For prompts, resources, transports, or MCP `outputSchema`, use the [global runtime](/packages/global/reference).
 
 ## Related pages
 
 <CardGroup cols={2}>
   <Card title="Reference" icon="book-open" href="/packages/webmcp-polyfill/reference">
-    Upstream initialization and core runtime behavior.
+    Installer and temporary declarative layer.
   </Card>
   <Card title="First tool tutorial" icon="graduation-cap" href="/tutorials/first-tool">
     Build your first browser tool.

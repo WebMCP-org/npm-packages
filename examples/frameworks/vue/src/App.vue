@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { installWebMCP } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@w3c/webmcp-polyfill';
 import { onMounted } from 'vue';
 
 onMounted(async () => {

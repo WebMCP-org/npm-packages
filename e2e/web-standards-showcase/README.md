@@ -7,8 +7,9 @@ and discovery, and it checks whether the browser exposes the current draft’s
 
 The authoritative API definition lives in the
 [WebMCP specification](https://webmachinelearning.github.io/webmcp/). For
-Chrome's preview status and enrollment details, see the
-[Chrome WebMCP early preview](https://developer.chrome.com/blog/webmcp-epp).
+Chrome's availability and origin trial details, see
+[Chrome's WebMCP overview](https://developer.chrome.com/docs/ai/webmcp) and the
+[origin trial announcement](https://developer.chrome.com/blog/ai-webmcp-origin-trial).
 The
 [Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd)
 can inspect tools exposed by a page.

@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/webmcp-polyfill",
   "version": "6.0.3",
-  "description": "Vendored upstream WebMCP polyfill plus temporary declarative tools",
+  "description": "Deprecated: wraps @w3c/webmcp-polyfill and adds temporary declarative tools; use @w3c/webmcp-polyfill directly",
   "keywords": [
     "browser",
     "model-context",
@@ -61,7 +61,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "webmcp-types": "0.1.9"
+    "@w3c/webmcp-polyfill": "0.1.0",
+    "webmcp-types": "0.1.10"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "catalog:",
@@ -72,9 +73,5 @@
   },
   "engines": {
     "node": ">=20"
-  },
-  "upstream": {
-    "repository": "https://github.com/webmachinelearning/webmcp-polyfill",
-    "commit": "6bf6c57bbaf3d1173d7737cfb79572632d9b7871"
   }
 }

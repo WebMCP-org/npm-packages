@@ -218,7 +218,7 @@ The relay supports pages using:
 
 1. `@mcp-b/global` (recommended for the complete MCP-B runtime)
 2. Native Chrome with `document.modelContext.getTools()` and object-input `executeTool()`
-3. `@mcp-b/webmcp-polyfill`
+3. `@w3c/webmcp-polyfill`, or the deprecated `@mcp-b/webmcp-polyfill` that wraps it
 
 `file:` pages report an opaque `null` origin, which the polyfill's descriptor execution path rejects.
 Local integrations therefore need a non-opaque origin such as `http://localhost`.

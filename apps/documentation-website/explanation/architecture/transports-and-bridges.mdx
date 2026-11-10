@@ -37,6 +37,10 @@ Native WebMCP stays within the browser's document model:
    able to discover it.
 3. The parent includes that origin in `getTools({ fromOrigins })`.
 
+Chrome's [cross-origin iframe
+guidance](https://developer.chrome.com/docs/ai/webmcp/imperative-api#cross-origin_iframes)
+describes the same three steps.
+
 The browser returns `RegisteredTool` values with their owning `window` and
 `origin`. This path needs no MCP client, server, or transport. It does not add
 MCP-B name prefixes or carry MCP prompts and resources.

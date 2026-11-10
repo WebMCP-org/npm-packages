@@ -118,7 +118,7 @@ connected peer's origin appears in that list. `BrowserMcpServer` reads the origi
 from transports that report one, such as
 [`IframeChildTransport`](/packages/transports/reference#iframechildtransport).
 Restricted tools fail closed: they stay hidden before the first peer origin
-arrives, and on transports that never report one. The supplied WebMCP context also validates the origin list before the tool is published. The vendored polyfill rejects opaque origins and browser-specific extension schemes.
+arrives, and on transports that never report one. The supplied WebMCP context also validates the origin list before the tool is published. The polyfill rejects opaque origins and browser-specific extension schemes.
 
 `exposedTo` only narrows. The child transport's `allowedOrigins` still decides
 who may connect, and enforcement is the page's own JavaScript rather than the

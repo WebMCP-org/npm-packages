@@ -66,6 +66,8 @@ function createNativeModelContextStub(overrides: Partial<ModelContext> = {}): Mo
     new EventTarget(),
     {
       ontoolchange: null,
+      ontoolactivated: null,
+      ontoolcancel: null,
       registerTool: async () => {},
       getTools: async () => [],
       executeTool: async () => {
