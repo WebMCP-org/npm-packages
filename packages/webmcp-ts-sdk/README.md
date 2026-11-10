@@ -90,7 +90,7 @@ MCP requires an object-root tool input schema. An array-root WebMCP tool remains
 - `PromptDescriptor`, `ResourceDescriptor`, `RegistrationHandle`
 - `ModelContext`, `ModelContextWithExtensions`, `RegisteredTool`, `ToolDescriptor`, `ToolDescriptorFromSchema`, `ToolListItem`, `InputSchema`, and the other MCP-B descriptor and inference types
 - `CallToolResult`, `ContentBlock`, `TextContent`, `JsonObject`, `JsonValue`, re-exported from `@modelcontextprotocol/server`
-- `WebMCP`, the upstream namespace re-exported through `@mcp-b/webmcp-polyfill`, which also brings the polyfill's `SubmitEvent` and `ModelContext` declarations into scope
+- `WebMCP`, the `webmcp-types` namespace re-exported through `@mcp-b/webmcp-polyfill`, which also brings the polyfill's `SubmitEvent` and `ModelContext` declarations into scope
 - `@mcp-b/webmcp-ts-sdk/schema`: `normalizeInputSchema()`, `normalizeToolResponse()`, `isMcpStandardSchema()`, `ToolInputSchema`, `NormalizedInputSchema`
 
 Import MCP clients, servers, schemas, transports, and validators from the official `@modelcontextprotocol/*` packages.

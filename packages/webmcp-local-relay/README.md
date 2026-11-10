@@ -236,13 +236,13 @@ Supported page runtimes:
 
 1. `@mcp-b/global` (recommended for the complete MCP-B runtime)
 2. Current native Chrome with `document.modelContext.getTools()` and object-input `executeTool()`
-3. `@mcp-b/webmcp-polyfill`
+3. `@w3c/webmcp-polyfill` or `@mcp-b/webmcp-polyfill`
 
 Runtime dispatch behavior in the browser embed/widget layer:
 
 - Uses asynchronous `document.modelContext.getTools()` and the exact returned
   descriptor with `executeTool()` and object input, as defined by the current
-  upstream API.
+  WebMCP draft.
 - Refreshes the descriptor before every invocation so Chrome never receives a
   stale registration object.
 - Relays the host page's tools plus tools registered by other same-origin

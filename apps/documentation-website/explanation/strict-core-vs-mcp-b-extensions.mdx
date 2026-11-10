@@ -12,19 +12,20 @@ project.
 
 The phrase **strict core** describes MCP-B's portable package boundary. It is
 not a second definition of the WebMCP proposal. Keeping that boundary narrow
-lets libraries publish tools through native implementations or the polyfill
-without depending on an MCP server or transport.
+lets libraries publish tools through native implementations or the official
+[`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill) without
+depending on an MCP server or transport.
 
 ## Three related layers
 
 ```mermaid
 flowchart TB
   subgraph Upstream["Community Group"]
-    Proposal["WebMCP proposal<br/>evolving document.modelContext API"]
+    Proposal["WebMCP proposal<br/>evolving document.modelContext API,<br/>official polyfill and types"]
   end
 
   subgraph Project["MCP-B packages"]
-    Portable["Portable layer<br/>hooks, helpers, polyfill"]
+    Portable["Portable layer<br/>hooks, helpers, temporary declarative tools"]
     Extensions["Extension layer<br/>BrowserMcpServer, MCP features, transports"]
     Portable -->|"extended by"| Extensions
   end
@@ -32,8 +33,9 @@ flowchart TB
   Proposal -->|"target browser contract"| Portable
 ```
 
-The live draft owns the exact `ModelContext` members and signatures. Upstream [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types)
-provides the browser declarations. MCP-B adapter and extension contracts live
+The live draft owns the exact `ModelContext` members and signatures. The Community Group's
+[`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) provides the browser
+declarations; `@mcp-b/webmcp-types` is deprecated and only forwards it. MCP-B adapter and extension contracts live
 with [`@mcp-b/webmcp-ts-sdk`](/packages/webmcp-ts-sdk/reference). The SDK may
 include compatibility adapters, but they do not redefine the proposal.
 

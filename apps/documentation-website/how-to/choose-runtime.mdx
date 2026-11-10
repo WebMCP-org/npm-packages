@@ -1,10 +1,10 @@
 ---
 title: 'Choose a runtime'
-description: 'Decide when to use the native browser API, the tool-only polyfill, or the full @mcp-b/global runtime for your project.'
+description: 'Decide when to use the native browser API, the official W3C polyfill, or the full @mcp-b/global runtime for your project.'
 keywords:
   [
     '@mcp-b/global',
-    '@mcp-b/webmcp-polyfill',
+    '@w3c/webmcp-polyfill',
     'webmcp-types',
     'usewebmcp',
     '@mcp-b/react-webmcp',
@@ -15,8 +15,8 @@ keywords:
 icon: 'code-branch'
 ---
 
-Start with the live WebMCP proposal and current browser support. Add MCP-B packages only for the
-compatibility, type inference, or extension behavior your application needs.
+Start with the live WebMCP proposal and current browser support. Use the official W3C packages for
+the standard API. Add MCP-B packages when the page must reach MCP clients or needs MCP features.
 
 ## Choose in order
 
@@ -25,13 +25,18 @@ compatibility, type inference, or extension behavior your application needs.
    package.
 
 2. **Do you only need ambient types for the live proposal?** Use the Community Group's
-   [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) package.
+   [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) package, which Chrome's
+   [Imperative API guide](https://developer.chrome.com/docs/ai/webmcp/imperative-api) also
+   recommends. `@mcp-b/webmcp-types` is deprecated and only forwards it.
 
 3. **Do you need MCP-B adapter extensions or schema conversion?** Use
    [`@mcp-b/webmcp-ts-sdk`](/packages/webmcp-ts-sdk/overview).
 
 4. **Do you need browser tool registration and discovery where native support is unavailable?** Use
-   [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview).
+   the W3C Community Group polyfill,
+   [`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill). It does not ship
+   declarative tools yet. If you need declarative tools without native support, use the deprecated
+   [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/overview) or `@mcp-b/global` until it does.
 
 5. **Do you need MCP bridge transport, `listTools`, prompts, resources, or direct MCP server
    access?** Use [`@mcp-b/global`](/packages/global/overview).
@@ -51,8 +56,9 @@ compatibility, type inference, or extension behavior your application needs.
 | ------------------------ | ------------------------------------- | ------------------------------------------------------------- |
 | Native browser support   | No                                    | Browser behavior documented by the implementation             |
 | `webmcp-types`           | No                                    | Core browser declarations that track the live proposal        |
+| `@w3c/webmcp-polyfill`   | Yes                                   | Standard tool registration, discovery, and execution          |
 | `@mcp-b/webmcp-ts-sdk`   | When you construct `BrowserMcpServer` | MCP-B adapter extensions and schema conversion                |
-| `@mcp-b/webmcp-polyfill` | Yes                                   | Tool registration, discovery, and temporary declarative tools |
+| `@mcp-b/webmcp-polyfill` | Yes                                   | Deprecated; the W3C polyfill plus temporary declarative tools |
 | `@mcp-b/global`          | Yes                                   | MCP-B extensions, server access, and browser transports       |
 | `usewebmcp`              | No                                    | React tool hooks over an initialized `document.modelContext`  |
 | `@mcp-b/react-webmcp`    | No                                    | React tool, prompt, resource, and MCP client/provider hooks   |
@@ -61,8 +67,8 @@ compatibility, type inference, or extension behavior your application needs.
 
 - For native behavior and ambient proposal types, use the [WebMCP API
   sources](/reference/webmcp/standard-api).
-- For the standalone polyfill, follow the [`@mcp-b/webmcp-polyfill`
-  overview](/packages/webmcp-polyfill/overview) and [first tool
+- For the standalone polyfill, follow the [`@w3c/webmcp-polyfill`
+  README](https://github.com/w3c-oss/webmcp-polyfill#readme) and the [first tool
   tutorial](/tutorials/first-tool).
 - For the full MCP-B runtime, follow the [`@mcp-b/global`
   overview](/packages/global/overview) and [reference](/packages/global/reference).

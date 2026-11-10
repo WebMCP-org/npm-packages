@@ -25,9 +25,12 @@ documentation as Chrome implementation behavior.
 
 ## MCP-B coverage
 
+The W3C Community Group polyfill,
+[`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill), does not
+implement declarative tools yet. Until it does, the deprecated
 [`@mcp-b/webmcp-polyfill`](/packages/webmcp-polyfill/reference#declarative-tools)
-temporarily adds declarative tools alongside the vendored upstream core until
-upstream supports them. Existing native `SubmitEvent` hooks are preserved. [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference#declarative-form-attributes)
+and `@mcp-b/global` add them on top of it for browsers without native support.
+Existing native `SubmitEvent` hooks are preserved. [`@mcp-b/react-webmcp`](/packages/react-webmcp/reference#declarative-form-attributes)
 provides JSX declarations for the supported form attributes; it does not add a
 separate declarative runtime.
 

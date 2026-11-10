@@ -12,7 +12,7 @@ runtime or polyfill. They use:
 - `toolchange` events
 - `executeTool(registeredTool, inputObject)`
 
-`executeTool()` receives a descriptor returned by `getTools()`. Calls use the object-input contract from upstream `webmcp-types`.
+`executeTool()` receives a descriptor returned by `getTools()`. Calls use the object-input contract from the official `webmcp-types`.
 
 Current Chrome no longer exposes `navigator.modelContext` as the canonical
 surface. `navigator.modelContextTesting` is also outside the current native

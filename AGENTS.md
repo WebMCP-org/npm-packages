@@ -89,15 +89,18 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 ### WebMCP Proposal APIs
 
 - `document.modelContext` is the canonical current-draft WebMCP surface.
+- The official packages are [`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill)
+  (core imperative API and frames; no declarative tools or lifecycle events yet) and
+  `webmcp-types`. MCP-B packages build the MCP side on top of them.
 - `executeTool(tool, inputObject)` takes an input object and resolves to a string.
   Results are JSON, except that native declarative tools can return plain text, so
   MCP-B treats a result as structured only when it parses to a plain JSON object.
   String input, string input schemas, and navigator aliases are not supported.
-- The draft fires `toolactivated` and `toolcancel` at the model context. The polyfill
-  fires both for declarative tools; `BrowserMcpServer` re-dispatches them and adds
-  `ontoolactivated` and `ontoolcancel`.
+- The draft fires `toolactivated` and `toolcancel` at the model context. `@w3c/webmcp-polyfill`
+  does not fire them yet; MCP-B's declarative layer fires both for declarative tools;
+  `BrowserMcpServer` re-dispatches them and adds `ontoolactivated` and `ontoolcancel`.
 - Native Chrome lanes require Chrome 155 or later, the first release with object input.
-- The vendored core needs Chrome 126, Firefox 126, or Safari 18 (`URL.parse()`). On older
+- `@mcp-b/webmcp-polyfill` needs Chrome 126, Firefox 126, or Safari 18 (`URL.parse()`). On older
   engines and insecure pages, `installWebMCP()` installs nothing.
 - Check the live draft and package source before documenting browser behavior.
 - New examples and public documentation use `document.modelContext`.
@@ -116,10 +119,10 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 │  MCP server. Mirrors core tool ops down to the       │
 │  native/polyfill context.                            │
 ├─────────────────────────────────────────────────────┤
-│  @mcp-b/webmcp-polyfill                             │
-│  Bundles upstream webmcp-polyfill (pinned commit).  │
-│  Exposes installWebMCP() plus temporary MCP-B       │
-│  declarative tools.                                 │
+│  @mcp-b/webmcp-polyfill (deprecated)                │
+│  Passes through @w3c/webmcp-polyfill. Exposes       │
+│  installWebMCP() plus temporary MCP-B declarative   │
+│  tools.                                             │
 ├─────────────────────────────────────────────────────┤
 │  Native browser API (if available)                   │
 │  document.modelContext provided by the browser.      │
@@ -128,9 +131,9 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 ### Initialization Flow (`@mcp-b/global`)
 
-1. **Polyfill:** Call `installWebMCP()` from `@mcp-b/webmcp-polyfill`. It preserves existing native/preinstalled contexts and adds declarative support when missing. That package bundles the upstream source at the commit recorded in `packages/webmcp-polyfill/package.json` and temporarily retains MCP-B declarative tools. MCP `outputSchema` belongs to `@mcp-b/global`.
+1. **Polyfill:** Call `installWebMCP()` from `@mcp-b/webmcp-polyfill`. It preserves existing native/preinstalled contexts and adds declarative support when missing. That package passes through the official `@w3c/webmcp-polyfill` dependency and temporarily adds MCP-B declarative tools. MCP `outputSchema` belongs to `@mcp-b/global`.
 2. **Capture native:** A reference to the current document context is saved as `native`.
-3. **BrowserMcpServer:** Uses the page's context by default, installing the upstream polyfill when needed. Global passes its captured `{ native }` explicitly. Browser-facing tool registrations mirror down to that context and native tools are reconciled through `getTools()`. In the top frame that includes tools from same-origin descendant frames; in a child frame it mirrors only the frame's own tools.
+3. **BrowserMcpServer:** Uses the page's context by default, installing the polyfill when needed. Global passes its captured `{ native }` explicitly. Browser-facing tool registrations mirror down to that context and native tools are reconciled through `getTools()`. In the top frame that includes tools from same-origin descendant frames; in a child frame it mirrors only the frame's own tools.
 4. **Replace:** `document.modelContext` exposes the `BrowserMcpServer` instance, which adds `registerPrompt`, `registerResource`, `listTools`, and other MCP-B extensions. Browser-shaped execution uses `getTools()` plus `executeTool(tool, inputObject)`.
 5. **Cleanup:** `cleanupWebModelContext()` restores the original native/polyfill context. Closing the server unregisters every tool registered through it; tools registered directly on the underlying context remain. The polyfill and its declarative layer remain installed for the document lifetime.
 
@@ -159,14 +162,17 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 ### Type ownership
 
-- Upstream `webmcp-types` owns the WebMCP browser contracts and `document.modelContext`
-  declaration. Packages pin it exactly to `0.1.9`; 0.1.10 adds lifecycle members and event
-  classes that the vendored core does not implement.
-- `@mcp-b/webmcp-types` forwards upstream exports for existing package consumers;
-  new code imports `webmcp-types` directly. Both legacy core packages are temporary aliases.
+- The official `webmcp-types` owns the WebMCP browser contracts and `document.modelContext`
+  declaration. Packages pin it exactly to `0.1.10`, the version `@w3c/webmcp-polyfill`
+  resolves. It declares lifecycle members and event classes that the official polyfill does
+  not implement yet: `BrowserMcpServer` adds the two handlers, and nothing defines the event
+  constructors.
+- `@mcp-b/webmcp-types` is deprecated and only forwards `webmcp-types` for existing package
+  consumers; new code imports `webmcp-types` directly. `@mcp-b/webmcp-polyfill` is also
+  deprecated; pages that need only the standard API use `@w3c/webmcp-polyfill`.
 - `@mcp-b/webmcp-ts-sdk` owns MCP-B adapter and extension contracts plus schema helpers.
 - `@mcp-b/global` declares only `window.__webModelContextOptions`. `document.modelContext`
-  keeps the upstream type, so narrow it with `isBrowserMcpServer()` to reach MCP-B extensions.
+  keeps the official type, so narrow it with `isBrowserMcpServer()` to reach MCP-B extensions.
 
 ## Reference Repos (`.reference/`)
 

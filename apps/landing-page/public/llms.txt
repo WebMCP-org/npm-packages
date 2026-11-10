@@ -21,8 +21,9 @@ MCP-B is maintained in the WebMCP npm packages monorepo. The public landing page
 
 ## Packages
 
-- [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types): Upstream TypeScript declarations for WebMCP
-- [`@mcp-b/webmcp-polyfill`](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill): Strict browser polyfill for `document.modelContext`
+- [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types): Official TypeScript declarations for WebMCP
+- [`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill): Official W3C Community Group polyfill for `document.modelContext`
+- [`@mcp-b/webmcp-polyfill`](https://www.npmjs.com/package/@mcp-b/webmcp-polyfill): Deprecated; wraps `@w3c/webmcp-polyfill` and adds temporary declarative tools
 - [`@mcp-b/webmcp-ts-sdk`](https://www.npmjs.com/package/@mcp-b/webmcp-ts-sdk): WebMCP adapter, MCP-B extensions, and schema helpers
 - [`@mcp-b/global`](https://www.npmjs.com/package/@mcp-b/global): Full browser MCP-B runtime
 - [`@mcp-b/transports`](https://www.npmjs.com/package/@mcp-b/transports): Browser transport primitives

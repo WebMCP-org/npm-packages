@@ -6,7 +6,7 @@ keywords:
     'webmcp',
     'registertool',
     'document.modelcontext',
-    'webmcp-polyfill',
+    '@w3c/webmcp-polyfill',
     'html',
     'vanilla',
     'first tool',
@@ -20,7 +20,7 @@ In this tutorial, we will create a plain HTML page that registers one WebMCP too
 ## Prerequisites
 
 - A text editor
-- Chrome or Edge 126+, Firefox 126+, or Safari 18+
+- A current version of Chrome, Edge, Firefox, or Safari
 - A local static server, such as Python's built-in HTTP server
 
 No build step or framework is required. Serve the page from `localhost` because
@@ -30,7 +30,7 @@ WebMCP rejects tool execution from opaque `file:` origins.
 
 A single HTML page that:
 
-1. Loads the tool-only `@mcp-b/webmcp-polyfill` runtime via a script tag
+1. Loads the W3C Community Group polyfill, `@w3c/webmcp-polyfill`, via a script tag
 2. Registers a tool called `get-page-title`
 3. Displays confirmation in the page when the tool is ready
 
@@ -46,7 +46,7 @@ Create a new file called `index.html` and paste in this starting point:
   <head>
     <meta charset="UTF-8" />
     <title>My First WebMCP Tool</title>
-    <script src="https://unpkg.com/@mcp-b/webmcp-polyfill@6/dist/index.iife.js"></script>
+    <script src="https://unpkg.com/@w3c/webmcp-polyfill@0.1/dist/polyfill.js"></script>
   </head>
   <body>
     <h1>My First WebMCP Tool</h1>
@@ -59,7 +59,7 @@ Create a new file called `index.html` and paste in this starting point:
 </html>
 ```
 
-The `<script>` tag in the `<head>` loads `@mcp-b/webmcp-polyfill`, which installs its WebMCP-compatible tool surface on `document.modelContext`. No import statements or bundler needed.
+The `<script>` tag in the `<head>` loads the standalone build of [`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill), which installs `document.modelContext` as soon as it runs. No import statements or bundler needed.
 
 </Step>
 
@@ -157,7 +157,7 @@ The output should be an object containing your tool's response:
 }
 ```
 
-You have registered a WebMCP tool, discovered it through `getTools()`, and executed it through the upstream object-input API.
+You have registered a WebMCP tool, discovered it through `getTools()`, and executed it through the standard object-input API.
 
 </Step>
 
@@ -189,7 +189,7 @@ Here is the full `index.html` for reference:
   <head>
     <meta charset="UTF-8" />
     <title>My First WebMCP Tool</title>
-    <script src="https://unpkg.com/@mcp-b/webmcp-polyfill@6/dist/index.iife.js"></script>
+    <script src="https://unpkg.com/@w3c/webmcp-polyfill@0.1/dist/polyfill.js"></script>
   </head>
   <body>
     <h1>My First WebMCP Tool</h1>
@@ -221,14 +221,14 @@ Here is the full `index.html` for reference:
 
 ## What you learned
 
-- `@mcp-b/webmcp-polyfill` installs its WebMCP-compatible tool surface when loaded via a script tag
+- `@w3c/webmcp-polyfill` installs `document.modelContext` when loaded via a script tag
 - `registerTool()` returns a promise that resolves after registering a tool with a name, description, input schema, and execute function
-- `document.modelContext.getTools()` discovers registered tools; the upstream polyfill accepts an object as `executeTool()` input
+- `document.modelContext.getTools()` discovers registered tools; the polyfill accepts an object as `executeTool()` input
 - A WebMCP callback can return any serializable value; this example returns an MCP-shaped `content` array
 
 ## Next steps
 
 - [Build Your First React Tool](/tutorials/first-react-tool) to register tools from React components
-- [Choose a Runtime](/how-to/choose-runtime) to compare the tool-only and full MCP-B runtimes
+- [Choose a Runtime](/how-to/choose-runtime) to compare the official polyfill with the full MCP-B runtime
 - [WebMCP resources and status](/explanation/design/spec-status-and-limitations) for current native browser guidance
 - [Connect a Desktop Agent](/tutorials/desktop-agent-relay) to let Claude or Cursor call your tools
