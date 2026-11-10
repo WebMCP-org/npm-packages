@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "@w3c/webmcp-polyfill": "^0.1.0",
-    "astro": "^7.3.5"
+    "astro": "^7.4.7"
   }
 }
