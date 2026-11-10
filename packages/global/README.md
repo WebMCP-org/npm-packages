@@ -24,24 +24,22 @@
 
 ## Package Selection
 
-- Use upstream `webmcp-types` for standard browser contracts and `@mcp-b/webmcp-ts-sdk` for MCP-B extensions.
-- Use `@mcp-b/webmcp-polyfill` when you only need strict WebMCP runtime polyfill behavior.
+- Use the official `webmcp-types` for standard browser contracts and `@mcp-b/webmcp-ts-sdk` for MCP-B extensions.
+- Use the official [`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill) when you only need the standard WebMCP API without MCP.
 - Use `@mcp-b/global` when you want MCPB integration features (bridge transport, prompts/resources, extension APIs).
 
-## Upstream runtime
+## Polyfill runtime
 
 When no context is installed, `@mcp-b/global` calls `installWebMCP()` from
-`@mcp-b/webmcp-polyfill`. That package bundles the upstream
-[WebMCP polyfill](https://github.com/webmachinelearning/webmcp-polyfill) at
-revision `6bf6c57bbaf3d1173d7737cfb79572632d9b7871`. It depends on the
-upstream `webmcp-types` declarations. Consumers do not install or build a Git
-dependency.
+`@mcp-b/webmcp-polyfill`. That package passes through the official W3C
+[`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill), which
+implements the core imperative API and frames.
 
-`@mcp-b/webmcp-polyfill` retains the declarative API and its `SubmitEvent` extensions
-until upstream supports them. `@mcp-b/global` adds MCP-B transports, prompts,
+`@mcp-b/webmcp-polyfill` adds the declarative API and its `SubmitEvent` extensions
+until the official polyfill supports them. `@mcp-b/global` adds MCP-B transports, prompts,
 resources, MCP `outputSchema` metadata, and structured MCP responses. Existing native
 contexts take precedence and receive the MCP-B adapter when wrapped,
-including when the upstream polyfill was installed before `@mcp-b/global`.
+including when the official polyfill was installed before `@mcp-b/global`.
 `cleanupWebModelContext()` removes the MCP-B adapter; the polyfill context and
 declarative layer remain installed for the document lifetime. Existing native
 `SubmitEvent` hooks are preserved.
@@ -88,9 +86,7 @@ declarative layer remain installed for the document lifetime. Existing native
 ```html
 <script type="module">
   import '@mcp-b/global';
-  await document.modelContext.registerTool({
-    /* your tool */
-  });
+  await document.modelContext.registerTool({/* your tool */});
 </script>
 ```
 
@@ -106,9 +102,7 @@ npm install @mcp-b/global
 ```javascript
 import '@mcp-b/global';
 
-await document.modelContext.registerTool({
-  /* your tool */
-});
+await document.modelContext.registerTool({/* your tool */});
 ```
 
 ## API Reference
@@ -130,9 +124,7 @@ initializeWebModelContext({
   },
 });
 
-await document.modelContext.registerTool({
-  /* your tool */
-});
+await document.modelContext.registerTool({/* your tool */});
 ```
 
 **Behavior:**
@@ -351,11 +343,7 @@ To prevent auto-initialization:
 
 ```javascript
 if ('modelContext' in document) {
-  void document.modelContext
-    .registerTool({
-      /* your tool */
-    })
-    .catch(console.error);
+  void document.modelContext.registerTool({/* your tool */}).catch(console.error);
 }
 ```
 
@@ -508,7 +496,7 @@ await document.modelContext.registerTool({
 Native WebMCP needs Chrome 155 or newer with the WebMCP feature enabled; the
 runtime wraps the native context when it exists. Everywhere else the bundled
 polyfill runs. Its `installWebMCP()` installs only when the engine provides
-every API the vendored core calls. Otherwise it returns without defining
+every API the core polyfill calls. Otherwise it returns without defining
 `document.modelContext`, so `if (!document.modelContext)` remains a valid
 feature check.
 
@@ -535,7 +523,7 @@ This package exports its initialization options:
 import type { TransportConfiguration, WebModelContextInitOptions } from '@mcp-b/global';
 ```
 
-Import core browser contracts from upstream `webmcp-types`. Use
+Import core browser contracts from the official `webmcp-types`. Use
 `@mcp-b/webmcp-ts-sdk` for MCP-B extensions.
 
 ## Tool Routing Contract
@@ -557,4 +545,5 @@ Import core browser contracts from upstream `webmcp-types`. Use
 
 ## License
 
-MIT - see [LICENSE](../../LICENSE) for details
+MIT - see [LICENSE](../../LICENSE) for details. The IIFE bundle (`dist/index.iife.js`) includes
+`@w3c/webmcp-polyfill`, distributed under the Apache License 2.0 in `LICENSE.webmcp-polyfill`.

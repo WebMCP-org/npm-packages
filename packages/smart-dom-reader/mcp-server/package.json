@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/smart-dom-reader-server",
-  "version": "6.0.3",
+  "version": "6.1.0",
   "description": "MCP server for smart-dom-reader backed by Playwright",
   "license": "MIT",
   "repository": {
@@ -29,7 +29,7 @@
   "dependencies": {
     "@modelcontextprotocol/server": "catalog:",
     "playwright": "catalog:",
-    "tsx": "^4.23.12",
+    "tsx": "^4.23.15",
     "zod": "catalog:"
   },
   "devDependencies": {

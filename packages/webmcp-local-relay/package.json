@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-local-relay",
-  "version": "6.0.3",
+  "version": "6.1.0",
   "description": "Local MCP relay for browser WebMCP tools via embed iframe and localhost WebSocket",
   "keywords": [
     "ai-agents",
@@ -60,7 +60,7 @@
   "dependencies": {
     "@modelcontextprotocol/core": "catalog:",
     "@modelcontextprotocol/server": "catalog:",
-    "ws": "^8.22.0",
+    "ws": "^8.22.1",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -68,7 +68,7 @@
     "@mcp-b/webmcp-ts-sdk": "workspace:*",
     "@modelcontextprotocol/client": "catalog:",
     "@types/node": "catalog:",
-    "@types/ws": "^8.5.14",
+    "@types/ws": "^8.18.2",
     "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",

@@ -55,7 +55,7 @@ it('registers, executes, and cleans up through native WebMCP in StrictMode', asy
   });
   await hook.act(async () => {
     await expect(context.executeTool(tool, { count: -1 })).rejects.toMatchObject({
-      name: 'UnknownError',
+      name: 'OperationError',
     });
   });
   expect(hook.result.current.state.error).toBe(failure);

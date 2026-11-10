@@ -5,6 +5,12 @@ interface DeclarativeFormConformanceOptions {
   suiteName: string;
   install?(): void | Promise<void>;
   cleanup?(): void | Promise<void>;
+  /**
+   * DOMException names for a cancelled call and for input the form rejects. Chrome uses the
+   * draft's tool execution errors. The default is `UnknownError` for both, which is what
+   * `@w3c/webmcp-polyfill` reports for every failure.
+   */
+  errorNames?: { cancelled: string; invalidInput: string };
 }
 
 const FIXTURE_ATTRIBUTE = 'data-webmcp-declarative-conformance';
@@ -102,6 +108,10 @@ export function runDeclarativeFormConformanceSuite(
   options: DeclarativeFormConformanceOptions
 ): void {
   describe(options.suiteName, () => {
+    const errorNames = options.errorNames ?? {
+      cancelled: 'UnknownError',
+      invalidInput: 'UnknownError',
+    };
     const toolNames = new Set<string>();
 
     /** Inserts `markup` in one step and returns the form that declares the generated tool name. */
@@ -744,7 +754,7 @@ export function runDeclarativeFormConformanceSuite(
 
       await expect(
         Promise.race([execution, rejectAfter(200, 'timed out waiting for reset cancellation')])
-      ).rejects.toMatchObject({ name: 'UnknownError' });
+      ).rejects.toMatchObject({ name: errorNames.cancelled });
       expect(input.value).toBe('initial');
     });
 
@@ -897,14 +907,14 @@ export function runDeclarativeFormConformanceSuite(
       const tool = await waitForTool(name);
 
       await expect(executeTool(tool, { query: 'changed', unknown: true })).rejects.toMatchObject({
-        name: 'UnknownError',
+        name: errorNames.invalidInput,
       });
       expect(query.value).toBe('original');
       expect(scope.value).toBe('local');
 
       await expect(executeTool(tool, { query: 'changed', scope: 'missing' })).rejects.toMatchObject(
         {
-          name: 'UnknownError',
+          name: errorNames.invalidInput,
         }
       );
       expect(query.value).toBe('original');

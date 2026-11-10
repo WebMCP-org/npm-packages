@@ -388,7 +388,10 @@ function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor | null {
     );
     return null;
   }
-  if (tool.inputSchema !== undefined && !isJsonObject(tool.inputSchema)) {
+  // Chrome 158 returns Tool objects, which report an absent schema or annotations as null.
+  const inputSchema = tool.inputSchema ?? undefined;
+  const annotations = tool.annotations ?? undefined;
+  if (inputSchema !== undefined && !isJsonObject(inputSchema)) {
     console.warn(
       `[webmcp-relay-widget] Tool "${tool.name}" was not relayed because its input schema is malformed.`
     );
@@ -399,8 +402,8 @@ function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor | null {
     title: tool.title,
     description: tool.description,
   };
-  if (tool.inputSchema !== undefined) descriptor.inputSchema = tool.inputSchema;
-  if (tool.annotations !== undefined) descriptor.annotations = tool.annotations;
+  if (inputSchema !== undefined) descriptor.inputSchema = inputSchema;
+  if (annotations !== undefined) descriptor.annotations = annotations;
   return descriptor;
 }
 

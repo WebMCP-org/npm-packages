@@ -244,7 +244,7 @@ test.describe('Runtime Contract - Browser API Caller', () => {
 
     const errorMessage = await executeNativeToolError(page, 'always_fail', { reason: 'native' });
     // Native Chrome normalizes thrown tool errors into a generic failure string.
-    expect(errorMessage).toMatch(/always_fail:native|invocation failed/i);
+    expect(errorMessage).toMatch(/always_fail:native|invocation failed|Tool execution failed/i);
 
     await expect
       .poll(async () => await readInvocations(page))

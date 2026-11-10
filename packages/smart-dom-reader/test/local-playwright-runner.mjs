@@ -43,8 +43,7 @@ function parseArgs(argv) {
   for (const raw of argv) {
     if (!raw) continue;
     if (raw.startsWith('--url=')) args.url = raw.slice('--url='.length);
-    else if (raw === '--url')
-      args.url = null; // expect next positional
+    else if (raw === '--url') args.url = null; // expect next positional
     else if (raw.startsWith('--mode=')) args.mode = raw.slice('--mode='.length);
     else if (raw === '--mode') args.mode = 'full';
     else if (raw.startsWith('--screenshot=')) args.screenshot = raw.slice('--screenshot='.length);

@@ -97,17 +97,11 @@ const productLinks = [
 const packageGroups = [
   {
     label: 'Core runtime',
-    packages: [
-      '@mcp-b/webmcp-polyfill',
-      '@mcp-b/global',
-      '@mcp-b/webmcp-ts-sdk',
-      '@mcp-b/transports',
-      '@mcp-b/mcp-iframe',
-    ],
+    packages: ['@mcp-b/global', '@mcp-b/webmcp-ts-sdk', '@mcp-b/transports', '@mcp-b/mcp-iframe'],
   },
   {
-    label: 'Upstream types',
-    packages: ['webmcp-types'],
+    label: 'Official W3C packages',
+    packages: ['@w3c/webmcp-polyfill', 'webmcp-types'],
   },
   {
     label: 'React',

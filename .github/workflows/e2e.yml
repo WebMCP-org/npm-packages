@@ -32,10 +32,10 @@ jobs:
           persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@3754dd7dbdb32bd8f6d28b6043de13ad3a75f21f # v1.21.1
+        uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version: '24'
           cache: true
@@ -49,7 +49,7 @@ jobs:
 
       - name: Setup Chrome
         id: chrome
-        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
         with:
           chrome-version: stable
           install-dependencies: false
@@ -83,7 +83,7 @@ jobs:
         run: pnpm test:e2e:tarball:global --skip-build
 
       - name: Upload Playwright Report
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: playwright-report
@@ -91,7 +91,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Test Results
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: test-results
@@ -104,7 +104,7 @@ jobs:
     permissions:
       contents: read
     container:
-      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      image: mcr.microsoft.com/playwright:v1.65.0-noble
     timeout-minutes: 15
 
     steps:
@@ -114,10 +114,10 @@ jobs:
           persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@3754dd7dbdb32bd8f6d28b6043de13ad3a75f21f # v1.21.1
+        uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version: '24'
           cache: true
@@ -162,10 +162,10 @@ jobs:
             webmcp
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@3754dd7dbdb32bd8f6d28b6043de13ad3a75f21f # v1.21.1
+        uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version: '24'
           cache: true
@@ -179,14 +179,14 @@ jobs:
 
       - name: Setup Chrome Beta
         id: chrome_beta
-        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
         with:
           chrome-version: beta
           install-dependencies: false
 
       - name: Setup Chrome Canary
         id: chrome_canary
-        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
         with:
           chrome-version: canary
           install-dependencies: false
@@ -194,7 +194,7 @@ jobs:
       # Branded Chrome blocks --load-extension; native extension E2E needs unbranded Chromium.
       - name: Setup Chromium Snapshot
         id: chromium_snapshot
-        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
         with:
           chrome-version: latest
           install-dependencies: false
@@ -213,7 +213,7 @@ jobs:
           CHROME_BIN: ${{ steps.chrome_canary.outputs.chrome-path }}
         run: pnpm test:wpt
 
-      # Non-blocking until the vendored upstream runtime defines the lifecycle event
+      # Non-blocking until the upstream runtime defines the lifecycle event
       # interfaces. See docs/TESTING.md.
       - name: Report WebMCP IDL conformance (non-blocking)
         continue-on-error: true
@@ -259,7 +259,7 @@ jobs:
         run: pnpm --filter @mcp-b/webmcp-extension test:e2e
 
       - name: Upload Parity Playwright Report
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: playwright-report-native-parity
@@ -267,7 +267,7 @@ jobs:
           retention-days: 14
 
       - name: Upload Parity Test Results
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: test-results-native-parity

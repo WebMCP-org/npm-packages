@@ -1,5 +1,18 @@
 # @mcp-b/webmcp-local-relay
 
+## 6.1.0
+
+### Minor Changes
+
+- 17852d4: Update the MCP TypeScript SDK (`@modelcontextprotocol/client`, `core` and `server`) to 2.4.0
+  and Zod to 4.6.7. Every package now depends on the same SDK version.
+
+### Patch Changes
+
+- 1039b2b: Relay tools from pages that use Chrome's native WebMCP again. Chrome 158 reports a tool's
+  absent `inputSchema` and `annotations` as `null`, which made the relay drop every tool that
+  did not declare both.
+
 ## 6.0.3
 
 ### Patch Changes

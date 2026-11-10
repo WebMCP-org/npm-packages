@@ -1,5 +1,21 @@
 # @mcp-b/global
 
+## 6.1.0
+
+### Minor Changes
+
+- 17852d4: Update the MCP TypeScript SDK (`@modelcontextprotocol/client`, `core` and `server`) to 2.4.0
+  and Zod to 4.6.7. Every package now depends on the same SDK version.
+
+### Patch Changes
+
+- Updated dependencies [463e3d4]
+- Updated dependencies [17852d4]
+- Updated dependencies [463e3d4]
+  - @mcp-b/webmcp-polyfill@6.1.0
+  - @mcp-b/transports@6.1.0
+  - @mcp-b/webmcp-ts-sdk@6.1.0
+
 ## 6.0.3
 
 ### Patch Changes

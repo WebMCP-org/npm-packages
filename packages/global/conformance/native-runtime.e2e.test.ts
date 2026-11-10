@@ -137,5 +137,6 @@ describe('Native WebMCP conformance', () => {
 
 runDeclarativeFormConformanceSuite({
   suiteName: 'Native declarative conformance (Chrome)',
+  errorNames: { cancelled: 'AbortError', invalidInput: 'DataError' },
   // Native Chromium keeps a pending declarative execution alive after its form is removed.
 });
