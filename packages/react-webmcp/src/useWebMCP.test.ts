@@ -87,6 +87,24 @@ describe('useWebMCP in a browser runtime', () => {
     expect(response?.structuredContent).toEqual({ total: 7 });
   });
 
+  it('publishes tool _meta to MCP clients', async () => {
+    await renderHook(() =>
+      useWebMCP({
+        name: 'browser_app_tool',
+        description: 'Renders an MCP app',
+        _meta: { ui: { resourceUri: 'ui://browser/app.html' } },
+        execute: async () => 'ready',
+      })
+    );
+
+    await expect
+      .poll(
+        async () =>
+          (await client.listTools()).tools.find(({ name }) => name === 'browser_app_tool')?._meta
+      )
+      .toEqual({ ui: { resourceUri: 'ui://browser/app.html' } });
+  });
+
   it('records non-serializable schema output as an execution error', async () => {
     const cyclic: CircularOutput = {};
     cyclic.self = cyclic;

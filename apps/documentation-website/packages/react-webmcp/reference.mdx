@@ -84,6 +84,7 @@ The published entry point preserves `'use client'`; server rendering is tested o
 | `inputSchema`             | JSON Schema or Standard JSON Schema v1   | No       | Input parameters                 |
 | `outputSchema`            | JSON Schema                              | No       | MCP-B output helper metadata     |
 | `annotations`             | `ToolAnnotations`                        | No       | Metadata hints                   |
+| `_meta`                   | `Record<string, unknown>`                | No       | MCP tool metadata                |
 | `execute(input, options)` | `(input, { signal }) => T \| Promise<T>` | Yes      | Tool implementation              |
 | `formatOutput`            | `(result: T) => unknown`                 | No       | Overrides MCP success formatting |
 | `formatError`             | `(error: Error) => unknown`              | No       | Overrides MCP error formatting   |

@@ -48,7 +48,7 @@ Import `@mcp-b/global` once in your client entry. Zod is optional; compatible sc
 | `useWebMCPPrompt` or `useWebMCPResource` | `@mcp-b/global` or a configured `BrowserMcpServer`                 |
 | `McpClientProvider` and `useMcpClient`   | Your MCP client and transport; no `document.modelContext` required |
 
-Native WebMCP and the standalone polyfill do not advertise MCP `outputSchema` metadata. Use the MCP-B runtime to expose that metadata to MCP clients.
+Native WebMCP and the standalone polyfill do not advertise MCP `outputSchema` or `_meta` metadata. Use the MCP-B runtime to expose that metadata to MCP clients.
 
 ## Schemas and results
 

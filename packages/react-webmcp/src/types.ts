@@ -1,4 +1,5 @@
 import type { StandardJSONSchemaV1, StandardSchemaV1 } from '@standard-schema/spec';
+import type { Tool as McpTool } from '@modelcontextprotocol/client';
 import type { ToolInputSchema } from '@mcp-b/webmcp-ts-sdk/schema';
 import type {
   InferJsonSchema,
@@ -45,6 +46,7 @@ export interface WebMCPConfig<
   execute: ToolExecuteFunction<TInput, TOutput>;
   outputSchema?: TOutput;
   annotations?: ToolAnnotations;
+  _meta?: McpTool['_meta'];
   formatOutput?: (result: InferOutput<TOutput>) => MaybePromise<unknown>;
   formatError?: (error: Error) => MaybePromise<unknown>;
 }

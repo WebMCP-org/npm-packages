@@ -4,7 +4,10 @@ import type {
   InferJsonSchema,
   JsonSchemaForInference,
 } from './json-schema.js';
-import type { ToolAnnotations as McpToolAnnotations } from '@modelcontextprotocol/server';
+import type {
+  Tool as McpTool,
+  ToolAnnotations as McpToolAnnotations,
+} from '@modelcontextprotocol/server';
 import type { WebMCP } from 'webmcp-types';
 
 /** MCP annotations plus the WebMCP tool annotations. */
@@ -26,7 +29,7 @@ export interface ModelContextTool<
   execute: (input: TArgs, options: WebMCP.ToolExecuteCallbackOptions) => MaybePromise<TResult>;
 }
 
-/** MCP-B tool dictionary with output metadata. */
+/** MCP-B tool dictionary with output and MCP metadata. */
 export type ToolDescriptor<
   TArgs extends object = WebMcpToolObjectInput,
   TResult = unknown,
@@ -34,6 +37,12 @@ export type ToolDescriptor<
 > = Omit<ModelContextTool<TArgs, TResult, TName>, 'annotations'> & {
   outputSchema?: JsonSchemaForInference;
   annotations?: ToolAnnotations;
+  /**
+   * MCP tool `_meta`, published in `tools/list` (for example MCP Apps'
+   * `{ ui: { resourceUri } }`). WebMCP has no such member, so it is not mirrored to the
+   * browser's model context.
+   */
+  _meta?: McpTool['_meta'];
 };
 
 /** MCP response with `structuredContent` inferred from an output schema. */
