@@ -85,11 +85,11 @@ jobs:
 
       - name: Setup pnpm
         if: inputs.recover_signatures_version == ''
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
       - name: Setup Vite+
         if: inputs.recover_signatures_version == ''
-        uses: voidzero-dev/setup-vp@3754dd7dbdb32bd8f6d28b6043de13ad3a75f21f # v1.21.1
+        uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version: '24'
           cache: false
@@ -97,7 +97,7 @@ jobs:
 
       - name: Use npm with trusted publishing support
         if: inputs.recover_signatures_version == ''
-        run: npm install --global npm@11.14.1
+        run: npm ci --prefix .github/npm-cli && echo "$GITHUB_WORKSPACE/.github/npm-cli/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Install dependencies
         if: inputs.recover_signatures_version == ''
@@ -190,7 +190,7 @@ jobs:
 
       - name: Install cosign
         if: steps.changesets.outputs.published == 'true' || steps.recovery.outputs.packages != ''
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v3.8.0
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
 
       - name: Sign release artifacts with sigstore
         if: steps.changesets.outputs.published == 'true' || steps.recovery.outputs.packages != ''
@@ -243,17 +243,17 @@ jobs:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
       - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@3754dd7dbdb32bd8f6d28b6043de13ad3a75f21f # v1.21.1
+        uses: voidzero-dev/setup-vp@cab1ab9eaff52d4857875f4f2c016e36af8f2c76 # v1.22.0
         with:
           node-version: '24'
           cache: false
           run-install: false
 
       - name: Use npm with trusted publishing support
-        run: npm install --global npm@11.14.1
+        run: npm ci --prefix .github/npm-cli && echo "$GITHUB_WORKSPACE/.github/npm-cli/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Install dependencies
         run: vp install --frozen-lockfile
@@ -304,7 +304,7 @@ jobs:
           pnpm -r "${FILTERS[@]}" publish --access public --tag "$TAG_SUFFIX" --no-git-checks
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v3.8.0
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
 
       - name: Create GitHub releases and sign artifacts
         env:

@@ -86,6 +86,7 @@
     "@modelcontextprotocol/client": "catalog:",
     "@types/chrome": "catalog:",
     "@types/node": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "chrome-types": "catalog:",
     "playwright": "catalog:",

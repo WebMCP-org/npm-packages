@@ -325,9 +325,7 @@
   ```ts
   const modelContext = document.modelContext || navigator.modelContext;
   if (modelContext) {
-    modelContext.registerTool({
-      /* ... */
-    });
+    modelContext.registerTool({/* ... */});
   }
   ```
 

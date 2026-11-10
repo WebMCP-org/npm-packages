@@ -1,4 +1,4 @@
-import { expectTypeOf } from 'vitest';
+import { expectTypeOf, test } from 'vitest';
 import type { ReactElement } from 'react';
 import type {} from './index.js';
 
@@ -19,7 +19,9 @@ const declarativeForm = (
   </form>
 );
 
-expectTypeOf(declarativeForm).toMatchTypeOf<ReactElement>();
+test('declarative form attributes', () => {
+  expectTypeOf(declarativeForm).toMatchTypeOf<ReactElement>();
+});
 
 // @ts-expect-error React drops true-valued unknown attributes instead of rendering them.
 const booleanAutosubmit = <form toolautosubmit />;

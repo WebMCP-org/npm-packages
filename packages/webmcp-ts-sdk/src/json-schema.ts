@@ -34,13 +34,13 @@ type AdditionalProperties<TSchema> = TSchema extends { additionalProperties: fal
 
 type InferObject<TSchema> = Simplify<
   {
-    -readonly [K in keyof Properties<TSchema> as K extends RequiredKeys<TSchema>
-      ? K
-      : never]-?: InferJsonSchema<Properties<TSchema>[K]>;
+    -readonly [
+      K in keyof Properties<TSchema> as K extends RequiredKeys<TSchema> ? K : never
+    ]-?: InferJsonSchema<Properties<TSchema>[K]>;
   } & {
-    -readonly [K in keyof Properties<TSchema> as K extends RequiredKeys<TSchema>
-      ? never
-      : K]?: InferJsonSchema<Properties<TSchema>[K]>;
+    -readonly [
+      K in keyof Properties<TSchema> as K extends RequiredKeys<TSchema> ? never : K
+    ]?: InferJsonSchema<Properties<TSchema>[K]>;
   } & AdditionalProperties<TSchema>
 >;
 

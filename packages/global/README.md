@@ -86,9 +86,7 @@ declarative layer remain installed for the document lifetime. Existing native
 ```html
 <script type="module">
   import '@mcp-b/global';
-  await document.modelContext.registerTool({
-    /* your tool */
-  });
+  await document.modelContext.registerTool({/* your tool */});
 </script>
 ```
 
@@ -104,9 +102,7 @@ npm install @mcp-b/global
 ```javascript
 import '@mcp-b/global';
 
-await document.modelContext.registerTool({
-  /* your tool */
-});
+await document.modelContext.registerTool({/* your tool */});
 ```
 
 ## API Reference
@@ -128,9 +124,7 @@ initializeWebModelContext({
   },
 });
 
-await document.modelContext.registerTool({
-  /* your tool */
-});
+await document.modelContext.registerTool({/* your tool */});
 ```
 
 **Behavior:**
@@ -348,11 +342,7 @@ To prevent auto-initialization:
 
 ```javascript
 if ('modelContext' in document) {
-  void document.modelContext
-    .registerTool({
-      /* your tool */
-    })
-    .catch(console.error);
+  void document.modelContext.registerTool({/* your tool */}).catch(console.error);
 }
 ```
 
