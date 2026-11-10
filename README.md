@@ -133,9 +133,7 @@ Or as a script tag (zero build step):
 <script src="https://unpkg.com/@mcp-b/global@6/dist/index.iife.js"></script>
 <script type="module">
   if (!document.modelContext) throw new Error('WebMCP is unavailable');
-  await document.modelContext.registerTool({
-    /* ... */
-  });
+  await document.modelContext.registerTool({/* ... */});
 </script>
 ```
 
