@@ -1,7 +1,7 @@
 {
   "name": "@mcp-b/webmcp-types",
   "version": "6.0.3",
-  "description": "Compatibility alias for upstream webmcp-types; use webmcp-types directly",
+  "description": "Deprecated: forwards webmcp-types; use webmcp-types directly",
   "homepage": "https://github.com/webmachinelearning/webmcp-types",
   "bugs": {
     "url": "https://github.com/WebMCP-org/npm-packages/issues"
@@ -29,6 +29,6 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
-    "webmcp-types": "0.1.9"
+    "webmcp-types": "0.1.10"
   }
 }

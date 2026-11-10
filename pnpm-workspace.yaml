@@ -10,9 +10,9 @@ packages:
   - apps/*
 
 catalog:
-  '@modelcontextprotocol/client': 2.2.0
-  '@modelcontextprotocol/core': 2.0.0
-  '@modelcontextprotocol/server': 2.0.0
+  '@modelcontextprotocol/client': 2.4.0
+  '@modelcontextprotocol/core': 2.4.0
+  '@modelcontextprotocol/server': 2.4.0
   '@oxlint/plugins': 1.85.0
   '@types/chrome': ^0.2.7
   '@types/node': 22.20.1
@@ -28,7 +28,7 @@ catalog:
   vite: npm:@voidzero-dev/vite-plus-core@0.1.24
   vite-plus: 0.1.24
   vitest: npm:@voidzero-dev/vite-plus-test@0.1.24
-  zod: 4.4.3
+  zod: 4.6.7
 
 onlyBuiltDependencies:
   - '@parcel/watcher'

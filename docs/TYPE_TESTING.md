@@ -222,8 +222,9 @@ If you need anything broader than that, the design is probably wrong.
 
 ### 1. Use the canonical package for the boundary you are testing
 
-- strict core WebMCP types come from upstream `webmcp-types`
-- strict core runtime behavior comes from `@mcp-b/webmcp-polyfill`
+- strict core WebMCP types come from the official `webmcp-types`
+- strict core runtime behavior comes from the official `@w3c/webmcp-polyfill`;
+  `@mcp-b/webmcp-polyfill` adds only temporary declarative tools
 - MCP-B adapter extensions come from `@mcp-b/webmcp-ts-sdk`; globals installed by the full
   runtime come from `@mcp-b/global`
 
@@ -231,9 +232,10 @@ Do not import a weaker or more convenient type from the wrong layer.
 
 ### 2. Prefer the real runtime package over manual global installation
 
-If the test is about runtime behavior, use the runtime we publish.
+If the test is about runtime behavior, use the real runtime package.
 
-- use `@mcp-b/webmcp-polyfill` when testing strict core runtime behavior
+- use `@w3c/webmcp-polyfill` when testing strict core runtime behavior, and
+  `@mcp-b/webmcp-polyfill` when testing its temporary declarative tools
 - use `@mcp-b/global` when testing MCP-B runtime and extension behavior
 - the polyfill installs `document.modelContext`; `@mcp-b/global` wraps it with MCP-B extensions
 
@@ -326,7 +328,7 @@ Fix it so the nearest example matches the canonical package story:
 
 - Import each MCP-B contract from its owning package, with adapter extensions in
   `@mcp-b/webmcp-ts-sdk`
-- `@mcp-b/webmcp-polyfill` installs strict core runtime globals
+- `@w3c/webmcp-polyfill` installs strict core runtime globals
 - `@mcp-b/global` installs MCP-B runtime/extension globals
 - native Chromium tests use the real `document.modelContext.getTools()` and object-input `executeTool()` surfaces
 

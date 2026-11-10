@@ -41,7 +41,8 @@
     "directory": "packages/global"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE.webmcp-polyfill"
   ],
   "type": "module",
   "sideEffects": true,

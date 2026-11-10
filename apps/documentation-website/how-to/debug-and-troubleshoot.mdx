@@ -44,18 +44,17 @@ If `document.modelContext` is undefined, import the runtime before code register
 import '@mcp-b/global';
 ```
 
-For the tool-only polyfill, initialize it explicitly:
+For the W3C Community Group polyfill, initialize it explicitly:
 
 ```ts title="main.ts"
-import { installWebMCP } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@w3c/webmcp-polyfill';
 
 installWebMCP();
 ```
 
-The polyfill installs nothing on insecure pages or in browsers older than Chrome 126, Firefox 126,
-or Safari 18, so `document.modelContext` stays undefined there.
+The polyfill installs nothing on insecure pages, so `document.modelContext` stays undefined there.
 
-If you load the IIFE build, place its script tag before scripts that register tools. See [Choose a
+If you load the standalone script build, place its script tag before scripts that register tools. See [Choose a
 runtime](/how-to/choose-runtime) if the application imports more than one MCP-B runtime.
 
 The standalone polyfill has no public runtime marker. `@mcp-b/global` replaces the core context
@@ -105,5 +104,6 @@ bridges](/explanation/architecture/transports-and-bridges) for the trust boundar
 - If a tool works in isolation but an agent selects it incorrectly, use Chrome's [WebMCP evals
   guidance](https://developer.chrome.com/docs/ai/webmcp/evals).
 - For current native browser requirements and limitations, use the [Chrome WebMCP
-  documentation](https://developer.chrome.com/docs/ai/webmcp) instead of copying version or flag
-  instructions into your project.
+  documentation](https://developer.chrome.com/docs/ai/webmcp) and the [origin trial
+  announcement](https://developer.chrome.com/blog/ai-webmcp-origin-trial) instead of copying
+  version or flag instructions into your project.

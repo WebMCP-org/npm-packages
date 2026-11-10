@@ -1,10 +1,12 @@
 # Chrome flags for the native WebMCP showcase
 
 The showcase requires Chrome 155 or newer with the experimental WebMCP feature
-enabled. Chrome's preview can change between releases. Check the
-[WebMCP early preview post](https://developer.chrome.com/blog/webmcp-epp) and
-[WebMCP specification](https://webmachinelearning.github.io/webmcp/) when the
-browser surface changes.
+enabled. Chrome's implementation can change between releases. Check
+[Chrome's WebMCP overview](https://developer.chrome.com/docs/ai/webmcp), the
+[origin trial announcement](https://developer.chrome.com/blog/ai-webmcp-origin-trial),
+and the [WebMCP specification](https://webmachinelearning.github.io/webmcp/) when
+the browser surface changes. For manual local testing, Chrome's overview
+enables `chrome://flags/#enable-webmcp-testing`.
 
 Use the
 [Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd)
@@ -146,7 +148,7 @@ console.table(
 
 `executeTool()` is part of the current WebMCP draft. Browser previews can lag
 the draft; the native showcase skips execution assertions when the method is
-absent. MCP-B requires the upstream execution contract.
+absent. MCP-B requires the draft's execution contract.
 
 Do not fall back to `navigator.modelContextTesting.executeTool()` in native
 coverage. That would test a removed compatibility surface.

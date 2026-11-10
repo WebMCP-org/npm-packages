@@ -49,11 +49,13 @@ Pass an inline JSON Schema object to either hook. Both hooks preserve literal ty
 For a reusable schema constant, use `as const` to keep its literal information. Neither hook validates
 plain JSON Schema at runtime; validate in your handler when needed.
 
-For direct browser registration, activate the Community Group's declarations. Install the version
+For direct browser registration, activate the Community Group's declarations, which Chrome's
+[Imperative API guide](https://developer.chrome.com/docs/ai/webmcp/imperative-api) also recommends.
+`@mcp-b/webmcp-types` is deprecated and only forwards this package. Install the version
 the `@mcp-b/*` packages use so the project loads one copy of them:
 
 ```bash title="Install browser declarations"
-pnpm add -D webmcp-types@0.1.9
+pnpm add -D webmcp-types@0.1.10
 ```
 
 ## Convert a Standard JSON Schema implementation outside React
@@ -62,11 +64,11 @@ For direct native or polyfilled `registerTool()` calls, convert the metadata and
 callback. The MCP-B adapter lives at [`@mcp-b/webmcp-ts-sdk/schema`](/packages/webmcp-ts-sdk/reference#schema-boundary):
 
 ```bash title="Install the adapter and Zod"
-pnpm add @mcp-b/webmcp-polyfill @mcp-b/webmcp-ts-sdk zod@^4.2
+pnpm add @w3c/webmcp-polyfill @mcp-b/webmcp-ts-sdk zod@^4.2
 ```
 
 ```ts title="total-tool.ts"
-import { installWebMCP } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@w3c/webmcp-polyfill';
 import { normalizeInputSchema } from '@mcp-b/webmcp-ts-sdk/schema';
 import { z } from 'zod';
 

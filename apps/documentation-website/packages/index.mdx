@@ -7,8 +7,13 @@ icon: 'boxes-stacked'
 
 Packages are the primary entry point for this documentation. Start with a package overview when you need to choose the right building block, then move into that package's reference page for API details.
 
-Core browser declarations come from the Community Group package
-[`webmcp-types`](https://github.com/webmachinelearning/webmcp-types).
+The standard API has official packages outside this monorepo. Install
+[`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill), the W3C Community Group
+polyfill, for `document.modelContext`, and
+[`webmcp-types`](https://github.com/webmachinelearning/webmcp-types) for its TypeScript types, as
+Chrome's [Imperative API guide](https://developer.chrome.com/docs/ai/webmcp/imperative-api)
+recommends. `@mcp-b/webmcp-types` is deprecated and only forwards `webmcp-types`.
+The packages below connect a page to MCP clients and add MCP features.
 Cross-package concepts stay in [Explanation](/explanation/index); task-oriented setup stays in
 [Tutorials](/tutorials/index) and [How-To Guides](/how-to/index).
 
@@ -20,8 +25,8 @@ Cross-package concepts stay in [Explanation](/explanation/index); task-oriented 
     icon="boxes-stacked"
     href="/packages/webmcp-polyfill/overview"
   >
-    Tool registration and discovery polyfill for browsers without a compatible
-    `document.modelContext` implementation.
+    Deprecated pass-through over `@w3c/webmcp-polyfill` that keeps temporary declarative tools until
+    the official polyfill ships them.
   </Card>
   <Card title="@mcp-b/global" icon="boxes-stacked" href="/packages/global/overview">
     Full MCP-B runtime entry point that layers transport and extension APIs on top of the WebMCP

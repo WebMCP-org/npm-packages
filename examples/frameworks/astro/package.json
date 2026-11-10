@@ -10,7 +10,7 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "@mcp-b/webmcp-polyfill": "workspace:*",
+    "@w3c/webmcp-polyfill": "^0.1.0",
     "astro": "^7.3.5"
   }
 }

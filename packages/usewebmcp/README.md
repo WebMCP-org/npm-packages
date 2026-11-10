@@ -39,19 +39,17 @@ pnpm add usewebmcp
 ```
 
 The hook reads `document.modelContext` when it registers and does not wait for a runtime installed
-later. For browsers without it, install and initialize the polyfill before rendering tools:
+later. For browsers without it, load the official W3C polyfill before rendering tools:
 
 ```bash
-pnpm add @mcp-b/webmcp-polyfill
+pnpm add @w3c/webmcp-polyfill
 ```
 
 ```ts
-import { installWebMCP } from '@mcp-b/webmcp-polyfill';
-
-installWebMCP();
+import '@w3c/webmcp-polyfill/auto';
 ```
 
-Use [`@mcp-b/global`](../global/README.md) for MCP server features. Browser types come from the Community Group's [`webmcp-types`](https://github.com/webmachinelearning/webmcp-types).
+Use [`@mcp-b/global`](../global/README.md) for MCP server features. Browser types come from the Community Group's official [`webmcp-types`](https://www.npmjs.com/package/webmcp-types).
 
 ## Input schemas
 

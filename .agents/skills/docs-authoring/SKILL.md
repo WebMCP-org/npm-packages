@@ -217,7 +217,7 @@ Rules:
 
 ## Source of truth: what we own vs. what upstream owns
 
-This is critical. WebMCP is an active **Web Machine Learning Community Group proposal**, not a W3C Standard or Standards Track document. Our project (`@mcp-b/*`) provides a **polyfill and runtime** for that proposed API. The docs must make this distinction clear and always point to the canonical upstream sources for the proposal itself.
+This is critical. WebMCP is an active **Web Machine Learning Community Group proposal**, not a W3C Standard or Standards Track document. The Community Group publishes the official polyfill (`@w3c/webmcp-polyfill`) and types (`webmcp-types`). Our project (`@mcp-b/*`) provides the **MCP bridge and runtime** on top of that proposed API, plus temporary declarative tools. The docs must make this distinction clear and always point to the canonical upstream sources for the proposal itself.
 
 ### What the Community Group and Chrome own (link to these, don't re-document)
 
@@ -228,6 +228,8 @@ This is critical. WebMCP is an active **Web Machine Learning Community Group pro
 | Community Group draft      | https://webmachinelearning.github.io/webmcp/                                                    |
 | WebMCP repository overview | https://github.com/webmachinelearning/webmcp/blob/main/README.md                                |
 | Declarative API explainer  | https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md             |
+| Official polyfill          | https://github.com/w3c-oss/webmcp-polyfill                                                      |
+| Official TypeScript types  | https://www.npmjs.com/package/webmcp-types                                                      |
 | Implementation status      | https://github.com/webmachinelearning/webmcp/blob/main/implementation-status.md                 |
 | Security questionnaire     | https://github.com/webmachinelearning/webmcp/blob/main/security-privacy-questionnaire.md        |
 | Security and privacy       | https://webmachinelearning.github.io/webmcp/#security-and-privacy-considerations                |
@@ -299,7 +301,7 @@ This is critical. WebMCP is an active **Web Machine Learning Community Group pro
 | ---------------------------------- | ------------------------------------------------------------------------------- |
 | `@mcp-b/*` package APIs            | `packages/*/README.md` and `packages/*/src/`                                    |
 | Package architecture & philosophy  | `AGENTS.md`, `docs/MCPB_PACKAGE_PHILOSOPHY.md`                                  |
-| Polyfill behavior & initialization | `packages/webmcp-polyfill/`, `packages/global/`                                 |
+| Declarative layer & initialization | `packages/webmcp-polyfill/`, `packages/global/`                                 |
 | React hooks                        | `packages/react-webmcp/`, `packages/usewebmcp/`                                 |
 | Transports, iframe, relay          | `packages/transports/`, `packages/mcp-iframe/`, `packages/webmcp-local-relay/`  |
 | Tooling (smart-dom-reader, etc.)   | `packages/smart-dom-reader/`, etc.                                              |

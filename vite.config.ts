@@ -14,8 +14,6 @@ const agentToolingIgnorePatterns = [
   '.windsurf/**',
 ];
 
-const upstreamVendorIgnorePatterns = ['packages/webmcp-polyfill/src/upstream/**'];
-
 export default defineConfig({
   lint: {
     ignorePatterns: [
@@ -30,7 +28,6 @@ export default defineConfig({
       'chromium/',
       'packages/smart-dom-reader/**/lib/**',
       ...agentToolingIgnorePatterns,
-      ...upstreamVendorIgnorePatterns,
     ],
     jsPlugins: [{ name: 'anti-slop', specifier: './tools/oxlint/anti-slop/index.ts' }],
     rules: {
@@ -50,12 +47,7 @@ export default defineConfig({
     },
   },
   fmt: {
-    ignorePatterns: [
-      '**/dist/**',
-      'tools/oxlint/anti-slop/**',
-      ...agentToolingIgnorePatterns,
-      ...upstreamVendorIgnorePatterns,
-    ],
+    ignorePatterns: ['**/dist/**', 'tools/oxlint/anti-slop/**', ...agentToolingIgnorePatterns],
     singleQuote: true,
     semi: true, // semicolons: "always"
     trailingComma: 'es5',

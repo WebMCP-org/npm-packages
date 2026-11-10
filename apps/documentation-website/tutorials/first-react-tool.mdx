@@ -1,7 +1,8 @@
 ---
 title: 'Build your first React tool'
 description: 'Register a WebMCP tool from a React component using the useWebMCP hook, and verify it from the browser console.'
-keywords: ['react', 'usewebmcp', 'hook', 'webmcp-polyfill', 'vite', 'registertool', 'component']
+keywords:
+  ['react', 'usewebmcp', 'hook', '@w3c/webmcp-polyfill', 'vite', 'registertool', 'component']
 icon: 'react'
 ---
 
@@ -12,7 +13,7 @@ In this tutorial, we will create a minimal React app that registers one WebMCP t
 - Node.js 22.12 or later
 - pnpm
 - A text editor
-- Chrome or Edge 126+, Firefox 126+, or Safari 18+
+- A current version of Chrome, Edge, Firefox, or Safari
 
 ## What we will build
 
@@ -37,10 +38,10 @@ cd my-webmcp-react
 Install the WebMCP dependencies:
 
 ```bash title="Install the hook and polyfill"
-pnpm add @mcp-b/webmcp-polyfill usewebmcp
+pnpm add @w3c/webmcp-polyfill usewebmcp
 ```
 
-`@mcp-b/webmcp-polyfill` provides the `document.modelContext` runtime. `usewebmcp` provides the React hook for tool registration.
+[`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill), the W3C Community Group polyfill, provides the `document.modelContext` runtime. `usewebmcp` provides the React hook for tool registration.
 
 </Step>
 
@@ -49,7 +50,7 @@ pnpm add @mcp-b/webmcp-polyfill usewebmcp
 Open `src/main.tsx` and add the polyfill initialization before `createRoot`:
 
 ```tsx title="src/main.tsx"
-import { installWebMCP } from '@mcp-b/webmcp-polyfill';
+import { installWebMCP } from '@w3c/webmcp-polyfill';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';

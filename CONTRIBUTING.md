@@ -162,9 +162,9 @@ Package scopes (all in `packages/` directory):
 - `usewebmcp` - usewebmcp (strict core WebMCP React hooks)
 - `webmcp-extension` - @mcp-b/webmcp-extension
 - `webmcp-local-relay` - @mcp-b/webmcp-local-relay
-- `webmcp-polyfill` - @mcp-b/webmcp-polyfill
+- `webmcp-polyfill` - @mcp-b/webmcp-polyfill (deprecated; temporary declarative tools over `@w3c/webmcp-polyfill`)
 - `webmcp-ts-sdk` - @mcp-b/webmcp-ts-sdk
-- `webmcp-types` - compatibility alias for upstream webmcp-types
+- `webmcp-types` - @mcp-b/webmcp-types (deprecated; forwards `webmcp-types`)
 
 Repository-wide scopes:
 
@@ -229,10 +229,10 @@ npm-packages/
 │   ├── transports/              # Core transport implementations
 │   ├── webmcp-extension/        # MV3 extension template and content-script client
 │   ├── webmcp-local-relay/      # Local relay for desktop MCP clients
-│   ├── webmcp-polyfill/         # Vendored upstream polyfill plus temporary declarative tools
+│   ├── webmcp-polyfill/         # Deprecated: @w3c/webmcp-polyfill plus temporary declarative tools
 │   ├── usewebmcp/               # React hooks for strict core WebMCP API
 │   ├── webmcp-ts-sdk/           # MCP SDK adapter and MCP-B extensions
-│   └── webmcp-types/            # Compatibility alias for upstream webmcp-types
+│   └── webmcp-types/            # Deprecated: forwards webmcp-types
 ├── e2e/                         # E2E tests and test apps
 ├── docs/                        # Technical documentation
 └── .changeset/                  # Changeset files
