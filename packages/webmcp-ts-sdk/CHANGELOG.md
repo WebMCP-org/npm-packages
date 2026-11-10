@@ -1,5 +1,21 @@
 # @mcp-b/webmcp-ts-sdk
 
+## 6.1.0
+
+### Minor Changes
+
+- 17852d4: Update the MCP TypeScript SDK (`@modelcontextprotocol/client`, `core` and `server`) to 2.4.0
+  and Zod to 4.6.7. Every package now depends on the same SDK version.
+
+### Patch Changes
+
+- 463e3d4: Update `webmcp-types` to 0.1.10, the version `@w3c/webmcp-polyfill` resolves. It adds
+  `ontoolactivated` and `ontoolcancel` to `ModelContext`, so an object you type as `ModelContext`
+  yourself now needs both.
+- Updated dependencies [463e3d4]
+- Updated dependencies [463e3d4]
+  - @mcp-b/webmcp-polyfill@6.1.0
+
 ## 6.0.3
 
 ### Patch Changes
