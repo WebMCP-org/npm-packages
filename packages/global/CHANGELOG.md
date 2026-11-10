@@ -1,5 +1,14 @@
 # @mcp-b/global
 
+## 6.2.0
+
+### Patch Changes
+
+- Updated dependencies [f2e2de2]
+  - @mcp-b/webmcp-ts-sdk@6.2.0
+  - @mcp-b/webmcp-polyfill@6.2.0
+  - @mcp-b/transports@6.2.0
+
 ## 6.1.0
 
 ### Minor Changes

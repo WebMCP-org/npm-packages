@@ -1,5 +1,7 @@
 # @mcp-b/webmcp-types
 
+## 6.2.0
+
 ## 6.1.0
 
 ### Minor Changes

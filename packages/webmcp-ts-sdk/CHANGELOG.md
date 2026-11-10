@@ -1,5 +1,15 @@
 # @mcp-b/webmcp-ts-sdk
 
+## 6.2.0
+
+### Minor Changes
+
+- f2e2de2: Publish a tool descriptor's `_meta` as the MCP tool's `_meta` in `tools/list`, so MCP Apps tools can link their UI with `_meta.ui.resourceUri` through `registerTool()` and `useWebMCP()`. Previously the field was silently dropped. It is not mirrored to the browser's model context, and a non-object `_meta` rejects with `TypeError`.
+
+### Patch Changes
+
+- @mcp-b/webmcp-polyfill@6.2.0
+
 ## 6.1.0
 
 ### Minor Changes

@@ -1,5 +1,12 @@
 # @mcp-b/smart-dom-reader-server
 
+## 6.2.0
+
+### Patch Changes
+
+- b265a07: Update dependencies that had known vulnerabilities: `ws` in `@mcp-b/webmcp-local-relay`, and
+  `tsx` and `playwright` in `@mcp-b/smart-dom-reader-server`.
+
 ## 6.1.0
 
 ### Minor Changes

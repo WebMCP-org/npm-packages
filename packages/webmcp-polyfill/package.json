@@ -1,6 +1,6 @@
 {
   "name": "@mcp-b/webmcp-polyfill",
-  "version": "6.1.0",
+  "version": "6.2.0",
   "description": "Deprecated: wraps @w3c/webmcp-polyfill and adds temporary declarative tools; use @w3c/webmcp-polyfill directly",
   "keywords": [
     "browser",
