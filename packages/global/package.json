@@ -92,6 +92,7 @@
   "devDependencies": {
     "@modelcontextprotocol/client": "catalog:",
     "@types/node": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",
     "typescript": "catalog:",

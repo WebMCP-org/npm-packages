@@ -1,4 +1,4 @@
-import { expectTypeOf } from 'vitest';
+import { expectTypeOf, test } from 'vitest';
 import type {
   CallToolResult,
   ModelContextProtocol,
@@ -30,16 +30,18 @@ const readResource: WebMCPResourceConfig['read'] = async (
   contents: [{ uri: uri.href, text: '{}' }],
 });
 
-expectTypeOf(getPrompt).parameter(0).toEqualTypeOf<Parameters<PromptDescriptor['get']>[0]>();
-expectTypeOf(readResource).parameter(0).toEqualTypeOf<URL>();
+test('prompt and resource handler types', () => {
+  expectTypeOf(getPrompt).parameter(0).toEqualTypeOf<Parameters<PromptDescriptor['get']>[0]>();
+  expectTypeOf(readResource).parameter(0).toEqualTypeOf<URL>();
 
-expectTypeOf<WebMCPResourceConfig>().toEqualTypeOf<
-  ResourceDescriptor & Pick<WebMCPConfig, 'enabled'>
->();
-expectTypeOf<WebMCPResourceReturn>().toEqualTypeOf<WebMCPPromptReturn>();
-expectTypeOf<Parameters<typeof useWebMCPContext>[3]>().toEqualTypeOf<
-  Pick<WebMCPConfig, 'enabled'> | undefined
->();
+  expectTypeOf<WebMCPResourceConfig>().toEqualTypeOf<
+    ResourceDescriptor & Pick<WebMCPConfig, 'enabled'>
+  >();
+  expectTypeOf<WebMCPResourceReturn>().toEqualTypeOf<WebMCPPromptReturn>();
+  expectTypeOf<Parameters<typeof useWebMCPContext>[3]>().toEqualTypeOf<
+    Pick<WebMCPConfig, 'enabled'> | undefined
+  >();
+});
 
 const disabledTool = {
   name: 'disabled_tool',
@@ -78,6 +80,8 @@ void invalidPrompt;
 void invalidResource;
 void invalidContext;
 
-expectTypeOf<ModelContextProtocol['registerPrompt']>().toBeFunction();
-expectTypeOf<ToolDescriptor['annotations']>().toEqualTypeOf<ToolAnnotations | undefined>();
-expectTypeOf<CallToolResult['content']>().toBeArray();
+test('re-exported SDK types', () => {
+  expectTypeOf<ModelContextProtocol['registerPrompt']>().toBeFunction();
+  expectTypeOf<ToolDescriptor['annotations']>().toEqualTypeOf<ToolAnnotations | undefined>();
+  expectTypeOf<CallToolResult['content']>().toBeArray();
+});

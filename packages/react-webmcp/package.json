@@ -86,6 +86,7 @@
     "@modelcontextprotocol/server": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "playwright": "catalog:",
     "react": "catalog:",
