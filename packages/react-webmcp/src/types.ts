@@ -1,4 +1,5 @@
 import type { StandardJSONSchemaV1, StandardSchemaV1 } from '@standard-schema/spec';
+import type { WebMCPPlugin } from '@mcp-b/webmcp-plugins';
 import type { ToolInputSchema } from '@mcp-b/webmcp-ts-sdk/schema';
 import type {
   InferJsonSchema,
@@ -47,6 +48,8 @@ export interface WebMCPConfig<
   annotations?: ToolAnnotations;
   formatOutput?: (result: InferOutput<TOutput>) => MaybePromise<unknown>;
   formatError?: (error: Error) => MaybePromise<unknown>;
+  /** Run around every execution, outermost first, with the validated input. */
+  plugins?: readonly WebMCPPlugin[];
 }
 
 export type ToolExecuteFunction<
