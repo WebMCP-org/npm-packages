@@ -58,9 +58,9 @@ interface TestTool {
   name: string;
   title?: string;
   description: string;
-  /** A string is what Chrome before 155 reports. */
-  inputSchema?: object | string;
-  annotations?: RegisteredTool['annotations'];
+  /** A string is what Chrome before 155 reports; null is what Chrome 158 reports when absent. */
+  inputSchema?: object | string | null;
+  annotations?: RegisteredTool['annotations'] | null;
   execute?: (
     input: WebMcpToolObjectInput,
     signal?: AbortSignal
@@ -607,6 +607,18 @@ describe('widget runtime', () => {
     });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('Chrome 155'));
     warn.mockRestore();
+  });
+
+  it('relays a tool whose input schema and annotations are null', async () => {
+    const env = startRuntime({
+      tools: [{ name: 'bare', description: 'No schema', inputSchema: null, annotations: null }],
+    });
+    const connection = await completeHandshake(env);
+
+    expect(connection.messages[1]).toEqual({
+      tools: [{ name: 'bare', title: '', description: 'No schema' }],
+      type: 'tools/list',
+    });
   });
 
   it('publishes tools and tool changes from the host page model context', async () => {
