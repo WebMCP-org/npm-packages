@@ -129,7 +129,9 @@ test.describe('Chrome WebMCP native smoke', () => {
     expect(result.hasToolAfterUnregister).toBe(false);
   });
 
-  test('getTools omits inputSchema when registration omits it', async ({ page }) => {
+  // Chrome returns Tool interface objects (webmachinelearning/webmcp#348), whose inputSchema is
+  // null when absent. The draft's RegisteredTool dictionary leaves the member undefined.
+  test('getTools reports a null inputSchema when registration omits it', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
       if (!context) throw new Error('Native document.modelContext is unavailable');
@@ -173,8 +175,8 @@ test.describe('Chrome WebMCP native smoke', () => {
           throw new Error('Registered tools are missing from getTools()');
         }
         return {
-          noSchemaIsUndefined: listedNoSchema.inputSchema === undefined,
-          undefinedSchemaIsUndefined: listedUndefinedSchema.inputSchema === undefined,
+          noSchemaIsNull: listedNoSchema.inputSchema === null,
+          undefinedSchemaIsNull: listedUndefinedSchema.inputSchema === null,
         };
       } finally {
         noSchemaController.abort();
@@ -182,8 +184,8 @@ test.describe('Chrome WebMCP native smoke', () => {
       }
     });
 
-    expect(result.noSchemaIsUndefined).toBe(true);
-    expect(result.undefinedSchemaIsUndefined).toBe(true);
+    expect(result.noSchemaIsNull).toBe(true);
+    expect(result.undefinedSchemaIsNull).toBe(true);
   });
 
   test('executeTool accepts a discovered tool descriptor and object inputs', async ({ page }) => {
@@ -282,7 +284,7 @@ test.describe('Chrome WebMCP native smoke', () => {
 
     expect(result.didThrow).toBe(true);
     expect(result.name).toBe('TypeError');
-    expect(result.message).toMatch(/input object|not an object/i);
+    expect(result.message).toMatch(/parameter 2 is not of type 'object'/);
   });
 
   test('executeTool rejects primitive inputs with TypeError', async ({ page }) => {
@@ -307,10 +309,10 @@ test.describe('Chrome WebMCP native smoke', () => {
 
     expect(result.didThrow).toBe(true);
     expect(result.name).toBe('TypeError');
-    expect(result.message).toMatch(/input object|not an object/i);
+    expect(result.message).toMatch(/parameter 2 is not of type 'object'/);
   });
 
-  test('executeTool rejects a stale registered descriptor with UnknownError', async ({ page }) => {
+  test('executeTool rejects a stale registered descriptor with NotFoundError', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
       if (!context) throw new Error('Native document.modelContext is unavailable');
@@ -345,11 +347,11 @@ test.describe('Chrome WebMCP native smoke', () => {
     });
 
     expect(result.didThrow).toBe(true);
-    expect(result.name).toBe('UnknownError');
+    expect(result.name).toBe('NotFoundError');
     expect((result.message ?? '').length).toBeGreaterThan(0);
   });
 
-  test('executeTool maps thrown tool invocation failures to UnknownError', async ({ page }) => {
+  test('executeTool maps thrown tool invocation failures to OperationError', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
       if (!context) throw new Error('Native document.modelContext is unavailable');
@@ -385,7 +387,7 @@ test.describe('Chrome WebMCP native smoke', () => {
     });
 
     expect(result.didThrow).toBe(true);
-    expect(result.name).toBe('UnknownError');
+    expect(result.name).toBe('OperationError');
     expect((result.message ?? '').length).toBeGreaterThan(0);
   });
 
