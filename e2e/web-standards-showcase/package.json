@@ -26,10 +26,10 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "tailwind-merge": "^3.7.0",
-    "webmcp-types": "^0.1.10"
+    "webmcp-types": "^0.1.11"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.67.0",
+    "@cloudflare/vite-plugin": "^1.70.0",
     "@mcp-b/webmcp-local-relay": "workspace:*",
     "@modelcontextprotocol/server": "catalog:",
     "@tailwindcss/vite": "^4.3.4",
@@ -42,6 +42,6 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:",
-    "wrangler": "^4.157.0"
+    "wrangler": "^4.165.0"
   }
 }

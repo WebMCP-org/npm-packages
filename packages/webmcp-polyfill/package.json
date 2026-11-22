@@ -61,8 +61,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@w3c/webmcp-polyfill": "0.1.0",
-    "webmcp-types": "0.1.10"
+    "@w3c/webmcp-polyfill": "0.1.1",
+    "webmcp-types": "0.1.11"
   },
   "devDependencies": {
     "@vitest/browser-playwright": "catalog:",
