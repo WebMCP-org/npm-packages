@@ -89,8 +89,8 @@ controllers. They are not browser API buckets.
 
 ### Discover registered descriptors
 
-`getTools()` is asynchronous and returns registered descriptors. Each descriptor
-includes browser-owned fields such as `window` and `origin`.
+`getTools()` is asynchronous and returns `Tool` objects. Each one includes
+browser-owned members such as `source` and `origin`.
 
 ```javascript
 const tools = await document.modelContext.getTools();

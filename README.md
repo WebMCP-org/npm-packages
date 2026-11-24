@@ -241,7 +241,7 @@ pnpm add @mcp-b/global
 pnpm add @w3c/webmcp-polyfill
 
 # Official WebMCP TypeScript definitions (dev dependency)
-pnpm add -D webmcp-types@0.1.10
+pnpm add -D webmcp-types@0.2.0
 
 # MCP-B adapter and schema helpers
 pnpm add @mcp-b/webmcp-ts-sdk

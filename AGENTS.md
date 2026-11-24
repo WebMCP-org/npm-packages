@@ -90,15 +90,18 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 
 - `document.modelContext` is the canonical current-draft WebMCP surface.
 - The official packages are [`@w3c/webmcp-polyfill`](https://github.com/w3c-oss/webmcp-polyfill)
-  (core imperative API and frames; no declarative tools or lifecycle events yet) and
+  (core imperative API, frames, and lifecycle events; no declarative tools yet) and
   `webmcp-types`. MCP-B packages build the MCP side on top of them.
 - `executeTool(tool, inputObject)` takes an input object and resolves to a string.
   Results are JSON, except that native declarative tools can return plain text, so
   MCP-B treats a result as structured only when it parses to a plain JSON object.
   String input, string input schemas, and navigator aliases are not supported.
-- The draft fires `toolactivated` and `toolcancel` at the model context. `@w3c/webmcp-polyfill`
-  does not fire them yet; MCP-B's declarative layer fires both for declarative tools;
-  `BrowserMcpServer` re-dispatches them and adds `ontoolactivated` and `ontoolcancel`.
+- `getTools()` returns `Tool` objects (webmachinelearning/webmcp#348). Each identifies one
+  registration, so executing a `Tool` whose registration is gone rejects with `NotFoundError`,
+  and `executeTool()` rejects anything `getTools()` did not return. Their `source` is `window`
+  in Chrome before 160.
+- The draft, native Chrome, and `@w3c/webmcp-polyfill` fire `toolactivated` and `toolcancel` at
+  the model context; `BrowserMcpServer` re-dispatches them and adds `ontoolactivated` and `ontoolcancel`.
 - Native Chrome lanes require Chrome 155 or later, the first release with object input.
 - `@mcp-b/webmcp-polyfill` needs Chrome 126, Firefox 126, or Safari 18 (`URL.parse()`). On older
   engines and insecure pages, `installWebMCP()` installs nothing.
@@ -145,8 +148,8 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 | `getTools()`                       |       Y       |            Y             |       Y (delegates to core)        |
 | `ontoolchange`                     |       Y       |            Y             |                 Y                  |
 | `executeTool(tool, input)`         |  Y (object)   |        Y (object)        |             Y (object)             |
-| `toolactivated` / `toolcancel`     |       Y       |   Y (declarative only)   |         Y (re-dispatched)          |
-| `ontoolactivated` / `ontoolcancel` |       Y       |            -             |                 Y                  |
+| `toolactivated` / `toolcancel`     |       Y       |            Y             |         Y (re-dispatched)          |
+| `ontoolactivated` / `ontoolcancel` |       Y       |            Y             |                 Y                  |
 | MCP-B declarative tools            |   explainer   |            Y             |          Y (via polyfill)          |
 | `outputSchema`                     |       -       |            -             |                 Y                  |
 | `registerPrompt()`                 |       -       |            -             |                 Y                  |
@@ -163,7 +166,7 @@ Repo scopes: `root`, `deps`, `release`, `ci`, `docs`, `*`
 ### Type ownership
 
 - The official `webmcp-types` owns the WebMCP browser contracts and `document.modelContext`
-  declaration. Packages pin it exactly to `0.1.10`, the version `@w3c/webmcp-polyfill`
+  declaration. Packages pin it exactly to `0.2.0`, the version `@w3c/webmcp-polyfill`
   resolves. It declares lifecycle members and event classes that the official polyfill does
   not implement yet: `BrowserMcpServer` adds the two handlers, and nothing defines the event
   constructors.
