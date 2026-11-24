@@ -1,5 +1,13 @@
 # @mcp-b/react-webmcp
 
+## 7.0.0
+
+### Patch Changes
+
+- Updated dependencies [81f55db]
+  - @mcp-b/webmcp-ts-sdk@7.0.0
+  - usewebmcp@7.0.0
+
 ## 6.2.0
 
 ### Minor Changes

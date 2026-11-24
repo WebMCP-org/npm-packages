@@ -1,5 +1,7 @@
 # @mcp-b/smart-dom-reader-server
 
+## 7.0.0
+
 ## 6.2.0
 
 ### Patch Changes
