@@ -224,10 +224,11 @@ The upstream suite lives in
 workflow pins its WPT revision and injects
 `packages/webmcp-polyfill/dist/index.iife.js` with native WebMCP disabled. It
 runs an explicit allowlist of page-local imperative and declarative files. The
-frame-tree, origin-policy, and navigation files need native coverage. The rest
-need features the official `@w3c/webmcp-polyfill` does not provide yet:
-`ToolActivatedEvent` and `ToolCancelEvent`, the tool pseudo-classes, and raw
-(non-JSON) `executeTool()` results. The shared declarative suite runs against both
+frame-tree, origin-policy, and navigation files need native coverage, as does
+`model_context.https.html`, whose helper frames the harness does not inject. The rest
+need features the polyfill does not provide: the tool pseudo-classes, raw
+(non-JSON) `executeTool()` results, and `DataError` for input a declarative form
+rejects, which the official core reports as `OperationError`. The shared declarative suite runs against both
 `@mcp-b/global` and the standalone polyfill. The polyfill harness lives in
 `packages/webmcp-polyfill/src/declarative-forms.test.ts` and runs with that
 package's default `test` and `test:coverage` scripts. Its `test:smoke` script
@@ -250,10 +251,9 @@ Two requirements beyond the behavioral lane:
   checkout without it fails with `Error fetching /interfaces/webmcp.idl`. The
   workflow's `sparse-checkout` block lists it; fix an existing local clone with
   `git -C .reference/wpt sparse-checkout add interfaces` (~1.8 MB).
-- The official `@w3c/webmcp-polyfill` does not define `ToolActivatedEvent`,
-  `ToolCancelEvent`, or the `ontoolactivated`/`ontoolcancel` handlers, so those
-  subtests fail. CI runs the lane with `continue-on-error: true` until the official
-  polyfill ships them.
+- The pinned `webmcp.idl` still declares the `RegisteredTool` dictionary that the
+  draft replaced with the `Tool` interface, so the lane does not check `Tool`. CI
+  runs it with `continue-on-error: true` until the pin catches up.
 
 ## Extension Transport Testing
 
