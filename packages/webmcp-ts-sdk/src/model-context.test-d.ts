@@ -10,7 +10,7 @@ import type {
 } from './index.js';
 
 test('core contracts come directly from upstream WebMCP', () => {
-  expectTypeOf<RegisteredTool>().toEqualTypeOf<WebMCP.RegisteredTool>();
+  expectTypeOf<RegisteredTool>().toEqualTypeOf<WebMCP.Tool>();
   expectTypeOf<ModelContext>().toEqualTypeOf<WebMCP.ModelContext>();
 });
 

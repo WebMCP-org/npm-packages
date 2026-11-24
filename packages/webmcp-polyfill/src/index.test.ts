@@ -44,3 +44,32 @@ it('installs the upstream object-input API idempotently', async () => {
     .poll(async () => (await context.getTools()).some(({ name }) => name === tool.name))
     .toBe(false);
 });
+
+it('returns Tool objects that identify one registration', async () => {
+  installWebMCP();
+  const context = document.modelContext;
+  if (!context) throw new Error('Upstream installer did not provide document.modelContext');
+  const registerVersion = async (version: string) => {
+    const controller = new AbortController();
+    await context.registerTool(
+      { name: 'versioned', description: version, execute: () => version },
+      { signal: controller.signal }
+    );
+    const tool = (await context.getTools()).find(({ name }) => name === 'versioned');
+    if (!tool) throw new Error('Upstream polyfill did not return the registered tool');
+    return { controller, tool };
+  };
+
+  const first = await registerVersion('first');
+  expect(first.tool.source).toBe(window);
+  expect(first.tool).toMatchObject({ inputSchema: null, outputSchema: null, annotations: null });
+  await expect(context.executeTool({ ...first.tool }, {})).rejects.toBeInstanceOf(TypeError);
+
+  first.controller.abort();
+  const second = await registerVersion('second');
+  await expect(context.executeTool(first.tool, {})).rejects.toMatchObject({
+    name: 'NotFoundError',
+  });
+  await expect(context.executeTool(second.tool, {})).resolves.toBe('"second"');
+  second.controller.abort();
+});

@@ -38,7 +38,7 @@ export type ToolExecuteFunction<
 export interface WebMCPConfig<
   TInputSchema extends ToolInputSchema = object,
   TResult = unknown,
-> extends Omit<WebMCP.ModelContextTool, 'inputSchema' | 'execute'> {
+> extends Omit<WebMCP.ModelContextTool, 'inputSchema' | 'outputSchema' | 'execute'> {
   inputSchema?: TInputSchema;
   execute: ToolExecuteFunction<TInputSchema, TResult>;
   /** Register while true. Local execution remains available when false. */

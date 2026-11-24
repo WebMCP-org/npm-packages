@@ -1,6 +1,6 @@
 import type { WebMCP } from 'webmcp-types';
 
-export type ToolInfo = WebMCP.RegisteredTool;
+export type ToolInfo = WebMCP.Tool;
 
 export interface ToolRegistration {
   unregister(): void;

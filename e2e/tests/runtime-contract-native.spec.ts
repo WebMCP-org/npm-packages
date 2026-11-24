@@ -151,7 +151,8 @@ test.describe('Runtime Contract - Browser API Caller', () => {
           inputSchemaIsObject:
             inputSchema !== null && typeof inputSchema === 'object' && !Array.isArray(inputSchema),
           origin: sumTool.origin,
-          hasWindow: sumTool.window === window,
+          // Chrome before 160 reports `window` instead of `source`.
+          hasSource: (sumTool.source ?? sumTool.window) === window,
         },
         execution,
       };
@@ -162,7 +163,7 @@ test.describe('Runtime Contract - Browser API Caller', () => {
       name: 'sum',
       inputSchemaIsObject: true,
       origin: expect.any(String),
-      hasWindow: true,
+      hasSource: true,
     });
     expect(result.execution).toContain('sum:11');
   });

@@ -335,21 +335,23 @@ describe('global adapter', () => {
     });
 
     const tools = await modelContext.getTools();
-    expect(tools).toEqual([
-      expect.objectContaining({
-        name: 'native_shape_tool',
-        title: 'Native shape tool',
-        description: 'Native shape tool',
-        // An object since webmcp#241.
-        inputSchema: {
-          type: 'object',
-          properties: { value: { type: 'number' } },
-          required: ['value'],
-        },
-        origin: expect.any(String),
-        window: expect.any(Object),
-      }),
-    ]);
+    expect(tools).toHaveLength(1);
+    // A Tool's members are prototype getters, so toEqual() cannot see them.
+    expect(tools[0]).toMatchObject({
+      name: 'native_shape_tool',
+      title: 'Native shape tool',
+      description: 'Native shape tool',
+      // An object since webmcp#241.
+      inputSchema: {
+        type: 'object',
+        properties: { value: { type: 'number' } },
+        required: ['value'],
+      },
+      outputSchema: null,
+      annotations: null,
+      origin: location.origin,
+    });
+    expect(tools[0]?.source).toBe(window);
     await expect(modelContext.executeTool(tools[0]!, { value: 7 })).resolves.toBe('{"value":7}');
   });
 
@@ -514,8 +516,11 @@ describe('global adapter', () => {
       title: '',
       name: 'native_event_tool',
       description: 'Added after initialization',
+      inputSchema: null,
+      outputSchema: null,
+      annotations: null,
       origin: window.location.origin,
-      window,
+      source: window,
     });
     nativeContext.dispatchEvent(new Event('toolchange'));
     await vi.waitFor(() => {

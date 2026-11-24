@@ -46,7 +46,7 @@ test.describe('Chrome WebMCP native smoke', () => {
     expect(surface.hasMcpBExtensions).toBe(true);
   });
 
-  test('getTools returns valid RegisteredTool entries for every tool', async ({ page }) => {
+  test('getTools returns valid Tool objects for every tool', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;
       if (!context) throw new Error('Native document.modelContext is unavailable');
@@ -67,10 +67,12 @@ test.describe('Chrome WebMCP native smoke', () => {
         if (!isString(tool.origin)) {
           invalidEntries.push({ index, reason: 'origin' });
         }
-        if (!tool.window || tool.window.window !== tool.window) {
-          invalidEntries.push({ index, reason: 'window' });
+        // Chrome before 160 reports `window` instead of `source`.
+        const source = tool.source ?? tool.window;
+        if (!source || source.window !== source) {
+          invalidEntries.push({ index, reason: 'source' });
         }
-        if (tool.inputSchema !== undefined && !isJsonObject(tool.inputSchema)) {
+        if (tool.inputSchema !== null && !isJsonObject(tool.inputSchema)) {
           invalidEntries.push({ index, reason: 'inputSchema-type' });
         }
       });
@@ -129,8 +131,8 @@ test.describe('Chrome WebMCP native smoke', () => {
     expect(result.hasToolAfterUnregister).toBe(false);
   });
 
-  // Chrome returns Tool interface objects (webmachinelearning/webmcp#348), whose inputSchema is
-  // null when absent. The draft's RegisteredTool dictionary leaves the member undefined.
+  // getTools() returns Tool objects (webmachinelearning/webmcp#348), whose inputSchema is null
+  // when absent.
   test('getTools reports a null inputSchema when registration omits it', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const context = window.__WEBMCP_RAW_DOCUMENT_MODEL_CONTEXT__;

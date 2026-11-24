@@ -2,7 +2,6 @@ import { expect, type Page, test } from '@playwright/test';
 import type { BrowserMcpServer } from '@mcp-b/webmcp-ts-sdk';
 
 type NativeRegisterTool = NonNullable<Document['modelContext']>['registerTool'];
-type RegisterTool = (...args: Parameters<NativeRegisterTool>) => ReturnType<NativeRegisterTool>;
 
 const dynamicItemSnapshot = (page: Page) =>
   page.evaluate(() => {
@@ -237,7 +236,7 @@ test('keeps the replacement ready when an older refresh finishes', async ({ page
       Promise.withResolvers<void>();
     let delayNextRegistration = true;
 
-    const delayedRegisterTool: RegisterTool = async (tool, options) => {
+    const delayedRegisterTool: NativeRegisterTool = async (tool, options) => {
       await registerTool(tool, options);
       if (!delayNextRegistration) return;
       delayNextRegistration = false;

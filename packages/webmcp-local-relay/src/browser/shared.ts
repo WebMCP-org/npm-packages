@@ -52,6 +52,11 @@ export function normalizeSerializedToolResult(serialized: string): CallToolResul
   return normalizeToolResponse(rawResult);
 }
 
+/** Chrome before 160 and earlier polyfills call a tool's source `window`. */
+function isFromPage(tool: RegisteredTool, page: Window): boolean {
+  return (tool.source ?? tool.window) === page;
+}
+
 /**
  * Keeps one tool per name. `getTools()` also returns tools from other
  * same-origin frames; a tool registered by `page` wins a name collision.
@@ -67,7 +72,7 @@ export function selectRelayTools(tools: RegisteredTool[], page: Window): Registe
           `[webmcp-relay-widget] More than one frame registered a tool named "${tool.name}". Only one is relayed, preferring the host page's own tool.`
         );
       }
-      if (kept.window === page || tool.window !== page) continue;
+      if (isFromPage(kept, page) || !isFromPage(tool, page)) continue;
     }
     selected.set(tool.name, tool);
   }

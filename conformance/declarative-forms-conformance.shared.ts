@@ -6,9 +6,9 @@ interface DeclarativeFormConformanceOptions {
   install?(): void | Promise<void>;
   cleanup?(): void | Promise<void>;
   /**
-   * DOMException names for a cancelled call and for input the form rejects. Chrome uses the
-   * draft's tool execution errors. The default is `UnknownError` for both, which is what
-   * `@w3c/webmcp-polyfill` reports for every failure.
+   * DOMException names for a cancelled call and for input the form rejects, which Chrome tells
+   * apart. The default is `OperationError` for both: a declarative tool is a callback to
+   * `@w3c/webmcp-polyfill`, which reports that name whenever a callback rejects.
    */
   errorNames?: { cancelled: string; invalidInput: string };
 }
@@ -57,8 +57,8 @@ function onToolActivated(name: string, handler: () => void): void {
 
 async function waitForTool(
   name: string,
-  predicate: (tool: WebMCP.RegisteredTool) => boolean = () => true
-): Promise<WebMCP.RegisteredTool> {
+  predicate: (tool: WebMCP.Tool) => boolean = () => true
+): Promise<WebMCP.Tool> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const tool = (await requireModelContext().getTools()).find(
       (candidate) => candidate.name === name
@@ -89,7 +89,7 @@ async function waitForCondition(
 
 // Chrome returns a string passed to respondWith() as plain text rather than JSON.
 async function executeTool(
-  tool: WebMCP.RegisteredTool,
+  tool: WebMCP.Tool,
   input: Parameters<WebMCP.ModelContext['executeTool']>[1]
 ): Promise<Awaited<ReturnType<WebMCP.ToolExecuteCallback>>> {
   const serialized = await requireModelContext().executeTool(tool, input);
@@ -109,8 +109,8 @@ export function runDeclarativeFormConformanceSuite(
 ): void {
   describe(options.suiteName, () => {
     const errorNames = options.errorNames ?? {
-      cancelled: 'UnknownError',
-      invalidInput: 'UnknownError',
+      cancelled: 'OperationError',
+      invalidInput: 'OperationError',
     };
     const toolNames = new Set<string>();
 
