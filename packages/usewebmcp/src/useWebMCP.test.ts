@@ -549,7 +549,7 @@ describe('useWebMCP in a browser runtime', () => {
     );
     await hook.act(async () => {
       await expect(executeRegisteredTool('unserializable_result')).rejects.toMatchObject({
-        name: 'UnknownError',
+        name: 'OperationError',
       });
     });
     expect(hook.result.current.state).toMatchObject({ lastResult: null, executionCount: 0 });

@@ -541,17 +541,10 @@ function findSubmitter(form: HTMLFormElement): Submitter | undefined {
 }
 
 function executionError(): DOMException {
-  return new DOMException('Tool execution failed', 'UnknownError');
-}
-
-function lifecycleEvent(type: 'toolactivated' | 'toolcancel', toolName: string): Event {
-  const event = new Event(type);
-  Object.defineProperty(event, 'toolName', { enumerable: true, value: toolName });
-  return event;
+  return new DOMException('Tool execution failed', 'OperationError');
 }
 
 function waitForSubmission(
-  context: WebMCP.ModelContext,
   registration: DeclarativeRegistration,
   definition: DeclarativeToolDefinition,
   submitter: Submitter | undefined,
@@ -593,10 +586,7 @@ function waitForSubmission(
       });
     };
     const onAbort = () => {
-      finish(() => {
-        context.dispatchEvent(lifecycleEvent('toolcancel', definition.name));
-        reject(signal.reason);
-      });
+      finish(() => reject(signal.reason));
     };
 
     activeSubmissions.set(form, {
@@ -626,12 +616,10 @@ function waitForSubmission(
 
     if (!definition.autosubmit) {
       submitter?.focus();
-      context.dispatchEvent(lifecycleEvent('toolactivated', definition.name));
       return;
     }
     try {
       requestFormSubmit(form, submitter);
-      context.dispatchEvent(lifecycleEvent('toolactivated', definition.name));
     } catch (error) {
       cancel(error);
     }
@@ -804,13 +792,7 @@ export function installWebMCPDeclarativeExtensions(context: WebMCP.ModelContext)
               const submitter = findSubmitter(form);
               if (!definition.autosubmit && !submitter) throw executionError();
               fillForm(form, input);
-              return waitForSubmission(
-                context,
-                registration,
-                definition,
-                submitter,
-                options.signal
-              );
+              return waitForSubmission(registration, definition, submitter, options.signal);
             },
           },
           { signal: controller.signal }

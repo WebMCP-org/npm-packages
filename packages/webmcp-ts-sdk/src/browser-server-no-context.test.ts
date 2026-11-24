@@ -33,8 +33,11 @@ it('serves MCP only when the page has no WebMCP context', async () => {
         name: 'echo',
         title: '',
         description: 'Echoes input',
+        inputSchema: null,
+        outputSchema: null,
+        annotations: null,
         origin: location.origin,
-        window,
+        source: window,
       })
     ).rejects.toMatchObject({ name: 'InvalidStateError' });
     await expect(server.syncNativeTools()).resolves.toBeUndefined();

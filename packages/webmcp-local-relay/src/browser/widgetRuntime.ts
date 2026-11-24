@@ -18,10 +18,10 @@ import {
   selectRelayTools,
 } from './shared.js';
 
-type RelayToolDescriptor = Pick<
-  RegisteredTool,
-  'name' | 'title' | 'description' | 'inputSchema' | 'annotations'
->;
+interface RelayToolDescriptor extends Pick<RegisteredTool, 'name' | 'title' | 'description'> {
+  inputSchema?: NonNullable<RegisteredTool['inputSchema']>;
+  annotations?: NonNullable<RegisteredTool['annotations']>;
+}
 
 interface RelayToolEntry {
   registered: RegisteredTool;
@@ -388,7 +388,7 @@ function mapRegisteredTool(tool: RegisteredTool): RelayToolDescriptor | null {
     );
     return null;
   }
-  // Chrome 158 returns Tool objects, which report an absent schema or annotations as null.
+  // A Tool reports an absent schema or annotations as null; earlier browsers left them undefined.
   const inputSchema = tool.inputSchema ?? undefined;
   const annotations = tool.annotations ?? undefined;
   if (inputSchema !== undefined && !isJsonObject(inputSchema)) {
@@ -600,8 +600,8 @@ function runWidget(cfg: WidgetConfig): void {
       const controller = new AbortController();
       invocations.set(callId, controller);
       void (async () => {
-        // Current Chrome requires a RegisteredTool returned by getTools(), not a
-        // name or a stale copy.
+        // executeTool() requires a Tool returned by getTools(), not a name, a copy, or
+        // a registration that has since been replaced.
         await refreshTools();
         controller.signal.throwIfAborted();
         const entry = currentToolEntries.find(({ registered }) => registered.name === toolName);

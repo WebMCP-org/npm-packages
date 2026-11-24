@@ -1,5 +1,6 @@
 import { normalizeInputSchema, normalizeToolResponse } from './schema.js';
 import type { ModelContext, RegisteredTool } from './model-context.js';
+import type { WebMCP } from 'webmcp-types';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Transport } from '@modelcontextprotocol/server';
@@ -96,7 +97,7 @@ async function executeRegisteredTool(
   return modelContext.executeTool(tool, args);
 }
 
-type NativeToolDictionary = Parameters<ModelContext['registerTool']>[0];
+type NativeToolDictionary = Pick<WebMCP.ModelContextTool, 'name' | 'description'>;
 
 /** A native context that accepts registrations and lists nothing unless overridden. */
 function createNativeContext(
@@ -116,7 +117,24 @@ function createNativeContext(
 }
 
 function registeredTool(name: string, overrides: Partial<RegisteredTool> = {}): RegisteredTool {
-  return { name, title: '', description: name, origin: location.origin, window, ...overrides };
+  return {
+    name,
+    title: '',
+    description: name,
+    inputSchema: null,
+    outputSchema: null,
+    annotations: null,
+    origin: location.origin,
+    source: window,
+    ...overrides,
+  };
+}
+
+/** A tool as Chrome before 160 reports it, with `window` instead of `source`. */
+function windowTool(name: string, owner: Window): RegisteredTool {
+  const { source: _source, ...tool } = registeredTool(name);
+  // SAFETY: webmcp-types requires `source`, which these browsers do not implement.
+  return { ...tool, window: owner } as RegisteredTool;
 }
 
 /** The browser runner frames this document; `parent` is replaceable, `top` is not. */
@@ -169,7 +187,7 @@ describe('BrowserMcpServer', () => {
       TypeError
     );
     await expect(server.executeTool(tool, { toJSON: () => 'primitive' })).rejects.toMatchObject({
-      name: 'UnknownError',
+      name: 'DataError',
     });
     await server.registerTool({
       name: 'undefined',
@@ -177,7 +195,7 @@ describe('BrowserMcpServer', () => {
       execute: () => undefined,
     });
     await expect(executeRegisteredTool(server, 'undefined')).rejects.toMatchObject({
-      name: 'UnknownError',
+      name: 'OperationError',
     });
   });
 
@@ -206,8 +224,8 @@ describe('BrowserMcpServer', () => {
 
     await expect(executeRegisteredTool(server, 'receiver')).resolves.toBe('{"ok":true}');
     await expect(executeRegisteredTool(server, 'failure')).rejects.toMatchObject({
-      name: 'UnknownError',
-      message: 'Tool execution failed',
+      name: 'OperationError',
+      message: expect.not.stringContaining('boom'),
     });
   });
 
@@ -456,7 +474,7 @@ describe('BrowserMcpServer', () => {
         inputSchema,
       }))
     ).toEqual([
-      { name: 'a_tool', title: '', inputSchema: undefined },
+      { name: 'a_tool', title: '', inputSchema: null },
       { name: 'z_tool', title: '', inputSchema: schema },
     ]);
   });
@@ -817,9 +835,10 @@ describe('BrowserMcpServer', () => {
     const { frameWindow: siblingWindow } = createFrame(hostWindow.document);
     const tools = [
       registeredTool('own'),
-      registeredTool('descendant', { window: childWindow }),
-      registeredTool('ancestor', { window: hostWindow }),
-      registeredTool('sibling', { window: siblingWindow }),
+      registeredTool('descendant', { source: childWindow }),
+      registeredTool('ancestor', { source: hostWindow }),
+      registeredTool('sibling', { source: siblingWindow }),
+      registeredTool('gone', { source: null }),
     ];
     const executeTool = vi.fn(async () => JSON.stringify({ ok: true }));
     const server = createServer('frame-scope-server', {
@@ -837,10 +856,24 @@ describe('BrowserMcpServer', () => {
     expect(executeTool).toHaveBeenCalledWith(tools[1], {}, expect.any(Object));
   });
 
+  it('mirrors tools that report window instead of source, as Chrome before 160 does', async () => {
+    const { frameWindow: childWindow } = createFrame();
+    const tools = [windowTool('own', window), windowTool('descendant', childWindow)];
+    const server = createServer('window-scope-server', {
+      native: createNativeContext({ getTools: async () => tools }),
+    });
+
+    await server.syncNativeTools();
+    expect(server.listTools().map(({ name }) => name)).toEqual(['own']);
+    asTopLevelWindow();
+    await server.syncNativeTools();
+    expect(server.listTools().map(({ name }) => name)).toEqual(['own', 'descendant']);
+  });
+
   it('lets a local registration take over a name mirrored from a child frame', async () => {
     asTopLevelWindow();
     const { frameWindow: childWindow } = createFrame();
-    const nativeTools = [registeredTool('shared', { description: 'child', window: childWindow })];
+    const nativeTools = [registeredTool('shared', { description: 'child', source: childWindow })];
     const executeTool = vi.fn(async () => '{"from":"child"}');
     const native = createNativeContext({
       async registerTool(tool: NativeToolDictionary) {
@@ -873,7 +906,7 @@ describe('BrowserMcpServer', () => {
   it('mirrors a child frame tool after the parent aborts its own registration of the name', async () => {
     asTopLevelWindow();
     const { frameWindow: childWindow } = createFrame();
-    const childTool = registeredTool('shared', { description: 'child', window: childWindow });
+    const childTool = registeredTool('shared', { description: 'child', source: childWindow });
     let ownTool: RegisteredTool | undefined;
     const native = createNativeContext({
       async registerTool(tool: NativeToolDictionary, options?: { signal?: AbortSignal }) {
@@ -905,15 +938,27 @@ describe('BrowserMcpServer', () => {
     );
   });
 
-  it('drops a child frame mirror after a call fails because the frame was removed', async () => {
+  it.each([
+    {
+      shape: 'source, null once the document is gone',
+      createTool: (frame: Window) =>
+        Object.defineProperty(registeredTool('removed_frame_tool'), 'source', {
+          get: () => (frame.closed ? null : frame),
+        }),
+    },
+    {
+      shape: 'window, as in Chrome before 160',
+      createTool: (frame: Window) => windowTool('removed_frame_tool', frame),
+    },
+  ])('drops a mirror after a call into a removed frame fails ($shape)', async ({ createTool }) => {
     asTopLevelWindow();
     const { frameWindow: childWindow, remove: removeChildFrame } = createFrame();
-    const childTool = registeredTool('removed_frame_tool', { window: childWindow });
+    const childTool = createTool(childWindow);
     const server = createServer('removed-frame-server', {
       native: createNativeContext({
         getTools: async () => (childWindow.closed ? [] : [childTool]),
         executeTool: async () => {
-          throw new DOMException('Tool execution failed', 'UnknownError');
+          throw new DOMException('Tool execution failed', 'InvalidStateError');
         },
       }),
     });

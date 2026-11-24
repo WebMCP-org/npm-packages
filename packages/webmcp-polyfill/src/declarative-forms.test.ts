@@ -31,25 +31,29 @@ it('cancels a pending manual-review call when the execute signal aborts', async 
     .toBe(true);
   const tool = (await context.getTools()).find((candidate) => candidate.name === name);
   if (!tool) throw new Error('Expected the declarative form to register a tool');
-  const activated = new Promise<Event>((resolve) => {
-    context.addEventListener('toolactivated', resolve, { once: true });
-  });
-  const cancelled = new Promise<Event>((resolve) => {
-    context.addEventListener('toolcancel', resolve, { once: true });
-  });
-
+  const events: Event[] = [];
   const controller = new AbortController();
+  const recordEvent = (event: Event) => events.push(event);
+  context.addEventListener('toolactivated', recordEvent);
+  context.addEventListener('toolcancel', recordEvent);
+
   const execution = context.executeTool(
     tool,
     { message: 'review me' },
     { signal: controller.signal }
   );
   await expect.poll(() => input.value).toBe('review me');
-  expect(await activated).toHaveProperty('toolName', name);
   controller.abort();
 
   await expect(execution).rejects.toMatchObject({ name: 'AbortError' });
-  expect(await cancelled).toHaveProperty('toolName', name);
+  await expect.poll(() => events.some(({ type }) => type === 'toolcancel')).toBe(true);
+  // The upstream core fires both events, so the declarative layer must not repeat them.
+  expect(events).toMatchObject([
+    { type: 'toolactivated', toolName: name },
+    { type: 'toolcancel', toolName: name },
+  ]);
+  context.removeEventListener('toolactivated', recordEvent);
+  context.removeEventListener('toolcancel', recordEvent);
 
   let agentInvoked: boolean | undefined;
   let respondWithError: unknown;

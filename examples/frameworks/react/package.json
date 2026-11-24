@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@w3c/webmcp-polyfill": "^0.1.0",
+    "@w3c/webmcp-polyfill": "^0.2.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "usewebmcp": "workspace:*"

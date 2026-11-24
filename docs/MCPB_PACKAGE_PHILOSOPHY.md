@@ -30,8 +30,8 @@ Use when you want:
 ### 2) `@w3c/webmcp-polyfill` (Canonical Core Runtime) and `@mcp-b/webmcp-polyfill`
 
 - The W3C Community Group's `@w3c/webmcp-polyfill` is the canonical core runtime. It installs
-  the standard `document.modelContext` API, including frames. It does not ship declarative
-  tools or lifecycle events yet.
+  the standard `document.modelContext` API, including frames and lifecycle events. It does not
+  ship declarative tools yet.
 - `@mcp-b/webmcp-polyfill` is deprecated. It passes through `@w3c/webmcp-polyfill` and adds
   temporary MCP-B declarative tools and `SubmitEvent` extensions until the official polyfill
   supports them.

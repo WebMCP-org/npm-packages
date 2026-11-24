@@ -71,26 +71,33 @@ describe('normalizeSerializedToolResult', () => {
 });
 
 describe('selectRelayTools', () => {
-  it("keeps the host page's tool on a name collision and warns once per name", () => {
-    const pageWindow = { name: 'page' };
-    const frameWindow = { name: 'frame' };
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const frameTool = { name: 'dup', description: 'Frame tool', window: frameWindow };
-      const pageTool = { name: 'dup', description: 'Page tool', window: pageWindow };
-      const frameOnly = { name: 'frame_only', description: 'Frame only', window: frameWindow };
+  it.each([
+    { member: 'source', browser: 'Chrome 160 and the polyfill' },
+    { member: 'window', browser: 'Chrome before 160' },
+  ])(
+    "keeps the host page's tool on a name collision and warns once per name ($browser)",
+    ({ member }) => {
+      const pageWindow = { name: 'page' };
+      const frameWindow = { name: 'frame' };
+      const name = `dup_${member}`;
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const frameTool = { name, description: 'Frame tool', [member]: frameWindow };
+        const pageTool = { name, description: 'Page tool', [member]: pageWindow };
+        const frameOnly = { name: 'frame_only', description: 'Frame only', [member]: frameWindow };
 
-      const selected = selectRelayTools([frameTool, frameOnly, pageTool], pageWindow);
-      expect(selected).toHaveLength(2);
-      expect(selected[0]).toBe(pageTool);
-      expect(selected[1]).toBe(frameOnly);
-      expect(selectRelayTools([pageTool, frameTool], pageWindow)).toEqual([pageTool]);
-      expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn.mock.calls[0]?.[0]).toContain('"dup"');
-    } finally {
-      warn.mockRestore();
+        const selected = selectRelayTools([frameTool, frameOnly, pageTool], pageWindow);
+        expect(selected).toHaveLength(2);
+        expect(selected[0]).toBe(pageTool);
+        expect(selected[1]).toBe(frameOnly);
+        expect(selectRelayTools([pageTool, frameTool], pageWindow)).toEqual([pageTool]);
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn.mock.calls[0]?.[0]).toContain(`"${name}"`);
+      } finally {
+        warn.mockRestore();
+      }
     }
-  });
+  );
 });
 
 describe('isLoopbackHost', () => {

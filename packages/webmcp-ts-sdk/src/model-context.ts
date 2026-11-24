@@ -6,8 +6,8 @@ import type { ToolDescriptor, ToolDescriptorFromSchema, ToolListItem } from './t
 /** Options for tools exposed by descendant documents. */
 export type ModelContextGetToolOptions = WebMCP.ModelContextGetToolOptions;
 
-/** Tool metadata returned by `document.modelContext.getTools()`. */
-export type RegisteredTool = WebMCP.RegisteredTool;
+/** A tool returned by `document.modelContext.getTools()`. */
+export type RegisteredTool = WebMCP.Tool;
 
 /** Options accepted by `ModelContext.registerTool()`. */
 export type ModelContextRegisterToolOptions = WebMCP.ModelContextRegisterToolOptions;

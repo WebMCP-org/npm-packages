@@ -41,8 +41,7 @@ Chrome's [cross-origin iframe
 guidance](https://developer.chrome.com/docs/ai/webmcp/imperative-api#cross-origin_iframes)
 describes the same three steps.
 
-The browser returns `RegisteredTool` values with their owning `window` and
-`origin`. This path needs no MCP client, server, or transport. It does not add
+The browser returns `Tool` objects with their `source` window and `origin`. This path needs no MCP client, server, or transport. It does not add
 MCP-B name prefixes or carry MCP prompts and resources.
 
 ## MCP-B iframe bridging

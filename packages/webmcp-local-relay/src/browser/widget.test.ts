@@ -80,7 +80,7 @@ class TestModelContext extends EventTarget {
       ...tool,
       title: tool.title ?? '',
       origin: APP_ORIGIN,
-      window: globalThis.window.parent,
+      source: globalThis.window.parent,
     }));
   }
 

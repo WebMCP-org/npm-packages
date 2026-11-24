@@ -22,8 +22,8 @@ if (!existsSync(polyfill)) {
 }
 
 // ponytail: page-local allowlist; frame/origin tests qualify only if every assertion is page-local.
-// The rest of the suite needs ToolActivatedEvent/ToolCancelEvent, tool pseudo-classes, raw
-// (non-JSON) results, or frame trees, which the upstream runtime does not provide.
+// The rest of the suite needs tool pseudo-classes, raw (non-JSON) results, frame trees, or
+// DataError for input a form rejects, which the polyfill and this harness do not provide.
 const imperativeTests = [
   'duplicate_tool_registration.https.html',
   'executeTool-error-window-onerror.https.html',
@@ -32,7 +32,6 @@ const imperativeTests = [
   'getTools-imperative-annotations.https.html',
   'getTools-imperative-schema.https.html',
   'getTools.https.html',
-  'model_context.https.html',
   'non-secure.html',
   'opaque-origin-tools.https.html',
   'register-tool-title.https.html',
@@ -49,7 +48,6 @@ const declarativeTests = [
   'execute_tool_change_event.https.html',
   'execute_tool_submit_from_js.https.html',
   'executeTool-flexible-types.https.html',
-  'executeTool-invalid-input.https.html',
   'executeTool-respondWith-circular-object.https.html',
   'executeTool-respondWith-reject.https.html',
   'getTools-declarative-schema.https.html',

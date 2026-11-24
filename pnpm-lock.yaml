@@ -349,8 +349,8 @@ importers:
         specifier: ^3.7.0
         version: 3.7.0
       webmcp-types:
-        specifier: ^0.1.10
-        version: 0.1.10
+        specifier: ^0.2.0
+        version: 0.2.0
     devDependencies:
       '@cloudflare/vite-plugin':
         specifier: ^1.67.0
@@ -410,8 +410,8 @@ importers:
         specifier: ^21.2.26
         version: 21.2.26(@angular/common@21.2.26(@angular/core@21.2.26(@angular/compiler@21.2.26)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.26(@angular/compiler@21.2.26)(rxjs@7.8.2))
       '@w3c/webmcp-polyfill':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.0
+        version: 0.2.0
       rxjs:
         specifier: ^7.8.0
         version: 7.8.2
@@ -435,8 +435,8 @@ importers:
   examples/frameworks/astro:
     dependencies:
       '@w3c/webmcp-polyfill':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.0
+        version: 0.2.0
       astro:
         specifier: ^7.4.5
         version: 7.4.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.97.3)(tsx@4.23.15)(yaml@2.9.1)
@@ -444,8 +444,8 @@ importers:
   examples/frameworks/nextjs:
     dependencies:
       '@w3c/webmcp-polyfill':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.0
+        version: 0.2.0
       next:
         specifier: 16.4.5
         version: 16.4.5(@opentelemetry/api@1.9.1)(@playwright/test@1.65.0)(@types/node@22.20.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(sass@1.97.3)
@@ -472,8 +472,8 @@ importers:
   examples/frameworks/react:
     dependencies:
       '@w3c/webmcp-polyfill':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.0
+        version: 0.2.0
       react:
         specifier: ^19.3.1
         version: 19.3.1
@@ -503,8 +503,8 @@ importers:
   examples/frameworks/svelte:
     dependencies:
       '@w3c/webmcp-polyfill':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.0
+        version: 0.2.0
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: ^6.2.1
@@ -528,8 +528,8 @@ importers:
   examples/frameworks/vanilla:
     dependencies:
       '@w3c/webmcp-polyfill':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.0
+        version: 0.2.0
     devDependencies:
       typescript:
         specifier: ~5.9.3
@@ -541,8 +541,8 @@ importers:
   examples/frameworks/vue:
     dependencies:
       '@w3c/webmcp-polyfill':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.2.0
+        version: 0.2.0
       vue:
         specifier: ^3.5.45
         version: 3.5.45(typescript@5.9.3)
@@ -778,8 +778,8 @@ importers:
   packages/usewebmcp:
     dependencies:
       webmcp-types:
-        specifier: 0.1.10
-        version: 0.1.10
+        specifier: 0.2.0
+        version: 0.2.0
     devDependencies:
       '@mcp-b/webmcp-polyfill':
         specifier: workspace:*
@@ -892,11 +892,11 @@ importers:
   packages/webmcp-polyfill:
     dependencies:
       '@w3c/webmcp-polyfill':
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.2.0
+        version: 0.2.0
       webmcp-types:
-        specifier: 0.1.10
-        version: 0.1.10
+        specifier: 0.2.0
+        version: 0.2.0
     devDependencies:
       '@vitest/browser-playwright':
         specifier: 'catalog:'
@@ -929,8 +929,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
       webmcp-types:
-        specifier: 0.1.10
-        version: 0.1.10
+        specifier: 0.2.0
+        version: 0.2.0
     devDependencies:
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
@@ -957,8 +957,8 @@ importers:
   packages/webmcp-types:
     dependencies:
       webmcp-types:
-        specifier: 0.1.10
-        version: 0.1.10
+        specifier: 0.2.0
+        version: 0.2.0
 
 packages:
 
@@ -5323,8 +5323,8 @@ packages:
       vue:
         optional: true
 
-  '@w3c/webmcp-polyfill@0.1.0':
-    resolution: {integrity: sha512-FNzmob4B72T9cHDVODskyFjNi0JaZgcD1U0eFmuc2J4o3Lr5k1xabZ5rjw1AuvzgvdxRfvNr9FHUP9yG1s/StA==}
+  '@w3c/webmcp-polyfill@0.2.0':
+    resolution: {integrity: sha512-L1ZbvOuqD4zNpmwJn5YbFwAi+7hI2duqlfdDqftZcFkEPcN/nfnFCYuxPcmvCVdw9OSjQ+EZGiwkn9OgDOo3+A==}
 
   '@x0k/json-schema-merge@1.1.1':
     resolution: {integrity: sha512-m/h+8EsppgHWI1gNhwCo2KsV1tmAPCnXkKUqxdWK/TrxIqPKhT6+zWkd14YNfUIyqJ6aORPPK6QjxXE2NiJdkA==}
@@ -8577,8 +8577,8 @@ packages:
   webidl-conversions@3.0.1:
     resolution: {integrity: sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==}
 
-  webmcp-types@0.1.10:
-    resolution: {integrity: sha512-U4GQ1RpJ0tqCUt2ALMV9Pnhi+hsy8L31f/Q1v4mLVhW64r5sYhh+2+SjP/Lq4/9jP33vZgNkuRZARJl65A/ZIg==}
+  webmcp-types@0.2.0:
+    resolution: {integrity: sha512-YPuBdkpZbmOKHwH00buRfqNfYWK9o85iL53dn9KLSBAzMPMFVQ3xwtBqKv855lPwlMwAoHFUm7ypreiTPgyrng==}
 
   whatwg-url@5.0.0:
     resolution: {integrity: sha512-saE57nupxk6v3HY35+jzBwYa0rKSy0XR8JSxZPwgLr7ys0IBzhGviA1/TUGJLmSVqs8pb9AnvICXEuOHLprYTw==}
@@ -13122,9 +13122,9 @@ snapshots:
       typescript: 5.9.3
       vue: 3.5.45(typescript@5.9.3)
 
-  '@w3c/webmcp-polyfill@0.1.0':
+  '@w3c/webmcp-polyfill@0.2.0':
     dependencies:
-      webmcp-types: 0.1.10
+      webmcp-types: 0.2.0
 
   '@x0k/json-schema-merge@1.1.1':
     dependencies:
@@ -17137,7 +17137,7 @@ snapshots:
 
   webidl-conversions@3.0.1: {}
 
-  webmcp-types@0.1.10: {}
+  webmcp-types@0.2.0: {}
 
   whatwg-url@5.0.0:
     dependencies:

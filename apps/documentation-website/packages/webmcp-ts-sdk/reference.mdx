@@ -135,7 +135,7 @@ Invalid descriptors, duplicate names, blocked Permissions Policy, and pre-aborte
 getTools(options?: ModelContextGetToolOptions): Promise<RegisteredTool[]>
 ```
 
-Delegates to `native.getTools(options)`. The supplied context owns discovery, frame access, and Permissions Policy checks.
+Delegates to `native.getTools(options)`. The supplied context owns discovery, frame access, and Permissions Policy checks. `RegisteredTool` is the `Tool` interface from `webmcp-types`.
 
 ### `executeTool(tool, input, options?)`
 
@@ -147,7 +147,7 @@ executeTool(
 ): Promise<string>
 ```
 
-Executes a descriptor returned by `getTools()` with an input object and returns the underlying context's result string: JSON for imperative tools, plain text for native declarative tools. The optional signal aborts the call.
+Executes a `Tool` returned by `getTools()` with an input object and returns the underlying context's result string: JSON for imperative tools, plain text for native declarative tools. A `Tool` whose registration is gone rejects with `NotFoundError`, even if another tool now has its name. The optional signal aborts the call.
 
 ### Lifecycle events
 

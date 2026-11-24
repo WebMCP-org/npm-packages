@@ -16,7 +16,7 @@ function uniqueToolName(prefix: string): string {
   return `${prefix}_${String(Date.now())}_${String(Math.random()).slice(2)}`;
 }
 
-async function listNativeTools(): Promise<WebMCP.RegisteredTool[]> {
+async function listNativeTools(): Promise<WebMCP.Tool[]> {
   return requireNativeModelContext().getTools();
 }
 

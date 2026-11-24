@@ -90,7 +90,7 @@ Goal: keep one place to track standards decisions, implementation details, and e
 Current MCP-B alignment note:
 
 - The current WebMCP draft and the official `@w3c/webmcp-polyfill` use `document.modelContext`, registration signals, `getTools()`, `toolchange`, and object-input `executeTool()`.
-- `getTools({ fromOrigins })` returns `RegisteredTool` values. Their `inputSchema` fields contain JSON Schema objects.
+- `getTools({ fromOrigins })` returns `Tool` objects, each identifying one registration. Their `inputSchema` members contain JSON Schema objects, or null when the registration had none.
 - The official polyfill registers an `abort` listener on `options.signal` and removes the tool when the signal aborts; pre-aborted signals reject with `AbortError`.
 - `BrowserMcpServer.registerTool(tool, options?)` accepts the same shape, resolves `undefined`, and forwards `options.signal` to the underlying native context when the caller provides one.
 - MCP-B execution follows the draft's object-input API and returns JSON-serialized results.
@@ -120,7 +120,7 @@ Run commands:
 - WebMCP remains experimental and is in an origin trial rather than generally shipped stable.
 - Native conformance discovers tools through `await document.modelContext.getTools()`.
 - Native conformance does not rely on removed preview methods such as `provideContext()` or `clearContext()`.
-- Native conformance executes tools through `document.modelContext.executeTool(tool, input)` with the exact `RegisteredTool` returned by `getTools()` and an input object; Chrome 155+ accepts that contract.
+- Native conformance executes tools through `document.modelContext.executeTool(tool, input)` with the exact `Tool` returned by `getTools()` and an input object; Chrome 155+ accepts that contract.
 - Current Chromium source notes that tool input schema enforcement during execution is incomplete.
 - The official polyfill treats input schemas as metadata during direct execution; it accepts object input and does not validate it against the schema.
 - Conformance implication: do not assert execution-time schema validation in native or polyfill conformance; MCP transport validation belongs to the official MCP server.

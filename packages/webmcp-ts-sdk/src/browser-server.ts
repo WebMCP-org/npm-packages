@@ -97,6 +97,11 @@ interface NativeBackfilledTool {
   fingerprint: string;
 }
 
+/** The window that registered `tool`, or null once it is gone. Chrome before 160 calls it `window`. */
+function toolSource(tool: RegisteredTool): Window | null {
+  return tool.source ?? tool.window ?? null;
+}
+
 function parseNativeToolResult(serialized: string): CallToolResult | WebMcpToolObjectInput {
   let result: unknown;
   try {
@@ -483,12 +488,13 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     // into their source.
     const ownerWindow = this.ownerDocument?.defaultView;
     const tools = (await native.getTools()).filter((tool) => {
-      if (tool.window === ownerWindow) return true;
+      let frame = toolSource(tool);
+      if (!frame) return false;
+      if (frame === ownerWindow) return true;
       if (ownerWindow?.parent !== ownerWindow) return false;
-      let frame = tool.window;
       while (frame) {
         if (frame === ownerWindow) return true;
-        const parent = frame.parent;
+        const parent: Window = frame.parent;
         if (parent === frame) break;
         frame = parent;
       }
@@ -498,7 +504,7 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
     // A removal completes once this document no longer registers the name; a
     // descendant's same-named tool is mirrored afterwards.
     for (const name of this.removingNativeTools) {
-      if (!tools.some((tool) => tool.name === name && tool.window === ownerWindow)) {
+      if (!tools.some((tool) => tool.name === name && toolSource(tool) === ownerWindow)) {
         this.removingNativeTools.delete(name);
       }
     }
@@ -545,7 +551,8 @@ export class BrowserMcpServer extends EventTarget implements ModelContextWithExt
         } catch (error) {
           // Upstream fires no toolchange when a frame is removed, so a failed call
           // into a closed window is the first signal to drop its mirrors.
-          if (currentTool.window.closed) this.nativeToolChangeListener();
+          const source = toolSource(currentTool);
+          if (!source || source.closed) this.nativeToolChangeListener();
           throw error;
         }
       };
