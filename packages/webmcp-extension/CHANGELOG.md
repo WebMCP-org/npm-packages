@@ -1,5 +1,11 @@
 # @mcp-b/webmcp-extension
 
+## 7.0.0
+
+### Patch Changes
+
+- @mcp-b/transports@7.0.0
+
 ## 6.2.0
 
 ### Patch Changes
