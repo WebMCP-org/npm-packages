@@ -1,4 +1,5 @@
 import { z } from 'zod/v4';
+import { collectAgentSources } from './browser/agentSources.js';
 import {
   CallToolResultSchema,
   InboundToolSchema,
@@ -23,6 +24,8 @@ function parseBrowserTools(tools: unknown[]): RelayTool[] {
   });
 }
 
+const AgentSourcesSchema = z.array(z.unknown()).transform(collectAgentSources);
+
 const BrowserHelloMessageSchema = z.object({
   type: z.literal('hello'),
   tabId: z.string().min(1),
@@ -30,6 +33,7 @@ const BrowserHelloMessageSchema = z.object({
   url: z.string().optional(),
   title: z.string().optional(),
   iconUrl: z.string().optional(),
+  agentSources: AgentSourcesSchema.optional().catch(undefined),
 });
 
 const BrowserToolsListMessageSchema = z.object({
@@ -223,7 +227,20 @@ export const RelayClientToServerMessageSchema = z.discriminatedUnion('type', [
  */
 export type RelayClientToServerMessage = z.infer<typeof RelayClientToServerMessageSchema>;
 
+const RelaySourceInstructionsSchema = RelaySourceInfoSchema.pick({
+  sourceId: true,
+  origin: true,
+  title: true,
+}).extend({
+  instructions: AgentSourcesSchema.transform((entries) =>
+    entries.filter((entry) => entry.type === 'instruction')
+  ),
+});
+
+export type RelaySourceInstructions = z.infer<typeof RelaySourceInstructionsSchema>;
+
 const RelayToolsPayloadFields = {
+  sourceInstructions: z.array(RelaySourceInstructionsSchema).optional(),
   tools: z.array(NormalizedToolSchema),
   sources: z.array(RelaySourceInfoSchema),
   toolSourceMap: z.record(z.string(), z.array(z.string())),

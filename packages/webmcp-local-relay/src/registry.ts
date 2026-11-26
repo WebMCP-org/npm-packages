@@ -1,6 +1,7 @@
 import { buildPublicToolName, MAX_MCP_TOOL_NAME_LENGTH } from './naming.js';
 import type { RelayTool } from './protocol.js';
-import type { BrowserHelloMessage } from './schemas.js';
+import type { AgentSourceEntry } from './browser/agentSources.js';
+import type { BrowserHelloMessage, RelaySourceInstructions } from './schemas.js';
 
 /**
  * Internal metadata tracked for each active browser source.
@@ -16,6 +17,10 @@ interface SourceMetadata {
   iconUrl?: string | undefined;
   connectedAt: number;
   lastSeenAt: number;
+}
+
+interface RegisteredSource extends SourceMetadata {
+  agentSources?: AgentSourceEntry[] | undefined;
 }
 
 /**
@@ -72,7 +77,7 @@ export class HelloRequiredError extends Error {
  * In-memory source and tool registry used by the relay bridge.
  */
 export class RelayRegistry {
-  private readonly sourceByConnectionId = new Map<string, SourceMetadata>();
+  private readonly sourceByConnectionId = new Map<string, RegisteredSource>();
   private readonly toolsByConnectionId = new Map<string, ToolProvider[]>();
   private readonly providersByPublicToolName = new Map<string, ToolProvider[]>();
 
@@ -98,6 +103,7 @@ export class RelayRegistry {
       url: hello.url ?? existing?.url,
       title: hello.title ?? existing?.title,
       iconUrl: hello.iconUrl ?? existing?.iconUrl,
+      agentSources: hello.agentSources,
       connectedAt: existing?.connectedAt ?? now,
       lastSeenAt: now,
     });
@@ -161,6 +167,16 @@ export class RelayRegistry {
       .map((source) => this.toSourceInfo(source))
       .filter((source) => source.toolCount > 0)
       .sort((a, b) => this.compareRecency(b.lastSeenAt, a.lastSeenAt, b.sourceId, a.sourceId));
+  }
+
+  /** Page-provided instructions for sources with active tools, separate from normal discovery. */
+  listSourceInstructions(): RelaySourceInstructions[] {
+    return this.listSources().flatMap(({ sourceId, origin, title }) => {
+      const instructions = this.sourceByConnectionId
+        .get(sourceId)
+        ?.agentSources?.filter((entry) => entry.type === 'instruction');
+      return instructions?.length ? [{ sourceId, origin, title, instructions }] : [];
+    });
   }
 
   /**
@@ -239,7 +255,7 @@ export class RelayRegistry {
   /**
    * Converts internal source metadata to public source info.
    */
-  private toSourceInfo(source: SourceMetadata): SourceInfo {
+  private toSourceInfo({ agentSources: _agentSources, ...source }: RegisteredSource): SourceInfo {
     return {
       ...source,
       toolCount: this.toolsByConnectionId.get(source.sourceId)?.length ?? 0,

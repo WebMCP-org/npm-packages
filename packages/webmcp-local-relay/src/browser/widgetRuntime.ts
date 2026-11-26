@@ -1,6 +1,7 @@
 import type { RegisteredTool } from '@mcp-b/webmcp-ts-sdk';
+import type { AgentSourceEntry } from './agentSources.js';
 declare global {
-  var __WEBMCP_RELAY_CONFIG: Record<string, string> | undefined;
+  var __WEBMCP_RELAY_CONFIG: Record<string, string | AgentSourceEntry[]> | undefined;
 }
 
 /** Runs in the hidden iframe, using WebMCP for page tools and WebSocket for MCP. */
@@ -29,6 +30,7 @@ interface RelayToolEntry {
 }
 
 export interface WidgetConfig {
+  agentSources?: AgentSourceEntry[];
   autoConnect: boolean;
   hostOrigin: string;
   hostTitle: string;
@@ -94,7 +96,8 @@ export function parseConfig(search = window.location.search): WidgetConfig | nul
   const globalConfig = globalThis.__WEBMCP_RELAY_CONFIG;
 
   function getParam(key: string): string | null {
-    return params.get(key) ?? globalConfig?.[key] ?? null;
+    const value = globalConfig?.[key];
+    return params.get(key) ?? (typeof value === 'string' ? value : null);
   }
 
   const hostOrigin = getParam('hostOrigin');
@@ -134,6 +137,9 @@ export function parseConfig(search = window.location.search): WidgetConfig | nul
   }
 
   return {
+    ...(Array.isArray(globalConfig?.agentSources) && globalConfig.agentSources.length > 0
+      ? { agentSources: globalConfig.agentSources }
+      : {}),
     autoConnect: getParam('autoConnect') !== 'false',
     hostOrigin,
     hostTitle: getParam('hostTitle') || '',
@@ -710,6 +716,7 @@ function runWidget(cfg: WidgetConfig): void {
             origin: cfg.hostOrigin,
             title: cfg.hostTitle || document.referrer || 'Unknown page',
             url: cfg.hostUrl,
+            agentSources: cfg.agentSources,
           })
         );
         helloAckTimer = setTimeout(() => {
