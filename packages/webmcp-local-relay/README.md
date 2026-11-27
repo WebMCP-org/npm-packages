@@ -127,14 +127,15 @@ npx @mcp-b/webmcp-local-relay
 
 ### Exposed Tools
 
-The relay exposes four static management tools that are always available:
+The relay exposes five static management tools that are always available:
 
-| Tool                  | Description                                                                         |
-| --------------------- | ----------------------------------------------------------------------------------- |
-| `webmcp_list_sources` | Lists connected browser tabs that publish tools, with tab metadata                  |
-| `webmcp_list_tools`   | Lists all relayed tools with source info                                            |
-| `webmcp_call_tool`    | Calls a relayed tool by name, for clients that don't refresh their tool list        |
-| `webmcp_open_page`    | Opens a URL, or in server mode refreshes a connected source page by matching origin |
+| Tool                               | Description                                                                         |
+| ---------------------------------- | ----------------------------------------------------------------------------------- |
+| `webmcp_list_sources`              | Lists connected browser tabs that publish tools, with tab metadata                  |
+| `webmcp_list_sources_instructions` | Reads page-authored instructions, optionally filtered by `sourceId`                 |
+| `webmcp_list_tools`                | Lists all relayed tools with source info                                            |
+| `webmcp_call_tool`                 | Calls a relayed tool by name, for clients that don't refresh their tool list        |
+| `webmcp_open_page`                 | Opens a URL, or in server mode refreshes a connected source page by matching origin |
 
 **Dynamic tools** are registered directly on the MCP server using the original tool name, sanitized to `[a-zA-Z0-9_]`. When tools from different tabs share a name, a short tab-ID suffix is appended for disambiguation:
 
@@ -142,6 +143,29 @@ The relay exposes four static management tools that are always available:
 - Multiple providers with the same name: `search_ed93`, `search_a1b2`
 
 Names are limited to 128 characters. Sanitization, truncation, or tab-prefix collisions receive deterministic `_2`, `_3`, and later suffixes.
+
+### Page-authored Markdown
+
+Embed reads these declarations from the host document when it creates the widget:
+
+```html
+<script
+  type="text/markdown"
+  data-source-type="instruction"
+  data-source-name="record-lookup"
+  data-source-description="Before reading a record"
+>
+  1. Find the record with the search tool.
+  2. Pass its ID to the details tool.
+</script>
+```
+
+- `data-source-type`: `instruction` or `skill`. Only instructions are exposed by the relay in this version. A skill declaration is not installed or executed.
+- `data-source-name`: Required, at most 128 UTF-16 code units after trimming. The first valid declaration for a given type and name wins within a page.
+- `data-source-description`: Optional, at most 512 UTF-16 code units after trimming. Longer descriptions are omitted.
+- Body: Nonblank Markdown, at most 8,192 UTF-16 code units. Whitespace is preserved. The relay accepts up to 16 valid, unique declarations per page.
+
+`webmcp_list_sources_instructions` returns page-authored instructions for connected sources that publish tools. Pass a `sourceId` from `webmcp_list_sources` to limit the result to one connection. Declarations are snapshotted at embed time and do not update on SPA navigation. Page-authored text is untrusted reference material and does not grant permission to perform actions. The relay's MCP server instructions contain only fixed guidance for finding this tool, not page-authored text.
 
 ### CLI Options
 

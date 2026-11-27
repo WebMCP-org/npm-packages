@@ -130,6 +130,7 @@ async function connectBrowser(
     tabId: string;
     url: string;
     tools: BrowserToolFixture[];
+    agentSources?: unknown[];
   }
 ): Promise<WebSocket> {
   const ws = new WebSocket(`ws://127.0.0.1:${bridge.port}`);
@@ -144,6 +145,7 @@ async function connectBrowser(
       tabId: options.tabId,
       url: options.url,
       origin: new URL(options.url).origin,
+      agentSources: options.agentSources,
     })
   );
   ws.send(JSON.stringify({ type: 'tools/list', tools: options.tools }));
@@ -422,6 +424,7 @@ describe('LocalRelayMcpServer', () => {
       const ws = await connectBrowser(serverBridge, {
         tabId: 'tab-client-src',
         url: 'https://example.com/app',
+        agentSources: [{ type: 'instruction', name: 'start', content: 'Read before editing.' }],
         tools: [{ name: 'my_tool' }],
       });
 
@@ -455,12 +458,82 @@ describe('LocalRelayMcpServer', () => {
       expect(text).toContain('"mode": "client"');
       expect(text).toContain('tab-client-src');
       expect(text).toContain('"count": 1');
+      expect(text).not.toContain('Read before editing.');
+      const instructions = await client.callTool({ name: 'webmcp_list_sources_instructions' });
+      expect(instructions.structuredContent).toMatchObject({
+        count: 1,
+        sources: [
+          {
+            instructions: [{ type: 'instruction', name: 'start', content: 'Read before editing.' }],
+          },
+        ],
+      });
 
       ws.close();
       await client.close();
       await relay.stop();
       await serverBridge.stop();
     });
+  });
+
+  it('returns only the selected source instructions and keeps them out of ordinary discovery', async () => {
+    const { bridge, client, cleanup } = await createConnectedRelay();
+    const instruction = {
+      type: 'instruction',
+      name: 'read-records',
+      description: 'Before reading records',
+      content: 'Find an ID first.',
+    };
+    try {
+      await connectBrowser(bridge, {
+        tabId: 'tab-instructions',
+        url: 'https://example.com/page',
+        tools: [{ name: 'read_record' }],
+        agentSources: [
+          instruction,
+          { type: 'skill', name: 'compare', content: 'Compare two records.' },
+          { ...instruction, type: 'unknown' },
+          { ...instruction, name: 'blank', content: '  ' },
+          { ...instruction, content: 'Ignored duplicate.' },
+          { ...instruction, name: 'oversized', content: 'x'.repeat(100_000) },
+        ],
+      });
+      await connectBrowser(bridge, {
+        tabId: 'tab-other',
+        url: 'https://other.example/page',
+        tools: [{ name: 'other_record' }],
+        agentSources: [{ ...instruction, content: 'Other page instructions.' }],
+      });
+      await waitFor(() => (bridge.registry.listSources().length === 2 ? true : undefined));
+      const sourceId = bridge.registry
+        .listSources()
+        .find((s) => s.tabId === 'tab-instructions')?.sourceId;
+      expect(sourceId).toBeDefined();
+      const result = await client.callTool({
+        name: 'webmcp_list_sources_instructions',
+        arguments: { sourceId },
+      });
+      expect(result.structuredContent).toEqual({
+        count: 1,
+        sources: [{ sourceId, origin: 'https://example.com', instructions: [instruction] }],
+      });
+      const all = await client.callTool({ name: 'webmcp_list_sources_instructions' });
+      expect(all.structuredContent).toMatchObject({ count: 2 });
+      const missing = await client.callTool({
+        name: 'webmcp_list_sources_instructions',
+        arguments: { sourceId: 'no-such-source' },
+      });
+      expect(missing.structuredContent).toEqual({ count: 0, sources: [] });
+      for (const name of ['webmcp_list_sources', 'webmcp_list_tools']) {
+        const listing = await client.callTool({ name });
+        expect(JSON.stringify(listing.structuredContent)).not.toContain(instruction.content);
+        expect(JSON.stringify(listing.structuredContent)).not.toContain('Compare two records.');
+      }
+      expect(client.getInstructions()).toContain('webmcp_list_sources_instructions');
+      expect(client.getInstructions()).not.toContain(instruction.content);
+    } finally {
+      await cleanup();
+    }
   });
 
   describe('webmcp_list_tools', () => {
@@ -497,6 +570,7 @@ describe('LocalRelayMcpServer', () => {
       expect(before.tools.map((tool) => tool.name).sort()).toEqual([
         'webmcp_call_tool',
         'webmcp_list_sources',
+        'webmcp_list_sources_instructions',
         'webmcp_list_tools',
         'webmcp_open_page',
       ]);
@@ -953,6 +1027,7 @@ describe('LocalRelayMcpServer', () => {
       tools: [
         { name: 'webmcp_list_tools', description: 'Takes a built-in name' },
         { name: 'webmcp_call_tool', description: 'Takes a built-in name' },
+        { name: 'webmcp_list_sources_instructions', description: 'Takes a built-in name' },
         { name: 'good_tool', description: 'Valid' },
       ],
     });
@@ -1305,6 +1380,17 @@ describe('LocalRelayMcpServer', () => {
           type: 'object',
           properties: {},
         },
+        webmcp_list_sources_instructions: {
+          $schema: 'https://json-schema.org/draft/2020-12/schema',
+          type: 'object',
+          properties: {
+            sourceId: {
+              type: 'string',
+              minLength: 1,
+              description: 'Source ID from webmcp_list_sources.',
+            },
+          },
+        },
         webmcp_list_tools: {
           $schema: 'https://json-schema.org/draft/2020-12/schema',
           type: 'object',
@@ -1352,8 +1438,8 @@ describe('LocalRelayMcpServer', () => {
       const dynamicTool = list.tools.find((t) => t.name === toolName);
       expect(dynamicTool?.inputSchema).toEqual(dynamicSchema);
 
-      // Total count: 4 static + 1 dynamic
-      expect(list.tools).toHaveLength(5);
+      // Total count: 5 static + 1 dynamic
+      expect(list.tools).toHaveLength(6);
 
       ws.close();
       await cleanup();
@@ -1443,7 +1529,7 @@ describe('LocalRelayMcpServer', () => {
 
       const list2 = await client.listTools();
       expect(list2.tools.filter((t) => !t.name.startsWith('webmcp_'))).toHaveLength(0);
-      expect(list2.tools).toHaveLength(4); // only static tools
+      expect(list2.tools).toHaveLength(5); // only static tools
 
       await cleanup();
     });
@@ -1481,7 +1567,7 @@ describe('LocalRelayMcpServer', () => {
       });
 
       const list = await client.listTools();
-      expect(list.tools).toHaveLength(7); // 4 static + 3 dynamic
+      expect(list.tools).toHaveLength(8); // 5 static + 3 dynamic
 
       for (const expected of tools) {
         const found = list.tools.find((t) => t.name.includes(expected.name));
@@ -1589,7 +1675,7 @@ describe('LocalRelayMcpServer', () => {
       const toolName = await waitFor(() => bridge.registry.listTools()[0]?.name);
 
       const list = await waitForClientToolList(client, toolName);
-      expect(list.tools).toHaveLength(5); // 4 static + 1 dynamic
+      expect(list.tools).toHaveLength(6); // 5 static + 1 dynamic
       const tool = list.tools.find((t) => t.name === toolName);
       expect(tool?.inputSchema).toEqual(finalSchema);
 
@@ -1641,16 +1727,16 @@ describe('LocalRelayMcpServer', () => {
 
       const list1 = await waitFor(async () => {
         const list = await client.listTools();
-        return list.tools.length === 6 ? list : undefined; // 4 static + 2 dynamic
+        return list.tools.length === 7 ? list : undefined; // 5 static + 2 dynamic
       });
-      expect(list1.tools).toHaveLength(6);
+      expect(list1.tools).toHaveLength(7);
 
       ws1.close();
       await waitFor(() => (bridge.registry.listSources().length === 0 ? true : undefined));
 
       await waitFor(async () => {
         const list = await client.listTools();
-        return list.tools.length === 4 ? true : undefined; // only static tools
+        return list.tools.length === 5 ? true : undefined; // only static tools
       });
 
       const ws2 = await connectBrowser(bridge, {
@@ -1661,7 +1747,7 @@ describe('LocalRelayMcpServer', () => {
 
       const list2 = await waitFor(async () => {
         const list = await client.listTools();
-        return list.tools.length === 6 ? list : undefined;
+        return list.tools.length === 7 ? list : undefined;
       });
 
       const dynamicTools2 = list2.tools.filter((t) => !t.name.startsWith('webmcp_'));

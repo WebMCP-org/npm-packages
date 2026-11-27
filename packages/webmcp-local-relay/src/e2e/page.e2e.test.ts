@@ -333,6 +333,37 @@ it('relays tools from a same-origin child frame', async () => {
   expect(await relay.call('from_frame')).toBe('frame');
 });
 
+it('reads Markdown declarations from the page and exposes only instructions', async () => {
+  const { relay, page, site } = await setup({
+    body: `<script type="text/markdown" data-source-type="instruction"
+      data-source-name="records" data-source-description="Before reading records">1. Find an ID.
+   - Keep the indentation.</script>
+    <script type="text/markdown" data-source-type="skill" data-source-name="compare-records">
+Compare two records.</script>
+    <script type="text/markdown" data-source-type="instruction" data-source-name="empty"> </script>
+    <script type="text/markdown" data-source-type="instruction">Missing name.</script>`,
+  });
+  await toolsBecome(relay, page, ['echo']);
+  const result = await relay.client.callTool({ name: 'webmcp_list_sources_instructions' });
+  expect(result.structuredContent).toMatchObject({
+    count: 1,
+    sources: [
+      {
+        origin: site.origin,
+        title: 'Relay harness',
+        instructions: [
+          {
+            type: 'instruction',
+            name: 'records',
+            description: 'Before reading records',
+            content: '1. Find an ID.\n   - Keep the indentation.',
+          },
+        ],
+      },
+    ],
+  });
+});
+
 it('reads a page title with markup as plain text', async () => {
   const title = `</script><script>parent.document.body.dataset.injected='yes'</script> $' $& $$`;
   const { relay, page } = await setup({ title: title.replaceAll('<', '&lt;') });

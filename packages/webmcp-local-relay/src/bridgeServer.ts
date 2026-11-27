@@ -21,6 +21,7 @@ import {
   type RelayHelloAcceptedMessage,
   type RelayHelloRejectedMessage,
   type RelaySourceInfo,
+  type RelaySourceInstructions,
   type RelayToBrowserMessage,
   type ServerHelloMessage,
 } from './schemas.js';
@@ -182,6 +183,7 @@ export class RelayBridgeServer extends EventEmitter {
   private readonly clientPendingInvocations = new Map<string, PendingInvocation>();
   private clientTools: RelayTool[] = [];
   private clientSources: RelaySourceInfo[] = [];
+  private clientSourceInstructions: RelaySourceInstructions[] = [];
   private clientToolSourceMap: Record<string, string[]> = {};
   private stopping = false;
 
@@ -268,6 +270,12 @@ export class RelayBridgeServer extends EventEmitter {
    */
   listSourcesFromRelay(): RelaySourceInfo[] {
     return this._mode === 'client' ? [...this.clientSources] : [];
+  }
+
+  listSourceInstructions(): RelaySourceInstructions[] {
+    return this._mode === 'client'
+      ? [...this.clientSourceInstructions]
+      : this.registry.listSourceInstructions();
   }
 
   /**
@@ -372,6 +380,7 @@ export class RelayBridgeServer extends EventEmitter {
       }
       this.clientTools = [];
       this.clientSources = [];
+      this.clientSourceInstructions = [];
       this.clientToolSourceMap = {};
 
       if (this.clientSocket) {
@@ -1099,6 +1108,7 @@ export class RelayBridgeServer extends EventEmitter {
 
       this.clientTools = [];
       this.clientSources = [];
+      this.clientSourceInstructions = [];
       this.clientToolSourceMap = {};
       this.emit('stateChanged');
 
@@ -1153,6 +1163,7 @@ export class RelayBridgeServer extends EventEmitter {
       case 'relay/tools-changed':
         this.clientTools = message.tools;
         this.clientSources = message.sources;
+        this.clientSourceInstructions = message.sourceInstructions ?? [];
         this.clientToolSourceMap = message.toolSourceMap;
         this.emit('stateChanged');
         break;
@@ -1320,6 +1331,7 @@ export class RelayBridgeServer extends EventEmitter {
       type,
       tools: tools.map(({ originalName: _originalName, sources: _sources, ...tool }) => tool),
       sources,
+      sourceInstructions: this.registry.listSourceInstructions(),
       toolSourceMap,
     };
   }

@@ -11,6 +11,7 @@
  * chain multiple API calls:
  * `<script src=".../embed.js" data-request-timeout="120000"></script>`
  */
+import { collectAgentSources } from './agentSources.js';
 import { isJsonObject } from './shared.js';
 
 /** The widget URL plus the settings the widget's `parseConfig()` reads, by key. */
@@ -74,6 +75,31 @@ function buildRelayConfig(script: HTMLScriptElement | null): RelayConfig {
   };
 }
 
+/**
+ * Reads page-authored Markdown from non-executable script data blocks, for example:
+ *
+ * <script type="text/markdown"
+ *         data-source-type="instruction"
+ *         data-source-name="record-lookup"
+ *         data-source-description="Before reading a record">
+ * Find the record with the search tool, then pass its ID to the details tool.
+ * </script>
+ *
+ * The type can also be "skill". The description is optional.
+ */
+function* readAgentDeclarations(): Iterable<unknown> {
+  for (const script of document.querySelectorAll(
+    'script[type="text/markdown"][data-source-type]'
+  )) {
+    yield {
+      type: script.getAttribute('data-source-type'),
+      name: script.getAttribute('data-source-name'),
+      description: script.getAttribute('data-source-description'),
+      content: script.textContent,
+    };
+  }
+}
+
 async function injectRelayWidget({ widgetUrl, ...widgetConfig }: RelayConfig): Promise<void> {
   if (document.querySelector(RELAY_IFRAME_SELECTOR)) {
     return;
@@ -82,12 +108,13 @@ async function injectRelayWidget({ widgetUrl, ...widgetConfig }: RelayConfig): P
   const hostUrl = new URL(window.location.href);
   hostUrl.search = '';
   hostUrl.hash = '';
-  // Escaping `<` keeps page-controlled text, such as the title, inside the script element.
+  // Escaping `<` keeps page-controlled text, including Markdown, inside the config script element.
   const configJson = JSON.stringify({
     ...widgetConfig,
     hostOrigin: window.location.origin,
     hostUrl: hostUrl.href,
     hostTitle: document.title,
+    agentSources: collectAgentSources(readAgentDeclarations()),
   }).replace(/</g, '\\u003c');
 
   // The blob inherits the host origin, so the widget sees the page's WebMCP tools
